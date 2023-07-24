@@ -1,0 +1,273 @@
+#pragma once
+
+#include <mutex>
+
+#include <sys/un.h>
+
+#include "result.h"
+#include "idp.h"
+#include "sendrecv.h"
+#include "define.h"
+
+namespace interface
+{
+
+class dataPlane
+{
+public:
+	dataPlane():
+	        clientSocket(-1)
+	{
+	}
+
+	~dataPlane()
+	{
+		if (clientSocket != -1)
+		{
+			close(clientSocket);
+		}
+	}
+
+public:
+	auto updateGlobalBase(const common::idp::updateGlobalBase::request& request) const
+	{
+		return get<common::idp::requestType::updateGlobalBase, common::idp::updateGlobalBase::response>(request);
+	}
+
+	eResult updateGlobalBaseBalancer(const common::idp::updateGlobalBaseBalancer::request& request) const
+	{
+		return get<common::idp::requestType::updateGlobalBaseBalancer, common::idp::updateGlobalBaseBalancer::response>(request);
+	}
+
+	common::idp::lpm4LookupAddress::response lpm4LookupAddress(const common::idp::lpm4LookupAddress::request& request) const
+	{
+		return get<common::idp::requestType::lpm4LookupAddress, common::idp::lpm4LookupAddress::response>(request);
+	}
+
+	common::idp::lpm6LookupAddress::response lpm6LookupAddress(const common::idp::lpm6LookupAddress::request& request) const
+	{
+		return get<common::idp::requestType::lpm6LookupAddress, common::idp::lpm6LookupAddress::response>(request);
+	}
+
+	common::idp::getWorkerStats::response getWorkerStats(const common::idp::getWorkerStats::request& request) const
+	{
+		return get<common::idp::requestType::getWorkerStats, common::idp::getWorkerStats::response>(request);
+	}
+
+	auto getSlowWorkerStats() const
+	{
+		return get<common::idp::requestType::getSlowWorkerStats, common::idp::getSlowWorkerStats::response>();
+	}
+
+	auto get_worker_gc_stats() const
+	{
+		return get<common::idp::requestType::get_worker_gc_stats, common::idp::get_worker_gc_stats::response>();
+	}
+
+	auto get_dregress_counters() const
+	{
+		return get<common::idp::requestType::get_dregress_counters, common::idp::get_dregress_counters::response>();
+	}
+
+	auto get_ports_stats() const
+	{
+		return get<common::idp::requestType::get_ports_stats, common::idp::get_ports_stats::response>();
+	}
+
+	auto get_ports_stats_extended() const
+	{
+		return get<common::idp::requestType::get_ports_stats_extended, common::idp::get_ports_stats_extended::response>();
+	}
+
+	common::idp::getControlPlanePortStats::response getControlPlanePortStats(const common::idp::getControlPlanePortStats::request& request) const
+	{
+		return get<common::idp::requestType::getControlPlanePortStats, common::idp::getControlPlanePortStats::response>(request);
+	}
+
+	common::idp::getFragmentationStats::response getFragmentationStats() const
+	{
+		return get<common::idp::requestType::getFragmentationStats, common::idp::getFragmentationStats::response>();
+	}
+
+	common::idp::getFWState::response getFWState() const
+	{
+		return get<common::idp::requestType::getFWState, common::idp::getFWState::response>();
+	}
+
+	common::idp::getFWStateStats::response getFWStateStats() const
+	{
+		return get<common::idp::requestType::getFWStateStats, common::idp::getFWStateStats::response>();
+	}
+
+	eResult clearFWState() const
+	{
+		return get<common::idp::requestType::clearFWState, eResult>();
+	}
+
+	common::idp::getAclCounters::response getAclCounters() const
+	{
+		return get<common::idp::requestType::getAclCounters, common::idp::getAclCounters::response>();
+	}
+
+	common::idp::getPortStatsEx::response getPortStatsEx() const
+	{
+		return get<common::idp::requestType::getPortStatsEx, common::idp::getPortStatsEx::response>();
+	}
+
+	common::idp::getCounters::response getCounters(const common::idp::getCounters::request& request) const
+	{
+		return get<common::idp::requestType::getCounters, common::idp::getCounters::response>(request);
+	}
+
+	common::idp::getOtherStats::response getOtherStats() const
+	{
+		return get<common::idp::requestType::getOtherStats, common::idp::getOtherStats::response>();
+	}
+
+	common::idp::getConfig::response getConfig() const
+	{
+		return get<common::idp::requestType::getConfig, common::idp::getConfig::response>();
+	}
+
+	common::idp::getErrors::response getErrors() const
+	{
+		return get<common::idp::requestType::getErrors, common::idp::getErrors::response>();
+	}
+
+	common::idp::getReport::response getReport() const
+	{
+		return get<common::idp::requestType::getReport, common::idp::getReport::response>();
+	}
+
+	common::idp::getGlobalBaseStats::response getGlobalBaseStats() const
+	{
+		return get<common::idp::requestType::getGlobalBaseStats, common::idp::getGlobalBaseStats::response>();
+	}
+
+	common::idp::getGlobalBase::response getGlobalBase(const common::idp::getGlobalBase::request& request) const
+	{
+		return get<common::idp::requestType::getGlobalBase, common::idp::getGlobalBase::response>(request);
+	}
+
+	auto nat64stateful_state(const common::idp::nat64stateful_state::request& request) const
+	{
+		return get<common::idp::requestType::nat64stateful_state, common::idp::nat64stateful_state::response>(request);
+	}
+
+	auto balancer_connection(const common::idp::balancer_connection::request& request) const
+	{
+		return get<common::idp::requestType::balancer_connection, common::idp::balancer_connection::response>(request);
+	}
+
+	auto balancer_service_connections() const
+	{
+		return get<common::idp::requestType::balancer_service_connections, common::idp::balancer_service_connections::response>();
+	}
+
+	auto balancer_real_connections() const
+	{
+		return get<common::idp::requestType::balancer_real_connections, common::idp::balancer_real_connections::response>();
+	}
+
+	auto limits() const
+	{
+		return get<common::idp::requestType::limits, common::idp::limits::response>();
+	}
+
+	auto samples() const
+	{
+		return get<common::idp::requestType::samples, common::idp::samples::response>();
+	}
+
+	eResult debug_latch_update(const common::idp::debug_latch_update::request& request) const
+	{
+		return get<common::idp::requestType::debug_latch_update, common::idp::debug_latch_update::response>(request);
+	}
+
+	eResult unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request) const
+	{
+		return get<common::idp::requestType::unrdup_vip_to_balancers, common::idp::unrdup_vip_to_balancers::response>(request);
+	}
+
+	eResult update_interfaces_ips(const common::idp::update_interfaces_ips::request& request) const
+	{
+		return get<common::idp::requestType::update_interfaces_ips, common::idp::update_interfaces_ips::response>(request);
+	}
+
+	eResult update_vip_vport_proto(const common::idp::update_vip_vport_proto::request& request) const
+	{
+		return get<common::idp::requestType::update_vip_vport_proto, common::idp::update_vip_vport_proto::response>(request);
+	}
+
+	auto version() const
+	{
+		return get<common::idp::requestType::version, common::idp::version::response>();
+	}
+
+	auto get_counter_by_name(const common::idp::get_counter_by_name::request& request) const
+	{
+		return get<common::idp::requestType::get_counter_by_name, common::idp::get_counter_by_name::response>(request);
+	}
+
+protected:
+	void connectToDataPlane() const
+	{
+		if (clientSocket != -1)
+		{
+			/// already connected
+			return;
+		}
+
+		clientSocket = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (clientSocket == -1)
+		{
+			throw std::string("socket(): ") + strerror(errno);
+		}
+
+		sockaddr_un address;
+		memset((char*)&address, 0, sizeof(address));
+		address.sun_family = AF_UNIX;
+		strncpy(address.sun_path, common::idp::socketPath, sizeof(address.sun_path) - 1);
+		address.sun_path[sizeof(address.sun_path) - 1] = 0;
+
+		int ret = connect(clientSocket, (struct sockaddr*)&address, sizeof(address));
+		if (ret == -1)
+		{
+			throw std::string("connect(): ") + strerror(errno);
+		}
+	}
+
+	template<common::idp::requestType T, class Resp, class Req = std::tuple<>>
+	Resp get(const Req& request = Req()) const
+	{
+		return std::get<Resp>(call<T>(request));
+	}
+
+	template<common::idp::requestType T, class Req>
+	inline common::idp::response call(const Req& request) const
+	{
+		std::lock_guard<std::mutex> guard(mutex);
+		connectToDataPlane();
+		return common::sendAndRecv<common::idp::response>(clientSocket, common::idp::request(T, request));
+	}
+
+	template<common::idp::requestType T, class Resp, class Req>
+	Resp get(Req&& request) const
+	{
+		return std::get<Resp>(call<T>(std::move(request)));
+	}
+
+	template<common::idp::requestType T, class Req>
+	inline common::idp::response call(Req&& request) const
+	{
+		std::lock_guard<std::mutex> guard(mutex);
+		connectToDataPlane();
+		return common::sendAndRecv<common::idp::response>(clientSocket, common::idp::request(T, std::move(request)));
+	}
+
+protected:
+	mutable int clientSocket;
+	mutable std::mutex mutex;
+};
+
+}

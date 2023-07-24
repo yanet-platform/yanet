@@ -1,0 +1,137 @@
+#pragma once
+
+#include "type.h"
+#include "module.h"
+#include "base.h"
+#include "counter.h"
+
+#include "common/refarray.h"
+#include "common/icp.h"
+#include "common/idataplane.h"
+#include "common/controlplaneconfig.h"
+#include "common/generation.h"
+#include "common/counters.h"
+#include "libprotobuf/controlplane.pb.h"
+
+namespace balancer
+{
+
+using real_key_t = std::tuple<common::ip_address_t,
+                              uint16_t>; ///< port
+
+using service_key_t = std::tuple<common::ip_address_t,
+                                 uint8_t, ///< proto
+                                 uint16_t>; ///< port
+
+using service_counter_key_t = std::tuple<std::string, ///< module_name
+                                         service_key_t>;
+
+using real_counter_key_t = std::tuple<std::string, ///< module_name
+                                      service_key_t,
+                                      real_key_t>;
+
+class generation_config_t
+{
+public:
+	generation_config_t() :
+	        services_count(0),
+	        reals_count(0)
+	{
+	}
+
+	void update(const controlplane::base_t& base_prev,
+	            const controlplane::base_t& base_next)
+	{
+		(void)base_prev;
+
+		for (const auto& [name, balancer] : base_next.balancers)
+		{
+			name_id[name] = balancer.balancer_id;
+		}
+
+		config_balancers = base_next.balancers;
+		services_count = base_next.services_count;
+		reals_count = base_next.reals_count;
+	}
+
+public:
+	std::map<std::string, balancer_id_t> name_id;
+	std::map<std::string, controlplane::balancer::config_t> config_balancers;
+	uint64_t services_count;
+	uint64_t reals_count;
+};
+
+class generation_services_t
+{
+public:
+	generation_services_t() :
+	        reals_enabled_count(0)
+	{
+	}
+
+public:
+	uint64_t reals_enabled_count;
+	common::icp::balancer_summary::response summary;
+	common::icp::balancer_service::response services;
+	common::icp::balancer_real_find::response reals;
+	common::icp::balancer_announce::response announces;
+};
+
+}
+
+class balancer_t : public module_t, common::icp_proto::BalancerService
+{
+public:
+	eResult init() override;
+	void limit(common::icp::limit_summary::response& limits) const override;
+	void controlplane_values(common::icp::controlplane_values::response& controlplane_values) const override;
+	void reload_before() override;
+	void reload(const controlplane::base_t& base_prev, const controlplane::base_t& base_next, common::idp::updateGlobalBase::request& globalbase) override;
+	void reload_after() override;
+
+	common::icp::balancer_config::response balancer_config() const;
+	common::icp::balancer_summary::response balancer_summary() const;
+	common::icp::balancer_service::response balancer_service(const common::icp::balancer_service::request& request) const;
+	common::icp::balancer_real_find::response balancer_real_find(const common::icp::balancer_real_find::request& request) const;
+	void balancer_real(const common::icp::balancer_real::request& request);
+	void balancer_real_flush(); ///< @todo: flush_thread
+	common::icp::balancer_announce::response balancer_announce() const;
+
+	void compile(common::idp::updateGlobalBase::request& globalbase, const balancer::generation_config_t& generation_config);
+
+	void flush_reals(common::idp::updateGlobalBaseBalancer::request& balancer,
+			 const balancer::generation_config_t& generation_config);
+
+	void update_service(const balancer::generation_config_t& generation_config,
+			    balancer::generation_services_t& generation_services);
+protected:
+	void counters_gc_thread();
+	void reconfigure_wlc_thread();
+
+protected:
+	interface::dataPlane dataplane;
+
+	generation_manager<balancer::generation_config_t> generations_config;
+	generation_manager<balancer::generation_services_t> generations_services;
+
+	mutable std::mutex reals_enabled_mutex;
+	std::map<std::tuple<std::string, ///< module
+	                    balancer::service_key_t,
+	                    balancer::real_key_t>,
+			    std::optional<uint32_t>> reals_enabled;
+
+	mutable std::mutex reals_unordered_mutex;
+	mutable std::mutex config_switch_mutex;
+	std::map<std::tuple<std::string, ///< module
+	                    balancer::service_key_t,
+	                    balancer::real_key_t>,
+	         uint32_t> reals_unordered;
+	std::set<id_t> reals_unordered_ids_unused;
+
+	friend class telegraf_t;
+	counter_t<balancer::service_counter_key_t, (size_t)balancer::service_counter::size> service_counters;
+	counter_t<balancer::real_counter_key_t, (size_t)balancer::real_counter::size> real_counters;
+	void RealFind(google::protobuf::RpcController* controller, const common::icp_proto::BalancerRealFindRequest* request, common::icp_proto::BalancerRealFindResponse* response, google::protobuf::Closure* done) override;
+	void Real(google::protobuf::RpcController* controller, const ::common::icp_proto::BalancerRealRequest* request, ::common::icp_proto::Empty* response, ::google::protobuf::Closure* done) override;
+	void RealFlush(google::protobuf::RpcController* controller, const ::common::icp_proto::Empty* request, ::common::icp_proto::Empty* response, ::google::protobuf::Closure* done) override;
+};

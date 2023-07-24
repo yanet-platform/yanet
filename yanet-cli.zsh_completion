@@ -1,0 +1,13 @@
+#compdef yanet-cli
+
+COMPREPLY=()
+while read word;
+do
+  COMPREPLY+=( "$word" )
+done < <(yanet-cli | grep "$(echo $words)" | sed 's/\[.*\]//' | sed 's/^[ \t]*//' | sed 's/[ \t]*^//' | cut -d' ' -f${#words[@]} | uniq)
+[ "${COMPREPLY[*]}" = "" ] && COMPREPLY=()
+
+for word in "${COMPREPLY[@]}"
+do
+  compadd -- "$word"
+done

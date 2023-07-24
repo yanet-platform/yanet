@@ -1,0 +1,70 @@
+#pragma once
+
+#include "base.h"
+
+class config_converter_t
+{
+public:
+	config_converter_t(cControlPlane* controlplane,
+	                   const controlplane::base_t& baseNext,
+	                   const common::idp::limits::response& limits) :
+	        controlplane(controlplane),
+	        baseNext(baseNext),
+	        limits(limits)
+	{
+	}
+
+	[[nodiscard]] eResult process(uint32_t serial);
+
+	const controlplane::base_t& getBaseNext() const
+	{
+		return baseNext;
+	}
+
+	common::idp::updateGlobalBase::request& get_globalbase()
+	{
+		return globalbase;
+	}
+
+protected:
+	void processLogicalPorts();
+	void processRoutes();
+	void processDecap();
+	void processNat64stateful();
+	void processNat64();
+	void processTun64();
+	void processBalancer();
+	void processDregress();
+	void processAcl();
+	void buildAcl();
+
+	void serializeLogicalPorts();
+	void serializeRoutes();
+
+	std::string checkLimit(size_t count, const std::string& limit, size_t multiplier(size_t));
+
+	void convertToFlow(const std::string& nextModule, common::globalBase::tFlow& flow) const;
+	common::globalBase::tFlow convertToFlow(std::string nextModule) const;
+	common::globalBase::tFlow convertToFlow(std::string nextModule, const std::string& entryName) const;
+
+	void acl_rules_route_local(controlplane::base::acl_t& acl, const std::string& next_module) const;
+	void acl_rules_route_forward(controlplane::base::acl_t& acl, const std::string& next_module) const;
+	void acl_rules_tun64(controlplane::base::acl_t& acl, const std::string& nextModule) const;
+	void acl_rules_decap(controlplane::base::acl_t& acl, const std::string& nextModule) const;
+	void acl_rules_nat64stateful(controlplane::base::acl_t& acl, const std::string& next_module) const;
+	void acl_rules_nat64stateless(controlplane::base::acl_t& acl, const std::string& nextModule, const std::string& entry) const;
+	void acl_rules_nat64stateless_ingress(controlplane::base::acl_t& acl, const std::string& nextModule) const;
+	void acl_rules_nat64stateless_egress(controlplane::base::acl_t& acl, const std::string& nextModule) const;
+	void acl_rules_dregress(controlplane::base::acl_t& acl, const std::string& nextModule) const;
+	void acl_rules_balancer(controlplane::base::acl_t& acl, const std::string& nextModule) const;
+	void acl_rules_early_decap(controlplane::base::acl_t& acl) const;
+	void acl_rules_balancer_icmp_reply(controlplane::base::acl_t& acl, const std::string& nextModule) const;
+	void acl_rules_balancer_icmp_forward(controlplane::base::acl_t& acl, const std::string& nextModule) const;
+
+private:
+	cControlPlane* controlplane;
+
+	controlplane::base_t baseNext;
+	common::idp::updateGlobalBase::request globalbase;
+	common::idp::limits::response limits;
+};

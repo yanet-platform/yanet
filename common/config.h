@@ -1,0 +1,13 @@
+#pragma once
+
+#ifndef YANET_CONFIG_SUFFIX
+#define YANET_CONFIG_SUFFIX release
+#endif
+
+#define YANET_HELPER_XSTRING(x) #x
+#define YANET_HELPER_STRING(x) YANET_HELPER_XSTRING(x)
+
+#include YANET_HELPER_STRING(config.YANET_CONFIG_SUFFIX.h)
+
+#undef YANET_HELPER_XSTRING
+#undef YANET_HELPER_STRING

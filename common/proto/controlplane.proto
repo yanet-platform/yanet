@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package common.icp_proto;
+option cc_generic_services = true;
+
+message IPAddr {
+  oneof addr{
+    uint32 ipv4 = 1;
+    bytes ipv6 = 2;
+  }
+}
+
+enum Scheduler
+{
+  RR = 0;
+  WRR = 1;
+  WLC = 2;
+}
+
+
+enum NetProto {
+  undefined = 0;
+  tcp = 1;
+  udp = 2;
+}
+
+message BalancerRealFindRequest {
+  string module = 1;
+  IPAddr virtual_ip = 2;
+  NetProto proto = 3;
+  optional uint32 virtual_port = 4;
+  IPAddr real_ip = 5;
+  optional uint32 real_port = 6;
+}
+
+message BalancerRealFindResponse {
+  message Real {
+    IPAddr ip = 1;
+    uint32 port = 2;
+    bool enabled = 3;
+    uint32 weight = 4;
+    uint64 connections = 5;
+    uint64 packets = 6;
+    uint64 bytes = 7;
+  }
+  message ServiceKey{
+    IPAddr ip = 1;
+    NetProto proto = 2;
+    uint32 port = 3;
+  }
+  message Service {
+    ServiceKey key = 1;
+    string scheduler = 2;
+    repeated Real reals = 3;
+  }
+  message BalancerData {
+    uint32 balancer_id = 1;
+    string module = 2;
+    repeated Service services = 3;
+  }
+
+  repeated BalancerData balancers = 1;
+}
+
+message BalancerRealRequest {
+  message Real {
+    string module = 1;
+    IPAddr virtual_ip = 2;
+    NetProto proto = 3;
+    uint32 virtual_port = 4;
+    IPAddr real_ip = 5;
+    uint32 real_port = 6;
+    bool enable = 7;
+    optional uint32 weight = 8;
+  }
+  repeated Real reals = 1;
+}
+
+message Empty{}
+
+service BalancerService {
+  rpc RealFind(BalancerRealFindRequest) returns (BalancerRealFindResponse);
+  rpc Real(BalancerRealRequest) returns (Empty);
+  rpc RealFlush(Empty) returns (Empty);
+}

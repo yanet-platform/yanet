@@ -1,0 +1,43 @@
+option('target',
+       type: 'combo',
+       choices : ['release', 'autotest', 'unittest', 'buildenv'],
+       value: 'release',
+       description: 'Set the target build.')
+
+option('arch',
+       type: 'array',
+       description: 'Set the target host arch.')
+
+option('yanet_config',
+       type: 'array',
+       description: 'Set the suffix for yanet configure file.')
+
+option('version_major',
+       type: 'integer',
+       value: '0',
+       description: 'Set the major version.',
+       yield: true)
+
+option('version_minor',
+       type: 'integer',
+       value: '0',
+       description: 'Set the minor version.',
+       yield: true)
+
+option('version_revision',
+       type: 'string',
+       value: '00000000',
+       description: 'Set the revision version.',
+       yield: true)
+
+option('version_hash',
+       type: 'string',
+       value: '00000000',
+       description: 'Set the hash version.',
+       yield: true)
+
+option('version_custom',
+       type: 'string',
+       value: 'develop',
+       description: 'Set the custom string version.',
+       yield: true)

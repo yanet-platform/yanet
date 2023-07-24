@@ -1,0 +1,10 @@
+_yanet-cli()
+{
+  COMPREPLY=()
+  while read word;
+  do
+    COMPREPLY+=( "$word" )
+  done < <(yanet-cli | grep "$(echo ${COMP_WORDS[*]})" | sed 's/\[.*\]//' | sed 's/ *^//' | cut -d' ' -f$((COMP_CWORD + 3)) | uniq)
+  [ "${COMPREPLY[*]}" = "" ] && COMPREPLY=()
+}
+complete -F _yanet-cli yanet-cli

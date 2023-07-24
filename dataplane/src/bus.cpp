@@ -1,0 +1,370 @@
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/stat.h>
+#include <netinet/in.h>
+#include <fcntl.h>
+
+#include "common/stream.h"
+
+#include "common.h"
+#include "bus.h"
+#include "dataplane.h"
+#include "controlplane.h"
+
+cBus::cBus(cDataPlane* dataPlane) :
+        dataPlane(dataPlane),
+        controlPlane(dataPlane->controlPlane.get()),
+        serverSocket(-1)
+{
+}
+
+eResult cBus::init()
+{
+	serverSocket = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (serverSocket < 0)
+	{
+		serverSocket = -1;
+		return eResult::errorSocket;
+	}
+
+	return eResult::success;
+}
+
+void cBus::run()
+{
+	thread = std::thread([this]{mainLoop();});
+}
+
+void cBus::stop()
+{
+	if (serverSocket != -1)
+	{
+		shutdown(serverSocket, SHUT_RDWR);
+		close(serverSocket);
+		unlink(common::idp::socketPath);
+	}
+}
+
+void cBus::join()
+{
+	if (thread.joinable())
+	{
+		thread.join();
+	}
+}
+
+static bool recvAll(int clientSocket,
+                    char* buffer,
+                    uint64_t size)
+{
+	uint64_t totalRecv = 0;
+
+	while (totalRecv < size)
+	{
+		int ret = recv(clientSocket, buffer + totalRecv, size - totalRecv, MSG_NOSIGNAL);
+		if (ret <= 0)
+		{
+			return false;
+		}
+
+		totalRecv += ret;
+	}
+
+	return true;
+}
+
+static bool sendAll(int clientSocket,
+                    const char* buffer,
+                    uint64_t bufferSize)
+{
+	uint64_t totalSend = 0;
+
+	while (totalSend < bufferSize)
+	{
+		int ret = send(clientSocket, buffer + totalSend, bufferSize - totalSend, MSG_NOSIGNAL);
+		if (ret <= 0)
+		{
+			return false;
+		}
+
+		totalSend += ret;
+	}
+
+	return true;
+}
+
+void cBus::mainLoop()
+{
+	sockaddr_un address;
+	memset((char*)&address, 0, sizeof(address));
+	address.sun_family = AF_UNIX;
+	strncpy(address.sun_path, common::idp::socketPath, sizeof(address.sun_path) - 1);
+	address.sun_path[sizeof(address.sun_path) - 1] = 0;
+
+	unlink(common::idp::socketPath);
+
+	if (bind(serverSocket, (struct sockaddr*)&address, sizeof(address)) < 0)
+	{
+		auto ec = errno;
+		YADECAP_LOG_ERROR("bind(): %d\n", ec);
+		return;
+	}
+
+	chmod(common::idp::socketPath, 0770);
+
+	if (listen(serverSocket, 64) < 0)
+	{
+		auto ec = errno;
+		YADECAP_LOG_ERROR("listen(): %d\n", ec);
+		return;
+	}
+
+	for (;;)
+	{
+		struct sockaddr_in6 address;
+		socklen_t addressLength = sizeof(address);
+		int clientSocket = accept(serverSocket, (struct sockaddr*)&address, &addressLength);
+		if (clientSocket < 0)
+		{
+			continue;
+		}
+
+		std::thread([this, clientSocket]{clientThread(clientSocket);}).detach();
+	}
+
+	serverSocket = -1;
+}
+
+static const uint32_t BigMessage = 1024 * 1024 * 1024;
+
+void cBus::clientThread(int clientSocket)
+{
+	std::vector<uint8_t> buffer;
+
+	for (;;)
+	{
+		uint64_t messageSize;
+		if (!recvAll(clientSocket, (char*)&messageSize, sizeof(messageSize)))
+		{
+			stats.errors[(uint32_t) common::idp::errorType::busRead]++;
+			break;
+		}
+
+		auto startTime = std::chrono::system_clock::now();;
+
+		if (messageSize > BigMessage)
+		{
+			YANET_LOG_DEBUG("reading %lu bytes message\n", messageSize);
+		}
+		buffer.resize(messageSize);
+		if (!recvAll(clientSocket, (char*)buffer.data(), buffer.size()))
+		{
+			stats.errors[(uint32_t) common::idp::errorType::busRead]++;
+			break;
+		}
+
+		common::idp::request request;
+		common::idp::response response = std::tuple<>();
+
+		if (messageSize > BigMessage)
+		{
+			YANET_LOG_DEBUG("parsing %lu bytes message\n", messageSize);
+		}
+
+		{
+			common::stream_in_t stream(buffer);
+			stream.pop(request);
+			if (stream.isFailed())
+			{
+				stats.errors[(uint32_t) common::idp::errorType::busParse]++;
+				break;
+			}
+		}
+
+		if (messageSize > BigMessage)
+		{
+			YANET_LOG_DEBUG("free message buffer memory\n");
+
+			// free memory from above 1Gb messages
+			buffer.clear();
+			buffer.shrink_to_fit();
+		}
+
+		const common::idp::requestType& type = std::get<0>(request);
+		YANET_LOG_DEBUG("request type %d\n", (int)type);
+		if (type == common::idp::requestType::updateGlobalBase)
+		{
+			response = callWithResponse(&cControlPlane::updateGlobalBase, request);
+		}
+		else if (type == common::idp::requestType::updateGlobalBaseBalancer)
+		{
+			response = callWithResponse(&cControlPlane::updateGlobalBaseBalancer, request);
+		}
+		else if (type == common::idp::requestType::getGlobalBase)
+		{
+			response = callWithResponse(&cControlPlane::getGlobalBase, request);
+		}
+		else if (type == common::idp::requestType::getWorkerStats)
+		{
+			response = callWithResponse(&cControlPlane::getWorkerStats, request);
+		}
+		else if (type == common::idp::requestType::getSlowWorkerStats)
+		{
+			response = callWithResponse(&cControlPlane::getSlowWorkerStats, request);
+		}
+		else if (type == common::idp::requestType::get_worker_gc_stats)
+		{
+			response = callWithResponse(&cControlPlane::get_worker_gc_stats, request);
+		}
+		else if (type == common::idp::requestType::get_dregress_counters)
+		{
+			response = callWithResponse(&cControlPlane::get_dregress_counters, request);
+		}
+		else if (type == common::idp::requestType::get_ports_stats)
+		{
+			response = callWithResponse(&cControlPlane::get_ports_stats, request);
+		}
+		else if (type == common::idp::requestType::get_ports_stats_extended)
+		{
+			response = callWithResponse(&cControlPlane::get_ports_stats_extended, request);
+		}
+		else if (type == common::idp::requestType::getControlPlanePortStats)
+		{
+			response = callWithResponse(&cControlPlane::getControlPlanePortStats, request);
+		}
+		else if (type == common::idp::requestType::getPortStatsEx)
+		{
+			response = callWithResponse(&cControlPlane::getPortStatsEx, request);
+		}
+		else if (type == common::idp::requestType::getFragmentationStats)
+		{
+			response = callWithResponse(&cControlPlane::getFragmentationStats, request);
+		}
+		else if (type == common::idp::requestType::getFWState)
+		{
+			response = callWithResponse(&cControlPlane::getFWState, request);
+		}
+		else if (type == common::idp::requestType::getFWStateStats)
+		{
+			response = callWithResponse(&cControlPlane::getFWStateStats, request);
+		}
+		else if (type == common::idp::requestType::clearFWState)
+		{
+			response = callWithResponse(&cControlPlane::clearFWState, request);
+		}
+		else if (type == common::idp::requestType::getCounters)
+		{
+			response = callWithResponse(&cControlPlane::getCounters, request);
+		}
+		else if (type == common::idp::requestType::getOtherStats)
+		{
+			response = callWithResponse(&cControlPlane::getOtherStats, request);
+		}
+		else if (type == common::idp::requestType::getConfig)
+		{
+			response = callWithResponse(&cControlPlane::getConfig, request);
+		}
+		else if (type == common::idp::requestType::getErrors)
+		{
+			response = callWithResponse(&cControlPlane::getErrors, request);
+		}
+		else if (type == common::idp::requestType::getReport)
+		{
+			response = callWithResponse(&cControlPlane::getReport, request);
+		}
+		else if (type == common::idp::requestType::getGlobalBaseStats)
+		{
+			response = callWithResponse(&cControlPlane::getGlobalBaseStats, request);
+		}
+		else if (type == common::idp::requestType::lpm4LookupAddress)
+		{
+			response = callWithResponse(&cControlPlane::lpm4LookupAddress, request);
+		}
+		else if (type == common::idp::requestType::lpm6LookupAddress)
+		{
+			response = callWithResponse(&cControlPlane::lpm6LookupAddress, request);
+		}
+		else if (type == common::idp::requestType::limits)
+		{
+			response = callWithResponse(&cControlPlane::limits, request);
+		}
+		else if (type == common::idp::requestType::getAclCounters)
+		{
+			response = callWithResponse(&cControlPlane::getAclCounters, request);
+		}
+		else if (type == common::idp::requestType::balancer_connection)
+		{
+			response = callWithResponse(&cControlPlane::balancer_connection, request);
+		}
+		else if (type == common::idp::requestType::balancer_service_connections)
+		{
+			response = callWithResponse(&cControlPlane::balancer_service_connections, request);
+		}
+		else if (type == common::idp::requestType::balancer_real_connections)
+		{
+			response = callWithResponse(&cControlPlane::balancer_real_connections, request);
+		}
+		else if (type == common::idp::requestType::samples)
+		{
+			response = callWithResponse(&cControlPlane::samples, request);
+		}
+		else if (type == common::idp::requestType::debug_latch_update)
+		{
+			response = callWithResponse(&cControlPlane::debug_latch_update, request);
+		}
+		else if (type == common::idp::requestType::unrdup_vip_to_balancers)
+		{
+			response = callWithResponse(&cControlPlane::unrdup_vip_to_balancers, request);
+		}
+		else if (type == common::idp::requestType::update_interfaces_ips)
+		{
+			response = callWithResponse(&cControlPlane::update_interfaces_ips, request);
+		}
+		else if (type == common::idp::requestType::update_vip_vport_proto)
+		{
+			response = callWithResponse(&cControlPlane::update_vip_vport_proto, request);
+		}
+		else if (type == common::idp::requestType::version)
+		{
+			response = callWithResponse(&cControlPlane::version, request);
+		}
+		else if (type == common::idp::requestType::get_counter_by_name)
+		{
+			response = callWithResponse(&cControlPlane::get_counter_by_name, request);
+		}
+		else if (type == common::idp::requestType::nat64stateful_state)
+		{
+			response = callWithResponse(&cControlPlane::nat64stateful_state, request);
+		}
+		else
+		{
+			stats.errors[(uint32_t) common::idp::errorType::busParse]++;
+			break;
+		}
+
+		if ((uint32_t)type < (uint32_t)common::idp::requestType::size)
+		{
+			stats.requests[(uint32_t)type]++;
+		}
+
+		common::stream_out_t stream;
+		stream.push(response);
+
+		messageSize = stream.getBuffer().size();
+		if ((!sendAll(clientSocket, (const char*)&messageSize, sizeof(messageSize))) ||
+		    (!sendAll(clientSocket, (const char*)stream.getBuffer().data(), messageSize)))
+		{
+			stats.errors[(uint32_t) common::idp::errorType::busWrite]++;
+			break;
+		}
+
+		std::chrono::duration<double> duration = std::chrono::system_clock::now() - startTime;
+
+		YANET_LOG_DEBUG("request type %d processed - %.3f sec\n",
+		                (int)type, duration.count());
+	}
+
+	close(clientSocket);
+}

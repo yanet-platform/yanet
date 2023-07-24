@@ -1,0 +1,14 @@
+sources = files('src/autotest.cpp',
+                'src/main.cpp')
+
+dependencies = []
+dependencies += dependency('libsystemd')
+dependencies += dependency('yaml-cpp', static: true)
+dependencies += dependency('libpcap', static: true)
+dependencies += dependency('gmock')
+
+executable('yanet-autotest',
+           sources,
+           include_directories: yanet_rootdir,
+           dependencies: dependencies,
+           install: true)
