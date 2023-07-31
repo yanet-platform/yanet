@@ -1,2 +1,2 @@
 all:
-	docker build -f yanet-builder.Dockerfile -t yanet/builder .
+	docker build -f builder.Dockerfile -t yanetplatform/builder .

@@ -6,13 +6,13 @@ YANET is an open-source extensible framework for software forwarding traffic bas
 - Build docker image:
 ```
 $ cd yanet/docker
-$ make
+$ docker build -f builder.Dockerfile -t yanetplatform/builder .
 ```
 
 - Build YANET:
 ```
 $ cd yanet
-$ docker run --rm -it -v $PWD:/project yanet/builder
+$ docker run --rm -it -v $PWD:/project yanetplatform/builder
 # meson setup build
 # meson compile -C build
 # meson install -C build
@@ -21,7 +21,7 @@ $ docker run --rm -it -v $PWD:/project yanet/builder
 - Run Unittests:
 ```
 $ cd yanet
-$ docker run --rm -it -v $PWD:/project yanet/builder
+$ docker run --rm -it -v $PWD:/project yanetplatform/builder
 # meson setup -Dtarget=unittest build_unittest
 # meson compile -C build_unittest
 # meson test -C build_unittest
