@@ -66,7 +66,7 @@ WORKDIR /project/protobuf
 RUN git submodule update --init --recursive
 RUN ./autogen.sh && \
     ./configure --prefix=/usr
-RUN make -j
+RUN make
 RUN make install && \
     ldconfig
 

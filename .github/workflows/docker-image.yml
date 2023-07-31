@@ -1,0 +1,67 @@
+name: Docker Image
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-image-builder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build the yanetplatform/builder
+      run: |
+        cd docker
+
+
+  build-unittest:
+    needs: build-image-builder
+    runs-on: ubuntu-latest
+    container:
+      image: yanetplatform/builder
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          meson setup --prefix=/target_unittest -Dtarget=unittest build_unittest
+          meson compile -C build_unittest
+      - uses: actions/upload-artifact@v3
+        with:
+          name: build_unittest
+          path: build_unittest
+  build-autotest:
+    needs: build-image-builder
+    runs-on: ubuntu-latest
+    container:
+      image: yanetplatform/builder
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          meson setup --prefix=/target_autotest -Dtarget=autotest build_autotest
+          meson compile -C build_autotest
+      - run: meson install -C build_autotest
+  build:
+    needs: build-image-builder
+    runs-on: ubuntu-latest
+    container:
+      image: yanetplatform/builder
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          meson setup --prefix=/target build
+          meson compile -C build
+      - run: meson install -C build
+
+
+  unittest:
+    needs: build-unittest
+    runs-on: ubuntu-latest
+    container:
+      image: yanetplatform/builder
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: build_unittest
+          path: build_unittest
+      - run: meson test -C build_unittest
