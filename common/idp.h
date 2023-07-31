@@ -202,12 +202,20 @@ namespace updateGlobalBase
 
 	namespace nat64stateful_update
 	{
+		using state_timeout = std::tuple<uint16_t, ///< tcp_syn
+		                                 uint16_t, ///< tcp_ack
+		                                 uint16_t, ///< tcp_fin
+		                                 uint16_t, ///< udp
+		                                 uint16_t, ///< icmp
+		                                 uint16_t>; ///< other
+
 		using request = std::tuple<nat64stateful_id_t,
 		                           eDscpMarkType,
 		                           uint8_t, ///< DSCP
 		                           tCounterId,
 		                           uint32_t, ///< pool_start
 		                           uint32_t, ///< pool_size
+		                           state_timeout,
 		                           common::globalBase::flow_t>;
 	}
 
@@ -724,8 +732,10 @@ namespace nat64stateful_state
 	                         uint16_t, ///< port_destination
 	                         ipv4_address_t, ///< ipv4_source
 	                         uint16_t, ///< wan_port_source
-	                         uint16_t, ///< lan_timestamp_last_packet
-	                         uint16_t>; ///< wan_timestamp_last_packet
+	                         uint32_t, ///< lan_flags
+	                         uint32_t, ///< wan_flags
+	                         std::optional<uint16_t>, ///< lan_last_seen
+	                         std::optional<uint16_t>>; ///< wan_last_seen
 
 	using response = std::vector<state>;
 }

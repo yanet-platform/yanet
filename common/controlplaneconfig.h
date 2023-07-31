@@ -1,11 +1,89 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 #include "stream.h"
 #include "type.h"
 #include "scheduler.h"
 
 namespace controlplane
 {
+
+class state_timeout
+{
+public:
+	state_timeout() :
+	        tcp_syn(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
+	        tcp_ack(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
+	        tcp_fin(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
+	        udp(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
+	        icmp(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
+	        other(YANET_CONFIG_STATE_TIMEOUT_DEFAULT)
+	{
+	}
+
+	operator std::tuple<uint16_t, uint16_t, uint16_t, uint16_t, uint16_t, uint16_t>() const
+	{
+		return {tcp_syn, tcp_ack, tcp_fin, udp, icmp, other};
+	}
+
+public:
+	uint16_t tcp_syn;
+	uint16_t tcp_ack;
+	uint16_t tcp_fin;
+	uint16_t udp;
+	uint16_t icmp;
+	uint16_t other;
+};
+
+[[maybe_unused]]
+static void from_json(const nlohmann::json& json,
+                      controlplane::state_timeout& state_timeout)
+{
+	state_timeout.tcp_syn = json.value("tcp_syn", state_timeout.tcp_syn);
+	state_timeout.tcp_ack = json.value("tcp_ack", state_timeout.tcp_ack);
+	state_timeout.tcp_fin = json.value("tcp_fin", state_timeout.tcp_fin);
+	state_timeout.udp = json.value("udp", state_timeout.udp);
+	state_timeout.icmp = json.value("icmp", state_timeout.icmp);
+	state_timeout.icmp = json.value("icmpv6", state_timeout.icmp);
+	state_timeout.other = json.value("other", state_timeout.other);
+
+	if (state_timeout.tcp_syn >= YANET_CONFIG_STATE_TIMEOUT_MAX)
+	{
+		state_timeout.tcp_syn = YANET_CONFIG_STATE_TIMEOUT_MAX - 1;
+		YANET_LOG_WARNING("state timeout (tcp_syn) set to: %u\n", state_timeout.tcp_syn);
+	}
+
+	if (state_timeout.tcp_ack >= YANET_CONFIG_STATE_TIMEOUT_MAX)
+	{
+		state_timeout.tcp_ack = YANET_CONFIG_STATE_TIMEOUT_MAX - 1;
+		YANET_LOG_WARNING("state timeout (tcp_ack) set to: %u\n", state_timeout.tcp_ack);
+	}
+
+	if (state_timeout.tcp_fin >= YANET_CONFIG_STATE_TIMEOUT_MAX)
+	{
+		state_timeout.tcp_fin = YANET_CONFIG_STATE_TIMEOUT_MAX - 1;
+		YANET_LOG_WARNING("state timeout (tcp_fin) set to: %u\n", state_timeout.tcp_fin);
+	}
+
+	if (state_timeout.udp >= YANET_CONFIG_STATE_TIMEOUT_MAX)
+	{
+		state_timeout.udp = YANET_CONFIG_STATE_TIMEOUT_MAX - 1;
+		YANET_LOG_WARNING("state timeout (udp) set to: %u\n", state_timeout.udp);
+	}
+
+	if (state_timeout.icmp >= YANET_CONFIG_STATE_TIMEOUT_MAX)
+	{
+		state_timeout.icmp = YANET_CONFIG_STATE_TIMEOUT_MAX - 1;
+		YANET_LOG_WARNING("state timeout (icmp) set to: %u\n", state_timeout.icmp);
+	}
+
+	if (state_timeout.other >= YANET_CONFIG_STATE_TIMEOUT_MAX)
+	{
+		state_timeout.other = YANET_CONFIG_STATE_TIMEOUT_MAX - 1;
+		YANET_LOG_WARNING("state timeout (other) set to: %u\n", state_timeout.other);
+	}
+}
 
 namespace route
 {
@@ -390,6 +468,7 @@ public:
 	std::vector<common::ipv6_prefix_t> ipv6_prefixes;
 	std::vector<common::ipv4_prefix_t> ipv4_prefixes;
 	std::set<common::ip_prefix_t> announces;
+	controlplane::state_timeout state_timeout;
 	std::string next_module;
 	common::globalBase::flow_t flow;
 };

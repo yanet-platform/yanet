@@ -170,4 +170,36 @@ void print(const std::string& name,
 	print(name.data(), keys, values);
 }
 
+template<typename array_T,
+         typename index_T>
+void print_histogram(const char* name,
+                     const std::vector<key_t>& keys,
+                     const char* tag_name,
+                     const char* value_name,
+                     const array_T& array,
+                     const index_T start,
+                     const index_T end)
+{
+	for (unsigned int i = (unsigned int)start;
+	     i <= (unsigned int)end;
+	     i++)
+	{
+		std::ostringstream line;
+		line << name;
+
+		for (const auto& key : keys)
+		{
+			if (key.to_string().size())
+			{
+				line << "," << key.to_string();
+			}
+		}
+
+		line << "," << influxdb_format::to_string(tag_name, i - (unsigned int)start + 1, "", {});
+		line << " " << influxdb_format::to_string(value_name, array[i], "u", {});
+
+		std::cout << line.str() << std::endl;
+	}
+}
+
 }

@@ -96,6 +96,7 @@ void nat64stateful_t::compile(common::idp::updateGlobalBase::request& globalbase
 		                                                                                     counter_id,
 		                                                                                     pool_start,
 		                                                                                     pool_size,
+		                                                                                     nat64stateful.state_timeout,
 		                                                                                     nat64stateful.flow));
 
 		pool_start += pool_size;

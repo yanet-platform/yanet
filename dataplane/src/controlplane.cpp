@@ -1240,70 +1240,7 @@ common::idp::nat64stateful_state::response cControlPlane::nat64stateful_state(co
 	for (auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 	{
 		(void)core_id;
-
-		uint32_t offset = 0;
-		worker_gc->run_on_this_thread([&, worker_gc = worker_gc]()
-		{
-			const auto& [filter_nat64stateful_id] = request;
-			auto& globalbase_atomic = worker_gc->base_permanently.globalBaseAtomic;
-
-			for (auto iter : globalbase_atomic->updater.nat64stateful_lan_state.range(offset, 64))
-			{
-				if (iter.is_valid())
-				{
-					iter.lock();
-					auto key = *iter.key();
-					auto value = *iter.value();
-					iter.unlock();
-
-					if (filter_nat64stateful_id &&
-					    key.nat64stateful_id != *filter_nat64stateful_id)
-					{
-						continue;
-					}
-
-					dataplane::globalBase::nat64stateful_wan_key wan_key;
-					wan_key.nat64stateful_id = key.nat64stateful_id;
-					wan_key.proto = key.proto;
-					wan_key.ipv4_source.address = *(uint32_t*)&key.ipv6_destination.bytes[12]; ///< @todo [12] -> [any]
-					wan_key.ipv4_destination = value.ipv4_source;
-					wan_key.port_source = key.port_destination;
-					wan_key.port_destination = value.port_source;
-
-					uint16_t wan_timestamp_last_packet = value.timestamp_last_packet - (uint16_t)512; ///< @todo: sync lan/wan hashtables
-
-					dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
-					dataplane::spinlock_nonrecursive_t* wan_locker;
-					globalbase_atomic->nat64stateful_wan_state->lookup(wan_key, wan_value_lookup, wan_locker);
-					if (wan_value_lookup)
-					{
-						wan_timestamp_last_packet = wan_value_lookup->timestamp_last_packet;
-					}
-					wan_locker->unlock();
-
-					response.emplace_back((uint32_t)key.nat64stateful_id,
-					                      key.proto,
-					                      key.ipv6_source.bytes,
-					                      key.ipv6_destination.bytes,
-					                      rte_be_to_cpu_16(key.port_source),
-					                      rte_be_to_cpu_16(key.port_destination),
-					                      rte_be_to_cpu_32(value.ipv4_source.address),
-					                      rte_be_to_cpu_16(value.port_source),
-					                      value.timestamp_last_packet,
-					                      wan_timestamp_last_packet);
-				}
-			}
-
-			if (offset != 0)
-			{
-				return false;
-			}
-
-			return true;
-		});
-
-		/// @todo: check all numa
-		break;
+		worker_gc->nat64stateful_state(request, response);
 	}
 
 	return response;
@@ -2052,46 +1989,7 @@ unsigned cControlPlane::ring_handle(rte_ring* ring_to_free_mbuf,
 		}
 		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_dump)
 		{
-			if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_ingress)
-			{
-				dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-				auto &[name, kni, mbufs, count] = ingress_dump_knis[metadata->flow.data.dump.id];
-				(void) name;
-				mbufs[count++] = mbuf;
-				if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
-				{
-					flushDump(kni, mbufs.data(), count);
-				}
-			}
-			else if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_egress)
-			{
-				dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-				auto &[name, kni, mbufs, count] = egress_dump_knis[metadata->flow.data.dump.id];
-				(void) name;
-				mbufs[count++] = mbuf;
-				if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
-				{
-					flushDump(kni, mbufs.data(), count);
-				}
-			}
-			else if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_drop)
-			{
-				dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-				auto &[name, kni, mbufs, count] = drop_dump_knis[metadata->flow.data.dump.id];
-				(void) name;
-				mbufs[count++] = mbuf;
-				if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
-				{
-					flushDump(kni, mbufs.data(), count);
-				}
-			}
-			else
-			{
-				rte_pktmbuf_free(mbuf);
-			}
+			handlePacket_dump(mbuf);
 		}
 		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_repeat)
 		{
@@ -3329,6 +3227,72 @@ void cControlPlane::handlePacket_balancer_icmp_forward(rte_mbuf* mbuf)
 	}
 
 	// packet itself is not going anywhere, only its clones with prepended header
+	rte_pktmbuf_free(mbuf);
+}
+
+void cControlPlane::handlePacket_dump(rte_mbuf* mbuf)
+{
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+
+	if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_ingress)
+	{
+		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+
+		auto it = ingress_dump_knis.find(metadata->flow.data.dump.id);
+		if (it != ingress_dump_knis.end())
+		{
+			auto& [name, kni, mbufs, count] = it->second;
+			(void)name;
+
+			mbufs[count++] = mbuf;
+			if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
+			{
+				flushDump(kni, mbufs.data(), count);
+			}
+
+			return;
+		}
+	}
+	else if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_egress)
+	{
+		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+
+		auto it = egress_dump_knis.find(metadata->flow.data.dump.id);
+		if (it != egress_dump_knis.end())
+		{
+			auto& [name, kni, mbufs, count] = it->second;
+			(void)name;
+
+			mbufs[count++] = mbuf;
+			if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
+			{
+				flushDump(kni, mbufs.data(), count);
+			}
+
+			return;
+		}
+	}
+	else if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_drop)
+	{
+		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+
+		auto it = drop_dump_knis.find(metadata->flow.data.dump.id);
+		if (it != drop_dump_knis.end())
+		{
+			auto& [name, kni, mbufs, count] = it->second;
+			(void)name;
+
+			mbufs[count++] = mbuf;
+			if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
+			{
+				flushDump(kni, mbufs.data(), count);
+			}
+
+			return;
+		}
+	}
+
+	stats.unknown_dump_interface++;
 	rte_pktmbuf_free(mbuf);
 }
 

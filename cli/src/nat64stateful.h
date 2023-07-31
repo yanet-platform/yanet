@@ -88,6 +88,43 @@ std::optional<uint8_t> string_to_proto(const std::string& string)
 	return it->second;
 }
 
+/// @todo: move
+const std::string& tcp_flags_to_string(const uint8_t flags)
+{
+	static std::vector<std::string> results(1u << (8 * sizeof(uint8_t)));
+
+	auto& result = results[flags];
+
+	if (flags)
+	{
+		if (result.empty())
+		{
+			auto check_and_insert = [&](const uint8_t flag,
+			                            const char* name)
+			{
+				if (flags & flag)
+				{
+					result += name;
+					result.push_back(',');
+				}
+			};
+
+			check_and_insert(TCP_SYN_FLAG, "syn");
+			check_and_insert(TCP_ACK_FLAG, "ack");
+			check_and_insert(TCP_PSH_FLAG, "psh");
+			check_and_insert(TCP_FIN_FLAG, "fin");
+			check_and_insert(TCP_RST_FLAG, "rst");
+			check_and_insert(TCP_URG_FLAG, "urg");
+			check_and_insert(TCP_ECN_FLAG, "ecn");
+			check_and_insert(TCP_CWR_FLAG, "cwr");
+
+			result.pop_back(); ///< remove last ','
+		}
+	}
+
+	return result;
+}
+
 void state(std::optional<std::string> module)
 {
 	interface::controlPlane controlplane;
@@ -125,19 +162,29 @@ void state(std::optional<std::string> module)
 	             "origin_port_source",
 	             "port_source",
 	             "port_destination",
-	             "last_seen");
+	             "lan_flags",
+	             "wan_flags",
+	             "lan_last_seen",
+	             "wan_last_seen");
 
-	uint32_t current_time = time(nullptr);
-	for (const auto& [nat64stateful_id, proto, ipv6_source, ipv6_destination, port_source, port_destination, ipv4_source, wan_port_source, lan_timestamp_last_packet, wan_timestamp_last_packet] : response)
+	for (const auto& [nat64stateful_id,
+	                  proto,
+	                  ipv6_source,
+	                  ipv6_destination,
+	                  port_source,
+	                  port_destination,
+	                  ipv4_source,
+	                  wan_port_source,
+	                  lan_flags,
+	                  wan_flags,
+	                  lan_last_seen,
+	                  wan_last_seen] : response)
 	{
 		auto it = modules.find(nat64stateful_id);
 		if (it == modules.end())
 		{
 			it = modules.emplace_hint(it, nat64stateful_id, "unknown");
 		}
-
-		uint16_t last_seen = std::min((uint16_t)((uint16_t)current_time - lan_timestamp_last_packet),
-		                              (uint16_t)((uint16_t)current_time - wan_timestamp_last_packet));
 
 		table.insert(it->second,
 		             ipv6_source,
@@ -147,7 +194,10 @@ void state(std::optional<std::string> module)
 		             port_source,
 		             wan_port_source,
 		             port_destination,
-		             last_seen);
+		             tcp_flags_to_string(lan_flags),
+		             tcp_flags_to_string(wan_flags),
+		             lan_last_seen,
+		             wan_last_seen);
 	}
 
 	table.print();

@@ -2465,6 +2465,7 @@ struct stats_t
 	uint64_t slowworker_packets;
 	uint64_t slowworker_drops;
 	uint64_t mempool_is_empty;
+	uint64_t unknown_dump_interface;
 };
 
 }

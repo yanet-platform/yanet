@@ -100,6 +100,12 @@ void config_converter_t::convertToFlow(const std::string& nextModule,
 	}
 	else if (moduleType == "route")
 	{
+		auto it = baseNext.routes.find(moduleName);
+		if (it == baseNext.routes.end())
+		{
+			throw error_result_t(eResult::invalidFlow, "invalid nextModule: " + nextModule);
+		}
+
 		if (entry == "")
 		{
 			flow.type = common::globalBase::eFlowType::route;
@@ -111,16 +117,15 @@ void config_converter_t::convertToFlow(const std::string& nextModule,
 		else if (entry == "tunnel")
 		{
 			flow.type = common::globalBase::eFlowType::route_tunnel;
+
+			if (!it->second.tunnel_enabled)
+			{
+				throw error_result_t(eResult::invalidFlow, "invalid entry (tunnel not configured)");
+			}
 		}
 		else
 		{
 			throw error_result_t(eResult::invalidFlow, "invalid entry: " + entry);
-		}
-
-		auto it = baseNext.routes.find(moduleName);
-		if (it == baseNext.routes.end())
-		{
-			throw error_result_t(eResult::invalidFlow, "invalid nextModule: " + nextModule);
 		}
 
 		flow.data.routeId = it->second.routeId;

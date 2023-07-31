@@ -54,6 +54,8 @@ extern LogPriority logPriority;
 #define YANET_NETWORK_TYPE_UNKNOWN ((uint16_t)(0))
 #define YANET_TRANSPORT_TYPE_UNKNOWN ((uint8_t)(254))
 
+#define TCP_CWR_FLAG (0x80)
+#define TCP_ECN_FLAG (0x40)
 #define TCP_URG_FLAG (0x20)
 #define TCP_ACK_FLAG (0x10)
 #define TCP_PSH_FLAG (0x08)

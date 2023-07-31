@@ -97,6 +97,7 @@ protected:
 	void handlePacket_fw_state_sync(rte_mbuf* mbuf);
 	bool handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf);
 	void handlePacket_balancer_icmp_forward(rte_mbuf* mbuf);
+	void handlePacket_dump(rte_mbuf* mbuf);
 
 	void SWRateLimiterTimeTracker();
 

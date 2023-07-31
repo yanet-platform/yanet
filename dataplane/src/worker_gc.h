@@ -22,6 +22,7 @@ public:
 	void start();
 
 	void run_on_this_thread(const std::function<bool()>& callback);
+	void nat64stateful_state(const common::idp::nat64stateful_state::request& request, common::idp::nat64stateful_state::response& response);
 
 	void limits(common::idp::limits::response& response) const;
 
@@ -38,6 +39,10 @@ protected:
 	void handle_free_mbuf();
 
 	bool is_timeout(const uint16_t timestamp, const uint16_t timeout);
+	void correct_timestamp(uint16_t& timestamp, const uint16_t last_seen_max = YANET_CONFIG_STATE_TIMEOUT_MAX);
+	uint16_t calc_last_seen(const uint16_t timestamp);
+
+	void nat64stateful_remove_state(const dataplane::globalBase::nat64stateful_lan_key& lan_key, const dataplane::globalBase::nat64stateful_wan_key& wan_key);
 
 	void send_to_slowworker(rte_mbuf* mbuf, const common::globalBase::eFlowType& flow_type);
 	void send_to_slowworker(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);

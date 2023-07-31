@@ -103,7 +103,8 @@ cDataPlane::cDataPlane() :
 	                {eConfigType::acl_states4_ht_size, YANET_CONFIG_ACL_STATES4_HT_SIZE},
 	                {eConfigType::acl_states6_ht_size, YANET_CONFIG_ACL_STATES6_HT_SIZE},
 	                {eConfigType::acl_network_lpm4_chunks_size, YANET_CONFIG_ACL_NETWORK_LPM4_EXTENDED_CHUNKS_SIZE},
-	                {eConfigType::acl_network_lpm6_chunks_size, YANET_CONFIG_ACL_NETWORK_LPM6_CHUNKS_SIZE},
+	                {eConfigType::acl_network_source_lpm6_chunks_size, YANET_CONFIG_ACL_NETWORK_SOURCE_LPM6_CHUNKS_SIZE},
+	                {eConfigType::acl_network_destination_lpm6_chunks_size, YANET_CONFIG_ACL_NETWORK_DESTINATION_LPM6_CHUNKS_SIZE},
 	                {eConfigType::acl_network_destination_ht_size, YANET_CONFIG_ACL_NETWORK_DESTINATION_HT_SIZE},
 	                {eConfigType::acl_network_table_size, YANET_CONFIG_ACL_NETWORK_TABLE_SIZE},
 	                {eConfigType::acl_transport_layers_size, YANET_CONFIG_ACL_TRANSPORT_LAYERS_SIZE},
@@ -489,7 +490,7 @@ eResult cDataPlane::initGlobalBases()
 				return nullptr;
 			}
 
-			auto* acl_network_ipv6_source = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_source>(socket_id, getConfigValue(eConfigType::acl_network_lpm6_chunks_size),
+			auto* acl_network_ipv6_source = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_source>(socket_id, getConfigValue(eConfigType::acl_network_source_lpm6_chunks_size),
 			                                                                                                         globalbase->updater.acl.network_ipv6_source);
 			if (!acl_network_ipv6_source)
 			{
@@ -503,7 +504,7 @@ eResult cDataPlane::initGlobalBases()
 				return nullptr;
 			}
 
-			auto* acl_network_ipv6_destination = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_destination>(socket_id, getConfigValue(eConfigType::acl_network_lpm6_chunks_size),
+			auto* acl_network_ipv6_destination = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_destination>(socket_id, getConfigValue(eConfigType::acl_network_destination_lpm6_chunks_size),
 			                                                                                                                   globalbase->updater.acl.network_ipv6_destination);
 			if (!acl_network_ipv6_destination)
 			{
@@ -1279,6 +1280,50 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	if (exist(json, "sample_gc_step"))
 	{
 		configValues[eConfigType::sample_gc_step] = json["sample_gc_step"];
+	}
+	if (exist(json, "acl_states4_ht_size"))
+	{
+		configValues[eConfigType::acl_states4_ht_size] = json["acl_states4_ht_size"];
+	}
+	if (exist(json, "acl_states6_ht_size"))
+	{
+		configValues[eConfigType::acl_states6_ht_size] = json["acl_states6_ht_size"];
+	}
+	if (exist(json, "acl_network_lpm4_chunks_size"))
+	{
+		configValues[eConfigType::acl_network_lpm4_chunks_size] = json["acl_network_lpm4_chunks_size"];
+	}
+	if (exist(json, "acl_network_source_lpm6_chunks_size"))
+	{
+		configValues[eConfigType::acl_network_source_lpm6_chunks_size] = json["acl_network_source_lpm6_chunks_size"];
+	}
+	if (exist(json, "acl_network_destination_lpm6_chunks_size"))
+	{
+		configValues[eConfigType::acl_network_destination_lpm6_chunks_size] = json["acl_network_destination_lpm6_chunks_size"];
+	}
+	if (exist(json, "acl_network_destination_ht_size"))
+	{
+		configValues[eConfigType::acl_network_destination_ht_size] = json["acl_network_destination_ht_size"];
+	}
+	if (exist(json, "acl_network_table_size"))
+	{
+		configValues[eConfigType::acl_network_table_size] = json["acl_network_table_size"];
+	}
+	if (exist(json, "acl_transport_layers_size"))
+	{
+		configValues[eConfigType::acl_transport_layers_size] = json["acl_transport_layers_size"];
+	}
+	if (exist(json, "acl_transport_ht_size"))
+	{
+		configValues[eConfigType::acl_transport_ht_size] = json["acl_transport_ht_size"];
+	}
+	if (exist(json, "acl_total_ht_size"))
+	{
+		configValues[eConfigType::acl_total_ht_size] = json["acl_total_ht_size"];
+	}
+	if (exist(json, "acl_values_size"))
+	{
+		configValues[eConfigType::acl_values_size] = json["acl_values_size"];
 	}
 
 	if (exist(json, "master_mempool_size"))

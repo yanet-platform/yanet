@@ -293,19 +293,33 @@ void config_parser_t::loadConfig_route(controlplane::base_t& baseNext,
 		}
 	}
 
+	route.tunnel_enabled = true;
+
 	if (exist(moduleJson, "ipv4SourceAddress"))
 	{
 		route.ipv4_source_address = moduleJson["ipv4SourceAddress"].get<std::string>();
+	}
+	else
+	{
+		route.tunnel_enabled = false;
 	}
 
 	if (exist(moduleJson, "ipv6SourceAddress"))
 	{
 		route.ipv6_source_address = moduleJson["ipv6SourceAddress"].get<std::string>();
 	}
+	else
+	{
+		route.tunnel_enabled = false;
+	}
 
 	if (exist(moduleJson, "udpDestinationPort"))
 	{
 		route.udp_destination_port = moduleJson["udpDestinationPort"];
+	}
+	else
+	{
+		route.tunnel_enabled = false;
 	}
 
 	if (exist(moduleJson, "localPrefixes"))
@@ -328,13 +342,15 @@ void config_parser_t::loadConfig_route(controlplane::base_t& baseNext,
 
 	if (exist(moduleJson, "peers"))
 	{
-		route.tunnel_enabled = true;
-
 		loadConfig_route_peers(baseNext,
 		                       route,
 		                       moduleJson["peers"],
 		                       rootFilePath,
 		                       jsons);
+	}
+	else
+	{
+		route.tunnel_enabled = false;
 	}
 
 	//
@@ -547,6 +563,11 @@ void config_parser_t::loadConfig_nat64stateful(controlplane::base_t& baseNext,
 		{
 			throw error_result_t(eResult::invalidConfigurationFile, "invalid dscpMarkType: " + dscpMarkTypeString);
 		}
+	}
+
+	if (exist(moduleJson, "state_timeout"))
+	{
+		nat64stateful.state_timeout = moduleJson["state_timeout"];
 	}
 
 	nat64stateful.next_module = moduleJson.value("nextModule", "");

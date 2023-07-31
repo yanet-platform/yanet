@@ -16,3 +16,4 @@ __pycache__
 .pydevproject
 report/
 .qtc_clangd
+.vscode

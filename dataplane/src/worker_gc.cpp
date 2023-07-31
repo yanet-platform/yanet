@@ -211,48 +211,148 @@ void worker_gc_t::handle()
 
 void worker_gc_t::handle_nat64stateful_gc()
 {
-	constexpr uint16_t timeout = 180; ///< @todo: TIMEOUTS
-
-	auto& globalbase_atomic = base_permanently.globalBaseAtomic;
-
-	for (auto iter : globalbase_atomic->updater.nat64stateful_lan_state.gc(nat64stateful_lan_state_gc.offset, gc_step))
-	{
-		if (iter.is_valid())
-		{
-			nat64stateful_lan_state_gc.valid_keys++;
-
-			iter.lock();
-			if (is_timeout(iter.value()->timestamp_last_packet, timeout))
-			{
-				iter.unset_valid();
-			}
-			iter.unlock();
-		}
-	}
-
-	if (nat64stateful_lan_state_gc.offset == 0)
-	{
-		nat64stateful_lan_state_gc.iterations++;
-	}
+	const auto& base = bases[local_base_id & 1];
+	auto* globalbase_atomic = base_permanently.globalBaseAtomic;
 
 	for (auto iter : globalbase_atomic->updater.nat64stateful_wan_state.gc(nat64stateful_wan_state_gc.offset, gc_step))
 	{
-		if (iter.is_valid())
+		iter.lock();
+		if (!iter.is_valid())
 		{
-			nat64stateful_wan_state_gc.valid_keys++;
-
-			iter.lock();
-			if (is_timeout(iter.value()->timestamp_last_packet, timeout))
-			{
-				iter.unset_valid();
-			}
 			iter.unlock();
+			continue;
+		}
+
+		correct_timestamp(iter.value()->timestamp_last_packet);
+		auto flags = iter.value()->flags;
+		auto wan_key = *iter.key();
+		auto wan_value = *iter.value();
+		iter.unlock();
+
+		nat64stateful_wan_state_gc.valid_keys++;
+
+		if ((wan_key.port_destination & base_permanently.nat64stateful_numa_reverse_mask) != base_permanently.nat64stateful_numa_id)
+		{
+			/// this state created on another numa
+			continue;
+		}
+
+		uint16_t last_seen = calc_last_seen(wan_value.timestamp_last_packet);
+
+		const auto& nat64stateful = base.globalBase->nat64statefuls[wan_key.nat64stateful_id];
+
+		/// check other wan tables
+		for (unsigned int numa_i = 0;
+		     numa_i < YANET_CONFIG_NUMA_SIZE;
+		     numa_i++)
+		{
+			auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
+			if (globalbase_atomic == base_permanently.globalBaseAtomic)
+			{
+				continue;
+			}
+			else if (globalbase_atomic == nullptr)
+			{
+				break;
+			}
+
+			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
+			dataplane::spinlock_nonrecursive_t* wan_locker;
+			globalbase_atomic->nat64stateful_wan_state->lookup(wan_key, wan_value_lookup, wan_locker);
+			if (wan_value_lookup)
+			{
+				correct_timestamp(wan_value_lookup->timestamp_last_packet);
+				last_seen = RTE_MIN(last_seen, calc_last_seen(wan_value_lookup->timestamp_last_packet));
+				flags |= wan_value_lookup->flags;
+			}
+			wan_locker->unlock();
+		}
+
+		dataplane::globalBase::nat64stateful_lan_key lan_key;
+		lan_key.nat64stateful_id = wan_key.nat64stateful_id;
+		lan_key.proto = wan_key.proto;
+		lan_key.ipv6_source = wan_value.ipv6_destination;
+		lan_key.ipv6_destination = wan_value.ipv6_source;
+		lan_key.ipv6_destination.mapped_ipv4_address = wan_key.ipv4_source;
+		lan_key.port_source = wan_value.port_destination;
+		lan_key.port_destination = wan_key.port_source;
+
+		/// check lan tables
+		for (unsigned int numa_i = 0;
+		     numa_i < YANET_CONFIG_NUMA_SIZE;
+		     numa_i++)
+		{
+			auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
+			if (globalbase_atomic == nullptr)
+			{
+				break;
+			}
+
+			dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup;
+			dataplane::spinlock_nonrecursive_t* lan_locker;
+			globalbase_atomic->nat64stateful_lan_state->lookup(lan_key, lan_value_lookup, lan_locker);
+			if (lan_value_lookup)
+			{
+				correct_timestamp(lan_value_lookup->timestamp_last_packet);
+				last_seen = RTE_MIN(last_seen, calc_last_seen(lan_value_lookup->timestamp_last_packet));
+				flags |= lan_value_lookup->flags;
+			}
+			lan_locker->unlock();
+		}
+
+		uint16_t timeout = nat64stateful.state_timeout.other;
+		if (wan_key.proto == IPPROTO_TCP)
+		{
+			if (flags & (TCP_FIN_FLAG | TCP_RST_FLAG))
+			{
+				timeout = nat64stateful.state_timeout.tcp_fin;
+			}
+			else if (flags & TCP_ACK_FLAG)
+			{
+				timeout = nat64stateful.state_timeout.tcp_ack;
+			}
+			else
+			{
+				timeout = nat64stateful.state_timeout.tcp_syn;
+			}
+		}
+		else if (wan_key.proto == IPPROTO_UDP)
+		{
+			timeout = nat64stateful.state_timeout.udp;
+		}
+		else if (wan_key.proto == IPPROTO_ICMPV6)
+		{
+			timeout = nat64stateful.state_timeout.icmp;
+		}
+
+		if (last_seen > timeout)
+		{
+			nat64stateful_remove_state(lan_key, wan_key);
 		}
 	}
 
 	if (nat64stateful_wan_state_gc.offset == 0)
 	{
 		nat64stateful_wan_state_gc.iterations++;
+	}
+
+	/// for calc stats only
+	for (auto iter : globalbase_atomic->updater.nat64stateful_lan_state.gc(nat64stateful_lan_state_gc.offset, gc_step))
+	{
+		iter.lock();
+		if (!iter.is_valid())
+		{
+			iter.unlock();
+			continue;
+		}
+		iter.unlock();
+
+		nat64stateful_lan_state_gc.valid_keys++;
+	}
+
+	if (nat64stateful_lan_state_gc.offset == 0)
+	{
+		nat64stateful_lan_state_gc.iterations++;
 	}
 }
 
@@ -839,6 +939,51 @@ inline bool worker_gc_t::is_timeout(const uint16_t timestamp,
 	return ((uint16_t)(current_time - timestamp) > timeout);
 }
 
+inline void worker_gc_t::correct_timestamp(uint16_t& timestamp,
+                                           const uint16_t last_seen_max)
+{
+	uint16_t last_seen = (uint16_t)(current_time - timestamp);
+	if (last_seen > last_seen_max)
+	{
+		timestamp = (uint16_t)(current_time - last_seen_max);
+	}
+}
+
+inline uint16_t worker_gc_t::calc_last_seen(const uint16_t timestamp)
+{
+	return (uint16_t)(current_time - timestamp);
+}
+
+void worker_gc_t::nat64stateful_remove_state(const dataplane::globalBase::nat64stateful_lan_key& lan_key,
+                                             const dataplane::globalBase::nat64stateful_wan_key& wan_key)
+{
+	/// remove on other numas
+	for (unsigned int numa_i = 0;
+	     numa_i < YANET_CONFIG_NUMA_SIZE;
+	     numa_i++)
+	{
+		auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
+		if (globalbase_atomic == base_permanently.globalBaseAtomic)
+		{
+			continue;
+		}
+		else if (globalbase_atomic == nullptr)
+		{
+			break;
+		}
+
+		globalbase_atomic->nat64stateful_lan_state->remove(lan_key);
+		globalbase_atomic->nat64stateful_wan_state->remove(wan_key);
+	}
+
+	/// remove on same numa
+	{
+		auto* globalbase_atomic = base_permanently.globalBaseAtomic;
+		globalbase_atomic->nat64stateful_lan_state->remove(lan_key);
+		globalbase_atomic->nat64stateful_wan_state->remove(wan_key); ///< must be deleted last!
+	}
+}
+
 void worker_gc_t::send_to_slowworker(rte_mbuf* mbuf,
                                      const common::globalBase::eFlowType& flow_type)
 {
@@ -920,4 +1065,136 @@ void worker_gc_t::handle_samples()
 		samples.clear();
 		samples_current_base_id = current_base_id;
 	}
+}
+
+void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::request& request,
+                                      common::idp::nat64stateful_state::response& response)
+{
+	uint32_t offset = 0;
+	run_on_this_thread([&]()
+	{
+		const auto& [filter_nat64stateful_id] = request;
+		auto& globalbase_atomic = base_permanently.globalBaseAtomic;
+
+		for (auto iter : globalbase_atomic->updater.nat64stateful_wan_state.range(offset, 64))
+		{
+			iter.lock();
+			if (!iter.is_valid())
+			{
+				iter.unlock();
+				continue;
+			}
+
+			if ((iter.key()->port_destination & base_permanently.nat64stateful_numa_reverse_mask) != base_permanently.nat64stateful_numa_id)
+			{
+				/// this state created on another numa
+				iter.unlock();
+				continue;
+			}
+
+			auto wan_key = *iter.key();
+			auto wan_value = *iter.value();
+			iter.unlock();
+
+			if (filter_nat64stateful_id &&
+			    wan_key.nat64stateful_id != *filter_nat64stateful_id)
+			{
+				continue;
+			}
+
+			uint32_t lan_flags = 0;
+			uint32_t wan_flags = wan_value.flags;
+			uint16_t lan_last_seen = YANET_CONFIG_STATE_TIMEOUT_MAX;
+			uint16_t wan_last_seen = calc_last_seen(wan_value.timestamp_last_packet);
+
+			/// check other wan tables
+			for (unsigned int numa_i = 0;
+			     numa_i < YANET_CONFIG_NUMA_SIZE;
+			     numa_i++)
+			{
+				auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
+				if (globalbase_atomic == base_permanently.globalBaseAtomic)
+				{
+					continue;
+				}
+				else if (globalbase_atomic == nullptr)
+				{
+					break;
+				}
+
+				dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
+				dataplane::spinlock_nonrecursive_t* wan_locker;
+				globalbase_atomic->nat64stateful_wan_state->lookup(wan_key, wan_value_lookup, wan_locker);
+				if (wan_value_lookup)
+				{
+					wan_last_seen = RTE_MIN(wan_last_seen, calc_last_seen(wan_value_lookup->timestamp_last_packet));
+					wan_flags |= wan_value_lookup->flags;
+				}
+				wan_locker->unlock();
+			}
+
+			dataplane::globalBase::nat64stateful_lan_key lan_key;
+			lan_key.nat64stateful_id = wan_key.nat64stateful_id;
+			lan_key.proto = wan_key.proto;
+			lan_key.ipv6_source = wan_value.ipv6_destination;
+			lan_key.ipv6_destination = wan_value.ipv6_source;
+			lan_key.ipv6_destination.mapped_ipv4_address = wan_key.ipv4_source;
+			lan_key.port_source = wan_value.port_destination;
+			lan_key.port_destination = wan_key.port_source;
+
+			/// check lan tables
+			for (unsigned int numa_i = 0;
+			     numa_i < YANET_CONFIG_NUMA_SIZE;
+			     numa_i++)
+			{
+				auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
+				if (globalbase_atomic == nullptr)
+				{
+					break;
+				}
+
+				dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup;
+				dataplane::spinlock_nonrecursive_t* lan_locker;
+				globalbase_atomic->nat64stateful_lan_state->lookup(lan_key, lan_value_lookup, lan_locker);
+				if (lan_value_lookup)
+				{
+					lan_last_seen = RTE_MIN(lan_last_seen, calc_last_seen(lan_value_lookup->timestamp_last_packet));
+					lan_flags |= lan_value_lookup->flags;
+				}
+				lan_locker->unlock();
+			}
+
+			std::optional<uint16_t> lan_last_seen_opt;
+			if (lan_last_seen < YANET_CONFIG_STATE_TIMEOUT_MAX)
+			{
+				lan_last_seen_opt = lan_last_seen;
+			}
+
+			std::optional<uint16_t> wan_last_seen_opt;
+			if (wan_last_seen < YANET_CONFIG_STATE_TIMEOUT_MAX)
+			{
+				wan_last_seen_opt = wan_last_seen;
+			}
+
+			response.emplace_back((uint32_t)lan_key.nat64stateful_id,
+			                      lan_key.proto,
+			                      lan_key.ipv6_source.bytes,
+			                      lan_key.ipv6_destination.bytes,
+			                      rte_be_to_cpu_16(lan_key.port_source),
+			                      rte_be_to_cpu_16(lan_key.port_destination),
+			                      rte_be_to_cpu_32(wan_key.ipv4_destination.address),
+			                      rte_be_to_cpu_16(wan_key.port_destination),
+			                      lan_flags,
+			                      wan_flags,
+			                      std::move(lan_last_seen_opt),
+			                      std::move(wan_last_seen_opt));
+		}
+
+		if (offset != 0)
+		{
+			return false;
+		}
+
+		return true;
+	});
 }

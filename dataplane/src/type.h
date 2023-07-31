@@ -6,6 +6,7 @@
 #include "common/type.h"
 #include "common/scheduler.h"
 #include "common/fallback.h"
+#include "common/config.h"
 
 #include "common.h"
 
@@ -296,6 +297,12 @@ namespace globalBase
 		nat64stateful_t() :
 		        pool_size(0)
 		{
+			state_timeout.tcp_syn = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+			state_timeout.tcp_ack = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+			state_timeout.tcp_fin = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+			state_timeout.udp = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+			state_timeout.icmp = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+			state_timeout.other = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
 		}
 
 		/// @todo: uint8_t enabled;
@@ -304,6 +311,15 @@ namespace globalBase
 		uint32_t pool_size;
 		tCounterId counter_id;
 		uint8_t ipv4_dscp_flags;
+		struct
+		{
+			uint16_t tcp_syn;
+			uint16_t tcp_ack;
+			uint16_t tcp_fin;
+			uint16_t udp;
+			uint16_t icmp;
+			uint16_t other;
+		} state_timeout;
 		common::globalBase::tFlow flow;
 	};
 
@@ -433,6 +449,7 @@ namespace globalBase
 		ipv4_address_t ipv4_source;
 		uint16_t port_source;
 		uint16_t timestamp_last_packet;
+		uint32_t flags;
 	};
 
 	struct nat64stateful_wan_key
@@ -460,6 +477,7 @@ namespace globalBase
 		};
 
 		ipv6_address_t ipv6_destination;
+		uint32_t flags;
 	};
 
 	static_assert(YANET_CONFIG_NAT64STATEFULS_SIZE <= 0xFFFFFF, "invalid size");

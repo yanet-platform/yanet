@@ -118,8 +118,8 @@ class tree_t
 	constexpr static uint32_t bits_mask = 0xFFFFFFFFu >> (32 - bits);
 
 public:
-	tree_t(const unsigned int chunks_size_init = 65536) :
-	        chunks_size_init(chunks_size_init)
+	tree_t(const unsigned int chunks_bucket_size = YANET_CONFIG_ACL_TREE_CHUNKS_BUCKET_SIZE) :
+	        chunks_bucket_size(chunks_bucket_size)
 	{
 		clear();
 	}
@@ -127,7 +127,7 @@ public:
 	void clear()
 	{
 		chunks.clear();
-		chunks.reserve(chunks_size_init);
+		chunks.reserve(chunks_bucket_size);
 		chunks.emplace_back(); ///< root_chunk
 		prefixes.clear();
 		intersection_prefixes.clear();
@@ -171,6 +171,7 @@ public:
 
 			if (is_mask_gapped(mask))
 			{
+				reserve_chunks();
 				prepare_gapped(address, mask);
 			}
 		}
@@ -181,6 +182,7 @@ public:
 
 			if (!is_mask_gapped(mask))
 			{
+				reserve_chunks();
 				prepare_simple(address, mask);
 			}
 		}
@@ -230,6 +232,7 @@ public:
 			{
 				const auto& [shift, warp_chunk_id] = it->second;
 
+				reserve_chunks();
 				insert_step(address << shift,
 				            mask << shift,
 				            group_id,
@@ -239,6 +242,7 @@ public:
 		}
 		else
 		{
+			reserve_chunks();
 			insert_step(address,
 			            mask,
 			            group_id,
@@ -278,6 +282,8 @@ public:
 			for (const auto& chunk_id : last_multirefs_chunk_ids)
 			{
 				merge_group_id = group_id;
+
+				reserve_chunks();
 				merge_chunk(warp_chunk_id, chunk_id, group_id);
 			}
 
@@ -389,7 +395,7 @@ public:
 	}
 
 public:
-	unsigned int chunks_size_init;
+	unsigned int chunks_bucket_size;
 
 	std::vector<common::acl::tree_chunk_t<bits>> chunks;
 
@@ -447,8 +453,25 @@ protected:
 		return result;
 	}
 
+	void reserve_chunks()
+	{
+		if (chunks.capacity() - chunks.size() < chunks_bucket_size)
+		{
+			YANET_LOG_DEBUG("acl::network: reserve chunks (free: %lu): %lu -> %lu\n",
+			                chunks.capacity() - chunks.size(),
+			                chunks.capacity(),
+			                chunks.capacity() + chunks_bucket_size);
+			chunks.reserve(chunks.capacity() + chunks_bucket_size);
+		}
+	}
+
 	inline unsigned int allocate_chunk()
 	{
+		if (chunks.size() == chunks.capacity())
+		{
+			throw std::runtime_error("not enough chunks");
+		}
+
 		unsigned int new_chunk_id = chunks.size();
 		chunks.emplace_back();
 

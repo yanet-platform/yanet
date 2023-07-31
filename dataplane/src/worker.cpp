@@ -568,12 +568,8 @@ inline void cWorker::handlePackets()
 
 	route_handle4();
 	route_handle6();
-
-	if (globalbase.route_tunnel_enabled)
-	{
-		route_tunnel_handle4();
-		route_tunnel_handle6();
-	}
+	route_tunnel_handle4();
+	route_tunnel_handle6();
 
 	if (globalbase.acl_egress_enabled)
 	{
@@ -2498,7 +2494,7 @@ inline void cWorker::nat64stateful_lan_handle()
 			icmpv6_header_t* icmpv6_header = rte_pktmbuf_mtod_offset(mbuf, icmpv6_header_t*, metadata->transport_headerOffset);
 
 			key.port_source = icmpv6_header->identifier;
-			key.port_destination = icmpv6_header->identifier;
+			key.port_destination = 0;
 		}
 		else
 		{
@@ -2524,6 +2520,19 @@ inline void cWorker::nat64stateful_lan_handle()
 		const uint32_t hash = nat64stateful_lan_state->lookup(key, value_lookup, locker);
 		if (value_lookup)
 		{
+			if (metadata->transport_headerType == IPPROTO_TCP)
+			{
+				rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+				if (tcp_header->tcp_flags & TCP_SYN_FLAG)
+				{
+					value_lookup->flags = tcp_header->tcp_flags;
+				}
+				else
+				{
+					value_lookup->flags |= tcp_header->tcp_flags;
+				}
+			}
+
 			value_lookup->timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime;
 			value = *value_lookup;
 			locker->unlock();
@@ -2574,11 +2583,10 @@ inline void cWorker::nat64stateful_lan_handle()
 				if (!wan_value_lookup)
 				{
 					/// success
+					counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::tries_array_start + try_i]++;
 					break;
 				}
 				wan_locker->unlock();
-
-				counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::tries]++;
 
 				wan_key.port_destination += port_step;
 			}
@@ -2596,16 +2604,20 @@ inline void cWorker::nat64stateful_lan_handle()
 				dataplane::globalBase::nat64stateful_wan_value wan_value;
 				memcpy(wan_value.ipv6_source.bytes, key.ipv6_destination.bytes, 12);
 				wan_value.port_destination = key.port_source;
-				wan_value.timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime;
+				wan_value.timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime - YANET_CONFIG_STATE_TIMEOUT_MAX;
 				wan_value.ipv6_destination = key.ipv6_source;
+				wan_value.flags = 0;
 
-				/// counter_id:
-				///   0 - insert failed
-				///   1 - insert done
-				uint32_t counter_id = nat64stateful_wan_state->insert(wan_hash, wan_key, wan_value);
+				bool insert_success = nat64stateful_wan_state->insert(wan_hash, wan_key, wan_value);
 				wan_locker->unlock();
 
-				counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::wan_state_insert + counter_id]++;
+				counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::wan_state_insert + (tCounterId)insert_success]++;
+
+				if (!insert_success)
+				{
+					drop(mbuf);
+					continue;
+				}
 
 				/// @todo: create cross-numa state over slowworker?
 				for (unsigned int numa_i = 0;
@@ -2622,11 +2634,8 @@ inline void cWorker::nat64stateful_lan_handle()
 						break;
 					}
 
-					/// counter_id:
-					///   0 - insert failed
-					///   1 - insert done
-					uint32_t counter_id = globalbase_atomic->nat64stateful_wan_state->insert_or_update(wan_key, wan_value);
-					counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::wan_state_cross_numa_insert + counter_id]++;
+					bool insert_success = globalbase_atomic->nat64stateful_wan_state->insert_or_update(wan_key, wan_value);
+					counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::wan_state_cross_numa_insert + (tCounterId)insert_success]++;
 				}
 			}
 
@@ -2634,18 +2643,23 @@ inline void cWorker::nat64stateful_lan_handle()
 				value.ipv4_source = wan_key.ipv4_destination;
 				value.port_source = wan_key.port_destination;
 				value.timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime;
+				value.flags = 0;
+
+				if (metadata->transport_headerType == IPPROTO_TCP)
+				{
+					rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+					value.flags = tcp_header->tcp_flags;
+				}
 
 				locker->lock();
 
-				/// counter_id:
-				///   0 - insert failed
-				///   1 - insert done
-				uint32_t counter_id = nat64stateful_lan_state->insert(hash, key, value);
+				bool insert_success = nat64stateful_lan_state->insert(hash, key, value);
 				locker->unlock();
 
-				counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::lan_state_insert + counter_id]++;
+				counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::lan_state_insert + (tCounterId)insert_success]++;
 
 				/// @todo: create cross-numa state over slowworker?
+				value.timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime - YANET_CONFIG_STATE_TIMEOUT_MAX;
 				for (unsigned int numa_i = 0;
 				     numa_i < YANET_CONFIG_NUMA_SIZE;
 				     numa_i++)
@@ -2660,11 +2674,8 @@ inline void cWorker::nat64stateful_lan_handle()
 						break;
 					}
 
-					/// counter_id:
-					///   0 - insert failed
-					///   1 - insert done
-					uint32_t counter_id = globalbase_atomic->nat64stateful_lan_state->insert_or_update(key, value);
-					counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::lan_state_cross_numa_insert + counter_id]++;
+					bool insert_success = globalbase_atomic->nat64stateful_lan_state->insert_or_update(key, value);
+					counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::lan_state_cross_numa_insert + (tCounterId)insert_success]++;
 				}
 			}
 		}
@@ -2876,7 +2887,7 @@ inline void cWorker::nat64stateful_wan_handle()
 			icmpv4_header_t* icmpv4_header = rte_pktmbuf_mtod_offset(mbuf, icmpv4_header_t*, metadata->transport_headerOffset);
 
 			key.proto = IPPROTO_ICMPV6; ///< for correct lookup
-			key.port_source = icmpv4_header->identifier;
+			key.port_source = 0;
 			key.port_destination = icmpv4_header->identifier;
 		}
 		else
@@ -2908,6 +2919,19 @@ inline void cWorker::nat64stateful_wan_handle()
 			counters[nat64stateful.counter_id + (tCounterId)nat64stateful::module_counter::wan_state_not_found]++;
 			drop(mbuf);
 			continue;
+		}
+
+		if (metadata->transport_headerType == IPPROTO_TCP)
+		{
+			rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+			if (tcp_header->tcp_flags & TCP_SYN_FLAG)
+			{
+				value_lookup->flags = tcp_header->tcp_flags;
+			}
+			else
+			{
+				value_lookup->flags |= tcp_header->tcp_flags;
+			}
 		}
 
 		value_lookup->timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime;

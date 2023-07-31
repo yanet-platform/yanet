@@ -2757,6 +2757,50 @@ public:
 		return result;
 	}
 
+	inline void remove(const key_t& key)
+	{
+		uint32_t hash = calculate_hash(key);
+		auto& chunk = chunks[hash & total_mask];
+
+		auto& locker = chunk.locker;
+		locker.lock();
+
+		const uint32_t pair_index = (hash >> total_shift) & (chunk_size - 1);
+		if (is_valid_and_equal(chunk, pair_index, key))
+		{
+			chunk.valid_mask ^= 1u << pair_index;
+			locker.unlock();
+			return;
+		}
+
+		if (chunk_size == 1)
+		{
+			/// not found
+			locker.unlock();
+			return;
+		}
+
+		/// check collision
+		uint32_t valid_mask = chunk.valid_mask;
+		for (unsigned int try_i = 1;
+		     try_i < chunk_size && valid_mask;
+		     try_i++)
+		{
+			const uint32_t pair_index = ((hash >> total_shift) + try_i) & (chunk_size - 1);
+			if (is_valid_and_equal(chunk, pair_index, key))
+			{
+				chunk.valid_mask ^= 1u << pair_index;
+				locker.unlock();
+				return;
+			}
+			valid_mask &= 0xFFFFFFFFu ^ (1u << pair_index);
+		}
+
+		/// not found
+		locker.unlock();
+		return;
+	}
+
 	void clear()
 	{
 		for (uint32_t i = 0;

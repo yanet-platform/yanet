@@ -22,7 +22,7 @@ os.makedirs("/run/yanet", exist_ok=True)
 p_dataplane = subprocess.Popen("yanet-dataplane -d -c units/%s/dataplane.conf" % (sys.argv[1]),
                                shell=True, preexec_fn = os.setsid)
 
-time.sleep(8)
+time.sleep(20)
 
 p_controlplane = None
 
@@ -36,6 +36,8 @@ for tries in range(1, 5):
 if (p_dataplane.poll() != None) or (p_controlplane.poll() != None):
 	kill_processes([p_controlplane, p_dataplane])
 	sys.exit(1)
+
+time.sleep(10)
 
 units = []
 if len(sys.argv) == 4 and sys.argv[2] == "--part":

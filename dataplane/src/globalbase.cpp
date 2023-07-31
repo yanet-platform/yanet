@@ -396,7 +396,6 @@ eResult generation::clear()
 	nat64stateful_enabled = 0;
 	nat64stateless_enabled = 0;
 	balancer_enabled = 0;
-	route_tunnel_enabled = 0;
 	acl_egress_enabled = 0;
 	sampler_enabled = 0;
 	serial = 0;
@@ -851,8 +850,6 @@ eResult generation::update_route(const common::idp::updateGlobalBase::update_rou
 		route.ipv4AddressSource = ipv4_address_t::convert(ipv4AddressSource);
 		route.ipv6AddressSource = ipv6_address_t::convert(ipv6AddressSource);
 		route.udpDestinationPort = rte_cpu_to_be_16(udpDestinationPort);
-
-		route_tunnel_enabled = 1;
 	}
 
 	return eResult::success;
@@ -920,7 +917,7 @@ eResult generation::updateInterface(const common::idp::updateGlobalBase::updateI
 
 eResult generation::nat64stateful_update(const common::idp::updateGlobalBase::nat64stateful_update::request& request)
 {
-	const auto& [nat64stateful_id, dscp_mark_type, dscp, counter_id, pool_start, pool_size, flow] = request;
+	const auto& [nat64stateful_id, dscp_mark_type, dscp, counter_id, pool_start, pool_size, state_timeout, flow] = request;
 
 	if (nat64stateful_id >= YANET_CONFIG_NAT64STATEFULS_SIZE)
 	{
@@ -982,6 +979,17 @@ eResult generation::nat64stateful_update(const common::idp::updateGlobalBase::na
 	{
 		YADECAP_LOG_ERROR("invalid dscp_mark_type\n");
 		return eResult::invalidArguments;
+	}
+
+	{
+		const auto& [tcp_syn, tcp_ack, tcp_fin, udp, icmp, other] = state_timeout;
+
+		nat64stateful.state_timeout.tcp_syn = tcp_syn;
+		nat64stateful.state_timeout.tcp_ack = tcp_ack;
+		nat64stateful.state_timeout.tcp_fin = tcp_fin;
+		nat64stateful.state_timeout.udp = udp;
+		nat64stateful.state_timeout.icmp = icmp;
+		nat64stateful.state_timeout.other = other;
 	}
 
 	nat64stateful_enabled = 1;

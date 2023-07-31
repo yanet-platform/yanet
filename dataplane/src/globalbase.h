@@ -218,7 +218,6 @@ public: ///< @todo
 	uint8_t nat64stateful_enabled;
 	uint8_t nat64stateless_enabled;
 	uint8_t balancer_enabled;
-	uint8_t route_tunnel_enabled;
 	uint8_t acl_egress_enabled;
 	uint8_t sampler_enabled;
 	uint8_t tun64_enabled;

@@ -245,7 +245,8 @@ void unsafe()
 		                        {"slowworker_packets", responseSlowWorker.slowworker_packets},
 		                        {"slowworker_drops", responseSlowWorker.slowworker_drops},
 		                        {"fwsync_multicast_ingress_packets", responseSlowWorker.fwsync_multicast_ingress_packets},
-		                        {"mempool_is_empty", responseSlowWorker.mempool_is_empty}});
+		                        {"mempool_is_empty", responseSlowWorker.mempool_is_empty},
+		                        {"unknown_dump_interface", responseSlowWorker.unknown_dump_interface}});
 	}
 
 	/// hashtable gc
@@ -317,7 +318,6 @@ void unsafe()
 		                        {"wan_packets", stats[(tCounterId)module_counter::wan_packets]},
 		                        {"wan_bytes", stats[(tCounterId)module_counter::wan_bytes]},
 		                        {"pool_is_empty", stats[(tCounterId)module_counter::pool_is_empty]},
-		                        {"tries", stats[(tCounterId)module_counter::tries]},
 		                        {"tries_failed", stats[(tCounterId)module_counter::tries_failed]},
 		                        {"wan_state_not_found", stats[(tCounterId)module_counter::wan_state_not_found]},
 		                        {"wan_state_insert_failed", stats[(tCounterId)module_counter::wan_state_insert_failed]},
@@ -328,6 +328,10 @@ void unsafe()
 		                        {"lan_state_insert_success", stats[(tCounterId)module_counter::lan_state_insert_success]},
 		                        {"lan_state_cross_numa_insert_failed", stats[(tCounterId)module_counter::lan_state_cross_numa_insert_failed]},
 		                        {"lan_state_cross_numa_insert_success", stats[(tCounterId)module_counter::lan_state_cross_numa_insert_success]}});
+
+		influxdb_format::print_histogram("nat64stateful",
+		                                 {{"name", name}},
+		                                 "try", "state_insert_collision", stats, module_counter::tries_array_start, module_counter::tries_array_end);
 	}
 
 	for (const auto& [name, duration] : durations)
