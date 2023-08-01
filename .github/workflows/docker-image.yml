@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: |
-          meson setup --prefix=/target_unittest -Dtarget=unittest build_unittest
+          meson setup -Dtarget=unittest build_unittest
           meson compile -C build_unittest
       - name: bug https://github.com/actions/upload-artifact/issues/38
         run: tar -cvf build_unittest.tar build_unittest
@@ -39,9 +39,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: |
-          meson setup --prefix=/target_autotest -Dtarget=autotest build_autotest
+          meson setup --prefix=/usr -Dtarget=autotest build_autotest
           meson compile -C build_autotest
-      - run: meson install -C build_autotest
+      - name: bug https://github.com/actions/upload-artifact/issues/38
+        run: tar -cvf build_autotest.tar build_autotest
+      - uses: actions/upload-artifact@v3
+        with:
+          name: build_autotest
+          path: build_autotest.tar
   build:
     needs: build-image-builder
     runs-on: ubuntu-latest
@@ -67,3 +72,17 @@ jobs:
       - name: bug https://github.com/actions/upload-artifact/issues/38
         run: tar -xf build_unittest.tar
       - run: meson test --no-rebuild -C build_unittest
+  autotest:
+    needs: build-autotest
+    runs-on: ubuntu-latest
+    container:
+      image: yanetplatform/builder
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: build_autotest
+      - name: bug https://github.com/actions/upload-artifact/issues/38
+        run: tar -xf build_autotest.tar
+      - run: meson install --no-rebuild -C build_autotest
+      - run: yanet-autotest-run.py autotest/units/001_one_port
