@@ -1400,7 +1400,7 @@ eResult cDataPlane::checkConfig()
 		    coreId == config.controlPlaneCoreId ||
 		    coreId == config.dumpKniCoreId)
 		{
-			YADECAP_LOG_ERROR("invalid coreId: '%u'\n", config.controlPlaneCoreId);
+			YADECAP_LOG_ERROR("invalid coreId: '%u'\n", coreId);
 			return eResult::invalidConfigurationFile;
 		}
 

@@ -24,8 +24,11 @@ def kill_processes():
 		if process is None:
 			continue
 
-		os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-		process.wait()
+		try:
+			os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+			process.wait()
+		except:
+			pass
 
 
 def wait_application(application):

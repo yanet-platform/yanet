@@ -73,6 +73,7 @@ jobs:
         run: tar -xf build_unittest.tar
       - run: meson test --no-rebuild -C build_unittest
   autotest:
+    name: 001_one_port
     needs: build-autotest
     runs-on: ubuntu-latest
     container:
