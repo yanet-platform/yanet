@@ -12,3 +12,5 @@ executable('yanet-autotest',
            include_directories: yanet_rootdir,
            dependencies: dependencies,
            install: true)
+
+install_data('yanet-autotest-run.py', install_dir: get_option('bindir'))
