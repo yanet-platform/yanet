@@ -6,6 +6,8 @@
 #include <set>
 #include <ctime>
 
+#include <inttypes.h>
+
 #define YANET_UNUSED [[maybe_unused]]
 
 #define YANET_LOG_PRINT(msg, args ...) fprintf(stdout, msg, ## args)

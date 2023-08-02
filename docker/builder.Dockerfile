@@ -82,4 +82,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgmock-dev \
     bison \
     flex \
-    libfl-dev
+    libfl-dev \
+    netbase
