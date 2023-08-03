@@ -33,7 +33,7 @@ jobs:
           path: build_unittest.tar
   build-autotest:
     needs: build-image-builder
-    runs-on: ubuntu-latest
+    runs-on: builder
     container:
       image: yanetplatform/builder
     steps:
@@ -76,7 +76,7 @@ jobs:
   autotest-001_one_port:
     name: 001_one_port
     needs: build-autotest
-    runs-on: ubuntu-latest
+    runs-on: autotest
     container:
       image: yanetplatform/builder
     steps:
