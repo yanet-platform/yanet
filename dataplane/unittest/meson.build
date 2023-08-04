@@ -5,7 +5,10 @@ dependencies += dependency('threads')
 dependencies += dependency('gtest')
 dependencies += dependency('gtest_main')
 
-sources = files('ip_address.cpp')
+sources = files('unittest.cpp',
+                'ip_address.cpp',
+                'lpm.cpp',
+                'hashtable.cpp')
 
 unittest = executable('yanet-dataplane-unittest',
                       sources,
