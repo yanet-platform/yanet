@@ -1,4 +1,4 @@
-FROM yanet/builder AS builder
+FROM yanetplatform/builder AS builder
 
 COPY . /project
 RUN meson setup --prefix=/target build
