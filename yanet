@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+CONFIG=""
+TYPE=""
+
+usage() {
+  cat <<EOF
+Usage: $(basename "${BASH_SOURCE[0]}") [OPTIONS]
+
+Yanet wrapper for yanet-dataplane.
+
+Options:
+-h        Print this help and exit
+-c        Config file for dataplane
+-t        Type of yanet dataplane binary(release, l3balancer or firewall)
+EOF
+  exit
+}
+
+while getopts "h:c:t:" opt ; do
+  case $opt in
+    h) usage ;;
+    c) CONFIG=$OPTARG ;;
+    t) TYPE=$OPTARG ;;
+    *) usage ;;
+  esac
+done
+
+/target/bin/yanet-dataplane-$TYPE -c $CONFIG
