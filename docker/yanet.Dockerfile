@@ -15,3 +15,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN mkdir -p /run/yanet
 
 COPY --from=builder /target /target
+COPY --from=builder /project/yanet /usr/sbin/
