@@ -1,7 +1,7 @@
 FROM yanetplatform/builder AS builder
 
 COPY . /project
-RUN meson setup --prefix=/target build
+RUN meson setup --prefix=/target -Dyanet_config=release,firewall,l3balancer build
 RUN meson compile -C build
 RUN meson install -C build
 
