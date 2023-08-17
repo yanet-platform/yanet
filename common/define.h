@@ -81,6 +81,8 @@ extern LogPriority logPriority;
 #define YANET_BALANCER_FIX_MSS_SIZE 1220
 #define YANET_BALANCER_FIX_MSS_FLAG ((uint8_t)(1u << 0))
 
+#define YANET_BALANCER_OPS_FLAG ((uint8_t)(1u << 1))
+
 #if __cpp_exceptions
 #define YANET_THROW(string) throw string
 #else // __cpp_exceptions

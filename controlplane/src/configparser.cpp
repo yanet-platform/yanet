@@ -1615,9 +1615,16 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			flags |= YANET_BALANCER_FIX_MSS_FLAG;
 		}
 
+		auto proto = controlplane::balancer::to_proto(service_json["proto"].get<std::string>());
+
+		if (service_json.value("ops", false) && proto == IPPROTO_UDP)
+		{
+			flags |= YANET_BALANCER_OPS_FLAG;
+		}
+
 		balancer.services.emplace_back(baseNext.services_count + 1, ///< 0 is invalid id
 		                               service_json["vip"].get<std::string>(),
-		                               controlplane::balancer::to_proto(service_json["proto"].get<std::string>()),
+		                               proto,
 		                               std::stoll(service_json["vport"].get<std::string>(), nullptr, 0),
 		                               scheduler,
 		                               scheduler_params,

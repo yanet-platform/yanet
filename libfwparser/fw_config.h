@@ -22,9 +22,11 @@ namespace acl {
 
 namespace ipfw {
 
+    using string_ptr_t = std::unique_ptr<std::string>;
+
     // we keep list of config files that were opened and nesting level
     typedef struct fw_config_history {
-        std::string name;
+        string_ptr_t name;
         size_t level;
     } fw_config_history_t;
 
