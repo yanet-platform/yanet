@@ -31,6 +31,7 @@ jobs:
         with:
           name: build_unittest
           path: build_unittest.tar
+          retention-days: 1
   build-autotest:
     needs: build-image-builder
     runs-on: builder
@@ -48,6 +49,7 @@ jobs:
         with:
           name: target_autotest
           path: target_autotest.tar
+          retention-days: 1
   build:
     needs: build-image-builder
     runs-on: ubuntu-latest
