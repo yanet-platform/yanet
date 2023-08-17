@@ -287,7 +287,7 @@ void fw_dump_t::dump_history()
     std::cerr << "# Files history" << std::endl;
     for (const auto& h : m_conf->m_history)
     {
-        std::cerr << "# " << ++idx << ". " << h.name << ": " << h.level << std::endl;
+        std::cerr << "# " << ++idx << ". " << *h.name << ": " << h.level << std::endl;
     }
 }
 

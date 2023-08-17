@@ -307,7 +307,7 @@ using service_t = std::tuple<balancer_service_id_t,
                              uint16_t, ///< vport
                              ::balancer::scheduler,
                              ::balancer::scheduler_params,
-                             bool, ///< mss_fix
+                             uint8_t, ///< flags: mss_fix|ops
                              std::vector<real_t>>;
 
 class config_t

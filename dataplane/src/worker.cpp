@@ -3771,20 +3771,23 @@ inline void cWorker::balancer_handle()
 
 			if (!value)
 			{
-				dataplane::globalBase::balancer_state_value_t value;
-				value.real_unordered_id = real_id;
-				value.timestamp_create = basePermanently.globalBaseAtomic->currentTime;
-				value.timestamp_last_packet = value.timestamp_create;
-				value.timestamp_gc = value.timestamp_last_packet - 1; ///< touch gc
-
-				/// counter_id:
-				///   0 - insert failed
-				///   1 - insert done
-				uint32_t counter_id = basePermanently.globalBaseAtomic->balancer_state.insert(hash, key, value);
-				counters[(uint32_t)common::globalBase::static_counter_type::balancer_state + counter_id]++;
-				if (counter_id)
+				if (!(service.flags & YANET_BALANCER_OPS_FLAG))
 				{
-					++counters[real_unordered.counter_id + (tCounterId)balancer::real_counter::sessions_created];
+					dataplane::globalBase::balancer_state_value_t value;
+					value.real_unordered_id = real_id;
+					value.timestamp_create = basePermanently.globalBaseAtomic->currentTime;
+					value.timestamp_last_packet = value.timestamp_create;
+					value.timestamp_gc = value.timestamp_last_packet - 1; ///< touch gc
+
+					/// counter_id:
+					///   0 - insert failed
+					///   1 - insert done
+					uint32_t counter_id = basePermanently.globalBaseAtomic->balancer_state.insert(hash, key, value);
+					counters[(uint32_t)common::globalBase::static_counter_type::balancer_state + counter_id]++;
+					if (counter_id)
+					{
+						++counters[real_unordered.counter_id + (tCounterId)balancer::real_counter::sessions_created];
+					}
 				}
 			}
 			else

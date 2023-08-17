@@ -90,10 +90,10 @@ void fw_config_t::setup_lexer(const std::string& name, istream_ptr_t istrm, bool
     m_fileno.emplace(m_history.size());
     // create new history entry: save filename and its level
     m_history.emplace_back(fw_config_history_t{
-        name, nested ? m_location.size() : 0});
+        std::make_unique<std::string>(name), nested ? m_location.size() : 0});
     // create new lexer cursor location
-    auto& file = m_history.back().name;
-    m_location.emplace(location{&file});
+    auto* file = m_history.back().name.get();
+    m_location.emplace(location{file});
     // save input stream
     m_filestrm.emplace(istrm);
     // use new input stream in lexer
@@ -110,7 +110,7 @@ bool fw_config_t::open(const std::string& file, bool nested)
     auto filename = file;
     if (nested && !filename.empty() && filename.front() != '/')
     {
-        auto parent = m_history.back().name;
+        auto parent = *m_history.back().name;
         auto pos = parent.find_last_of("/");
         if (pos == std::string::npos)
         {
@@ -125,6 +125,7 @@ bool fw_config_t::open(const std::string& file, bool nested)
     {
         throw std::runtime_error("failed to open config: " + filename);
     }
+
     setup_lexer(filename, fstrm, nested);
     return (true);
 }
@@ -134,7 +135,7 @@ bool fw_config_t::close(void)
     if (m_filestrm.empty())
         return (false);
 
-    FW_CONF_DEBUG(m_history[m_fileno.top()].name);
+    FW_CONF_DEBUG(*m_history[m_fileno.top()].name);
 
     m_fileno.pop();
     m_location.pop();
@@ -146,7 +147,7 @@ bool fw_config_t::close(void)
     {
         auto istrm = m_filestrm.top();
 
-        FW_CONF_DEBUG("return to " << m_history[m_fileno.top()].name);
+        FW_CONF_DEBUG("return to " << *m_history[m_fileno.top()].name);
         m_lexer.switch_streams(istrm.get(), nullptr);
         return (true);
     }
@@ -174,7 +175,6 @@ bool fw_config_t::schedule_file(const std::string& file)
 bool fw_config_t::schedule_string(const std::string& str)
 {
     auto istrm = std::make_shared<std::istringstream>(str);
-
     setup_lexer("<CMDLINE>", istrm, false);
     return true;
 }
@@ -992,7 +992,7 @@ std::string fw_config_t::format_location(const location_history_t& loc)
     if (m_history.size() > loc.fileno)
     {
         const auto& h = m_history.at(loc.fileno);
-        filename = h.name;
+        filename = *h.name;
     } else {
         filename = "UNKNOWN";
     }

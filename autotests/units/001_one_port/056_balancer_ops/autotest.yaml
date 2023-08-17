@@ -1,0 +1,53 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
+- ipv6Update: "::/0 -> fe80::1"
+- cli:
+  - balancer real enable balancer0 10.0.0.6 tcp 80 2056::1 80
+  - balancer real enable balancer0 10.0.0.6 tcp 80 2056::2 80
+  - balancer real enable balancer0 10.0.0.6 udp 80 2056::3 80
+  - balancer real enable balancer0 10.0.0.6 udp 80 2056::4 80
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+# ops must be ignored by tcp service. connections>0
+- cli_check: |
+    balancer real balancer0 10.0.0.6 tcp
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.6    tcp    80            wrr        2056::1  80         true     1       2            2        196
+    balancer0  10.0.0.6    tcp    80            wrr        2056::2  80         true     1       2            2        196
+    balancer0  10.0.0.6    tcp    80            wrr        2056::3  80         false    1       0            0        0
+    balancer0  10.0.0.6    tcp    80            wrr        2056::4  80         false    1       0            0        0
+
+- sendPackets:
+    - port: kni0
+      send: 002-send.pcap
+      expect: 002-expect.pcap
+# ops service must not create connections
+- cli_check: |
+    balancer real balancer0 10.0.0.6 udp
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.6    udp    80            wrr        2056::1  80         false    1       0            0        0
+    balancer0  10.0.0.6    udp    80            wrr        2056::2  80         false    1       0            0        0
+    balancer0  10.0.0.6    udp    80            wrr        2056::3  80         true     1       0            2        172
+    balancer0  10.0.0.6    udp    80            wrr        2056::4  80         true     1       0            2        172
+- cli:
+    - balancer real enable balancer0 10.0.0.6 udp 80 2056::1 80
+    - balancer real enable balancer0 10.0.0.6 udp 80 2056::2 80
+    - balancer real flush
+- sendPackets:
+    - port: kni0
+      send: 002-send.pcap
+      expect: 003-expect.pcap
+# packets must get different scheduling after flush
+- cli_check: |
+    balancer real balancer0 10.0.0.6 udp
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.6    udp    80            wrr        2056::1  80         true     1       0            1        86
+    balancer0  10.0.0.6    udp    80            wrr        2056::2  80         true     1       0            1        86
+    balancer0  10.0.0.6    udp    80            wrr        2056::3  80         true     1       0            3        258
+    balancer0  10.0.0.6    udp    80            wrr        2056::4  80         true     1       0            3        258
