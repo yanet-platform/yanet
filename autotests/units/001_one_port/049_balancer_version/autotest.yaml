@@ -1,0 +1,47 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
+- ipv6Update: "::/0 -> fe80::1"
+- cli_check: |
+    balancer service any
+    module     virtual_ip  proto  virtual_port  scheduler  connections  packets  bytes  version
+    ---------  ----------  -----  ------------  ---------  -----------  -------  -----  ----------
+    balancer0  10.49.0.1   tcp    80            rr         0            0        0      10
+    balancer0  10.49.0.2   tcp    80            rr         0            0        0      0
+    balancer0  10.49.0.3   tcp    80            rr         0            0        0      Kukarekuuu
+    balancer0  10.49.0.4   tcp    80            rr         0            0        0      n/s
+
+
+- cli_check: |
+    balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip     real_port  enabled  weight  connections  packets  bytes  version
+    ---------  ----------  -----  ------------  ---------  ----------  ---------  -------  ------  -----------  -------  -----  ----------
+    balancer0  10.49.0.1   tcp    80            rr         2000:49::1  80         false    1       0            0        0      10
+    balancer0  10.49.0.1   tcp    80            rr         2000:49::2  80         false    1       0            0        0      10
+    balancer0  10.49.0.2   tcp    80            rr         2001:49::1  80         false    1       0            0        0      0
+    balancer0  10.49.0.2   tcp    80            rr         2001:49::2  80         false    1       0            0        0      0
+    balancer0  10.49.0.3   tcp    80            rr         2002:49::1  80         false    1       0            0        0      Kukarekuuu
+    balancer0  10.49.0.3   tcp    80            rr         2002:49::2  80         false    1       0            0        0      Kukarekuuu
+    balancer0  10.49.0.4   tcp    80            rr         2003:49::1  80         false    1       0            0        0      n/s
+    balancer0  10.49.0.4   tcp    80            rr         2003:49::2  80         false    1       0            0        0      n/s
+
+- reload: controlplane.2.conf
+- cli_check: |
+    balancer service any
+    module     virtual_ip  proto  virtual_port  scheduler  connections  packets  bytes  version
+    ---------  ----------  -----  ------------  ---------  -----------  -------  -----  -------
+    balancer0  10.49.0.1   tcp    80            rr         0            0        0      11
+    balancer0  10.49.0.2   tcp    80            rr         0            0        0      0
+    balancer0  10.49.0.3   tcp    80            rr         0            0        0      Kukarek
+    balancer0  10.49.0.4   tcp    80            rr         0            0        0      n/s
+- cli_check: |
+    balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip     real_port  enabled  weight  connections  packets  bytes  version
+    ---------  ----------  -----  ------------  ---------  ----------  ---------  -------  ------  -----------  -------  -----  -------
+    balancer0  10.49.0.1   tcp    80            rr         2000:49::1  80         false    1       0            0        0      11
+    balancer0  10.49.0.1   tcp    80            rr         2000:49::2  80         false    1       0            0        0      11
+    balancer0  10.49.0.2   tcp    80            rr         2001:49::1  80         false    1       0            0        0      0
+    balancer0  10.49.0.2   tcp    80            rr         2001:49::2  80         false    1       0            0        0      0
+    balancer0  10.49.0.3   tcp    80            rr         2002:49::1  80         false    1       0            0        0      Kukarek
+    balancer0  10.49.0.3   tcp    80            rr         2002:49::2  80         false    1       0            0        0      Kukarek
+    balancer0  10.49.0.4   tcp    80            rr         2003:49::1  80         false    1       0            0        0      n/s
+    balancer0  10.49.0.4   tcp    80            rr         2003:49::2  80         false    1       0            0        0      n/s

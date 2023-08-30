@@ -52,6 +52,7 @@ message BalancerRealFindResponse {
     ServiceKey key = 1;
     string scheduler = 2;
     repeated Real reals = 3;
+    optional string version = 4;
   }
   message BalancerData {
     uint32 balancer_id = 1;
