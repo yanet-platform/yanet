@@ -13,7 +13,7 @@ steps:
     expect: 001-expect.pcap
 # ops must be ignored by tcp service. connections>0
 - cli_check: |
-    balancer real balancer0 10.0.0.6 tcp
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.6 tcp
     module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
     ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
     balancer0  10.0.0.6    tcp    80            wrr        2056::1  80         true     1       2            2        196
@@ -27,7 +27,7 @@ steps:
       expect: 002-expect.pcap
 # ops service must not create connections
 - cli_check: |
-    balancer real balancer0 10.0.0.6 udp
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.6 udp
     module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
     ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
     balancer0  10.0.0.6    udp    80            wrr        2056::1  80         false    1       0            0        0
@@ -44,7 +44,7 @@ steps:
       expect: 003-expect.pcap
 # packets must get different scheduling after flush
 - cli_check: |
-    balancer real balancer0 10.0.0.6 udp
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.6 udp
     module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
     ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
     balancer0  10.0.0.6    udp    80            wrr        2056::1  80         true     1       0            1        86

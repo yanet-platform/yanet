@@ -359,6 +359,7 @@ namespace balancer_summary
 namespace balancer_service
 {
 	using service = std::tuple<std::string, ///< scheduler
+		                   std::optional<std::string>, ///< version
 	                           uint64_t, ///< connections
 	                           uint64_t, ///< packets
 	                           uint64_t>; ///< bytes
@@ -387,6 +388,7 @@ namespace balancer_real_find
 	                        uint64_t>; ///< bytes
 
 	using service = std::tuple<std::string, ///< scheduler
+		                   std::optional<std::string>, ///< version
 	                           std::vector<real>>;
 
 	using request = std::tuple<std::optional<std::string>, ///< module

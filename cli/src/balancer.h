@@ -75,7 +75,8 @@ void service(std::string module_string,
 	             "scheduler",
 	             "connections",
 	             "packets",
-	             "bytes");
+	             "bytes",
+	             "version");
 
 	for (const auto& [module, services] : response)
 	{
@@ -84,7 +85,7 @@ void service(std::string module_string,
 		for (const auto& [service_key, service_value] : services)
 		{
 			const auto& [virtual_ip, proto, virtual_port] = service_key;
-			const auto& [scheduler, nap_connections, packets, bytes] = service_value;
+			const auto& [scheduler, version, nap_connections, packets, bytes] = service_value;
 			(void)nap_connections; ///< @todo: DELETE
 
 			auto proto_string = controlplane::balancer::from_proto(proto);
@@ -111,7 +112,8 @@ void service(std::string module_string,
 			             scheduler,
 			             connections,
 			             packets,
-			             bytes);
+			             bytes,
+			             version);
 		}
 	}
 
@@ -209,7 +211,8 @@ void real_find(std::string module_string,
 	             "weight",
 	             "connections",
 	             "packets",
-	             "bytes");
+	             "bytes",
+	             "version");
 
     for (const auto& balancer : response.balancers())
     {
@@ -253,7 +256,8 @@ void real_find(std::string module_string,
                              real.weight(),
                              connections,
                              real.packets(),
-                             real.bytes());
+                             real.bytes(),
+			     service.has_version() ? std::make_optional(service.version()) : std::nullopt);
             }
         }
     }

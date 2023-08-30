@@ -305,6 +305,7 @@ using service_t = std::tuple<balancer_service_id_t,
                              common::ip_address_t, ///< vip
                              uint8_t, ///< proto
                              uint16_t, ///< vport
+                             std::optional<std::string>, ///< version
                              ::balancer::scheduler,
                              ::balancer::scheduler_params,
                              uint8_t, ///< flags: mss_fix|ops

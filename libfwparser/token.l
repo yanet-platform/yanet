@@ -67,7 +67,7 @@ ip6	(({hexadecatet}:){6}{lu32})|(::({hexadecatet}:){5}{lu32})|(({hexadecatet}?):
 ip6scopied	{ip6}%[a-zA-Z0-9._]+
 network6 {ip6}\/{digit}+
 net6prjid	{hexdigit}{1,8}(\/{digit}+)?@{network6}
-label	:[0-9A-Za-z_]+
+label	:[-\.0-9A-Za-z_]+
 macro	_[0-9A-Z_]+_
 tablename	[-\.0-9A-Za-z]{1,63}
 host	[0-9A-Za-z][-0-9A-Za-z]*

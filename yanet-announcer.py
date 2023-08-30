@@ -1,418 +1,483 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import argparse
+import functools
 import json
-import os
-import time
-import subprocess
-import sys
+import logging
 import signal
+import subprocess
+import textwrap
+import time
+import typing
+from collections import abc
+
+CHECK_SERVICES_LIST: typing.List[str] = ["yanet-init", "yanet-dataplane", "yanet-controlplane"]
+
+CONFIGURATION_PATH: str = "/etc/yanet/announcer.conf"
+MACHINE_TARGET_PATH: str = "/etc/yanet/target"
+
+ANNOUNCER_CONFIG: typing.Any = None
+LOGGER: typing.Optional[logging.Logger] = None
+OPTIONS: typing.Optional[argparse.Namespace] = None
+SIGNAL_RECV: bool = False
+
+SKIP_CHECKS_ALL_KEYWORD: str = "all"
+SKIP_CHECKS_CONFIG_PARAM: str = "skip_checks"
 
 
-services = ["yanet-init", "yanet-dataplane", "yanet-controlplane"]
-announcer_config_path = "/etc/yanet/announcer.conf"
-machine_target_path = "/etc/yanet/target"
+class Decorator:
+    """Class with static decorators."""
+
+    @staticmethod
+    def skip_function(return_value: typing.Any = None):
+        """Decorator skips func execution for passed names in args."""
+
+        def decorator(func: typing.Callable):
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                if func.__name__ in OPTIONS.skip or SKIP_CHECKS_ALL_KEYWORD in OPTIONS.skip:
+                    LOGGER.debug("skip func execution: %s", func.__name__)
+                    return return_value
+                return func(*args, **kwargs)
+
+            return wrapper
+
+        return decorator
+
+    @staticmethod
+    def logger_function(func: typing.Callable):
+        """Decorator logs func args."""
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if OPTIONS.dry_run:
+                LOGGER.debug("func call %s(%s, %s)", func.__name__, args, kwargs)
+            return func(*args, **kwargs)
+
+        return wrapper
 
 
-class Table:
-	def __init__(self, command):
-		out = subprocess.check_output(command, shell=True).decode('ascii').splitlines()
+class Executer:
+    """Class that allow to execute commands."""
 
-		if len(out) <= 1:
-			return
+    @staticmethod
+    @functools.lru_cache(maxsize=128)
+    def get(command: str) -> typing.List[typing.Dict[str, str]]:
+        """Execute and parse output."""
 
-		self.column_lengths = [len(column) for column in out[1].split("  ")]
+        # don't use generator output, because LRU cache return wrong response
+        parsed_output: typing.List[typing.Dict[str, str]] = []
 
-		offset = 0
-		self.headers = []
-		for i in range(0, len(self.column_lengths)):
-			self.headers.append(out[0][offset:offset + self.column_lengths[i]].strip())
-			offset += self.column_lengths[i] + 2
+        out = subprocess.check_output(command, shell=True).decode("ascii").splitlines()
+        if len(out) <= 1:
+            return parsed_output
 
-		self.rows = []
-		for row_i in range(2, len(out)):
-			offset = 0
-			columns = {}
-			for i in range(0, len(self.column_lengths)):
-				columns[self.headers[i]] = out[row_i][offset:offset + self.column_lengths[i]].strip()
-				offset += self.column_lengths[i] + 2
+        column_lengths: typing.List[int] = [len(column) for column in out[1].split("  ")]
 
-			self.rows.append(columns)
+        offset = 0
+        headers = []
+        for i in range(0, len(column_lengths)):
+            headers.append(out[0][offset : offset + column_lengths[i]].strip())
+            offset += column_lengths[i] + 2
+
+        for row_i in range(2, len(out)):
+            offset = 0
+            columns: typing.Dict[str, str] = {}
+
+            for i in range(0, len(column_lengths)):
+                columns[headers[i]] = out[row_i][offset : offset + column_lengths[i]].strip()
+                offset += column_lengths[i] + 2
+            parsed_output.append(columns)
+
+        return parsed_output
+
+    @staticmethod
+    def flush_cache() -> None:
+        Executer.get.cache_clear()
+
+    @staticmethod
+    def run(command: str) -> int:
+        """Execute and return exit code."""
+
+        proc = subprocess.run(command, shell=True)
+        return proc.returncode
 
 
 def bgp_update_ipv4(prefix):
-	global testing
-	global announcer_config
+    LOGGER.info("bgp_update_ipv4: %s", prefix)
+    if prefix not in ANNOUNCER_CONFIG:
+        return
 
-	print(f"bgp_update_ipv4: {prefix}")
-	if prefix in announcer_config:
-		for command in announcer_config[prefix]["update"]:
-			print(command)
-			if not testing:
-				os.system(command)
+    for command in ANNOUNCER_CONFIG[prefix]["update"]:
+        LOGGER.info(command)
+        if not OPTIONS.dry_run:
+            Executer.run(command)
 
 
 def bgp_remove_ipv4(prefix):
-	global testing
-	global announcer_config
+    LOGGER.info("bgp_remove_ipv4: %s", prefix)
+    if prefix not in ANNOUNCER_CONFIG:
+        return
 
-	print(f"bgp_remove_ipv4: {prefix}")
-	if prefix in announcer_config:
-		for command in announcer_config[prefix]["remove"]:
-			print(command)
-			if not testing:
-				os.system(command)
+    for command in ANNOUNCER_CONFIG[prefix]["remove"]:
+        LOGGER.info(command)
+        if not OPTIONS.dry_run:
+            Executer.run(command)
 
 
 def bgp_update_ipv6(prefix):
-	global testing
-	global announcer_config
+    LOGGER.info("bgp_update_ipv6: %s", prefix)
+    if prefix not in ANNOUNCER_CONFIG:
+        return
 
-	print(f"bgp_update_ipv6: {prefix}")
-	if prefix in announcer_config:
-		for command in announcer_config[prefix]["update"]:
-			print(command)
-			if not testing:
-				os.system(command)
+    for command in ANNOUNCER_CONFIG[prefix]["update"]:
+        LOGGER.info(command)
+        if not OPTIONS.dry_run:
+            Executer.run(command)
 
 
 def bgp_remove_ipv6(prefix):
-	global testing
-	global announcer_config
+    LOGGER.info("bgp_remove_ipv6: %s", prefix)
+    if prefix not in ANNOUNCER_CONFIG:
+        return
 
-	print(f"bgp_remove_ipv6: {prefix}")
-	if prefix in announcer_config:
-		for command in announcer_config[prefix]["remove"]:
-			print(command)
-			if not testing:
-				os.system(command)
+    for command in ANNOUNCER_CONFIG[prefix]["remove"]:
+        LOGGER.info(command)
+        if not OPTIONS.dry_run:
+            Executer.run(command)
 
 
 def bgp_update(prefix):
-	if ":" in prefix:
-		bgp_update_ipv6(prefix)
-	else:
-		bgp_update_ipv4(prefix)
+    if ":" in prefix:
+        bgp_update_ipv6(prefix)
+    else:
+        bgp_update_ipv4(prefix)
 
 
 def bgp_remove(prefix):
-	if ":" in prefix:
-		bgp_remove_ipv6(prefix)
-	else:
-		bgp_remove_ipv4(prefix)
-
-
-def print_usage():
-	print("usage: %s --run" % (sys.argv[0]))
-	print("       %s --test" % (sys.argv[0]))
-
-
-def get_table(command):
-	global tables
-
-	if command not in tables:
-		tables[command] = Table(command)
-
-	return tables[command]
+    if ":" in prefix:
+        bgp_remove_ipv6(prefix)
+    else:
+        bgp_remove_ipv4(prefix)
 
 
 def get_announces(types):
-	for type in types:
-		table_decap = get_table(f"yanet-cli {type}")
-		table_decap_announce = get_table(f"yanet-cli {type} announce")
+    for type in types:
+        table_decap = Executer.get(f"yanet-cli {type}")
+        table_decap_announce = Executer.get(f"yanet-cli {type} announce")
 
-		for table_decap_row in table_decap.rows:
-			module = table_decap_row["module"]
-			next_module = table_decap_row["next_module"]
+        for table_decap_row in table_decap:
+            module = table_decap_row["module"]
+            next_module = table_decap_row["next_module"]
 
-			announces = []
-			for table_decap_announce_row in table_decap_announce.rows:
-				if table_decap_announce_row["module"] != module:
-					continue
+            announces = []
+            for table_decap_announce_row in table_decap_announce:
+                if table_decap_announce_row["module"] != module:
+                    continue
 
-				if table_decap_announce_row["announces"] == "n/s":
-					continue
+                if table_decap_announce_row["announces"] == "n/s":
+                    continue
 
-				announces.extend(table_decap_announce_row["announces"].split(","))
+                announces.extend(table_decap_announce_row["announces"].split(","))
 
-			yield {"module": module,
-			       "type": type,
-			       "announces": announces,
-			       "next_module": next_module}
+            yield {"module": module, "type": type, "announces": announces, "next_module": next_module}
 
 
+@Decorator.logger_function
+@Decorator.skip_function()
 def check_services():
-	global testing
-
-	if testing:
-		print("check_services()")
-
-	for service in services:
-		if os.system("systemctl status %s.service > /dev/null" % (service)):
-			raise Exception(f"check_services({service})")
+    for service in CHECK_SERVICES_LIST:
+        if Executer.run(f"systemctl status {service}.service > /dev/null"):
+            raise Exception(f"check_services({service})")
 
 
-def check_rib(rib_table):
-	global testing
+@Decorator.logger_function
+@Decorator.skip_function()
+def check_rib(rib_table: str) -> None:
+    runtime_rib_table = Executer.get("yanet-cli rib")
 
-	if testing:
-		print(f"check_rib('{rib_table}')")
+    if len(runtime_rib_table) < 1:
+        raise Exception(f"check_rib('{rib_table}')")
 
-	table = get_table("yanet-cli rib")
+    for row in runtime_rib_table:
+        if row["table_name"] == rib_table:
+            return
 
-	if len(table.rows) == 0:
-		raise Exception(f"check_rib('{rib_table}')")
-
-	for row in table.rows:
-		if row["table_name"] == rib_table and row["eor"] == "true":
-			return
-
-	raise Exception(f"check_rib('{rib_table}')")
+    raise Exception(f"check_rib('{rib_table}')")
 
 
+@Decorator.logger_function
+@Decorator.skip_function()
 def check_default_v4(route):
-	global testing
+    interfaces = Executer.get("yanet-cli route interface")
+    routes = Executer.get(f"yanet-cli route get {route} 0.0.0.0/0")
 
-	if testing:
-		print(f"check_default_v4('{route}')")
+    for route_row in routes:
+        for interface_row in interfaces:
+            if interface_row["module"] != route:
+                continue
+            if route_row["egress_interface"] == interface_row["interface"]:
+                return
 
-	interfaces = get_table("yanet-cli route interface")
-	routes = get_table(f"yanet-cli route get {route} 0.0.0.0/0")
-
-	for route_row in routes.rows:
-		for interface_row in interfaces.rows:
-			if interface_row["module"] != route:
-				continue
-			if route_row["egress_interface"] == interface_row["interface"]:
-				return
-
-	raise Exception(f"check_default_v4('{route}')")
+    raise Exception(f"check_default_v4('{route}')")
 
 
+@Decorator.logger_function
+@Decorator.skip_function()
 def check_default_v6(route):
-	global testing
+    interfaces = Executer.get("yanet-cli route interface")
+    routes = Executer.get(f"yanet-cli route get {route} ::/0")
 
-	if testing:
-		print(f"check_default_v6('{route}')")
+    for route_row in routes:
+        for interface_row in interfaces:
+            if interface_row["module"] != route:
+                continue
+            if route_row["egress_interface"] == interface_row["interface"]:
+                return
 
-	interfaces = get_table("yanet-cli route interface")
-	routes = get_table(f"yanet-cli route get {route} ::/0")
-
-	for route_row in routes.rows:
-		for interface_row in interfaces.rows:
-			if interface_row["module"] != route:
-				continue
-			if route_row["egress_interface"] == interface_row["interface"]:
-				return
-
-	raise Exception(f"check_default_v6('{route}')")
+    raise Exception(f"check_default_v6('{route}')")
 
 
+@Decorator.logger_function
+@Decorator.skip_function()
 def check_interfaces_neighbor_v4():
-	global testing
+    interfaces = Executer.get("yanet-cli route interface")
+    for row in interfaces:
+        if row["neighbor_mac_address_v4"] != "n/s":
+            return
 
-	if testing:
-		print(f"check_interfaces_neighbor_v4()")
-
-	interfaces = get_table("yanet-cli route interface")
-
-	for row in interfaces.rows:
-		if row["neighbor_mac_address_v4"] != "n/s":
-			return
-
-	raise Exception(f"check_interfaces_neighbor_v4()")
+    raise Exception(f"check_interfaces_neighbor_v4()")
 
 
+@Decorator.logger_function
+@Decorator.skip_function()
 def check_interfaces_neighbor_v6():
-	global testing
+    interfaces = Executer.get("yanet-cli route interface")
+    for row in interfaces:
+        if row["neighbor_mac_address_v6"] != "n/s":
+            return
 
-	if testing:
-		print(f"check_interfaces_neighbor_v6()")
-
-	interfaces = get_table("yanet-cli route interface")
-
-	for row in interfaces.rows:
-		if row["neighbor_mac_address_v6"] != "n/s":
-			return
-
-	raise Exception(f"check_interfaces_neighbor_v6()")
+    raise Exception(f"check_interfaces_neighbor_v6()")
 
 
+@Decorator.logger_function
+@Decorator.skip_function(return_value=True)
 def check_module(module):
-	global testing
+    try:
+        check_services()
 
-	try:
-		check_services()
+        if module["type"] == "tun64":
+            check_rib("ipv4 unicast")
+            check_rib("ipv6 unicast")
+            if module["next_module"].endswith(":tunnel"):
+                check_default_v4(module["next_module"][:-7])
+                check_default_v6(module["next_module"][:-7])
+            else:
+                check_default_v4(module["next_module"])
+                check_default_v6(module["next_module"])
+            check_interfaces_neighbor_v4()
+            check_interfaces_neighbor_v6()
+        elif module["type"] == "nat64stateful":
+            check_rib("ipv4 unicast")
+            check_rib("ipv6 unicast")
+            if module["next_module"].endswith(":tunnel"):
+                check_default_v4(module["next_module"][:-7])
+                check_default_v6(module["next_module"][:-7])
+            else:
+                check_default_v4(module["next_module"])
+                check_default_v6(module["next_module"])
+            check_interfaces_neighbor_v4()
+            check_interfaces_neighbor_v6()
+        elif module["type"] == "decap":
+            if module["next_module"].endswith(":tunnel"):
+                check_rib("ipv4 unicast")
+                check_rib("ipv6 unicast")
+                check_default_v4(module["next_module"][:-7])
+                check_default_v6(module["next_module"][:-7])
+                check_interfaces_neighbor_v4()
+                check_interfaces_neighbor_v6()
+            else:
+                check_rib("ipv4 unicast")
+                check_default_v4(module["next_module"])
+                check_interfaces_neighbor_v4()
+        elif module["type"] == "nat64stateless":
+            check_rib("ipv4 unicast")
+            check_rib("ipv6 unicast")
+            if module["next_module"].endswith(":tunnel"):
+                check_default_v4(module["next_module"][:-7])
+                check_default_v6(module["next_module"][:-7])
+            else:
+                check_default_v4(module["next_module"])
+                check_default_v6(module["next_module"])
+            check_interfaces_neighbor_v4()
+            check_interfaces_neighbor_v6()
+        elif module["type"] == "dregress":
+            check_rib("ipv4 unicast")
+            check_rib("ipv6 unicast")
+            check_default_v4(module["next_module"])
+            check_default_v6(module["next_module"])
+            check_interfaces_neighbor_v4()
+            check_interfaces_neighbor_v6()
+        elif module["type"] == "balancer":
+            check_rib("ipv6 unicast")
+            check_default_v6(module["next_module"])
+            check_interfaces_neighbor_v6()
+        elif module["type"] == "firewall":
+            check_rib("ipv6 unicast")
+            check_default_v6(module["next_module"])
+            check_interfaces_neighbor_v6()
+    except Exception as error:
+        if OPTIONS.dry_run:
+            LOGGER.error("Fail: %s", error)
 
-		if module["type"] == "tun64":
-			check_rib("ipv4 unicast")
-			check_rib("ipv6 unicast")
-			if module["next_module"].endswith(":tunnel"):
-				check_default_v4(module["next_module"][:-7])
-				check_default_v6(module["next_module"][:-7])
-			else:
-				check_default_v4(module["next_module"])
-				check_default_v6(module["next_module"])
-			check_interfaces_neighbor_v4()
-			check_interfaces_neighbor_v6()
-		elif module["type"] == "nat64stateful":
-			check_rib("ipv4 unicast")
-			check_rib("ipv6 unicast")
-			if module["next_module"].endswith(":tunnel"):
-				check_default_v4(module["next_module"][:-7])
-				check_default_v6(module["next_module"][:-7])
-			else:
-				check_default_v4(module["next_module"])
-				check_default_v6(module["next_module"])
-			check_interfaces_neighbor_v4()
-			check_interfaces_neighbor_v6()
-		elif module["type"] == "decap":
-			if module["next_module"].endswith(":tunnel"):
-				check_rib("ipv4 unicast")
-				check_rib("ipv6 unicast")
-				check_default_v4(module["next_module"][:-7])
-				check_default_v6(module["next_module"][:-7])
-				check_interfaces_neighbor_v4()
-				check_interfaces_neighbor_v6()
-			else:
-				check_rib("ipv4 unicast")
-				check_default_v4(module["next_module"])
-				check_interfaces_neighbor_v4()
-		elif module["type"] == "nat64stateless":
-			check_rib("ipv4 unicast")
-			check_rib("ipv6 unicast")
-			if module["next_module"].endswith(":tunnel"):
-				check_default_v4(module["next_module"][:-7])
-				check_default_v6(module["next_module"][:-7])
-			else:
-				check_default_v4(module["next_module"])
-				check_default_v6(module["next_module"])
-			check_interfaces_neighbor_v4()
-			check_interfaces_neighbor_v6()
-		elif module["type"] == "dregress":
-			check_rib("ipv4 unicast")
-			check_rib("ipv6 unicast")
-			check_default_v4(module["next_module"])
-			check_default_v6(module["next_module"])
-			check_interfaces_neighbor_v4()
-			check_interfaces_neighbor_v6()
-		elif module["type"] == "balancer":
-			check_rib("ipv6 unicast")
-			check_default_v6(module["next_module"])
-			check_interfaces_neighbor_v6()
-		elif module["type"] == "firewall":
-			check_rib("ipv6 unicast")
-			check_default_v6(module["next_module"])
-			check_interfaces_neighbor_v6()
-	except Exception as error:
-		if testing:
-			print(f"fail: {error}")
-		return False
+        return False
+    return True
 
-	return True
+
+@Decorator.logger_function
+@Decorator.skip_function(return_value=True)
+def check_firewall_module():
+    """Wrapper for firewall check module: allow to skip only firewall check."""
+    firewall_module_definition: typing.Dict[str, str] = {
+        "module": "firewall",
+        "type": "firewall",
+        "next_module": "route0",
+    }
+
+    return check_module(firewall_module_definition)
 
 
 def signal_handler(signum, frame):
-	global stop
-	stop = True
+    global SIGNAL_RECV
+    SIGNAL_RECV = True
+
+
+def init_logger():
+    global LOGGER
+
+    LOGGER = logging.getLogger(__name__)
+    LOGGER.setLevel(logging.INFO)
+
+    formatter = logging.Formatter("%(filename)s:%(lineno)s - %(levelname)s - %(message)s")
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+
+    LOGGER.addHandler(handler)
+
+
+def parse_args():
+    global OPTIONS
+
+    parser = argparse.ArgumentParser(description="YANET announcer", formatter_class=argparse.RawTextHelpFormatter)
+    run_mode_group = parser.add_mutually_exclusive_group(required=True)
+    run_mode_group.add_argument(
+        "-r", "--run", action="store_true", default=False, dest="daemon", help="run as a daemon"
+    )
+    run_mode_group.add_argument(
+        "-t", "--test", action="store_true", default=False, dest="dry_run", help="dry-run one time execution"
+    )
+    parser.add_argument(
+        "-s",
+        "--skip",
+        type=str,
+        nargs="*",
+        default=[],
+        dest="skip",
+        help=textwrap.dedent(
+            f"skipped checks names (keyword '{SKIP_CHECKS_ALL_KEYWORD}' disables all checks).\n"
+            f"Option may be overridden with configuration '{SKIP_CHECKS_CONFIG_PARAM}' param."
+        ),
+    )
+    OPTIONS = parser.parse_args()
+
+
+def update_config():
+    global ANNOUNCER_CONFIG
+    global OPTIONS
+
+    with open(CONFIGURATION_PATH) as f:
+        ANNOUNCER_CONFIG = json.load(f)
+
+    # Use skip checks for skip flag rewrite opts.
+    # "pop" using for back compatibility with previous format,
+    #   where ANNOUNCER_CONFIG contains only prefixes
+    config_skip_checks: typing.Iterable[str] = ANNOUNCER_CONFIG.pop(SKIP_CHECKS_CONFIG_PARAM, [])
+    if config_skip_checks and isinstance(config_skip_checks, abc.Iterable):
+        OPTIONS.skip = config_skip_checks
+
 
 def main():
-	global tables
-	global stop
-	global testing
-	global announcer_config
-	global is_fw
+    init_logger()
+    parse_args()
 
-	if len(sys.argv) != 2:
-		print_usage()
-		sys.exit(1)
+    if OPTIONS.daemon:
+        signal.signal(signal.SIGTERM, signal_handler)
 
-	if sys.argv[1] == "--run":
-		testing = False
-		signal.signal(signal.SIGTERM, signal_handler)
+    current_prefixes = []
+    report_counter: int = 0
+    is_firewall_machine: bool = False
 
-	current_prefixes = []
-	report_counter = 0
-	is_fw = False
+    try:
+        with open(MACHINE_TARGET_PATH, "r", encoding="UTF-8") as file:
+            line = file.readline().rstrip()
+            if "firewall" in line:
+                is_firewall_machine = True
+    except Exception as error:
+        LOGGER.error("Failed to read target file: %s", error)
 
-	try:
-		with open(machine_target_path, 'r', encoding='UTF-8') as file:
-			line = file.readline().rstrip()
-			if "firewall" in line:
-				is_fw = True
-			file.close()
-	except Exception as error:
-		print(f"failed to read target file: {error}")
+    while True:
+        Executer.flush_cache()
+        prefixes: typing.List[str] = []
 
-	while True:
-		prefixes = []
-		tables = {}
+        try:
+            update_config()
+        except Exception as error:
+            if report_counter % 25 == 0:
+                LOGGER.error("Fail: %s", error)
+            report_counter += 1
+            time.sleep(1)
+            continue
 
-		try:
-			with open(announcer_config_path) as f:
-				announcer_config = json.load(f)
-		except Exception as error:
-			if (report_counter % 25 == 0):
-				print(f"fail: {error}")
-			report_counter += 1
-			time.sleep(1)
-			continue
+        try:
+            for module in get_announces(["decap", "nat64stateless", "dregress", "balancer", "tun64", "nat64stateful"]):
+                if OPTIONS.dry_run:
+                    LOGGER.info(module)
 
-		try:
-			for module in get_announces(["decap", "nat64stateless", "dregress", "balancer", "tun64", "nat64stateful"]):
-				if testing:
-					print(module)
+                if check_module(module):
+                    prefixes.extend(module["announces"])
+        except:
+            pass
 
-				if check_module(module):
-					prefixes.extend(module["announces"])
+        if is_firewall_machine and check_firewall_module():
+            prefixes.extend(["firewall::/128"])
 
-				if testing:
-					print()
-		except:
-			pass
+        for prefix in list(set(prefixes) - set(current_prefixes)):
+            try:
+                bgp_update(prefix)
+            except:
+                pass
 
-		if is_fw:
-			if check_module({
-				"module": "firewall",
-				"type": "firewall",
-				"next_module": "route0"}):
-				prefixes.extend(["firewall::/128"])
+        for prefix in list(set(current_prefixes) - set(prefixes)):
+            try:
+                bgp_remove(prefix)
+            except:
+                pass
 
-		for prefix in list(set(prefixes) - set(current_prefixes)):
-			try:
-				bgp_update(prefix)
-			except:
-				pass
+        if not OPTIONS.daemon:
+            return
 
-		for prefix in list(set(current_prefixes) - set(prefixes)):
-			try:
-				bgp_remove(prefix)
-			except:
-				pass
+        current_prefixes = prefixes
+        if SIGNAL_RECV:
+            for prefix in current_prefixes:
+                try:
+                    bgp_remove(prefix)
+                except:
+                    pass
+            return
 
-		if testing:
-			sys.exit(0)
-
-		current_prefixes = prefixes
-
-		if stop:
-			for prefix in current_prefixes:
-				try:
-					bgp_remove(prefix)
-				except:
-					pass
-
-			sys.exit(0)
-
-		sys.stdout.flush()
-		time.sleep(1)
+        time.sleep(1)
 
 
-tables = {}
-stop = False
-testing = True
-announcer_config = None
-
-
-if __name__ == '__main__':
-	main()
+if __name__ == "__main__":
+    main()

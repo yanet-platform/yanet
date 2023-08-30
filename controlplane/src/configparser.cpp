@@ -1550,6 +1550,8 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			throw error_result_t(eResult::invalidConfigurationFile, "too many services");
 		}
 
+		std::optional<std::string> service_version = exist(service_json, "version") ? std::make_optional(service_json["version"].get<std::string>()) : std::nullopt;
+
 		std::string scheduler_string = service_json["scheduler"];
 
 		balancer::scheduler scheduler;
@@ -1626,6 +1628,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 		                               service_json["vip"].get<std::string>(),
 		                               proto,
 		                               std::stoll(service_json["vport"].get<std::string>(), nullptr, 0),
+		                               service_version,
 		                               scheduler,
 		                               scheduler_params,
 					       flags,

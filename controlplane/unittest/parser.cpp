@@ -738,4 +738,13 @@ add skipto :WIN ip from any to any { via o19 or via o20 } in
 	EXPECT_TRUE(parse_rules(rules));
 }
 
+TEST(Parser, 065_SkiptoDotDash)
+{
+		const auto rules = R"IPFW(
+add skipto :BEGIN-section.service ip from any to any
+:BEGIN-section.service
+)IPFW";
+	EXPECT_TRUE(parse_rules(rules));
+}
+
 } // namespace

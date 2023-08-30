@@ -123,9 +123,13 @@ void balancer_t::RealFind(
 			}
 			proto_service_key->set_port(port);
 
-			const auto& [scheduler, reals] = service_value;
+			const auto& [scheduler, version, reals] = service_value;
 
 			proto_service->set_scheduler(scheduler.data());
+			if (version.has_value())
+			{
+				proto_service->set_version(version->data());
+			}
 
 			for (const auto& [ip, port, enabled, weight, connections, packets, bytes] : reals)
 			{
@@ -220,9 +224,10 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 
 	for (const auto& [module_name, balancer] : base_prev.balancers)
 	{
-		for (const auto& [service_id, virtual_ip, proto, virtual_port, scheduler, scheduler_params, flags, reals] : balancer.services)
+		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, flags, reals] : balancer.services)
 		{
 			(void)service_id;
+			(void)version;
 			(void)scheduler;
 			(void)scheduler_params;
 			(void)reals;
@@ -250,9 +255,10 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 	{
 		std::unordered_set<std::tuple<common::ip_address_t, uint16_t, uint8_t>> vip_vport_proto;
 
-		for (const auto& [service_id, virtual_ip, proto, virtual_port, scheduler, scheduler_params, flags, reals] : balancer.services)
+		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, flags, reals] : balancer.services)
 		{
 			(void)service_id;
+			(void)version;
 			(void)scheduler;
 			(void)scheduler_params;
 			(void)flags;
@@ -443,8 +449,9 @@ common::icp::balancer_service::response balancer_t::balancer_service(const commo
 
 			response[module][service_key].swap(service);
 
-			auto& [scheduler, connections, packets, bytes] = response[module][service_key];
+			auto& [scheduler, version, connections, packets, bytes] = response[module][service_key];
 			(void)scheduler;
+			(void)version;
 			(void)connections; ///< @todo: DELETE
 
 			auto it = counters.find({module_name,
@@ -507,8 +514,9 @@ common::icp::balancer_real_find::response balancer_t::balancer_real_find(const c
 
 			response[module][service_key].swap(service);
 
-			auto& [scheduler, response_reals] = response[module][service_key];
+			auto& [scheduler, version, response_reals] = response[module][service_key];
 			(void)scheduler;
+			(void)version;
 
 			std::vector<common::icp::balancer_real_find::real> filtered_reals;
 			for (auto& [real_ip, real_port, enabled, weight, connections, packets, bytes] : response_reals)
@@ -592,7 +600,7 @@ void balancer_t::update_service(const balancer::generation_config_t& generation_
 		uint64_t services_reals_enabled_count = 0;
 		uint64_t services_reals_count = 0;
 
-		for (const auto& [service_id, virtual_ip, proto, virtual_port, scheduler, scheduler_params, flags, reals] : balancer.services)
+		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, flags, reals] : balancer.services)
 		{
 			(void) flags;
 			(void) scheduler_params;
@@ -604,14 +612,16 @@ void balancer_t::update_service(const balancer::generation_config_t& generation_
 
 			uint32_t enabled_count = 0;
 
-			auto& [service_scheduler, service_connections, service_packets, service_bytes] = generation_services.services[{balancer.balancer_id, module_name}][{virtual_ip, proto, virtual_port}];
+			auto& [service_scheduler, service_version, service_connections, service_packets, service_bytes] = generation_services.services[{balancer.balancer_id, module_name}][{virtual_ip, proto, virtual_port}];
 			service_scheduler = to_string(scheduler); ///< @todo: OPT
+			service_version = version;
 			(void)service_connections; ///< @todo: DELETE
 			(void)service_packets; ///< filled in request
 			(void)service_bytes; ///< filled in request
 
-			auto& [reals_service_scheduler, service_reals] = generation_services.reals[{balancer.balancer_id, module_name}][{virtual_ip, proto, virtual_port}];
+			auto& [reals_service_scheduler, reals_version, service_reals] = generation_services.reals[{balancer.balancer_id, module_name}][{virtual_ip, proto, virtual_port}];
 			reals_service_scheduler = service_scheduler;
+			reals_version = version;
 
 			for (const auto& [real_ip, real_port, weight] : reals)
 			{
@@ -674,9 +684,10 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 
 	for (const auto& [module_name, balancer] : generation_config.config_balancers)
 	{
-		for (const auto& [service_id, virtual_ip, proto, virtual_port, scheduler, scheduler_params, flags, reals] : balancer.services)
+		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, flags, reals] : balancer.services)
 		{
 			(void) scheduler_params;
+			(void) version;
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
@@ -742,11 +753,12 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 	for (const auto& [module_name, balancer] : generation_config.config_balancers)
 	{
 
-		for (const auto& [service_id, virtual_ip, proto, virtual_port, scheduler, scheduler_params, flags, reals] : balancer.services)
+		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, flags, reals] : balancer.services)
 		{
 			(void)flags;
 			(void)scheduler;
 			(void)scheduler_params;
+			(void)version;
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
 				continue;
