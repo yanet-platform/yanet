@@ -63,9 +63,9 @@ namespace acl
 	/// @todo: move to config
 	using network_ipv4_source = lpm4_24bit_8bit_id32_dynamic;
 	using network_ipv4_destination = lpm4_24bit_8bit_id32_dynamic;
-	using network_ipv6_source = lpm6_8x16bit_id32_dynamic;
+	using network_ipv6_source = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
 	using network_ipv6_destination_ht = hashtable_mod_id32_dynamic<ipv6_address_t, 1>;
-	using network_ipv6_destination = lpm6_8x16bit_id32_dynamic;
+	using network_ipv6_destination = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
 	using network_table = dynamic_table<uint32_t>;
 	using transport_table = hashtable_mod_id32_dynamic<common::acl::transport_key_t, 16>;
 	using total_table = hashtable_mod_id32_dynamic<common::acl::total_key_t, 16>;

@@ -2668,4 +2668,238 @@ protected:
 	chunk_t chunks[1];
 };
 
+class lpm6_16x8bit_id32_dynamic
+{
+public:
+	class updater
+	{
+	public:
+		updater() :
+		        lpm(nullptr),
+		        chunks_size(0)
+		{
+		}
+
+		void update_pointer(lpm6_16x8bit_id32_dynamic* lpm,
+		                    const tSocketId socket_id,
+		                    const unsigned int chunks_size)
+		{
+			this->lpm = lpm;
+			this->socket_id = socket_id;
+			this->chunks_size = chunks_size;
+		}
+
+		eResult update(const std::vector<common::acl::tree_chunk_8bit_t>& from_chunks)
+		{
+			chunks_count = 1; ///< 0 is root chunk
+			remap_chunks.resize(0);
+			remap_chunks.resize(from_chunks.size(), 0);
+			return update_chunk(from_chunks, root_chunk_id, root_chunk_id);
+		}
+
+	public:
+		template<typename list_T> ///< @todo: common::idp::limits::response
+		void limits(list_T& list,
+		            const std::string& name) const
+		{
+			list.emplace_back(name + ".chunks",
+			                  socket_id,
+			                  chunks_count,
+			                  chunks_size);
+		}
+
+		template<typename json_t> ///< @todo: nlohmann::json
+		void report(json_t& json) const
+		{
+			json["chunks_count"] = chunks_count;
+		}
+
+	protected:
+		inline unsigned int allocate_chunk()
+		{
+			if (chunks_count >= chunks_size)
+			{
+				return 0;
+			}
+
+			unsigned int new_chunk_id = chunks_count;
+			chunks_count++;
+
+			return new_chunk_id;
+		}
+
+		eResult update_chunk(const std::vector<common::acl::tree_chunk_8bit_t>& from_chunks,
+		                     const unsigned int from_chunk_id,
+		                     const unsigned int chunk_id)
+		{
+			auto& chunk = lpm->chunks[chunk_id];
+			chunk = {}; ///< @todo: delete?
+
+			const auto& from_chunk = from_chunks[from_chunk_id];
+
+			memcpy(chunk.values , from_chunk.values, (1u << 8) * sizeof(common::acl::tree_value_t));
+
+			std::vector<std::tuple<unsigned int, unsigned int>> nexts;
+
+			for (uint32_t i = 0;
+			     i < (1u << bits);
+			     i++)
+			{
+				auto& chunk_value = chunk.values[i];
+
+				if (chunk_value.id & 0x80000000u) ///< is_chunk_id
+				{
+					auto& chunk_id = remap_chunks[chunk_value.id ^ 0x80000000u];
+					if (!chunk_id)
+					{
+						chunk_id = allocate_chunk();
+						if (!chunk_id)
+						{
+							return eResult::isFull;
+						}
+
+						nexts.emplace_back(chunk_value.id ^ 0x80000000u, chunk_id);
+					}
+
+					chunk_value.id = chunk_id ^ 0x80000000u;
+				}
+			}
+
+			for (const auto& [next_from_chunk_id, next_chunk_id] : nexts)
+			{
+				auto result = update_chunk(from_chunks, next_from_chunk_id, next_chunk_id);
+				if (result != eResult::success)
+				{
+					return result;
+				}
+			}
+
+			return eResult::success;
+		}
+
+	public:
+		lpm6_16x8bit_id32_dynamic* lpm;
+		tSocketId socket_id;
+		unsigned int chunks_size;
+		unsigned int chunks_count;
+		std::vector<unsigned int> remap_chunks;
+	};
+
+public:
+	static size_t calculate_sizeof(const unsigned int chunks_size)
+	{
+		if (!chunks_size)
+		{
+			YANET_LOG_ERROR("wrong chunks_size: %u\n", chunks_size);
+			return 0;
+		}
+
+		return (size_t)chunks_size * sizeof(chunk_t);
+	}
+
+public:
+	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
+	inline void lookup(const ipv6_address_t (&addresses)[burst_size],
+	                   uint32_t (&group_ids)[burst_size],
+	                   const unsigned int count) const
+	{
+		/// @todo: OPT: le -> be
+
+		for (unsigned int address_i = 0;
+		     address_i < count;
+		     address_i++)
+		{
+			const auto& address = addresses[address_i];
+			auto& group_id = group_ids[address_i];
+
+			unsigned int chunk_id = root_chunk_id;
+			for (unsigned int step = 0;
+			     step < 16;
+			     step++)
+			{
+				const uint8_t step_address = *(((uint8_t*)address.bytes) + step);
+				const auto& chunk_value = chunks[chunk_id].values[step_address];
+
+				if (chunk_value.id & 0x80000000u)
+				{
+					chunk_id = chunk_value.id ^ 0x80000000u;
+				}
+				else
+				{
+					group_id = chunk_value.id;
+					break;
+				}
+			}
+		}
+	}
+
+	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
+	inline void lookup(const uint32_t mask,
+	                   const ipv6_address_t (&addresses)[burst_size],
+	                   uint32_t (&group_ids)[burst_size],
+	                   const unsigned int count) const
+	{
+		/// @todo: OPT: le -> be
+
+		if (mask == mask_full)
+		{
+			return;
+		}
+
+		for (unsigned int address_i = 0;
+		     address_i < count;
+		     address_i++)
+		{
+			if (mask & (1u << address_i))
+			{
+				continue;
+			}
+
+			const auto& address = addresses[address_i];
+			auto& group_id = group_ids[address_i];
+
+			unsigned int chunk_id = root_chunk_id;
+			for (unsigned int step = 0;
+			     step < 16;
+			     step++)
+			{
+				const uint8_t step_address = *(((uint8_t*)address.bytes) + step);
+				const auto& chunk_value = chunks[chunk_id].values[step_address];
+
+				if (chunk_value.id & 0x80000000u)
+				{
+					chunk_id = chunk_value.id ^ 0x80000000u;
+				}
+				else
+				{
+					group_id = chunk_value.id;
+					break;
+				}
+			}
+		}
+	}
+
+protected:
+	constexpr static unsigned int bits = 8;
+	constexpr static unsigned int root_chunk_id = 0;
+	constexpr static uint32_t mask_full = 0xFFFFFFFFu;
+
+	struct value_t
+	{
+		value_t() :
+		        id(0)
+		{
+		}
+
+		uint32_t id;
+	};
+
+	struct chunk_t
+	{
+		value_t values[1u << bits];
+	};
+
+	chunk_t chunks[1];
+};
+
 }
