@@ -17,6 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     automake \
     libtool \
     curl \
+    gdb \
+    vim \
     ca-certificates
 
 RUN mkdir -p /project
