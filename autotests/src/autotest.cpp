@@ -386,53 +386,154 @@ void tAutotest::dumpThread(std::string interfaceName,
 	YANET_LOG_DEBUG("received and dumped %lu packets\n", packetsCount);
 }
 
+class pcap_expectation
+{
+public:
+	pcap_expectation(std::string filename) :
+	        filename(filename), has_packet(true), packetsCount(0), buffer(MAX_PACK_LEN, 0)
+	{
+		char pcap_errbuf[PCAP_ERRBUF_SIZE];
+		pcap = pcap_open_offline(filename.c_str(), pcap_errbuf);
+		if (!pcap)
+		{
+			YANET_LOG_ERROR("error: pcap_open_offline(): %s\n", pcap_errbuf);
+			throw "";
+		}
+		memset(&header, 0, sizeof(struct pcap_pkthdr));
+		advance();
+	}
+
+	pcap_expectation(pcap_expectation&& other) :
+	        filename(std::move(other.filename)),
+	        has_packet(other.has_packet),
+	        packetsCount(other.packetsCount),
+	        pcap(other.pcap),
+		buffer(other.buffer)
+	{
+		memcpy(&header, &other.header, sizeof(struct pcap_pkthdr));
+		other.pcap = nullptr;
+	}
+
+	void advance()
+	{
+		if (!has_packet)
+		{
+			return;
+		}
+		pcap_pkthdr* h = 0;
+		const u_char* data = 0;
+		if (pcap_next_ex(pcap, &h, &data) >= 0)
+		{
+			memcpy(&header, h, sizeof(struct pcap_pkthdr));
+
+			memcpy(buffer.data(), data, header.caplen);
+			if (header.len > header.caplen)
+			{
+				memset(buffer.data() + header.caplen, 0, header.len - header.caplen);
+			}
+
+			++packetsCount;
+		}
+		else
+		{
+			has_packet = false;
+		}
+	}
+
+	bool has_unmatched_packets() const
+	{
+		return has_packet;
+	}
+
+	bool matches_packet(u_int packetSize, u_char* packet) const
+	{
+		return has_packet &&
+		       header.len == packetSize &&
+		       !memcmp(buffer.data(), packet, packetSize);
+	}
+
+	std::string location() const
+	{
+		return filename + ":" + std::to_string(packetsCount);
+	}
+
+	int expected_len() const
+	{
+		return header.len;
+	}
+
+	const u_char* begin() const
+	{
+		return buffer.data();
+	}
+
+	const u_char* end() const
+	{
+		return buffer.data() + header.len;
+	}
+
+	~pcap_expectation()
+	{
+		if (pcap)
+		{
+			pcap_close(pcap);
+		}
+	}
+
+private:
+	std::string filename;
+	bool has_packet;
+	struct pcap_pkthdr header;
+	uint64_t packetsCount;
+	pcap_t* pcap;
+	std::vector<u_char> buffer;
+};
+
 void tAutotest::recvThread(std::string interfaceName,
-                           std::string expectFilePath)
+                           std::vector<std::string> expectFilePaths)
 {
 	PcapDumper pcapDumper(std::tmpnam(nullptr) + std::string(".pcap"));
 
-	char pcap_errbuf[PCAP_ERRBUF_SIZE];
-	pcap_t* pcap = pcap_open_offline(expectFilePath.data(),
-	                                 pcap_errbuf);
-	if (!pcap)
+	std::vector<pcap_expectation> expect_pcaps;
+	for (const auto& expectFilePath : expectFilePaths)
 	{
-		YANET_LOG_ERROR("error: pcap_open_offline(): %s\n", pcap_errbuf);
-		throw "";
+		expect_pcaps.emplace_back(expectFilePath);
 	}
 
 	TextDumper dumper;
 
-	pcap_pkthdr* header;
-	const u_char* data;
-
 	auto iface = pcaps[interfaceName];
 	bool success = true;
 	uint64_t packetsCount = 0;
-	while (pcap_next_ex(pcap, &header, &data) >= 0)
+	while (std::any_of(expect_pcaps.begin(), expect_pcaps.end(), [](const auto& expectation) { return expectation.has_unmatched_packets(); }))
 	{
-		u_char expected_buffer[MAX_PACK_LEN];
-		if (header->caplen < header->len)
-		{
-			memcpy(expected_buffer, data, header->caplen);
-			memset(expected_buffer + header->caplen, 0, header->len - header->caplen);
-			data = expected_buffer;
-		}
-
 		u_char buffer[MAX_PACK_LEN];
 		pcap_pkthdr tmp_pcap_packetHeader;
 
 		if (!readPacket(iface, &tmp_pcap_packetHeader, buffer))
 		{
-			YANET_LOG_ERROR("error[%s]: miss packet %lu (%s)\n",
-							interfaceName.data(),
-							packetsCount + 1,
-							expectFilePath.data());
+			std::stringstream buf;
+			bool not_first = false;
+			for (const auto& expectation : expect_pcaps)
+			{
+				if (expectation.has_unmatched_packets())
+				{
+					if (not_first)
+					{
+						buf << " or ";
+					}
+					buf << expectation.location();
+					not_first = true;
+				}
+			}
+			YANET_LOG_ERROR("error[%s]: miss packet %lu from:(%s)\n",
+			                interfaceName.data(),
+			                packetsCount + 1,
+			                buf.str().data());
 
 			YANET_LOG_ERROR("pcap[%s]: %s\n",
 			                interfaceName.data(),
 			                pcapDumper.path().data());
-
-			pcap_close(pcap);
 
 			throw "";
 		}
@@ -443,18 +544,51 @@ void tAutotest::recvThread(std::string interfaceName,
 		}
 
 		auto packetSize = tmp_pcap_packetHeader.len;
-		if (header->len != packetSize ||
-		    memcmp(data, buffer, packetSize))
+		bool found = false;
+		for (auto& expectation : expect_pcaps)
 		{
-			YANET_LOG_ERROR("error[%s]: wrong packet #%lu (%s)\n",
+			if (expectation.matches_packet(packetSize, buffer))
+			{
+				expectation.advance();
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+		{
+			std::stringstream buf;
+			bool not_first = false;
+			for (const auto& expectation : expect_pcaps)
+			{
+				if (expectation.has_unmatched_packets())
+				{
+					if (not_first)
+					{
+						buf << " or ";
+					}
+					buf << expectation.location();
+					not_first = true;
+				}
+			}
+			YANET_LOG_ERROR("error[%s]: wrong packet #%lu. expected (%s)\n",
 			                interfaceName.data(),
 			                packetsCount + 1,
-			                expectFilePath.data());
+			                buf.str().c_str());
 
 			if (dumpPackets)
 			{
-				YANET_LOG_DEBUG("expected %u, got %u\n", header->len, packetSize);
-				dumper.dump(data, data + header->len, buffer, buffer + packetSize);
+				int n = std::count_if(expect_pcaps.begin(), expect_pcaps.end(), [](const auto& expectation) { return expectation.has_unmatched_packets(); });
+				int i = 1;
+				for (const auto& expectation : expect_pcaps)
+				{
+					if (!expectation.has_unmatched_packets())
+					{
+						continue;
+					}
+					YANET_LOG_DEBUG("Expectation (%d/%d) expected %u, got %u\n", i, n, expectation.expected_len(), packetSize);
+					dumper.dump(expectation.begin(), expectation.end(), buffer, buffer + packetSize);
+					++i;
+				}
 			}
 			success = false;
 		}
@@ -490,17 +624,13 @@ void tAutotest::recvThread(std::string interfaceName,
 
 	if (!success)
 	{
-		YANET_LOG_ERROR("error[%s]: unknown packet (%s)\n", interfaceName.data(), expectFilePath.data());
+		YANET_LOG_ERROR("error[%s]: unknown packet\n", interfaceName.data());
 		YANET_LOG_ERROR("pcap[%s]: %s\n",
 		                interfaceName.data(),
 		                pcapDumper.path().data());
 
-		pcap_close(pcap);
-
 		throw "";
 	}
-
-	pcap_close(pcap);
 
 	unlink(pcapDumper.path().data());
 }
@@ -692,12 +822,25 @@ bool tAutotest::step_sendPackets(const YAML::Node& yamlStep,
 		}
 		else
 		{
-			std::string expectFilePath = path + "/" + yamlPort["expect"].as<std::string>();
+			auto& yamlExpect = yamlPort["expect"];
+			std::vector<std::string> paths;
+			if (yamlExpect.IsSequence())
+			{
+				for (const auto& yamlPath : yamlExpect)
+				{
+					paths.push_back(path + "/" + yamlPath.as<std::string>());
+				}
+			}
+			else
+			{
+				// scalar
+				paths.push_back(path + "/" + yamlExpect.as<std::string>());
+			}
 
-			threads.emplace_back([this, &success, interfaceName, expectFilePath]() {
+			threads.emplace_back([this, &success, interfaceName, paths]() {
 				try
 				{
-					recvThread(interfaceName, expectFilePath);
+					recvThread(interfaceName, paths);
 				}
 				catch (...)
 				{

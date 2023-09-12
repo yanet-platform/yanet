@@ -38,7 +38,7 @@ public:
 
 protected:
 	void sendThread(std::string interfaceName, std::string sendFilePath);
-	void recvThread(std::string interfaceName, std::string expectFilePath);
+        void recvThread(std::string interfaceName, std::vector<std::string> expectFilePaths);
 	void dumpThread(std::string interfaceName, std::string dumpFilePath);
 
 	bool step_ipv4Update(const YAML::Node& yamlStep);
