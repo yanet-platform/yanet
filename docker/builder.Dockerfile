@@ -42,7 +42,7 @@ RUN cd dpdk && \
 
 WORKDIR /project/dpdk
 RUN mkdir build
-RUN meson setup --prefix=/usr -D disable_libs=flow_classify -D enable_driver_sdk=true -D disable_drivers=net/mlx4 -D tests=false build
+RUN meson setup --prefix=/usr -D platform=generic -D cpu_instruction_set=corei7 -D disable_libs=flow_classify -D enable_driver_sdk=true -D disable_drivers=net/mlx4 -D tests=false build
 RUN meson compile -C build
 RUN meson install -C build
 
