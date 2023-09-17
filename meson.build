@@ -1,6 +1,6 @@
 project('yanet', 'cpp',
         meson_version: '>= 0.61',
-        default_options: ['cpp_std=c++20',
+        default_options: ['cpp_std=c++17',
                           'buildtype=release',
                           'warning_level=2',
                           'werror=true',
