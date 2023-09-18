@@ -1,5 +1,6 @@
 dependencies = []
 dependencies += dependency('protobuf', static: true)
+dependencies += dependency('threads')
 
 proto_sources = ['meta.proto',
                  'controlplane.proto']
