@@ -1,5 +1,6 @@
 dependencies = []
 dependencies += libyanet_protobuf_dep
+dependencies += dependency('threads')
 
 sources = files('src/config.cpp',
                 'src/main.cpp')
