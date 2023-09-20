@@ -69,7 +69,8 @@ enum class requestType : uint32_t
 	update_vip_vport_proto,
 	version,
 	get_counter_by_name,
-	size
+	get_shm_info,
+	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
 using labelExp = std::tuple<uint32_t, ///< label
@@ -149,7 +150,8 @@ namespace updateGlobalBase
 		sampler_update,
 		tun64_update,
 		tun64mappings_update,
-		serial_update
+		serial_update,
+		dump_tags_ids
 	};
 
 	namespace updateLogicalPort
@@ -340,6 +342,11 @@ namespace updateGlobalBase
 		using request = std::vector<acl::value_t>;
 	}
 
+	namespace dump_tags_ids
+	{
+		using request = std::vector<std::string>;
+	}
+
 	namespace route_lpm_update
 	{
 		using request = lpm::request;
@@ -477,6 +484,7 @@ namespace updateGlobalBase
 	                                    acl_transport_table::request,
 	                                    acl_total_table::request,
 	                                    acl_values::request,
+										dump_tags_ids::request,
 	                                    lpm::request,
 	                                    route_value_update::request,
 	                                    route_tunnel_value_update::request,
@@ -833,6 +841,20 @@ namespace get_counter_by_name
 	using response = std::map<tCoreId, uint64_t>;
 }
 
+namespace get_shm_info
+{
+	using dump_meta = std::tuple<std::string, ///< ring name
+								std::string, ///< dump tag
+								unsigned int, ///< dump size
+								unsigned int, ///< dump count
+								tCoreId, ///< core id
+								tSocketId, ///< socket id
+								key_t, /// ipc shm key
+								uint64_t>; /// offset
+
+	using response = std::vector<dump_meta>;
+}
+
 namespace limits
 {
 	using limit = std::tuple<std::string, ///< name
@@ -920,6 +942,7 @@ using response = std::variant<std::tuple<>,
                               version::response,
                               limits::response,
                               samples::response,
-							  get_counter_by_name::response>;
+							  get_counter_by_name::response,
+							  get_shm_info::response>;
 
 }

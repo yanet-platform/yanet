@@ -10,6 +10,7 @@
 #include "common/result.h"
 #include "common/idataplane.h"
 #include "common/icontrolplane.h"
+#include "common/bufferring.h"
 
 using ipv4_address_t = common::ipv4_address_t;
 using ipv6_address_t = common::ipv6_address_t;
@@ -60,6 +61,11 @@ protected:
 	bool step_cli_check(const YAML::Node& yamlStep);
 	bool step_reload_async(const YAML::Node& yamlStep);
 	bool step_echo(const YAML::Node& yamlStep);
+	bool step_dumpPackets(const YAML::Node& yamlStep, const std::string& path);
+
+	eResult initSockets();
+    eResult initSharedMemory();
+	void fflushSharedMemory();
 
 	bool step_memorize_counter_value(const YAML::Node& yamlStep);
 	bool step_diff_with_kept_counter_value(const YAML::Node& yamlStep);
@@ -85,10 +91,14 @@ protected:
 	interface::controlPlane controlPlane;
 
 	common::idp::getConfig::response dataPlaneConfig;
+	common::idp::get_shm_info::response dataPlaneSharedMemory;
 
 	std::map<std::string, ///< interfaceName
 	         int>
 	    pcaps;
+
+	std::tuple<size_t, void*> rawShmInfo;
+	std::map<std::string, common::bufferring> dumpRings;
 
 	std::vector<std::thread> threads;
 	volatile bool flagStop;

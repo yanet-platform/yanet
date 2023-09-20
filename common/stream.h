@@ -342,21 +342,17 @@ inline void stream_in_t::pop(std::vector<TType>& vector)
 {
 	integer_t count = 0;
 
-	pop(count);
+    pop(count);
 
-	vector.reserve(count);
-	for (integer_t i = 0; i < count; i++)
-	{
-		TType vectorValue;
-
-		pop(vectorValue);
+    vector.resize(count);
+    for (integer_t i = 0; i < count; i++)
+    {
+        pop(vector[i]);
 		if (isFailed())
 		{
 			return;
 		}
-
-		vector.emplace_back(std::move(vectorValue));
-	}
+    }
 }
 
 template<typename TFirst, typename TSecond, typename TCompare>

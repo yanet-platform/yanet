@@ -1031,7 +1031,7 @@ const int64_t DISPATCHER = -1;
 struct rule_t
 {
 	ref_t<filter_t> filter;
-	std::variant<int64_t, common::globalBase::tFlow> action;
+	std::variant<int64_t, common::globalBase::tFlow, common::acl::action_t> action;
 	ids_t ids;
 	int64_t ruleno;
 	mutable std::string text;
@@ -1048,10 +1048,19 @@ struct rule_t
 		ruleno = DISPATCHER;
 	}
 
+	rule_t(const ref_t<filter_t>& _filter, common::acl::action_t action, const ids_t& ids, bool log) :
+	        filter(_filter),
+	        action(action),
+	        ids(ids),
+	        log(log)
+	{
+		ruleno = DISPATCHER;
+	}
+
 	rule_t(const ref_t<filter_t>& _filter, int64_t num, int64_t skipto) :
 	        filter(_filter),
 	        action(skipto),
-		ruleno(num),
+	        ruleno(num),
 	        log(false)
 	{}
 
@@ -1088,6 +1097,9 @@ struct rule_t
 			break;
 		case ipfw::rule_action_t::ALLOW:
 			action = DISPATCHER;
+			break;
+		case ipfw::rule_action_t::DUMP:
+			action = common::acl::action_t(std::get<std::string>(rulep->action_arg));
 			break;
 		default:
 			YANET_LOG_WARNING("unexpected rule action in rule '%s'\n", rulep->text.data());
@@ -1152,6 +1164,14 @@ struct rule_t
 			else
 			{
 				text = "flow " + std::string(eFlowType_toString(flow.type)) + "(" + std::to_string(flow.data.atomic) + ")";
+			}
+		}
+		else if (std::holds_alternative<common::acl::action_t>(action))
+		{
+			auto rule_action = std::get<common::acl::action_t>(action);
+			if (!rule_action.dump_tag.empty())
+			{
+				text = "dump(" + rule_action.dump_tag + ")";
 			}
 		}
 		else
@@ -1316,10 +1336,15 @@ struct hash<acl::rule_t>
 			const auto& act = std::get<int64_t>(r.action);
 			hash_combine(h, act);
 		}
-		else
+		else if (std::holds_alternative<common::globalBase::tFlow>(r.action))
 		{
 			auto flow = std::get<common::globalBase::tFlow>(r.action);
 			hash_combine(h, 1, (uint64_t(flow.type) << 32) & flow.data.atomic);
+		}
+		else
+		{
+			auto action = std::get<common::acl::action_t>(r.action);
+			hash_combine(h, action.dump_id);
 		}
 		if (r.filter)
 		{

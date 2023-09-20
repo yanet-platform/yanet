@@ -131,7 +131,7 @@
 		NOTCHAR LOOKUP UID RULENUM OBRACE EBRACE LBRACE RBRACE
 		SRCPRJID DSTPRJID RED ALL LMAX DSTIP6 SRCIP6 TCPSETMSS
 		NAT64CLAT NAT64LSN NAT64STL NPTV6 SRCADDR QM DSTADDR
-		SRCPORT DSTPORT SRCIP DSTIP EQUAL COMMA MINUS EOL M4LQ M4RQ
+		SRCPORT DSTPORT SRCIP DSTIP EQUAL COMMA MINUS EOL M4LQ M4RQ DUMP
 
 // QUEUE could be an argument to *MASK
 %nonassoc	QUEUE
@@ -490,6 +490,11 @@ action:
 	DENY
 	{
 		cfg.set_rule_action(rule_action_t::DENY);
+	}
+	|
+	DUMP dump_tag
+	{
+		cfg.set_rule_action(rule_action_t::DUMP);
 	}
 	|
 	T_REJECT
@@ -2010,6 +2015,17 @@ nptv6config:
 	nptv6token
 	|
 	nptv6config nptv6token
+	;
+dump_tag:
+	TOKEN
+	{
+	cfg.set_dump_action_arg($1);
+	}
+	|
+	NUMBER
+	{
+	cfg.set_dump_action_arg($1);
+	}
 	;
 nptv6token:
 	INT_PREFIX NETWORK6

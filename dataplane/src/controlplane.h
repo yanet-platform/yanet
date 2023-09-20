@@ -71,6 +71,7 @@ public:
 	common::idp::version::response version();
 	common::idp::get_counter_by_name::response get_counter_by_name(const common::idp::get_counter_by_name::request& request);
 	common::idp::nat64stateful_state::response nat64stateful_state(const common::idp::nat64stateful_state::request& request);
+	common::idp::get_shm_info::response get_shm_info();
 
 	void switchBase();
 	void switchGlobalBase();

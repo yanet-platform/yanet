@@ -1124,6 +1124,22 @@ inline void cWorker::acl_ingress_handle4()
 			acl_create_keepstate(mbuf, metadata->flow.data.aclId, value.flow);
 		}
 
+		for (auto dump_id : value.dump_ids)
+		{
+			if (dump_id == 0)
+			{
+				break;
+			}
+
+			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
+			if (ring_id == -1)
+			{
+				continue;
+			}
+			auto& ring = dumpRings[ring_id];
+			ring.write(mbuf);
+		}
+
 		acl_ingress_flow(mbuf, value.flow);
 	}
 
@@ -1297,6 +1313,22 @@ inline void cWorker::acl_ingress_handle6()
 		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
 		{
 			acl_create_keepstate(mbuf, metadata->flow.data.aclId, value.flow);
+		}
+
+		for (auto dump_id : value.dump_ids)
+		{
+			if (dump_id == 0)
+			{
+				break;
+			}
+
+			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
+			if (ring_id == -1)
+			{
+				continue;
+			}
+			auto& ring = dumpRings[ring_id];
+			ring.write(mbuf);
 		}
 
 		acl_ingress_flow(mbuf, value.flow);
@@ -4778,6 +4810,22 @@ inline void cWorker::acl_egress_handle4()
 			acl_create_keepstate(mbuf, metadata->aclId, value.flow);
 		}
 
+		for (auto dump_id : value.dump_ids)
+		{
+			if (dump_id == 0)
+			{
+				break;
+			}
+
+			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
+			if (ring_id == -1)
+			{
+				continue;
+			}
+			auto& ring = dumpRings[ring_id];
+			ring.write(mbuf);
+		}
+
 		acl_egress_flow(mbuf, value.flow);
 	}
 
@@ -4944,6 +4992,22 @@ inline void cWorker::acl_egress_handle6()
 		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
 		{
 			acl_create_keepstate(mbuf, metadata->aclId, value.flow);
+		}
+
+		for (auto dump_id : value.dump_ids)
+		{
+			if (dump_id == 0)
+			{
+				break;
+			}
+
+			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
+			if (ring_id == -1)
+			{
+				continue;
+			}
+			auto& ring = dumpRings[ring_id];
+			ring.write(mbuf);
 		}
 
 		acl_egress_flow(mbuf, value.flow);
