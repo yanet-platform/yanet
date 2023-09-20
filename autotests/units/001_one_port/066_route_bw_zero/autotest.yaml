@@ -1,0 +1,70 @@
+steps:
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 18.88.88.1
+        prefix: 1.0.0.0/24
+        path_information: 18.88.88.1:10001
+        labels:
+        - 1100
+    - table_name: ipv4 mpls-vpn
+      large_communities:
+      - 13238:1:0
+      prefixes:
+      - nexthop: 28.88.88.1
+        prefix: 1.0.0.0/26
+        path_information: 28.88.88.1:10001
+        labels:
+        - 1101
+    - table_name: ipv4 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 38.88.88.1
+        prefix: 1.0.0.0/28
+        path_information: 38.88.88.1:10001
+        labels:
+        - 1102
+    - table_name: ipv4 mpls-vpn
+      large_communities:
+      - 13238:1:0
+      prefixes:
+      - nexthop: 48.88.88.1
+        prefix: 1.0.0.0/30
+        path_information: 48.88.88.1:10001
+        labels:
+        - 1103
+    - table_name: ipv4 mpls-vpn
+      large_communities:
+      - 13238:1:0
+      prefixes:
+      - nexthop: 58.88.88.1
+        prefix: 1.0.0.4/30
+        path_information: 58.88.88.1:10001
+        labels:
+        - 1104
+    - table_name: ipv4 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 68.88.88.1
+        prefix: 1.0.0.1/32
+        path_information: 68.88.88.1:10001
+        labels:
+        - 1105
+- ipv4Update:
+  - "0.0.0.0/0 -> 200.0.0.1"
+- ipv6Update:
+  - "::/0 -> c0de::100:1 c0de::200:1"
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
