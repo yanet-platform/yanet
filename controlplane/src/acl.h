@@ -34,6 +34,9 @@ struct result_t
 	std::map<std::string, tAclId> in_iface_map;
 	std::map<std::string, tAclId> out_iface_map;
 	std::map<tAclId, std::set<tAclId>> acl_map;
+
+	std::vector<std::string> dump_id_to_tag;
+	std::map<std::string, uint32_t> tag_to_dump_id;
 };
 
 iface_map_t ifaceMapping(std::map<std::string, controlplane::base::logical_port_t> logicalPorts,

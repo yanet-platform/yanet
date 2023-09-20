@@ -209,6 +209,11 @@ public:
 		return get<common::idp::requestType::get_counter_by_name, common::idp::get_counter_by_name::response>(request);
 	}
 
+	auto get_shm_info() const
+	{
+		return get<common::idp::requestType::get_shm_info, common::idp::get_shm_info::response>();
+	}
+
 protected:
 	void connectToDataPlane() const
 	{

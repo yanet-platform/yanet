@@ -166,6 +166,7 @@ protected:
 	eResult acl_transport_table(const common::idp::updateGlobalBase::acl_transport_table::request& request);
 	eResult acl_total_table(const common::idp::updateGlobalBase::acl_total_table::request& request);
 	eResult acl_values(const common::idp::updateGlobalBase::acl_values::request& request);
+	eResult dump_tags_ids(const common::idp::updateGlobalBase::dump_tags_ids::request& request);
 	eResult dregress_prefix_update(const common::idp::updateGlobalBase::dregress_prefix_update::request& request);
 	eResult dregress_prefix_remove(const common::idp::updateGlobalBase::dregress_prefix_remove::request& request);
 	eResult dregress_prefix_clear();
@@ -291,6 +292,8 @@ public: ///< @todo
 	balancer_real_state_t balancer_real_states[YANET_CONFIG_BALANCER_REALS_SIZE];
 	uint32_t balancer_service_ring_id;
 	balancer_service_ring_t balancer_service_rings[2];
+
+	int64_t dump_id_to_tag[YANET_CONFIG_DUMP_ID_TO_TAG_SIZE];
 };
 
 }

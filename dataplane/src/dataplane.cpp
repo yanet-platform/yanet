@@ -17,6 +17,15 @@
 #include <rte_ring.h>
 #include <rte_eth_ring.h>
 
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <numa.h>
+#include <numaif.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+
 #include "common.h"
 #include "dataplane.h"
 #include "report.h"
@@ -152,6 +161,12 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		}
 	}
 
+	result = allocateSharedMemory();
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
 	result = initEal(binaryPath, filePrefix);
 	if (result != eResult::success)
 	{
@@ -185,6 +200,12 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	}
 
 	result = initWorkers();
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
+	result = splitSharedMemoryPerWorkers();
 	if (result != eResult::success)
 	{
 		return result;
@@ -983,6 +1004,172 @@ uint64_t cDataPlane::getConfigValue(const eConfigType& type) const
 	return configValues.find(type)->second;
 }
 
+eResult cDataPlane::allocateSharedMemory()
+{
+	/// precalculation of shared memory size for each numa
+	std::map<tSocketId, uint64_t> number_of_workers_per_socket;
+	for (const auto& worker : config.workers)
+	{
+		const int coreId = worker.first;
+
+		auto socket_id = numa_node_of_cpu(coreId);
+		if (socket_id == -1)
+		{
+			socket_id = 0;
+		}
+
+		if (number_of_workers_per_socket.find(socket_id) == number_of_workers_per_socket.end())
+		{
+            number_of_workers_per_socket[socket_id] = 1;
+        }
+		else
+		{
+            number_of_workers_per_socket[socket_id]++;
+        }
+	}
+
+	std::map<tSocketId, uint64_t> shm_size_per_socket;
+	for (const auto& ring_cfg : config.shared_memory)
+	{
+		const auto& [dump_size, dump_count] = ring_cfg.second;
+
+		auto unit_size = sizeof(cSharedMemory::item_header_t) + dump_size;
+		if (unit_size % RTE_CACHE_LINE_SIZE != 0)
+		{
+			unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
+		}
+
+		auto size = sizeof(cSharedMemory::ring_header_t) + unit_size * dump_count;
+
+		for (const auto& [socket_id, num] : number_of_workers_per_socket)
+		{
+			auto it = shm_size_per_socket.find(socket_id);
+			if (it == shm_size_per_socket.end())
+			{
+				it = shm_size_per_socket.emplace_hint(it, socket_id, 0);
+			}
+			it->second += size * num;
+		}
+	}
+
+	/// allocating IPC shared memory
+	key_t key = YANET_DEFAULT_IPC_SHMKEY;
+	for (const auto& [socket_id, size] : shm_size_per_socket)
+	{
+		numa_run_on_node(socket_id);
+
+		// deleting old shared memory if exists
+		if (int shmid = shmget(key, 0, 0) != -1)
+		{
+			shmctl(shmid, IPC_RMID, NULL);
+		}
+
+		int flags = IPC_CREAT | 0666;
+		if (config.useHugeMem)
+		{
+			flags |= SHM_HUGETLB;
+		}
+
+		int shmid = shmget(key, size, flags);
+		if (shmid == -1) {
+			YADECAP_LOG_ERROR("shmget(%d, %lu, %d) = %d\n", key, size, flags, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		void* shmaddr = shmat(shmid, NULL, 0);
+		if (shmaddr == (void*) -1) {
+			YADECAP_LOG_ERROR("shmat(%d, NULL, %d) = %d\n", shmid, 0, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		shm_by_socket_id[socket_id] = std::make_tuple(key, shmaddr);
+
+		key++;
+	}
+
+	return eResult::success;
+}
+
+eResult cDataPlane::splitSharedMemoryPerWorkers()
+{
+	std::map<void*, uint64_t> offsets;
+	for (const auto& it : shm_by_socket_id)
+	{
+		const auto& addr = std::get<1>(it.second);
+		offsets[addr] = 0;
+	}
+
+	/// split memory per worker
+	for (auto& [core_id, worker] : workers)
+	{
+		if (core_id == 0)
+		{
+			continue;
+		}
+
+		const auto& socket_id = worker->socketId;
+		const auto& it = shm_by_socket_id.find(socket_id);
+		if (it == shm_by_socket_id.end())
+		{
+			continue;
+		}
+
+		const auto& [key, shm] = it->second;
+
+		int ring_id = 0;
+		for (const auto& [tag, ring_cfg] : config.shared_memory)
+		{
+			const auto& [dump_size, units_number] = ring_cfg;
+
+			auto unit_size = sizeof(cSharedMemory::item_header_t) + dump_size;
+			if (unit_size % RTE_CACHE_LINE_SIZE != 0)
+			{
+				unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
+			}
+
+			auto size = sizeof(cSharedMemory::ring_header_t) + unit_size * units_number;
+			if (size % RTE_CACHE_LINE_SIZE != 0)
+			{
+				size += RTE_CACHE_LINE_SIZE - size % RTE_CACHE_LINE_SIZE; /// round up
+			}
+
+			auto name = "shm_" + std::to_string(core_id) + "_" + std::to_string(ring_id);
+
+			auto offset = offsets[shm];
+
+			auto memaddr = (void*)((intptr_t)shm + offset);
+
+			cSharedMemory ring;
+
+			ring.init(memaddr, unit_size, units_number);
+
+			offsets[shm] += size;
+
+			worker->dumpRings[ring_id] = ring;
+
+			auto meta = common::idp::get_shm_info::dump_meta(name, tag, unit_size, units_number, core_id, socket_id, key, offset);
+			dumps_meta.emplace_back(meta);
+
+			tag_to_id[tag] = ring_id;
+
+			ring_id++;
+		}
+	}
+
+	return eResult::success;
+}
+
+
+common::idp::get_shm_info::response cDataPlane::getShmInfo()
+{
+	common::idp::get_shm_info::response result;
+	result.reserve(dumps_meta.size());
+
+	std::copy(dumps_meta.begin(), dumps_meta.end(), std::back_inserter(result));
+
+	return result;
+}
+
 std::map<std::string, common::uint64> cDataPlane::getPortStats(const tPortId& portId) const
 {
 	/// unsafe
@@ -1148,6 +1335,15 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 	}
 
 	config.memory = rootJson.value("memory", 0);
+
+	if (rootJson.find("sharedMemory") != rootJson.end())
+	{
+		result = parseSharedMemory(rootJson.find("sharedMemory").value());
+		if (result != eResult::success)
+		{
+			return result;
+		}
+	}
 
 	auto it = rootJson.find("ealArgs");
 	if (it != rootJson.end())
@@ -1351,6 +1547,26 @@ eResult cDataPlane::parseRateLimits(const nlohmann::json& json)
 	}
 
 	config.SWICMPOutRateLimit = json.value("OutICMP", 0);
+
+	return eResult::success;
+}
+
+eResult cDataPlane::parseSharedMemory(const nlohmann::json& json)
+{
+	for (const auto& shmJson : json)
+	{
+		std::string tag = shmJson["tag"];
+		unsigned int size = shmJson["dump_size"];
+		unsigned int count = shmJson["dump_count"];
+
+		if (exist(config.shared_memory, tag))
+		{
+			YADECAP_LOG_ERROR("tag '%s' already exist\n", tag.data());
+			return eResult::invalidConfigurationFile;
+		}
+
+		config.shared_memory[tag] = {size, count};
+	}
 
 	return eResult::success;
 }

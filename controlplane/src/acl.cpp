@@ -306,6 +306,7 @@ struct firewall_rules_t
 					// simple skipto rules are handled as usual
 					[[fallthrough]];
 				case ipfw::rule_action_t::ALLOW:
+				case ipfw::rule_action_t::DUMP:
 				case ipfw::rule_action_t::DENY: {
 					// handle only meaning rules
 					auto& ruleref = yanet_rules.emplace_back(rulep, configp);
@@ -363,6 +364,15 @@ static inline auto is_term_filter(const ref_t<filter_t>& filter)
 	return (!filter || (!filter->src && !filter->dst && !filter->flags && !filter->proto));
 }
 
+static inline auto is_nonterm_action(const std::variant<int64_t, common::globalBase::tFlow, common::acl::action_t>& action)
+{
+	if (std::holds_alternative<common::acl::action_t>(action))
+	{
+		return true;
+	}
+	return false;
+}
+
 // gather matching rules from dispatcher
 static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher,
 			      const ref_t<filter_t>& filter,
@@ -393,8 +403,9 @@ static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher,
 		ids.resize(idSize);
 
 		ACL_DBGMSG("gathered...");
-		if (is_term_filter(rule.filter))
+		if (is_term_filter(rule.filter) && !is_nonterm_action(rule.action))
 		{
+			ACL_DBGMSG("terminating filter...");
 			break;
 		}
 	}
@@ -468,18 +479,26 @@ static bool unwind(int64_t start_from, firewall_rules_t& fw,
 							iface, ids, rules, log || rule.log);
 				}
 			}
-			else
+			else if (std::holds_alternative<common::globalBase::tFlow>(rule.action))
 			{
 				// handle tFlows
 				rules.emplace_back(std::move(result_filter),
 						   std::get<common::globalBase::tFlow>(rule.action),
 						   ids, log || rule.log);
-				ACL_DBGMSG("gathered...");
+				ACL_DBGMSG("tFlow gathered...");
+			}
+			else
+			{
+				rules.emplace_back(std::move(result_filter),
+						   std::get<common::acl::action_t>(rule.action),
+						   ids, log || rule.log);
+				ACL_DBGMSG("action_t gathered...");
 			}
 
 			ids.resize(idSize);
-			if (is_term_filter(rule.filter))
+			if (is_term_filter(rule.filter) && !is_nonterm_action(rule.action))
 			{
+				ACL_DBGMSG("terminating filter...");
 				return true;
 			}
 		}
@@ -856,35 +875,51 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 
 			for (auto &rule : rules)
 			{
-				auto &flow = std::get<common::globalBase::tFlow>(rule.action);
+				if (std::holds_alternative<common::globalBase::tFlow>(rule.action)) {
+					auto &flow = std::get<common::globalBase::tFlow>(rule.action);
 
-				if (rule.filter->keepstate)
-				{
-					flow.flags |= (int)common::globalBase::eFlowFlags::keepstate;
-				}
-				if (rule.log)
-				{
-					flow.flags |= (int)common::globalBase::eFlowFlags::log;
-				}
-
-				auto it = ids_map_map.find(rule.ids);
-				if (it != ids_map_map.end())
-				{
-					flow.counter_id = it->second;
-				}
-				else
-				{
-					if (result.ids_map.size() < YANET_CONFIG_ACL_COUNTERS_SIZE)
+					if (rule.filter->keepstate)
 					{
-						auto id = result.ids_map.size();
-						flow.counter_id = id;
-						result.ids_map.push_back(rule.ids);
-						ids_map_map.emplace(rule.ids, id);
+						flow.flags |= (int)common::globalBase::eFlowFlags::keepstate;
+					}
+					if (rule.log)
+					{
+						flow.flags |= (int)common::globalBase::eFlowFlags::log;
+					}
+
+					auto it = ids_map_map.find(rule.ids);
+					if (it != ids_map_map.end())
+					{
+						flow.counter_id = it->second;
 					}
 					else
 					{
-						flow.counter_id = 0;
-						ids_overflow.insert(rule.ids);
+						if (result.ids_map.size() < YANET_CONFIG_ACL_COUNTERS_SIZE)
+						{
+							auto id = result.ids_map.size();
+							flow.counter_id = id;
+							result.ids_map.push_back(rule.ids);
+							ids_map_map.emplace(rule.ids, id);
+						}
+						else
+						{
+							flow.counter_id = 0;
+							ids_overflow.insert(rule.ids);
+						}
+					}
+				}
+				else if (std::holds_alternative<common::acl::action_t>(rule.action))
+				{
+					auto& action = std::get<common::acl::action_t>(rule.action);
+					if (!action.dump_tag.empty())
+					{
+						auto it = result.tag_to_dump_id.find(action.dump_tag);
+						if (it == result.tag_to_dump_id.end())
+						{
+							result.dump_id_to_tag.emplace_back(action.dump_tag);
+							it = result.tag_to_dump_id.emplace_hint(it, action.dump_tag, result.dump_id_to_tag.size());
+						}
+						action.dump_id = it->second;
 					}
 				}
 			}

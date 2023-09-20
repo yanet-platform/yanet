@@ -1233,6 +1233,17 @@ common::idp::get_counter_by_name::response cControlPlane::get_counter_by_name(co
 	return response;
 }
 
+common::idp::get_shm_info::response cControlPlane::get_shm_info()
+{
+	common::idp::get_shm_info::response response;
+	for (const auto& key : dataPlane->getShmInfo())
+	{
+		response.emplace_back(key);
+	}
+
+	return response;
+}
+
 common::idp::nat64stateful_state::response cControlPlane::nat64stateful_state(const common::idp::nat64stateful_state::request& request)
 {
 	common::idp::nat64stateful_state::response response;
