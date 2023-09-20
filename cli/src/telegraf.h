@@ -367,7 +367,15 @@ void dregress()
 	{
 		std::string peer_link = peer_link_orig;
 		replaceAll(peer_link, " ", "\\ ");
-		communities[community] = peer_link;
+
+		uint32_t link_id = 0;
+
+		if (static_cast<uint32_t>(community) > 0)
+		{
+			link_id = static_cast<uint32_t>(community) & 0xFFFF;
+		}
+
+		communities[community] = std::to_string(link_id) + ",peer_link=" + peer_link;
 	}
 
 	counters_v4.convert_update(communities,
@@ -379,7 +387,7 @@ void dregress()
 	                            {false, "alternative"}},
 	                           {}, {}, {}, {});
 
-	counters_v4.print({"peer_link",
+	counters_v4.print({"link_id", // along with peer_name
 	                   "route",
 	                   "label",
 	                   "peer_as",
@@ -404,7 +412,7 @@ void dregress()
 		}
 	});
 
-	counters_v6.print({"peer_link",
+	counters_v6.print({"link_id",  // along with peer_name
 	                   "route",
 	                   "label",
 	                   "peer_as",
