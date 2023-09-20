@@ -1,17 +1,27 @@
-The following authors have created the source code of "YANET"
-published and distributed by YANDEX LLC as the owner:
+The following authors have created the source code of «YANET» published and distributed by YANDEX LLC as the owner.
 
-Alexey Esin <adess@yandex-team.ru>
-Alexander Leonov <alexleonov@yandex-team.ru>
-Aleksei Belov <alxblv@yandex-team.ru>
-Boris Litvinenko <borislitv@yandex-team.ru>
-Andrey Elsukov <butcher@yandex-team.ru>
-Evgeny Safronov <esafronov@yandex-team.ru>
-Georgy Kirichenko <g-e-o-r-g-y@yandex-team.ru>
-Maksim Giriaev <gemtmp@yandex-team.ru>
-Eugene Mamchits <mamchits@yandex-team.ru>
-Kirill Smorodinnikov <shaitan@yandex-team.ru>
-Sergey Kacheev <skacheev@yandex-team.ru>
-Aleksandr Kostrikov <speedwagon@yandex-team.ru>
-Timur Aitov <taitov@yandex-team.ru>
-Vladimir Sukhonosov <xornet@yandex-team.ru>
+Note: This list does not necessarily include everyone who has contributed code, especially since many employees of
+one corporation may be contributing. The revision history in source control gives the full list of contributors.
+
+The project was started by Timur Aitov <taitov@yandex-team.ru>, first commit was made on 2018-05-29.
+
+It's hard to imagine YANET project without these people even if they didn't contribute to the code much:
+    Alexey Esin <adess@yandex-team.ru>
+    Alexander Leonov <alexleonov@yandex-team.ru>
+    Dmitry Ershov <day@yandex-team.ru>
+
+List of most significant contributors:
+    Aleksei Belov <alxblv@yandex-team.ru>
+    Boris Litvinenko <borislitv@yandex-team.ru>
+    Andrey Elsukov <butcher@yandex-team.ru>
+    Evgeny Safronov <esafronov@yandex-team.ru>
+    Andrey Kiselev <ezhichek@yandex-team.ru>
+    Georgy Kirichenko <g-e-o-r-g-y@yandex-team.ru>
+    Maksim Giriaev <gemtmp@yandex-team.ru>
+    Eugene Mamchits <mamchits@yandex-team.ru>
+    Kirill Smorodinnikov <shaitan@yandex-team.ru>
+    Sergey Kacheev <skacheev@yandex-team.ru>
+    Aleksandr Kostrikov <speedwagon@yandex-team.ru>
+    Vladimir Sukhonosov <xornet@yandex-team.ru>
+
+You can be added to this list by a request to Timur Aitov.
