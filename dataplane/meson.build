@@ -12,6 +12,7 @@ sources = files('src/bus.cpp',
                 'src/globalbase.cpp',
                 'src/main.cpp',
                 'src/report.cpp',
+                'src/sharedmemory.cpp',
                 'src/sock_dev.cpp',
                 'src/worker.cpp',
                 'src/worker_gc.cpp')

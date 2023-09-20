@@ -1736,6 +1736,7 @@ void config_converter_t::buildAcl()
 
 	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::acl_total_table, std::move(result.acl_total_table));
 	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::acl_values, std::move(result.acl_values));
+	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::dump_tags_ids, std::move(result.dump_id_to_tag));
 
 	common::idp::updateGlobalBase::fwstate_synchronization_update::request fwstate_sync_request;
 	for (const auto& [moduleName, acl] : baseNext.acls)
@@ -1791,4 +1792,5 @@ void config_converter_t::buildAcl()
 	baseNext.ids_map = std::move(result.ids_map);
 	baseNext.rules = std::move(result.rules);
 	baseNext.dispatcher = std::move(result.dispatcher);
+	baseNext.dump_id_to_tag = std::move(result.dump_id_to_tag);
 }

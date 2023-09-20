@@ -344,18 +344,14 @@ inline void stream_in_t::pop(std::vector<TType>& vector)
 
 	pop(count);
 
-	vector.reserve(count);
+	vector.resize(count);
 	for (integer_t i = 0; i < count; i++)
 	{
-		TType vectorValue;
-
-		pop(vectorValue);
+		pop(vector[i]);
 		if (isFailed())
 		{
 			return;
 		}
-
-		vector.emplace_back(std::move(vectorValue));
 	}
 }
 

@@ -155,6 +155,7 @@ namespace ipfw {
         UNREACH6,
         SRCPRJID,
         DSTPRJID,
+        DUMP,
     };
 
     enum class rule_action_modifier_t {
@@ -413,6 +414,7 @@ namespace ipfw {
         void fill_rule_number(unsigned int);
         void set_rule_action(rule_action_t);
         void set_rule_action_arg(const rule_t::action_arg_t&);
+        void set_dump_action_arg(const rule_t::action_arg_t&);
         void set_rule_log()
         {
             m_curr_rule->log = true;

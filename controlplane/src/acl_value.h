@@ -14,10 +14,11 @@ public:
 	value_t();
 
 public:
-	using filter = common::globalBase::flow_t;
+	using filter = std::vector<std::variant<common::globalBase::flow_t, common::acl::action_t>>;
 
 	void clear();
 	unsigned int collect(const filter& filter);
+	unsigned int collect(const tAclGroupId prev_id, const tAclGroupId id);
 	void compile();
 
 public:

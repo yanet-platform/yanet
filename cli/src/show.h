@@ -816,4 +816,27 @@ void counter_by_name(std::string counter_name,
 	table.print();
 }
 
+void shm_info()
+{
+	interface::dataPlane dataplane;
+	const auto response = dataplane.get_shm_info();
+
+	table_t table;
+	table.insert("ring name",
+	             "dump tag",
+	             "dump size",
+				 "dump count",
+				 "core id",
+				 "socket id",
+				 "ipc key",
+				 "offset");
+
+	for (const auto& [name, tag, size, count, core, socket, ipc_key, offset] : response)
+	{
+		table.insert(name, tag, size, count, core, socket, ipc_key, offset);
+	}
+
+	table.print();
+}
+
 }

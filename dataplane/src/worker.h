@@ -15,6 +15,7 @@
 #include "common.h"
 #include "globalbase.h"
 #include "samples.h"
+#include "sharedmemory.h"
 
 class cDataPlane;
 class mControlPlane;
@@ -306,6 +307,8 @@ protected:
 
 	// will decrease with each new packet sent to slow worker, replenishes each N mseconds
 	int32_t packetsToSWNPRemainder;
+
+	cSharedMemory dumpRings[YANET_CONFIG_SHARED_RINGS_NUMBER];
 
 	samples::Sampler sampler;
 

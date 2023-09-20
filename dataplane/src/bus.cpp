@@ -334,6 +334,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::nat64stateful_state, request);
 		}
+		else if (type == common::idp::requestType::get_shm_info)
+		{
+			response = callWithResponse(&cControlPlane::get_shm_info, request);
+		}
 		else
 		{
 			stats.errors[(uint32_t) common::idp::errorType::busParse]++;

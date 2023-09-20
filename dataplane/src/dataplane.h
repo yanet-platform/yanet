@@ -76,6 +76,7 @@ struct tDataPlaneConfig
 	uint32_t SWICMPOutRateLimit = 0;
 	uint32_t rateLimitDivisor = 1;
 	unsigned int memory = 0;
+	std::map<std::string, std::tuple<unsigned int, unsigned int>> shared_memory;
 
 	std::vector<std::string> ealArgs;
 };
@@ -120,6 +121,7 @@ protected:
 	eResult parseJsonPorts(const nlohmann::json& json);
 	eResult parseConfigValues(const nlohmann::json& json);
 	eResult parseRateLimits(const nlohmann::json& json);
+	eResult parseSharedMemory(const nlohmann::json& json);
 	eResult checkConfig();
 
 	eResult initEal(const std::string& binaryPath, const std::string& filePrefix);
@@ -129,7 +131,11 @@ protected:
 	eResult initWorkers();
 	eResult initQueues();
 
+	eResult allocateSharedMemory();
+	eResult splitSharedMemoryPerWorkers();
+
 	std::optional<uint64_t> getCounterValueByName(const std::string &counter_name, uint32_t coreId);
+	common::idp::get_shm_info::response getShmInfo();
 
 	template<typename type,
 	         typename ... args_t>
@@ -312,6 +318,9 @@ protected:
 
 	rte_mempool* mempool_log;
 
+	common::idp::get_shm_info::response dumps_meta;
+	std::map<std::string, uint64_t> tag_to_id;
+
 	/// modules
 	cReport report;
 	std::unique_ptr<cControlPlane> controlPlane;
@@ -319,6 +328,8 @@ protected:
 
 	// array instead of the table - how many coreIds can be there?
 	std::unordered_map<uint32_t, std::unordered_map<std::string, uint64_t*>> coreId_to_stats_tables;
+
+	std::map<tSocketId, std::tuple<key_t, void*>> shm_by_socket_id;
 
 	std::mutex hugepage_pointers_mutex;
 	std::map<void*, hugepage_pointer> hugepage_pointers;

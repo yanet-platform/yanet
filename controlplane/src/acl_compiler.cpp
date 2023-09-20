@@ -274,11 +274,23 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 
 		/// value
 		{
-			common::globalBase::tFlow flow = std::get<common::globalBase::tFlow>(unwind_rule.action);
-			rule.value_filter_id = value.collect(flow);
+			if (auto flow = std::get_if<common::globalBase::tFlow>(&unwind_rule.action))
+			{
+				rule.value_filter_id = value.collect({*flow});
+			}
+			else if (auto action = std::get_if<common::acl::action_t>(&unwind_rule.action))
+			{
+				rule.value_filter_id = value.collect({*action});
+			}
+		}
+
+		/// terminating
+		{
+			rule.terminating = std::holds_alternative<common::globalBase::tFlow>(unwind_rule.action);
 		}
 
 		YANET_LOG_DEBUG("acl::compile: rule: %s\n", unwind_rule.to_string().data());
+		YANET_LOG_DEBUG("acl::compile: terminating: %s\n", rule.terminating ? "true" : "false");
 		YANET_LOG_DEBUG("acl::compile: rule_id: %u\n", rule.rule_id);
 		YANET_LOG_DEBUG("acl::compile: network_ipv4_source_filter_id: %u\n", rule.network_ipv4_source_filter_id);
 		YANET_LOG_DEBUG("acl::compile: network_ipv4_destination_filter_id: %u\n", rule.network_ipv4_destination_filter_id);
@@ -462,4 +474,6 @@ void compiler_t::total_table_compile()
 void compiler_t::value_compile()
 {
 	value.compile();
+	YANET_LOG_INFO("acl::compile: size: %lu\n",
+	               value.vector.size());
 }

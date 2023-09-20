@@ -63,27 +63,47 @@ void total_table_t::compile()
 		/// @todo: acl_id -> via_filter_id
 
 		key.acl_id = acl_id;
-
-		bool used = true;
+		bool used = false;
 		for (const auto& thread : compiler->transport_table.threads)
 		{
 			for (const auto transport_table_group_id : thread.transport_table_filter_id_group_ids[transport_table_filter_id])
 			{
 				key.transport_id = transport_table_group_id;
-
 				auto it = table.find(key);
 				if (it == table.end())
 				{
-					table.emplace_hint(it, key, group_id);
-					filter_id_group_ids[filter_id].emplace(group_id);
-
-					if (used)
+					// If there is no such key in table, then we save [key, group_id]
+					// without any additional checks.
+					it = table.emplace_hint(it, key, group_id);
+					used = true;
+				}
+				else
+				{
+					// If table already has such key, then we are trying to collect
+					// new combination of the previous group_id and the current group_id.
+					// If new_group_id differs from the current group_id, then we replace
+					// the previous group_id with the new one. Otherwise we don't do anything.
+					const auto new_group_id = compiler->value.collect(it->second, group_id);
+					if (new_group_id != it->second)
 					{
-						compiler->used_rules.emplace_back(rule.rule_id);
-						used = false;
+						it->second = new_group_id;
+						used = true;
 					}
 				}
+
+				if (rule.terminating && used)
+				{
+					// If the rule is termineting and has been used, then we mark filter_id
+					// as filled in to prevent further additional checks.
+					filter_id_group_ids[filter_id].emplace(it->second);
+				}
 			}
+		}
+
+
+		if (used)
+		{
+			compiler->used_rules.emplace_back(rule.rule_id);
 		}
 	}
 }

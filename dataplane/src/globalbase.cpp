@@ -179,6 +179,10 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		{
 			result = acl_values(std::get<common::idp::updateGlobalBase::acl_values::request>(data));
 		}
+		else if (type == common::idp::updateGlobalBase::requestType::dump_tags_ids)
+		{
+			result = dump_tags_ids(std::get<common::idp::updateGlobalBase::dump_tags_ids::request>(data));
+		}
 		else if (type == common::idp::updateGlobalBase::requestType::dregress_prefix_update)
 		{
 			result = dregress_prefix_update(std::get<common::idp::updateGlobalBase::dregress_prefix_update::request>(data));
@@ -1972,6 +1976,22 @@ eResult generation::acl_values(const common::idp::updateGlobalBase::acl_values::
 	}
 
 	std::copy(request.begin(), request.end(), acl.values);
+
+	return eResult::success;
+}
+
+eResult generation::dump_tags_ids(const common::idp::updateGlobalBase::dump_tags_ids::request& request)
+{
+	memset(dump_id_to_tag, -1, sizeof(dump_id_to_tag));
+
+	for (size_t i = 0; i < request.size(); i++)
+	{
+		auto it = dataPlane->tag_to_id.find(request[i]);
+		if (it != dataPlane->tag_to_id.end())
+		{
+			dump_id_to_tag[i + 1] = it->second;
+		}
+	}
 
 	return eResult::success;
 }

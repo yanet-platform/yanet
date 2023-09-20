@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <pcap.h>
 #include <string.h>
+#include <sys/shm.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -65,12 +66,24 @@ eResult tAutotest::init(const std::string& binaryPath,
 {
 	(void)binaryPath;
 	this->dumpPackets = dumpPackets;
-
-	eResult result = eResult::success;
-
 	this->configFilePaths = configFilePaths;
 
-	dataPlaneConfig = dataPlane.getConfig();
+	if (auto ret = initSockets(); ret != eResult::success)
+	{
+		return ret;
+	}
+
+	if (auto ret = initSharedMemory(); ret != eResult::success)
+	{
+		return ret;
+	}
+
+	return eResult::success;
+}
+
+eResult tAutotest::initSockets()
+{
+    dataPlaneConfig = dataPlane.getConfig();
 
 	for (const auto& port : std::get<0>(dataPlaneConfig))
 	{
@@ -100,7 +113,65 @@ eResult tAutotest::init(const std::string& binaryPath,
 		pcaps[interfaceName] = fd;
 	}
 
-	return result;
+	return eResult::success;
+}
+
+eResult tAutotest::initSharedMemory()
+{
+	dataPlaneSharedMemory = dataPlane.get_shm_info();
+
+	std::map<key_t, void*> shm_by_key;
+	key_t ipcKey;
+	int shmid;
+	void* shmaddr;
+
+	for (const auto& shmInfo : dataPlaneSharedMemory)
+	{
+		ipcKey = std::get<6>(shmInfo);
+
+		shmid = shmget(ipcKey, 0, 0);
+		if (shmid == -1) {
+			YANET_LOG_ERROR("shmget(%d, 0, 0) = %d\n", ipcKey, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		shmaddr = shmat(shmid, NULL, 0);
+		if (shmaddr == (void*) -1) {
+			YANET_LOG_ERROR("shmat(%d, NULL, 0) = %d\n", shmid, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		if (auto it = shm_by_key.find(ipcKey); it == shm_by_key.end())
+		{
+			shm_by_key[ipcKey] = shmaddr;
+		}
+	}
+
+	if (shm_by_key.size() > 0)
+	{
+		struct shmid_ds shm_info;
+		if (shmctl(shmid, IPC_STAT, &shm_info) == -1) {
+			YANET_LOG_ERROR("shmctl(%d, IPC_STAT, &shm_info) = %d\n", shmid, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		rawShmInfo = {shm_info.shm_segsz, shmaddr};
+	}
+
+	for (const auto& shmInfo : dataPlaneSharedMemory)
+	{
+		std::string tag = std::get<1>(shmInfo);
+		unsigned int unitSize = std::get<2>(shmInfo);
+		unsigned int unitsNumber = std::get<3>(shmInfo);
+		key_t ipcKey = std::get<6>(shmInfo);
+		uint64_t offset = std::get<7>(shmInfo);
+
+		void* shm = shm_by_key[ipcKey];
+		auto memaddr = (void*)((intptr_t)shm + offset);
+		dumpRings[tag] = common::bufferring(memaddr, unitSize, unitsNumber);
+	}
+
+	return eResult::success;
 }
 
 void tAutotest::start()
@@ -1188,6 +1259,8 @@ void tAutotest::mainThread()
 		fflush(stdout);
 		fflush(stderr);
 
+		fflushSharedMemory();
+
 		try
 		{
 			{
@@ -1340,6 +1413,12 @@ void tAutotest::mainThread()
 					YANET_LOG_DEBUG("step: echo\n");
 
 					result = step_echo(yamlStep["echo"]);
+				}
+				else if (yamlStep["dumpPackets"])
+				{
+					YANET_LOG_DEBUG("step: dumpPackets\n");
+
+					result = step_dumpPackets(yamlStep["dumpPackets"], configFilePath);
 				}
 				else
 				{
@@ -1749,4 +1828,117 @@ bool tAutotest::step_cli_check(const YAML::Node& yamlStep)
 	}
 
 	return true;
+}
+
+common::bufferring::item_t* read_shm_packet(common::bufferring* buffer, uint64_t position)
+{
+	if (position >= buffer->ring->header.after)
+	{
+		return nullptr;
+	}
+	common::bufferring::item_t* item = (common::bufferring::item_t*)((uintptr_t)buffer->ring->memory + (position * buffer->unit_size));
+	return item;
+}
+
+bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
+                                 const std::string& path)
+{
+	TextDumper dumper;
+	for (const auto& yamlDump : yamlStep)
+	{
+		std::string tag = yamlDump["ringTag"].as<std::string>();
+		std::string expectFilePath = path + "/" + yamlDump["expect"].as<std::string>();
+		bool success = true;
+
+		common::bufferring* ring;
+		{ /// searching memory ring by tag
+			auto it = dumpRings.find(tag);
+			if (it == dumpRings.end())
+			{
+				YANET_LOG_ERROR("dump [%s]: error: dump ring not found\n", tag.data());
+				throw "";
+			}
+			ring = &it->second;
+		}
+
+		pcap_t* pcap;
+		{ /// open pcap file with expected data
+			char pcap_errbuf[PCAP_ERRBUF_SIZE];
+			pcap = pcap_open_offline(expectFilePath.data(), pcap_errbuf);
+			if (!pcap)
+			{
+				YANET_LOG_ERROR("dump [%s]: error: pcap_open_offline(): %s\n", tag.data(), pcap_errbuf);
+				throw "";
+			}
+		}
+
+		struct pcap_pkthdr header;
+		const u_char* pcap_packet;
+		common::bufferring::item_t* shm_packet;
+		uint64_t position = 0;
+
+		/// read packets from pcap and compare them with packets from memory ring
+		while ((pcap_packet = pcap_next(pcap, &header)))
+		{
+			shm_packet = read_shm_packet(ring, position);
+			position++;
+
+			if (shm_packet && header.len == shm_packet->header.size &&
+				memcmp(shm_packet->memory, pcap_packet, header.len) == 0)
+			{ /// packets are the same
+				continue;
+			}
+
+			/// packets are different, so...
+			success = false;
+			YANET_LOG_ERROR("dump [%s]: error: wrong packet #%lu (%s)\n",
+			                tag.data(),
+			                position,
+			                expectFilePath.data());
+
+			if (dumpPackets && shm_packet)
+			{
+				YANET_LOG_DEBUG("dump [%s]: expected %u, got %u\n", tag.data(), header.len, shm_packet->header.size);
+				dumper.dump(pcap_packet, pcap_packet + shm_packet->header.size, shm_packet->memory, shm_packet->memory + header.len);
+			}
+		}
+
+		/// read the remaining packets from memory ring
+		for (;;)
+		{
+			shm_packet = read_shm_packet(ring, position);
+			if (!shm_packet)
+			{
+				break;
+			}
+			position++;
+
+			success = false;
+
+			if (dumpPackets)
+			{
+				YANET_LOG_DEBUG("dump [%s]: unexpected %u\n", tag.data(), shm_packet->header.size);
+				dumper.dump(NULL, NULL, shm_packet->memory, shm_packet->memory + header.len);
+			}
+		}
+
+		YANET_LOG_DEBUG("dump [%s]: recv %lu packets\n", tag.data(), position);
+
+		pcap_close(pcap);
+
+		if (!success)
+		{
+			YANET_LOG_ERROR("dump [%s]: error: unknown packet (%s)\n", tag.data(), expectFilePath.data());
+			throw "";
+		}
+	}
+
+	return true;
+}
+
+void tAutotest::fflushSharedMemory()
+{
+	size_t size = std::get<0>(rawShmInfo);
+	void* memaddr = std::get<1>(rawShmInfo);
+	memset(memaddr, 0, size);
 }
