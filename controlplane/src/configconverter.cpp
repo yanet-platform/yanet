@@ -702,6 +702,10 @@ void config_converter_t::processAcl()
 				{
 					acl_rules_route_forward(acl, nextModule);
 				}
+				else if (entry == "tunnel")
+				{
+					acl_rules_route_forward(acl, nextModule);
+				}
 				else
 				{
 					acl_rules_route_local(acl, nextModule);
