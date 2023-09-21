@@ -194,7 +194,6 @@ public:
 
 	void compile(common::idp::updateGlobalBase::request& globalbase, const route::generation_t& generation);
 	void compile_interface(common::idp::updateGlobalBase::request& globalbase, const route::generation_t& generation, route::generation_neighbors_t& generation_neighbors);
-	void update_interfaces_ips(const route::generation_t& current_generation, const route::generation_t& next_generation);
 
 protected:
 	void prefix_flush_prefixes(common::idp::updateGlobalBase::request& globalbase);

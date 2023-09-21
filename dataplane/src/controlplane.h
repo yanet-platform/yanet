@@ -66,7 +66,6 @@ public:
 	common::idp::balancer_real_connections::response balancer_real_connections();
 	eResult debug_latch_update(const common::idp::debug_latch_update::request& request);
 	eResult unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request);
-	eResult update_interfaces_ips(const common::idp::update_interfaces_ips::request& request);
 	eResult update_vip_vport_proto(const common::idp::update_vip_vport_proto::request& request);
 	common::idp::version::response version();
 	common::idp::get_counter_by_name::response get_counter_by_name(const common::idp::get_counter_by_name::request& request);
@@ -174,10 +173,6 @@ protected:
 	std::vector<std::unordered_map<common::ip_address_t, std::unordered_set<common::ip_address_t>>> vip_to_balancers;
 	// check presence prior to cloning
 	std::vector<std::unordered_set<std::tuple<common::ip_address_t, uint16_t, uint8_t>>> vip_vport_proto;
-	/* taken from route section, interface subsection of controlplane.cfg,
-	   used for excluding self from destination addresses when broadcasting cloned packets to neighbor balancers */
-	std::unordered_map<common::ipv4_address_t, std::string> self_interfaces_ipv4s;
-	std::unordered_map<common::ipv6_address_t, std::string> self_interfaces_ipv6s;
 
 	std::chrono::high_resolution_clock::time_point prevTimePointForSWRateLimiter;
 

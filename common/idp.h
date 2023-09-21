@@ -65,7 +65,6 @@ enum class requestType : uint32_t
 	samples,
 	debug_latch_update,
 	unrdup_vip_to_balancers,
-	update_interfaces_ips,
 	update_vip_vport_proto,
 	version,
 	get_counter_by_name,
@@ -802,14 +801,6 @@ namespace unrdup_vip_to_balancers
 	using response = eResult;
 }
 
-namespace update_interfaces_ips
-{
-	using request = std::tuple<std::unordered_map<common::ipv4_address_t, std::string>,
-	                           std::unordered_map<common::ipv6_address_t, std::string>>;
-
-	using response = eResult;
-}
-
 namespace update_vip_vport_proto
 {
 	using request = std::tuple<uint32_t, std::unordered_set<std::tuple<common::ip_address_t, uint16_t, uint8_t>>>;
@@ -888,7 +879,6 @@ using request = std::tuple<requestType,
                                         balancer_connection::request,
                                         debug_latch_update::request,
 										unrdup_vip_to_balancers::request,
-										update_interfaces_ips::request,
 										update_vip_vport_proto::request,
 										get_counter_by_name::request>>;
 

@@ -1156,16 +1156,6 @@ eResult cControlPlane::unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_
 	return eResult::success;
 }
 
-eResult cControlPlane::update_interfaces_ips(const common::idp::update_interfaces_ips::request& request)
-{
-	std::lock_guard<std::mutex> guard(interfaces_ips_mutex);
-
-	self_interfaces_ipv4s = std::get<0>(request);
-	self_interfaces_ipv6s = std::get<1>(request);
-
-	return eResult::success;
-}
-
 eResult cControlPlane::update_vip_vport_proto(const common::idp::update_vip_vport_proto::request& request)
 {
 	std::lock_guard<std::mutex> guard(vip_vport_proto_mutex);
@@ -3087,13 +3077,6 @@ void cControlPlane::handlePacket_balancer_icmp_forward(rte_mbuf* mbuf)
 
 	for (const auto &neighbor_balancer : neighbor_balancers)
 	{
-		if ((neighbor_balancer.is_ipv4() && self_interfaces_ipv4s.count(neighbor_balancer.get_ipv4()))
-		    || (neighbor_balancer.is_ipv6() && self_interfaces_ipv6s.count(neighbor_balancer.get_ipv6())))
-		{
-			// no need to send to yourself
-			continue;
-		}
-
 		// will not send a cloned packet if source address in "balancer" section of controlplane.conf is absent
 		if (neighbor_balancer.is_ipv4() && !base.globalBase->balancers[metadata->flow.data.balancer.id].source_ipv4.address)
 		{
