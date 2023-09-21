@@ -318,10 +318,6 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::unrdup_vip_to_balancers, request);
 		}
-		else if (type == common::idp::requestType::update_interfaces_ips)
-		{
-			response = callWithResponse(&cControlPlane::update_interfaces_ips, request);
-		}
 		else if (type == common::idp::requestType::update_vip_vport_proto)
 		{
 			response = callWithResponse(&cControlPlane::update_vip_vport_proto, request);

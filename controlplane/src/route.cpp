@@ -799,101 +799,6 @@ void route_t::compile_interface(common::idp::updateGlobalBase::request& globalba
 	}
 }
 
-void route_t::update_interfaces_ips(const route::generation_t& current_generation, const route::generation_t& next_generation)
-{
-	bool changed = false;
-	std::unordered_map<common::ipv4_address_t, std::string> current_ipv4_addrs;
-	std::unordered_map<common::ipv6_address_t, std::string> current_ipv6_addrs;
-
-	for (const auto& [route_name, route] : current_generation.routes)
-	{
-		(void)route_name;
-
-		for (const auto& [interface_name, interface] : route.interfaces)
-		{
-			for (const auto &interface_ip : interface.ipAddresses)
-			{
-				if (interface_ip.is_ipv4())
-				{
-					current_ipv4_addrs[interface_ip.get_ipv4()] = interface_name;
-				}
-				else
-				{
-					current_ipv6_addrs[interface_ip.get_ipv6()] = interface_name;
-				}
-			}
-		}
-	}
-
-	std::unordered_map<common::ipv4_address_t, std::string> next_ipv4_addrs;
-	std::unordered_map<common::ipv6_address_t, std::string> next_ipv6_addrs;
-
-	for (const auto& [route_name, route] : next_generation.routes)
-	{
-		(void)route_name;
-
-		for (const auto& [interface_name, interface] : route.interfaces)
-		{
-			for (const auto &interface_ip : interface.ipAddresses)
-			{
-				if (interface_ip.is_ipv4())
-				{
-					next_ipv4_addrs[interface_ip.get_ipv4()] = interface_name;
-
-					if (current_ipv4_addrs.count(interface_ip.get_ipv4()) == 0)
-					{
-						changed = true;
-					}
-				}
-				else
-				{
-					next_ipv6_addrs[interface_ip.get_ipv6()] = interface_name;
-
-					if (current_ipv6_addrs.count(interface_ip.get_ipv6()) == 0)
-					{
-						changed = true;
-					}
-				}
-			}
-		}
-	}
-
-	if (!changed)
-	{
-		for (const auto& [current_iface_ipv4, current_iface_name] : current_ipv4_addrs)
-		{
-			(void)current_iface_name;
-
-			// if some interface ips from current maps are absent in new maps, reload is required
-			if (next_ipv4_addrs.count(current_iface_ipv4) == 0)
-			{
-				changed = true;
-				break;
-			}
-		}
-	}
-
-	if (!changed)
-	{
-		for (const auto& [current_iface_ipv6, current_iface_name] : current_ipv6_addrs)
-		{
-			(void)current_iface_name;
-
-			// if some interface ips from current maps are absent in new maps, reload is required
-			if (next_ipv6_addrs.count(current_iface_ipv6) == 0)
-			{
-				changed = true;
-				break;
-			}
-		}
-	}
-
-	if (changed)
-	{
-		dataplane.update_interfaces_ips(std::make_tuple(next_ipv4_addrs, next_ipv6_addrs));
-	}
-}
-
 void route_t::limit(common::icp::limit_summary::response& limits) const
 {
 	limit_insert(limits, "route.values", values.stats());
@@ -987,7 +892,6 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 	compile(globalbase, generations.next());
 	compile_interface(globalbase, generations.next(), generations_neighbors.next());
-	update_interfaces_ips(generations.current(), generations.next());
 
 }
 

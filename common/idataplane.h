@@ -189,11 +189,6 @@ public:
 		return get<common::idp::requestType::unrdup_vip_to_balancers, common::idp::unrdup_vip_to_balancers::response>(request);
 	}
 
-	eResult update_interfaces_ips(const common::idp::update_interfaces_ips::request& request) const
-	{
-		return get<common::idp::requestType::update_interfaces_ips, common::idp::update_interfaces_ips::response>(request);
-	}
-
 	eResult update_vip_vport_proto(const common::idp::update_vip_vport_proto::request& request) const
 	{
 		return get<common::idp::requestType::update_vip_vport_proto, common::idp::update_vip_vport_proto::response>(request);
