@@ -17,6 +17,7 @@
 #include "scheduler.h"
 #include "type.h"
 #include "acl.h"
+#include "balancer.h"
 
 namespace common::idp
 {
@@ -259,6 +260,7 @@ namespace updateGlobalBase
 					   uint8_t, ///< flags
 					   tCounterId, ///< size 4
 					   balancer::scheduler,
+					   balancer::tunnel, // tunneling method (default ipip)
 		                           uint32_t, /// default_wlc_power
 		                           uint32_t, ///< real_start
 		                           uint32_t>; ///< real_size

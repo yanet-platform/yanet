@@ -3718,7 +3718,7 @@ inline void cWorker::balancer_handle()
 				value->timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime;
 				locker->unlock();
 
-				balancer_tunnel(mbuf, real_unordered, real_unordered.counter_id);
+				balancer_tunnel(mbuf, service, real_unordered, real_unordered.counter_id);
 
 				counters[(service.atomic1 >> 8) + (tCounterId)balancer::service_counter::packets]++;
 				counters[(service.atomic1 >> 8) + (tCounterId)balancer::service_counter::bytes] += mbuf->pkt_len;
@@ -3803,7 +3803,7 @@ inline void cWorker::balancer_handle()
 
 			locker->unlock();
 
-			balancer_tunnel(mbuf, real_unordered, real_unordered.counter_id);
+			balancer_tunnel(mbuf, service, real_unordered, real_unordered.counter_id);
 			counters[(service.atomic1 >> 8) + (tCounterId)balancer::service_counter::packets]++;
 			counters[(service.atomic1 >> 8) + (tCounterId)balancer::service_counter::bytes] += mbuf->pkt_len;
 			balancer_flow(mbuf, balancer.flow);
@@ -3817,6 +3817,7 @@ inline void cWorker::balancer_handle()
 }
 
 inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
+									 const dataplane::globalBase::balancer_service_t& service,
                                      const dataplane::globalBase::balancer_real_t& real,
                                      const tCounterId& real_counter_id)
 {
@@ -3875,7 +3876,7 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 			rte_memcpy(ipv6Header->dst_addr, real.destination.bytes, 16);
 		}
 	}
-	else
+	else // IPV4
 	{
 		rte_pktmbuf_prepend(mbuf, sizeof(rte_ipv4_hdr));
 		rte_memcpy(rte_pktmbuf_mtod(mbuf, char*),
@@ -3916,6 +3917,50 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 		ipv4Header->dst_addr = real.destination.mapped_ipv4_address.address;
 
 		yanet_ipv4_checksum(ipv4Header);
+	}
+	if (service.tunnel == balancer::tunnel::gre)
+	{
+		// update data in ip headers and insert gre
+		rte_pktmbuf_prepend(mbuf, sizeof(rte_gre_hdr));
+
+		if (real.flags & YANET_BALANCER_FLAG_DST_IPV6)
+		{
+			metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv6_hdr);
+
+			memmove(rte_pktmbuf_mtod(mbuf, char*),
+			        rte_pktmbuf_mtod_offset(mbuf, char*, sizeof(rte_gre_hdr)),
+			        metadata->transport_headerOffset);
+
+			rte_ipv6_hdr* ipv6_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+			ipv6_header->proto = IPPROTO_GRE;
+			ipv6_header->payload_len = rte_cpu_to_be_16(rte_be_to_cpu_16(ipv6_header->payload_len) + sizeof(rte_gre_hdr));
+		}
+		else  // ipv4
+		{
+			metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv4_hdr);
+
+			memmove(rte_pktmbuf_mtod(mbuf, char*),
+			        rte_pktmbuf_mtod_offset(mbuf, char*, sizeof(rte_gre_hdr)),
+			        metadata->transport_headerOffset);
+
+			rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+			ipv4_header->next_proto_id = IPPROTO_GRE;
+			ipv4_header->total_length = rte_cpu_to_be_16(rte_be_to_cpu_16(ipv4_header->total_length) + sizeof(rte_gre_hdr));
+
+			yanet_ipv4_checksum(ipv4_header);
+		}
+		// add gre data
+		rte_gre_hdr* gre_header = rte_pktmbuf_mtod_offset(mbuf, rte_gre_hdr*, metadata->transport_headerOffset);
+		memset(gre_header, 0, sizeof(rte_gre_hdr));
+		gre_header->ver= 0;  // default version
+		if (ipv4HeaderInner)
+		{
+			gre_header->proto = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
+		}
+		else
+		{
+			gre_header->proto = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
+		}
 	}
 
 	counters[real_counter_id + (tCounterId)balancer::real_counter::packets]++;
@@ -4218,7 +4263,7 @@ inline void cWorker::balancer_icmp_forward_handle()
 				value->timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime;
 				locker->unlock();
 
-				balancer_tunnel(mbuf, real_unordered, real_unordered.counter_id);
+				balancer_tunnel(mbuf, service, real_unordered, real_unordered.counter_id);
 				counters[(service.atomic1 >> 8) + (tCounterId)balancer::service_counter::packets]++;
 				counters[(service.atomic1 >> 8) + (tCounterId)balancer::service_counter::bytes] += mbuf->pkt_len;
 

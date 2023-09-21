@@ -4,6 +4,7 @@
 
 #include "stream.h"
 #include "type.h"
+#include "balancer.h"
 #include "scheduler.h"
 
 namespace controlplane
@@ -308,6 +309,7 @@ using service_t = std::tuple<balancer_service_id_t,
                              std::optional<std::string>, ///< version
                              ::balancer::scheduler,
                              ::balancer::scheduler_params,
+							 ::balancer::tunnel,
                              uint8_t, ///< flags: mss_fix|ops
                              std::vector<real_t>>;
 

@@ -1177,7 +1177,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 	}
 	balancer_services_count = 0;
 
-	for (const auto& [balancer_service_id, flags, counter_id, scheduler, default_wlc_power, real_start, real_size] : services)
+	for (const auto& [balancer_service_id, flags, counter_id, scheduler, tunnel, default_wlc_power, real_start, real_size] : services)
 	{
 		if (balancer_service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 		{
@@ -1208,6 +1208,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		balancer_service.real_size = real_size;
 		balancer_service.scheduler = scheduler;
 		balancer_service.wlc_power = default_wlc_power;
+		balancer_service.tunnel = tunnel;
 	}
 
 	const auto& reals = std::get<1>(request);
@@ -1257,9 +1258,11 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		}
 		real_unordered.destination = addr;
 		real_unordered.counter_id = counter_id;
-
 		real_unordered.flags = 0;
-		real_unordered.flags |= destination.is_ipv6() ? YANET_BALANCER_FLAG_DST_IPV6 : 0;
+		if (destination.is_ipv6())
+		{
+			real_unordered.flags |= YANET_BALANCER_FLAG_DST_IPV6;
+		}
 	}
 
 	const auto& binding = std::get<2>(request);
@@ -1280,6 +1283,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 	}
 
 	std::copy(binding.begin(), binding.end(), balancer_service_reals);
+
 	evaluate_service_ring(balancer_service_ring_id);
 
 	return eResult::success;
