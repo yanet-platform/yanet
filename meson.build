@@ -75,6 +75,8 @@ if get_option('target').contains('release')
     install_data('yanet-cli.zsh_completion',
                  rename: '_yanet-cli',
                  install_dir: get_option('datadir') / 'zsh' / 'functions' / 'Completion' / 'Unix')
+
+    install_data('yanet-wrapper', install_dir: get_option('bindir'))
 elif get_option('target').contains('autotest')
     subdir('autotest')
 endif
