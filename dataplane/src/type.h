@@ -5,6 +5,7 @@
 
 #include "common/type.h"
 #include "common/scheduler.h"
+#include "common/balancer.h"
 #include "common/fallback.h"
 #include "common/config.h"
 
@@ -573,6 +574,7 @@ namespace globalBase
 		uint32_t real_start;
 		uint32_t real_size;
 		::balancer::scheduler scheduler;
+		::balancer::tunnel tunnel;
 		uint32_t wlc_power;
 	};
 

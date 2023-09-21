@@ -151,7 +151,7 @@ protected:
 	inline void balancer_icmp_forward_entry(rte_mbuf* mbuf);
 	inline void balancer_fragment_entry(rte_mbuf* mbuf);
 	inline void balancer_handle();
-	inline void balancer_tunnel(rte_mbuf* mbuf, const dataplane::globalBase::balancer_real_t& real, const tCounterId& real_counter_id);
+	inline void balancer_tunnel(rte_mbuf* mbuf, const dataplane::globalBase::balancer_service_t& service, const dataplane::globalBase::balancer_real_t& real, const tCounterId& real_counter_id);
 	inline void balancer_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 	inline void balancer_icmp_reply_handle();
 	inline void balancer_icmp_forward_handle();
