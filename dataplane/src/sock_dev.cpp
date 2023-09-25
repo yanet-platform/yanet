@@ -53,6 +53,7 @@ struct sock_internals
 	struct rte_ether_addr address;
 	struct eth_dev_ops dev_ops;
 	struct sock_queue rx_queues[MAX_RX_QUEUES];
+	rte_eth_stats eth_stats;
 };
 
 static int
@@ -133,8 +134,8 @@ sock_dev_close(struct rte_eth_dev* dev)
 #endif
 
 static int
-sock_dev_rx_queue_setup(struct rte_eth_dev* dev __rte_unused,
-                        uint16_t rx_queue_id __rte_unused,
+sock_dev_rx_queue_setup(struct rte_eth_dev* dev,
+                        uint16_t rx_queue_id,
                         uint16_t nb_rx_desc __rte_unused,
                         unsigned int socket_id __rte_unused,
                         const struct rte_eth_rxconf* rx_conf __rte_unused,
@@ -148,8 +149,8 @@ sock_dev_rx_queue_setup(struct rte_eth_dev* dev __rte_unused,
 }
 
 static int
-sock_dev_tx_queue_setup(struct rte_eth_dev* dev __rte_unused,
-                        uint16_t tx_queue_id __rte_unused,
+sock_dev_tx_queue_setup(struct rte_eth_dev* dev,
+                        uint16_t tx_queue_id,
                         uint16_t nb_tx_desc __rte_unused,
                         unsigned int socket_id __rte_unused,
                         const struct rte_eth_txconf* tx_conf __rte_unused)
@@ -289,6 +290,7 @@ sock_dev_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		rc = readCount(sq->internals->conFd, read_buf, hdr.dataLen);
 		if (rc < 0)
 		{
+			sq->internals->eth_stats.ierrors++;
 			sq->internals->conFd = -1; /// Reset the connection
 			return 0;
 		}
@@ -298,6 +300,7 @@ sock_dev_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 	mbuf = rte_pktmbuf_alloc(sq->mb_pool);
 	if (unlikely(mbuf == NULL))
 	{
+		sq->internals->eth_stats.ierrors++;
 		return 0;
 	}
 
@@ -308,9 +311,13 @@ sock_dev_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		mbuf->pkt_len = mbuf->data_len;
 		mbuf->port = sq->internals->portId;
 		*bufs = mbuf;
+
+		sq->internals->eth_stats.ipackets++;
+		sq->internals->eth_stats.ibytes += hdr.dataLen;
 	}
 	else /// Packet does not fit, drop it
 	{
+		sq->internals->eth_stats.ierrors++;
 		rte_pktmbuf_free(mbuf);
 		return 0;
 	}
@@ -360,6 +367,7 @@ sock_dev_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 	struct sock_internals* si = (struct sock_internals*)q;
 	if (si->conFd < 0)
 	{
+		si->eth_stats.oerrors++;
 		return 0;
 	}
 
@@ -390,9 +398,20 @@ sock_dev_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 			return i;
 		}
 
+		si->eth_stats.opackets++;
+		si->eth_stats.obytes += len;
+
 		rte_pktmbuf_free(mbuf);
 	}
 	return nb_bufs;
+}
+
+int sock_dev_stats_get(struct rte_eth_dev* dev,
+                       struct rte_eth_stats* igb_stats)
+{
+	sock_internals* private_data = (struct sock_internals*)dev->data->dev_private;
+	memcpy(igb_stats, &private_data->eth_stats, sizeof(rte_eth_stats));
+	return 0;
 }
 
 int sock_dev_create(const char* name, uint8_t numa_node)
@@ -428,6 +447,7 @@ int sock_dev_create(const char* name, uint8_t numa_node)
 	internals->dev_ops.promiscuous_disable = sock_dev_promiscuous_disable;
 	internals->dev_ops.allmulticast_enable = sock_dev_allmulticast_enable;
 	internals->dev_ops.allmulticast_disable = sock_dev_allmulticast_disable;
+	internals->dev_ops.stats_get = sock_dev_stats_get;
 
 	unlink(path);
 	internals->fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
