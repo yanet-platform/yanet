@@ -18,11 +18,32 @@ eResult cModule::moduleInit(cControlPlane* controlPlane)
 
 void cModule::moduleStart()
 {
-	for (const auto& func : funcThreads)
+	for (auto& func : funcThreads)
 	{
-		threads.emplace_back(func);
+		threads.emplace_back([func = std::move(func)]()
+		{
+			try
+			{
+				func();
+			}
+			catch (const std::exception& exception)
+			{
+				YANET_LOG_ERROR("Terminate due to exception %s\n", exception.what());
+				throw;
+			}
+			catch (const std::string& string)
+			{
+				YANET_LOG_ERROR("Terminate due to string exception %s\n", string.data());
+				throw;
+			}
+			catch (...)
+			{
+				YANET_LOG_ERROR("Terminate due to unknown error\n");
+				throw;
+			}
+		});
 	}
-
+	funcThreads.clear();
 	start();
 }
 
