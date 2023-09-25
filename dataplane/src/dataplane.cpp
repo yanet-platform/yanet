@@ -1262,12 +1262,6 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 		return eResult::invalidConfigurationFile;
 	}
 
-	if (rootJson.find("dumpKniCoreId") == rootJson.end())
-	{
-		YADECAP_LOG_ERROR("not found: 'dumpKniCoreId'\n");
-		return eResult::invalidConfigurationFile;
-	}
-
 	result = parseJsonPorts(rootJson.find("ports").value());
 	if (result != eResult::success)
 	{
@@ -1279,7 +1273,6 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 		config.workerGCs.emplace(core_id);
 	}
 	config.controlPlaneCoreId = rootJson.find("controlPlaneCoreId").value();
-	config.dumpKniCoreId = rootJson.find("dumpKniCoreId").value();
 
 	if (rootJson.find("configValues") != rootJson.end())
 	{
@@ -1298,6 +1291,20 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 	if (rootJson.find("useKni") != rootJson.end())
 	{
 		config.useKni = rootJson.find("useKni").value();
+	}
+
+	if (config.useKni)
+	{
+		if (rootJson.find("dumpKniCoreId") == rootJson.end())
+		{
+			YADECAP_LOG_ERROR("not found: 'dumpKniCoreId'\n");
+			return eResult::invalidConfigurationFile;
+		}
+		config.dumpKniCoreId = rootJson.find("dumpKniCoreId").value();
+	}
+	else
+	{
+		config.dumpKniCoreId = 0;
 	}
 
 	auto rssDepth = rootJson.find("rssDepth");
