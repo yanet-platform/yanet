@@ -34,8 +34,7 @@ constexpr std::size_t str_length(char const (&)[N])
 
 struct __attribute__((__packed__)) packHeader
 {
-	uint16_t dataLen;
-	uint16_t capSize;
+	uint32_t data_length;
 };
 
 using namespace nAutotest;
@@ -172,11 +171,7 @@ void tAutotest::sendThread(std::string interfaceName,
 	{
 
 		struct packHeader hdr;
-		hdr.dataLen = header->len;
-		hdr.capSize = header->len;
-
-		hdr.dataLen = htons(hdr.dataLen);
-		hdr.capSize = htons(hdr.capSize);
+		hdr.data_length = htonl(header->len);
 
 		struct iovec iov[3];
 		size_t iov_count = 2;
@@ -226,10 +221,9 @@ static bool readPacket(int fd, pcap_pkthdr* header, u_char* data)
 		return false;
 	}
 
-	hdr.dataLen = ntohs(hdr.dataLen);
-	hdr.capSize = ntohs(hdr.capSize);
+	hdr.data_length = ntohl(hdr.data_length);
 
-	if (hdr.dataLen == 0)
+	if (hdr.data_length == 0)
 	{
 		YANET_LOG_ERROR("error: read size is 0\n");
 		throw "";
@@ -237,14 +231,14 @@ static bool readPacket(int fd, pcap_pkthdr* header, u_char* data)
 
 	for (; i < 1000; i++)
 	{
-		ret = read(fd, data, hdr.dataLen);
+		ret = read(fd, data, hdr.data_length);
 		if (ret >= 0)
 			break;
 		std::this_thread::sleep_for(std::chrono::microseconds{1000});
 	}
 	if (ret <= 0)
 	{
-		YANET_LOG_ERROR("error: read bytes %d: %s\n", hdr.dataLen, strerror(errno));
+		YANET_LOG_ERROR("error: read bytes %d: %s\n", hdr.data_length, strerror(errno));
 		return false;
 	}
 	header->len = ret;
