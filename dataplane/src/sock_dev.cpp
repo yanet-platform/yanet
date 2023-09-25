@@ -31,8 +31,7 @@ struct sock_internals;
 
 struct __attribute__((__packed__)) packHeader
 {
-	uint16_t dataLen;
-	uint16_t capSize;
+	uint32_t data_length;
 };
 
 struct sock_queue
@@ -281,13 +280,12 @@ sock_dev_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		return 0;
 	}
 
-	hdr.dataLen = ntohs(hdr.dataLen);
-	hdr.capSize = ntohs(hdr.capSize);
+	hdr.data_length = ntohl(hdr.data_length);
 
 	/// Packet header received, read the packet until reading is done or an error happened
 	do
 	{
-		rc = readCount(sq->internals->conFd, read_buf, hdr.dataLen);
+		rc = readCount(sq->internals->conFd, read_buf, hdr.data_length);
 		if (rc < 0)
 		{
 			sq->internals->eth_stats.ierrors++;
@@ -304,16 +302,16 @@ sock_dev_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		return 0;
 	}
 
-	if (hdr.dataLen <= rte_pktmbuf_tailroom(mbuf))
+	if (hdr.data_length <= rte_pktmbuf_tailroom(mbuf))
 	{
-		rte_memcpy(rte_pktmbuf_mtod(mbuf, void*), read_buf, hdr.dataLen);
-		mbuf->data_len = hdr.dataLen;
+		rte_memcpy(rte_pktmbuf_mtod(mbuf, void*), read_buf, hdr.data_length);
+		mbuf->data_len = hdr.data_length;
 		mbuf->pkt_len = mbuf->data_len;
 		mbuf->port = sq->internals->portId;
 		*bufs = mbuf;
 
 		sq->internals->eth_stats.ipackets++;
-		sq->internals->eth_stats.ibytes += hdr.dataLen;
+		sq->internals->eth_stats.ibytes += hdr.data_length;
 	}
 	else /// Packet does not fit, drop it
 	{
@@ -379,11 +377,7 @@ sock_dev_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		size_t len = rte_pktmbuf_pkt_len(mbuf);
 
 		struct packHeader hdr;
-		hdr.dataLen = len;
-		hdr.capSize = hdr.dataLen;
-
-		hdr.dataLen = htons(hdr.dataLen);
-		hdr.capSize = htons(hdr.capSize);
+		hdr.data_length = htonl(len);
 
 		struct iovec iov[2];
 		iov[0].iov_base = &hdr;
