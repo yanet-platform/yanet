@@ -32,4 +32,4 @@ while getopts "h:a:c:t:" opt ; do
   esac
 done
 
-/target/bin/yanet-dataplane-$ARCH-$TYPE -c $CONFIG
+/usr/bin/yanet-dataplane-$ARCH-$TYPE -c $CONFIG
