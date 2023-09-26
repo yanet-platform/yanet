@@ -4,15 +4,14 @@
 YANET is an open-source extensible framework for software forwarding traffic based on DPDK.
 
 ## Introduction
-The main objective of our solution is to be fault-tolerant and high-performance traffic processor. This is achieved due to the absence of context switching, no data race, constant complexity of algorithms, lockless. And covering with autotests.
+The main objective of our solution is to be fault-tolerant and high-performance traffic processor. This is achieved due to the absence of context switching, no data race, constant complexity of algorithms, lockless.
 
 ## Features
 - IPv4/IPv6 routing
-- Dynamic routing is based on integration with BIRD
 - ECMP with weight
 - MPLS encapsulation
 - Dot1q ethernet encapsulation
-- ACL
+- IPFW compatible ruleset with extensions
 - Stateful firewall
 - Layer-4 load balancer
 - IPIP tunnel
@@ -24,6 +23,7 @@ The main objective of our solution is to be fault-tolerant and high-performance 
 ## Quick Start
 You can build YANET in [docker](https://www.docker.com/) container and run it with virtual ports. See [DEMO](demo).
 
+Or build on bare metal. See [documentation](docs/build.md).
 ## Running Autotests
 ```
 $ cd yanet

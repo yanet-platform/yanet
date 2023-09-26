@@ -13,7 +13,7 @@ $ docker run --rm -it -v $PWD:/project yanetplatform/builder
 ```
 Uses the `low_memory` configuration with a reduced memory limit for the ACL, Firewall/NAT64/balancer states, etc.
 
-### Start Dataplane
+### Start DataPlane
 ```
 $ docker run --network=none --rm -it -v $PWD:/project -v /run/yanet:/run/yanet yanetplatform/builder
 
@@ -21,7 +21,7 @@ $ docker run --network=none --rm -it -v $PWD:/project -v /run/yanet:/run/yanet y
 ```
 `--network=none` - network in this container is optional.
 
-### Start Controlplane
+### Start ControlPlane
 Open new terminal:
 ```
 $ docker run --network=none --rm -it -v $PWD:/project -v /run/yanet:/run/yanet yanetplatform/builder
@@ -97,7 +97,7 @@ PING 2000:2::1(2000:2::1) 56 data bytes
 64 bytes from 2000:2::1: icmp_seq=3 ttl=63 time=0.177 ms
 ...
 ```
-Success, 'Host B` responded!
+Success, `Host B` responded!
 
 # Check YANET stats
 Open new terminal:
