@@ -188,6 +188,11 @@ def get_announces(types):
 @Decorator.skip_function()
 def check_services():
     for service in CHECK_SERVICES_LIST:
+        if os.path.exists("/etc/kubernetes/kubelet.conf") and service in ["yadecap-controlplane", "yadecap-dataplane"]:
+            container_name = service.split("-")[1]
+            result = Executer.get(f"crictl exec $(crictl ps --name {container_name} -q -s Running)")
+            if len(result) < 1:
+                raise Exception(f"check_services({service})")
         if Executer.run(f"systemctl status {service}.service > /dev/null"):
             raise Exception(f"check_services({service})")
 
