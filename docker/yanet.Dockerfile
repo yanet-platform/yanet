@@ -30,5 +30,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN mkdir -p /run/yanet
 
-COPY --from=builder /target /target
-RUN cp /target/bin/yanet-wrapper /usr/sbin/
+COPY --from=builder /target/bin/* /usr/bin/
