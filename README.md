@@ -22,7 +22,7 @@ The main objective of our solution is to be fault-tolerant and high-performance 
 - Advanced autotests
 
 ## Quick Start
-You can build YANET in [docker](https://www.docker.com/) container and run it with virtual ports. See [DEMO](demo/README.md).
+You can build YANET in [docker](https://www.docker.com/) container and run it with virtual ports. See [DEMO](demo).
 
 ## Running Autotests
 ```
