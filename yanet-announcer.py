@@ -12,8 +12,6 @@ import time
 import typing
 from collections import abc
 
-CHECK_SERVICES_LIST: typing.List[str] = ["yanet-init", "yanet-dataplane", "yanet-controlplane"]
-
 CONFIGURATION_PATH: str = "/etc/yanet/announcer.conf"
 MACHINE_TARGET_PATH: str = "/etc/yanet/target"
 
@@ -187,14 +185,26 @@ def get_announces(types):
 @Decorator.logger_function
 @Decorator.skip_function()
 def check_services():
-    for service in CHECK_SERVICES_LIST:
-        if os.path.exists("/etc/kubernetes/kubelet.conf") and service in ["yadecap-controlplane", "yadecap-dataplane"]:
-            container_name = service.split("-")[1]
-            result = Executer.get(f"crictl exec $(crictl ps --name {container_name} -q -s Running)")
-            if len(result) < 1:
-                raise Exception(f"check_services({service})")
-        if Executer.run(f"systemctl status {service}.service > /dev/null"):
-            raise Exception(f"check_services({service})")
+    # Example
+    """
+    ~ yanet-cli version
+    application   version  revision  hash      custom
+    ------------  -------  --------  --------  --------------
+    dataplane     0.0      0         00000000  develop
+    controlplane  0.0      0         00000000  develop
+    cli           0.0      0         00000000  develop
+    """
+    LOGGER.info("Checking dataplane/contorlplane...")
+    try:
+        lines = Executer.get("/usr/bin/yanet-cli version")
+        application = set()
+        for line in lines:
+            application.add(line.get("application"))
+        if application != {"cli", "controlplane", "dataplane"}:
+            raise Exception("main services(dataplane, controlplane) not running")
+        LOGGER.info("Dataplane/controlplane is in running state!")
+    except:
+        raise Exception("Can not get version from yanet-cli.")
 
 
 @Decorator.logger_function
