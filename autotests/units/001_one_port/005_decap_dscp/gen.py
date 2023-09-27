@@ -24,14 +24,14 @@ write_pcap("send.pcap",
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=101)/IPv6(dst="1:2:3:4::abcd", src="::")/IP(dst="1.2.3.4", src="0.0.0.0", ttl=64, tos=0x80)/ICMP(),
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=101)/IPv6(dst="1:2:3:4::abcd", src="::")/IP(dst="1.2.3.4", src="0.0.0.0", ttl=64, tos=0xfc)/ICMP(),
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=101)/IPv6(dst="1:2:3:4::abcd", src="::")/IP(dst="1.2.3.4", src="0.0.0.0", ttl=64, tos=0xff)/ICMP(),
-           
+
            # MarkType = always: replace initial first six bits of TOS with value from config
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=102)/IPv6(dst="1:2:3:4::abcd", src="::")/IP(dst="1.2.3.4", src="0.0.0.0", ttl=64, tos=0)/ICMP(),
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=102)/IPv6(dst="1:2:3:4::abcd", src="::")/IP(dst="1.2.3.4", src="0.0.0.0", ttl=64, tos=0x4)/ICMP(),
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=102)/IPv6(dst="1:2:3:4::abcd", src="::")/IP(dst="1.2.3.4", src="0.0.0.0", ttl=64, tos=0x80)/ICMP(),
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=102)/IPv6(dst="1:2:3:4::abcd", src="::")/IP(dst="1.2.3.4", src="0.0.0.0", ttl=64, tos=0xfc)/ICMP(),
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=102)/IPv6(dst="1:2:3:4::abcd", src="::")/IP(dst="1.2.3.4", src="0.0.0.0", ttl=64, tos=0xff)/ICMP(),
-           
+
            # MarkType = always: correct checksum evaluation, correct old TOS subtraction
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=103)/IPv6(dst="1:2:3:4::abcd", src="::")/IP(dst="250.250.108.139", src="251.251.21.180", ttl=64, tos=0x0, id=0xc0bd, flags="DF", frag=0)/TCP(dport=4612, sport=443)/("0123456789"*141),
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=103)/IPv6(dst="1:2:3:4::abcd", src="::")/IP(dst="250.250.108.139", src="251.251.21.180", ttl=64, tos=0x4, id=0xc0bd, flags="DF", frag=0)/TCP(dport=4712, sport=443)/("0123456789"*141),
@@ -69,7 +69,7 @@ write_pcap("expect.pcap",
            Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="1.2.3.4", src="0.0.0.0", ttl=63, tos=0x50)/ICMP(),
            Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="1.2.3.4", src="0.0.0.0", ttl=63, tos=0x50)/ICMP(),
            Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="1.2.3.4", src="0.0.0.0", ttl=63, tos=0x53)/ICMP(),
-           
+
            Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="250.250.108.139", src="251.251.21.180", ttl=63, tos=0xa0, id=0xc0bd, flags="DF", frag=0)/TCP(dport=4612, sport=443)/("0123456789"*141),
            Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="250.250.108.139", src="251.251.21.180", ttl=63, tos=0xa0, id=0xc0bd, flags="DF", frag=0)/TCP(dport=4712, sport=443)/("0123456789"*141),
            Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="252.252.222.185", src="253.253.204.158", ttl=63, tos=0xa0, id=0xc57a)/TCP(dport=58062, sport=443)/("0123456789"*141),
