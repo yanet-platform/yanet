@@ -28,12 +28,13 @@ jobs:
           meson setup -Dtarget=unittest build_unittest
           meson compile -C build_unittest
       - name: bug https://github.com/actions/upload-artifact/issues/38
-        run: tar -cvf build_unittest.tar build_unittest
+        run: tar -cvzf build_unittest.tar.gz build_unittest
       - uses: actions/upload-artifact@v3
         with:
           name: build_unittest
-          path: build_unittest.tar
+          path: build_unittest.tar.gz
           retention-days: 1
+
   build-autotest:
     needs: build-image-builder
     runs-on: builder
@@ -42,16 +43,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: |
-          meson setup --prefix=/target_autotest -Dtarget=autotest build_autotest
+          meson setup --prefix=/target_autotest -Dtarget=autotest -Dstrip=true build_autotest
           meson compile -C build_autotest
       - run: meson install -C build_autotest
       - name: bug https://github.com/actions/upload-artifact/issues/38
-        run: tar -C /target_autotest -cvf target_autotest.tar ./
+        run: tar -C /target_autotest -cvzf target_autotest.tar.gz ./
       - uses: actions/upload-artifact@v3
         with:
           name: target_autotest
-          path: target_autotest.tar
+          path: target_autotest.tar.gz
           retention-days: 1
+
   build:
     needs: build-image-builder
     runs-on: ubuntu-latest
@@ -60,7 +62,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: |
-          meson setup --prefix=/target build
+          meson setup --prefix=/target -Dstrip=true build
           meson compile -C build
       - run: meson install -C build
 
@@ -75,8 +77,9 @@ jobs:
         with:
           name: build_unittest
       - name: bug https://github.com/actions/upload-artifact/issues/38
-        run: tar -xf build_unittest.tar
+        run: tar -xf build_unittest.tar.gz
       - run: meson test --no-rebuild -C build_unittest
+
   autotest-001_one_port:
     name: 001_one_port
     needs: build-autotest
@@ -89,7 +92,7 @@ jobs:
         with:
           name: target_autotest
       - name: bug https://github.com/actions/upload-artifact/issues/38
-        run: tar -C /usr -xf target_autotest.tar
+        run: tar -C /usr -xf target_autotest.tar.gz
       - run: yanet-autotest-run.py autotest/units/001_one_port
 
 
