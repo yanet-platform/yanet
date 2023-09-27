@@ -48,7 +48,7 @@ write_pcap("decap_expect.pcap",
            Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="8.8.8.8", src="55.55.205.4", ttl=63, tos=0x50)/UDP(dport=2048, sport=443),
            Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="8.8.8.8", src="55.55.205.4", ttl=63, tos=0x50)/UDP(dport=2048, sport=443),
            Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="8.8.8.8", src="55.55.205.4", ttl=63, tos=0x53)/UDP(dport=2048, sport=443),
-           
+
            Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="8.8.8.8", src="55.66.206.4", ttl=63, tos=0x28)/UDP(dport=2048, sport=443),
            Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="8.8.8.8", src="55.66.206.4", ttl=63, tos=0x4)/UDP(dport=2048, sport=443),
            Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="8.8.8.8", src="55.66.206.4", ttl=63, tos=0x80)/UDP(dport=2048, sport=443),
