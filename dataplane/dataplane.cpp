@@ -292,6 +292,190 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	return result;
 }
 
+std::string rss_flags_to_string(uint64_t rss_flags)
+{
+	std::string flag_names;
+	if (rss_flags & RTE_ETH_RSS_IPV4)
+	{
+		flag_names += "IPV4 ";
+	}
+	if (rss_flags & RTE_ETH_RSS_FRAG_IPV4)
+	{
+		flag_names += "FRAG_IPV4 ";
+	}
+	if (rss_flags & RTE_ETH_RSS_NONFRAG_IPV4_TCP)
+	{
+		flag_names += "NONFRAG_IPV4_TCP ";
+	}
+	if (rss_flags & RTE_ETH_RSS_NONFRAG_IPV4_UDP)
+	{
+		flag_names += "NONFRAG_IPV4_UDP ";
+	}
+	if (rss_flags & RTE_ETH_RSS_NONFRAG_IPV4_SCTP)
+	{
+		flag_names += "NONFRAG_IPV4_SCTP ";
+	}
+	if (rss_flags & RTE_ETH_RSS_NONFRAG_IPV4_OTHER)
+	{
+		flag_names += "NONFRAG_IPV4_OTHER ";
+	}
+	if (rss_flags & RTE_ETH_RSS_IPV6)
+	{
+		flag_names += "IPV6 ";
+	}
+	if (rss_flags & RTE_ETH_RSS_FRAG_IPV6)
+	{
+		flag_names += "FRAG_IPV6 ";
+	}
+	if (rss_flags & RTE_ETH_RSS_NONFRAG_IPV6_TCP)
+	{
+		flag_names += "NONFRAG_IPV6_TCP ";
+	}
+	if (rss_flags & RTE_ETH_RSS_NONFRAG_IPV6_UDP)
+	{
+		flag_names += "NONFRAG_IPV6_UDP ";
+	}
+	if (rss_flags & RTE_ETH_RSS_NONFRAG_IPV6_SCTP)
+	{
+		flag_names += "NONFRAG_IPV6_SCTP ";
+	}
+	if (rss_flags & RTE_ETH_RSS_NONFRAG_IPV6_OTHER)
+	{
+		flag_names += "NONFRAG_IPV6_OTHER ";
+	}
+	if (rss_flags & RTE_ETH_RSS_L2_PAYLOAD)
+	{
+		flag_names += "L2_PAYLOAD ";
+	}
+	if (rss_flags & RTE_ETH_RSS_IPV6_EX)
+	{
+		flag_names += "IPV6_EX ";
+	}
+	if (rss_flags & RTE_ETH_RSS_IPV6_TCP_EX)
+	{
+		flag_names += "IPV6_TCP_EX ";
+	}
+	if (rss_flags & RTE_ETH_RSS_IPV6_UDP_EX)
+	{
+		flag_names += "IPV6_UDP_EX ";
+	}
+	if (rss_flags & RTE_ETH_RSS_PORT)
+	{
+		flag_names += "PORT ";
+	}
+	if (rss_flags & RTE_ETH_RSS_VXLAN)
+	{
+		flag_names += "VXLAN ";
+	}
+	if (rss_flags & RTE_ETH_RSS_GENEVE)
+	{
+		flag_names += "GENEVE ";
+	}
+	if (rss_flags & RTE_ETH_RSS_NVGRE)
+	{
+		flag_names += "NVGRE ";
+	}
+	if (rss_flags & RTE_ETH_RSS_MPLS)
+	{
+		flag_names += "MPLS ";
+	}
+	return flag_names;
+}
+
+uint64_t string_to_rss_flag(std::string flag_str)
+{
+	std::transform(flag_str.begin(), flag_str.end(), flag_str.begin(), ::toupper);
+	if (flag_str == "IPV4")
+	{
+		return RTE_ETH_RSS_IPV4;
+	}
+	else if (flag_str == "FRAG_IPV4")
+	{
+		return RTE_ETH_RSS_FRAG_IPV4;
+	}
+	else if (flag_str == "NONFRAG_IPV4_TCP")
+	{
+		return RTE_ETH_RSS_NONFRAG_IPV4_TCP;
+	}
+	else if (flag_str == "NONFRAG_IPV4_UDP")
+	{
+		return RTE_ETH_RSS_NONFRAG_IPV4_UDP;
+	}
+	else if (flag_str == "NONFRAG_IPV4_SCTP")
+	{
+		return RTE_ETH_RSS_NONFRAG_IPV4_SCTP;
+	}
+	else if (flag_str == "NONFRAG_IPV4_OTHER")
+	{
+		return RTE_ETH_RSS_NONFRAG_IPV4_OTHER;
+	}
+	else if (flag_str == "IPV6")
+	{
+		return RTE_ETH_RSS_IPV6;
+	}
+	else if (flag_str == "FRAG_IPV6")
+	{
+		return RTE_ETH_RSS_FRAG_IPV6;
+	}
+	else if (flag_str == "NONFRAG_IPV6_TCP")
+	{
+		return RTE_ETH_RSS_NONFRAG_IPV6_TCP;
+	}
+	else if (flag_str == "NONFRAG_IPV6_UDP")
+	{
+		return RTE_ETH_RSS_NONFRAG_IPV6_UDP;
+	}
+	else if (flag_str == "NONFRAG_IPV6_SCTP")
+	{
+		return RTE_ETH_RSS_NONFRAG_IPV6_SCTP;
+	}
+	else if (flag_str == "NONFRAG_IPV6_OTHER")
+	{
+		return RTE_ETH_RSS_NONFRAG_IPV6_OTHER;
+	}
+	else if (flag_str == "L2_PAYLOAD")
+	{
+		return RTE_ETH_RSS_L2_PAYLOAD;
+	}
+	else if (flag_str == "IPV6_EX")
+	{
+		return RTE_ETH_RSS_IPV6_EX;
+	}
+	else if (flag_str == "IPV6_TCP_EX")
+	{
+		return RTE_ETH_RSS_IPV6_TCP_EX;
+	}
+	else if (flag_str == "IPV6_UDP_EX")
+	{
+		return RTE_ETH_RSS_IPV6_UDP_EX;
+	}
+	else if (flag_str == "PORT")
+	{
+		return RTE_ETH_RSS_PORT;
+	}
+	else if (flag_str == "VXLAN")
+	{
+		return RTE_ETH_RSS_VXLAN;
+	}
+	else if (flag_str == "GENEVE")
+	{
+		return RTE_ETH_RSS_GENEVE;
+	}
+	else if (flag_str == "NVGRE")
+	{
+		return RTE_ETH_RSS_NVGRE;
+	}
+	else if (flag_str == "MPLS")
+	{
+		return RTE_ETH_RSS_MPLS;
+	}
+	else
+	{
+		YADECAP_LOG_WARNING("incorrect value for rss flag: '%s'\n", flag_str.c_str());
+		return 0;
+	}
+}
+
 eResult cDataPlane::initPorts()
 {
 	std::vector<std::string> remove_keys;
@@ -299,7 +483,7 @@ eResult cDataPlane::initPorts()
 	for (const auto& configPortIter : config.ports)
 	{
 		const std::string& interfaceName = configPortIter.first;
-		const auto& [pci, symmetric_mode] = configPortIter.second;
+		const auto& [pci, symmetric_mode, rss_flags] = configPortIter.second;
 
 		tPortId portId;
 		if (strncmp(pci.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
@@ -335,22 +519,23 @@ eResult cDataPlane::initPorts()
 		rte_eth_conf portConf;
 		memset(&portConf, 0, sizeof(rte_eth_conf));
 
-		if (config.rssFlags != 0)
+		if (rss_flags != 0)
 		{
 			portConf.rxmode.mq_mode = RTE_ETH_MQ_RX_RSS;
 
 			YADECAP_LOG_INFO("device info: flow type rss offloads 0x%lx\n", devInfo.flow_type_rss_offloads);
-			YADECAP_LOG_INFO("config.rssFlags: 0x%lx\n", config.rssFlags);
-			if ((devInfo.flow_type_rss_offloads | config.rssFlags) == devInfo.flow_type_rss_offloads)
+			YADECAP_LOG_INFO("port.rss_flags: 0x%lx\n", rss_flags);
+			if ((devInfo.flow_type_rss_offloads | rss_flags) == devInfo.flow_type_rss_offloads)
 			{
-				portConf.rx_adv_conf.rss_conf.rss_hf = config.rssFlags;
+				portConf.rx_adv_conf.rss_conf.rss_hf = rss_flags;
 			}
 			else
 			{
-				YADECAP_LOG_WARNING("config.rssFlags 0x%lx not supported, fallback to 0x%lx\n",
-				                    config.rssFlags,
-				                    (uint64_t)RTE_ETH_RSS_IP);
-				portConf.rx_adv_conf.rss_conf.rss_hf = RTE_ETH_RSS_IP;
+				uint64_t missedFlags = ~devInfo.flow_type_rss_offloads & rss_flags;
+				YADECAP_LOG_ERROR("port.rssFlags 0x%lx not supported, missed flags %s\n",
+				                  rss_flags,
+				                  rss_flags_to_string(missedFlags).c_str());
+				return eResult::invalidConfigurationFile;
 			}
 		}
 		else
@@ -1368,31 +1553,6 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 		config.use_kernel_interface = rootJson.find("use_kernel_interface").value();
 	}
 
-	auto rssDepth = rootJson.find("rssDepth");
-	if (rssDepth != rootJson.end())
-	{
-		if (rssDepth.value() == "L4" || rssDepth.value() == "l4")
-		{
-			config.rssFlags = RTE_ETH_RSS_IP | RTE_ETH_RSS_TCP | RTE_ETH_RSS_UDP;
-		}
-		else if (rssDepth.value() == "L3" || rssDepth.value() == "l3")
-		{
-			config.rssFlags = RTE_ETH_RSS_IP;
-		}
-		else if (rssDepth.value() == "NONE" || rssDepth.value() == "none")
-		{
-			config.rssFlags = 0;
-		}
-		else
-		{
-			YADECAP_LOG_WARNING("incorrect value for parameter: 'rssDepth', using default 'L3'\n");
-		}
-	}
-	else
-	{
-		YADECAP_LOG_WARNING("not found: 'rssDepth', using default 'L3'\n");
-	}
-
 	if (rootJson.find("rateLimits") != rootJson.end())
 	{
 		result = parseRateLimits(rootJson.find("rateLimits").value());
@@ -1438,6 +1598,7 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 		std::string interfaceName = portJson["interfaceName"];
 		std::string pci = portJson["pci"];
 		bool symmetric_mode = false;
+		uint64_t rss_flags = 0;
 
 		if (exist(config.ports, interfaceName))
 		{
@@ -1450,7 +1611,21 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 			symmetric_mode = portJson["symmetric_mode"];
 		}
 
-		config.ports[interfaceName] = {pci, symmetric_mode};
+		auto rssFlagsJson = portJson.find("rssFlags");
+		if (rssFlagsJson != portJson.end())
+		{
+			for (const auto& flag : rssFlagsJson.value())
+			{
+				rss_flags |= string_to_rss_flag(flag.get<std::string>());
+			}
+		}
+		else
+		{
+			YADECAP_LOG_WARNING("not found: 'rssFlags', using default 'IP'\n");
+			rss_flags = RTE_ETH_RSS_IP;
+		}
+
+		config.ports[interfaceName] = {pci, symmetric_mode, rss_flags};
 
 		for (tCoreId coreId : portJson["coreIds"])
 		{
@@ -1659,8 +1834,9 @@ eResult cDataPlane::checkConfig()
 		std::set<std::string> pcis;
 		for (const auto& portIter : config.ports)
 		{
-			const auto& [pci, symmetric_mode] = portIter.second;
+			const auto& [pci, symmetric_mode, rss_flags] = portIter.second;
 			(void)symmetric_mode;
+			(void)rss_flags;
 
 			if (exist(pcis, pci))
 			{
@@ -1752,8 +1928,9 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 
 	for (const auto& port : config.ports)
 	{
-		const auto& [pci, symmetric_mode] = port.second;
+		const auto& [pci, symmetric_mode, rss_flags] = port.second;
 		(void)symmetric_mode;
+		(void)rss_flags;
 
 		// Do not whitelist sock dev virtual devices
 		if (strncmp(pci.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
