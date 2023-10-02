@@ -254,6 +254,7 @@ common::icp::telegraf_dregress_traffic::response telegraf_t::telegraf_dregress_t
 						/// not fallback
 
 						response_peer_as.emplace_back(is_ipv4,
+						                              peer_id,
 						                              peers[peer_id],
 						                              origin_as,
 						                              packets - packets_prev,
@@ -268,7 +269,7 @@ common::icp::telegraf_dregress_traffic::response telegraf_t::telegraf_dregress_t
 			const auto& [is_ipv4, peer_id] = key;
 			const auto& [packets, bytes] = value;
 
-			response_peer.emplace_back(is_ipv4, peers[peer_id], packets, bytes);
+			response_peer.emplace_back(is_ipv4, peer_id, peers[peer_id], packets, bytes);
 		}
 
 		dregress_traffic_counters_prev = counters;

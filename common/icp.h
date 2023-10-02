@@ -203,11 +203,13 @@ namespace telegraf_dregress
 namespace telegraf_dregress_traffic
 {
 	using peer = std::tuple<bool, ///< is_ipv4
+	                        uint32_t, ///< link_id
 	                        std::string, ///< link_name
 	                        uint64_t, ///< packets
 	                        uint64_t>;
 
 	using peer_as = std::tuple<bool, ///< is_ipv4
+	                           uint32_t, ///< link_id
 	                           std::string, ///< link_name
 	                           uint32_t, ///< origin_as
 	                           uint64_t, ///< packets

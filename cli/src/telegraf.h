@@ -443,46 +443,53 @@ void dregress_traffic()
 	interface::controlPlane controlPlane;
 	const auto& [peer, peer_as] = controlPlane.telegraf_dregress_traffic();
 
-	for (const auto& [is_ipv4, peer_name_orig, packets, bytes] : peer)
+	for (const auto& [is_ipv4, link_id, peer_name_orig, packets, bytes] : peer)
 	{
 		std::string peer_name = peer_name_orig;
 		replaceAll(peer_name, " ", "\\ ");
 
 		influxdb_format::print(is_ipv4 ? "dregress_traffic_v4" : "dregress_traffic_v6",
-		                       {{"peer_link", peer_name, {.optional_null = "n/s",
-		                                                  .string_empty = "empty"}}},
+		                       {{"link_id", link_id},
+		                        {"peer_link", peer_name,
+		                         {.optional_null = "n/s",
+		                         .string_empty = "empty"}}},
 		                       {{"packets", packets},
 		                        {"bytes", bytes}});
 	}
 
 	std::map<std::tuple<bool, ///< is_ipv4
+	                    uint32_t, ///< link_id
 	                    std::string>, ///< link_name
 	         std::tuple<common::uint64, ///< packets
 	                    common::uint64>> peer_only;
-	for (const auto& [is_ipv4, peer_name_orig, origin_as, packets, bytes] : peer_as)
+
+	for (const auto& [is_ipv4, link_id, peer_name_orig, origin_as, packets, bytes] : peer_as)
 	{
 		std::string peer_name = peer_name_orig;
 		replaceAll(peer_name, " ", "\\ ");
 
 		influxdb_format::print(is_ipv4 ? "dregress_traffic_as_v4" : "dregress_traffic_as_v6",
-		                       {{"peer_link", peer_name, {.optional_null = "n/s",
-		                                                  .string_empty = "empty"}},
+		                       {{"link_id", link_id},
+		                        {"peer_link", peer_name,
+		                         {.optional_null = "n/s",
+		                          .string_empty = "empty"}},
 		                        {"origin_as", origin_as}},
 		                       {{"packets", packets},
 		                        {"bytes", bytes}});
 
-		auto& [peer_only_packets, peer_only_bytes] = peer_only[{is_ipv4, peer_name}];
+		auto& [peer_only_packets, peer_only_bytes] = peer_only[{is_ipv4, link_id, peer_name}];
 		peer_only_packets += packets;
 		peer_only_bytes += bytes;
 	}
 
 	for (const auto& [key, value] : peer_only)
 	{
-		const auto& [is_ipv4, peer_name] = key;
+		const auto& [is_ipv4, link_id, peer_name] = key;
 		const auto& [packets, bytes] = value;
 
 		influxdb_format::print(is_ipv4 ? "dregress_traffic_as_v4" : "dregress_traffic_as_v6",
-		                       {{"peer_link", peer_name, {.optional_null = "n/s",
+		                       {{"link_id", link_id},
+		                        {"peer_link", peer_name, {.optional_null = "n/s",
 		                                                  .string_empty = "empty"}}},
 		                       {{"packets", packets},
 		                        {"bytes", bytes}});
