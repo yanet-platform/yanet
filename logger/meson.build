@@ -3,7 +3,7 @@ dependencies += dependency('libdpdk', static: true)
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
 
-sources = files('src/main.cpp')
+sources = files('main.cpp')
 
 cpp_args = []
 cpp_args += '-fno-rtti'

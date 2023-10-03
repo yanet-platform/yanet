@@ -3,19 +3,19 @@ dependencies += dependency('libdpdk', static: true)
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
 
-sources = files('src/bus.cpp',
-                'src/controlplane.cpp',
-                'src/dataplane.cpp',
-                'src/debug_latch.cpp',
-                'src/dregress.cpp',
-                'src/fragmentation.cpp',
-                'src/globalbase.cpp',
-                'src/main.cpp',
-                'src/report.cpp',
-                'src/sharedmemory.cpp',
-                'src/sock_dev.cpp',
-                'src/worker.cpp',
-                'src/worker_gc.cpp')
+sources = files('bus.cpp',
+                'controlplane.cpp',
+                'dataplane.cpp',
+                'debug_latch.cpp',
+                'dregress.cpp',
+                'fragmentation.cpp',
+                'globalbase.cpp',
+                'main.cpp',
+                'report.cpp',
+                'sharedmemory.cpp',
+                'sock_dev.cpp',
+                'worker.cpp',
+                'worker_gc.cpp')
 
 foreach arch : archs
     foreach yanet_config : yanet_configs

@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "../src/hashtable.h"
-#include "../src/type.h"
+#include "../hashtable.h"
+#include "../type.h"
 
 namespace
 {

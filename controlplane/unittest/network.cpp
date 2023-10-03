@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "../src/acl/network.h"
+#include "../acl/network.h"
 
 namespace
 {

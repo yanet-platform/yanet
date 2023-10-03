@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-#include "../src/lpm.h"
+#include "../lpm.h"
 
 namespace
 {

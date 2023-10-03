@@ -1,7 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "../src/acl_table.h"
+#include "../acl_table.h"
 
 namespace
 {

@@ -1,5 +1,5 @@
-sources = files('src/autotest.cpp',
-                'src/main.cpp')
+sources = files('autotest.cpp',
+                'main.cpp')
 
 dependencies = []
 dependencies += dependency('libsystemd')
