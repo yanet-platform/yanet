@@ -14,7 +14,7 @@
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
 
-#include "dataplane/src/samples.h"
+#include "dataplane/samples.h"
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_INFO;
 

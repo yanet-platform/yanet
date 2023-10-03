@@ -1,9 +1,9 @@
 dependencies = []
 dependencies += dependency('threads')
 
-sources = files('src/libyabird.cpp')
+sources = files('libyabird.cpp')
 
-install_headers('src/libyabird.h')
+install_headers('libyabird.h')
 
 libyabird = library('yanet-rib',
                     sources,

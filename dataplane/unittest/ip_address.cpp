@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "../src/type.h"
+#include "../type.h"
 
 namespace
 {

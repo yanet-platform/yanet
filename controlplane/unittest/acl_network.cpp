@@ -1,7 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "../src/acl_network.h"
+#include "../acl_network.h"
 
 namespace
 {

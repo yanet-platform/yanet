@@ -3,7 +3,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "../src/acl_flat.h"
+#include "../acl_flat.h"
 
 namespace
 {
