@@ -261,7 +261,7 @@ namespace updateGlobalBase
 					   uint8_t, ///< flags
 					   tCounterId, ///< size 4
 					   balancer::scheduler,
-					   balancer::tunnel, // tunneling method (default ipip)
+					   balancer::forwarding_method, // tunneling method (default ipip)
 		                           uint32_t, /// default_wlc_power
 		                           uint32_t, ///< real_start
 		                           uint32_t>; ///< real_size
