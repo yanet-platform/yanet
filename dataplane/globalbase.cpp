@@ -1181,7 +1181,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 	}
 	balancer_services_count = 0;
 
-	for (const auto& [balancer_service_id, flags, counter_id, scheduler, tunnel, default_wlc_power, real_start, real_size] : services)
+	for (const auto& [balancer_service_id, flags, counter_id, scheduler, forwarding_method, default_wlc_power, real_start, real_size] : services)
 	{
 		if (balancer_service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 		{
@@ -1212,7 +1212,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		balancer_service.real_size = real_size;
 		balancer_service.scheduler = scheduler;
 		balancer_service.wlc_power = default_wlc_power;
-		balancer_service.tunnel = tunnel;
+		balancer_service.forwarding_method = forwarding_method;
 	}
 
 	const auto& reals = std::get<1>(request);

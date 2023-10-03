@@ -3950,7 +3950,7 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 
 		yanet_ipv4_checksum(ipv4Header);
 	}
-	if (service.tunnel == balancer::tunnel::gre)
+	if (service.forwarding_method == balancer::forwarding_method::gre)
 	{
 		// update data in ip headers and insert gre
 		rte_pktmbuf_prepend(mbuf, sizeof(rte_gre_hdr));

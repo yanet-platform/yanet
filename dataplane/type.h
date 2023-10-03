@@ -574,7 +574,7 @@ namespace globalBase
 		uint32_t real_start;
 		uint32_t real_size;
 		::balancer::scheduler scheduler;
-		::balancer::tunnel tunnel;
+		::balancer::forwarding_method forwarding_method;
 		uint32_t wlc_power;
 	};
 

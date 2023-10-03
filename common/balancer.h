@@ -5,21 +5,21 @@
 namespace balancer
 {
 
-enum class tunnel : uint8_t
+enum class forwarding_method : uint8_t
 {
 	ipip,  // in services.conf it means lvs_method: TUN
 	gre,
 };
 
-constexpr const char* to_string(const tunnel& tunnel)
+constexpr const char* to_string(const forwarding_method& forwarding_method)
 {
-	switch (tunnel)
+	switch (forwarding_method)
 	{
-		case tunnel::ipip:
+		case forwarding_method::ipip:
 		{
 			return "ipip";
 		}
-		case tunnel::gre:
+		case forwarding_method::gre:
 		{
 			return "gre";
 		}

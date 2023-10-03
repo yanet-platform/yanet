@@ -1577,22 +1577,22 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			throw error_result_t(eResult::invalidConfigurationFile, "unknown scheduler: " + scheduler_string);
 		}
 
-		balancer::tunnel tunnel;
+		balancer::forwarding_method forwarding_method;
 
 		if (!exist(service_json, "lvs_method"))
 		{
-			tunnel = balancer::tunnel::ipip;
+			forwarding_method = balancer::forwarding_method::ipip;
 		}
 		else
 		{
-			std::string tunnel_string = service_json["lvs_method"];
-			if (tunnel_string == "TUN")
+			std::string forwarding_method_string = service_json["lvs_method"];
+			if (forwarding_method_string == "TUN")
 			{
-				tunnel = balancer::tunnel::ipip;
+				forwarding_method = balancer::forwarding_method::ipip;
 			}
 			else
 			{
-				tunnel = balancer::tunnel::gre;
+				forwarding_method = balancer::forwarding_method::gre;
 			}
 		}
 
@@ -1650,7 +1650,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 		                               service_version,
 		                               scheduler,
 		                               scheduler_params,
-									   tunnel,
+									   forwarding_method,
 					       			   flags,
 		                               reals);
 
