@@ -388,10 +388,6 @@ YANET_NEVER_INLINE void cWorker::mainThread()
 		}
 
 		iteration++;
-
-#ifdef CONFIG_YADECAP_AUTOTEST
-		std::this_thread::sleep_for(std::chrono::microseconds{1});
-#endif // CONFIG_YADECAP_AUTOTEST
 	}
 }
 
