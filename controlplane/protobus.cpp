@@ -1,16 +1,16 @@
 #include <vector>
 
 #include <fcntl.h>
+#include <inttypes.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <inttypes.h>
 
-#include "libprotobuf/meta.pb.h"
 #include "common/icp.h"
 #include "common/icp_proto.h"
+#include "libprotobuf/meta.pb.h"
 
 #include "common.h"
 #include "controlplane.h"

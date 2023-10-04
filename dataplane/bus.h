@@ -2,15 +2,15 @@
 
 #include <arpa/inet.h>
 
+#include <array>
 #include <thread>
 #include <variant>
-#include <array>
 #include <vector>
 
 #include <rte_ether.h>
 
-#include "common/result.h"
 #include "common/idp.h"
+#include "common/result.h"
 #include "common/type.h"
 
 #include "type.h"

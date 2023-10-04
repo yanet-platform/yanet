@@ -2737,7 +2737,7 @@ public:
 
 			const auto& from_chunk = from_chunks[from_chunk_id];
 
-			memcpy(chunk.values , from_chunk.values, (1u << 8) * sizeof(common::acl::tree_value_t));
+			memcpy(chunk.values, from_chunk.values, (1u << 8) * sizeof(common::acl::tree_value_t));
 
 			std::vector<std::tuple<unsigned int, unsigned int>> nexts;
 

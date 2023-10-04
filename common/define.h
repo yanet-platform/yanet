@@ -1,55 +1,57 @@
 #pragma once
 
-#include <optional>
-#include <vector>
-#include <map>
-#include <set>
 #include <ctime>
+#include <map>
+#include <optional>
+#include <set>
+#include <vector>
 
 #include <inttypes.h>
 
 #define YANET_UNUSED [[maybe_unused]]
 
-#define YANET_LOG_PRINT(msg, args ...) fprintf(stdout, msg, ## args)
+#define YANET_LOG_PRINT(msg, args...) fprintf(stdout, msg, ##args)
 
 namespace common::log
 {
 enum LogPriority
 {
-    TLOG_EMERG = 0 /* "EMERG" */,
-    TLOG_ALERT = 1 /* "ALERT" */,
-    TLOG_CRIT = 2 /* "CRITICAL_INFO" */,
-    TLOG_ERR = 3 /* "ERROR" */,
-    TLOG_WARNING = 4 /* "WARNING" */,
-    TLOG_NOTICE = 5 /* "NOTICE" */,
-    TLOG_INFO = 6 /* "INFO" */,
-    TLOG_DEBUG = 7 /* "DEBUG" */,
-    TLOG_RESOURCES = 8 /* "RESOURCES" */
+	TLOG_EMERG = 0 /* "EMERG" */,
+	TLOG_ALERT = 1 /* "ALERT" */,
+	TLOG_CRIT = 2 /* "CRITICAL_INFO" */,
+	TLOG_ERR = 3 /* "ERROR" */,
+	TLOG_WARNING = 4 /* "WARNING" */,
+	TLOG_NOTICE = 5 /* "NOTICE" */,
+	TLOG_INFO = 6 /* "INFO" */,
+	TLOG_DEBUG = 7 /* "DEBUG" */,
+	TLOG_RESOURCES = 8 /* "RESOURCES" */
 };
 extern LogPriority logPriority;
 } // common::log
 
-#define YANET_LOG_(name, level, msg, args ...) \
-	do \
-	if (common::log::logPriority >= common::log::TLOG_##level) \
-	{ \
-		timespec ts; \
-		timespec_get(&ts, TIME_UTC); \
-		fprintf(stdout, "[" name "] %lu.%06lu %s:%d: " msg, ts.tv_sec, ts.tv_nsec/1000, __FILE__, __LINE__, ## args); \
-		fflush(stdout); \
-	} while(0)
-#define YANET_LOG(level, msg, args ...) YANET_LOG_(#level, level, msg, ## args)
+#define YANET_LOG_(name, level, msg, args...)                                                                                          \
+	do                                                                                                                             \
+		if (common::log::logPriority >= common::log::TLOG_##level)                                                             \
+		{                                                                                                                      \
+			timespec ts;                                                                                                   \
+			timespec_get(&ts, TIME_UTC);                                                                                   \
+			fprintf(stdout, "[" name "] %lu.%06lu %s:%d: " msg, ts.tv_sec, ts.tv_nsec / 1000, __FILE__, __LINE__, ##args); \
+			fflush(stdout);                                                                                                \
+		}                                                                                                                      \
+	while (0)
+#define YANET_LOG(level, msg, args...) YANET_LOG_(#level, level, msg, ##args)
 
-#define YANET_LOG_DEBUG(msg, args ...) YANET_LOG(DEBUG, msg, ## args)
-#define YANET_LOG_INFO(msg, args ...) YANET_LOG(INFO, msg, ## args)
-#define YANET_LOG_NOTICE(msg, args ...) YANET_LOG(NOTICE, msg, ## args)
-#define YANET_LOG_WARNING(msg, args ...) YANET_LOG(WARNING, msg, ## args)
-#define YANET_LOG_ERROR(msg, args ...) YANET_LOG_("ERROR", ERR, msg, ## args)
+#define YANET_LOG_DEBUG(msg, args...) YANET_LOG(DEBUG, msg, ##args)
+#define YANET_LOG_INFO(msg, args...) YANET_LOG(INFO, msg, ##args)
+#define YANET_LOG_NOTICE(msg, args...) YANET_LOG(NOTICE, msg, ##args)
+#define YANET_LOG_WARNING(msg, args...) YANET_LOG(WARNING, msg, ##args)
+#define YANET_LOG_ERROR(msg, args...) YANET_LOG_("ERROR", ERR, msg, ##args)
 
-#define YANET_ALWAYS_INLINE __attribute__ ((always_inline))
-#define YANET_NEVER_INLINE __attribute__ ((noinline))
+#define YANET_ALWAYS_INLINE __attribute__((always_inline))
+#define YANET_NEVER_INLINE __attribute__((noinline))
 
-#define YANET_MEMORY_BARRIER_COMPILE __asm__ __volatile__ ("" ::: "memory")
+#define YANET_MEMORY_BARRIER_COMPILE __asm__ __volatile__("" :: \
+	                                                          : "memory")
 
 #define YANET_ACL_ID_UNKNOWN ((tAclId)(0))
 
@@ -86,12 +88,12 @@ extern LogPriority logPriority;
 #if __cpp_exceptions
 #define YANET_THROW(string) throw string
 #else // __cpp_exceptions
-#define YANET_THROW(string) \
-	do \
-	{ \
+#define YANET_THROW(string)                             \
+	do                                              \
+	{                                               \
 		YANET_LOG_ERROR("%s\n", string.data()); \
-		std::abort(); \
-	} while(0)
+		std::abort();                           \
+	} while (0)
 #endif // __cpp_exceptions
 
 #define YANET_RIB_PRIORITY_DEFAULT ((uint32_t)10000)
@@ -124,14 +126,14 @@ inline bool exist(const std::set<key_T>& set, const key_T& key)
 }
 
 /// @todo: move
-template <typename type_T>
+template<typename type_T>
 bool check_size(const std::vector<type_T>& vector,
                 const std::size_t& size)
 {
 	return vector.size() * sizeof(type_T) == size;
 }
 
-template <typename list_T>
+template<typename list_T>
 inline void limit_insert(list_T& list,
                          const char* name,
                          const std::optional<uint32_t>& socket_id,
@@ -141,7 +143,7 @@ inline void limit_insert(list_T& list,
 	list.emplace_back(name, socket_id, current, maximum);
 }
 
-template <typename list_T>
+template<typename list_T>
 inline void limit_insert(list_T& list,
                          const char* name,
                          const std::optional<uint32_t>& socket_id,
@@ -151,7 +153,7 @@ inline void limit_insert(list_T& list,
 	limit_insert(list, name, socket_id, current, maximum);
 }
 
-template <typename list_T>
+template<typename list_T>
 inline void limit_insert(list_T& list,
                          const char* name,
                          const uint64_t& current,
@@ -160,7 +162,7 @@ inline void limit_insert(list_T& list,
 	list.emplace_back(name, std::nullopt, current, maximum);
 }
 
-template <typename list_T>
+template<typename list_T>
 inline void limit_insert(list_T& list,
                          const char* name,
                          const std::tuple<uint64_t, uint64_t>& current_maximum)

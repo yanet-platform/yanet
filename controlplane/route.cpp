@@ -14,43 +14,35 @@ eResult route_t::init()
 	tunnel_counter.insert({true, 0, 0}); ///< fallback v4
 	tunnel_counter.insert({false, 0, 0}); ///< fallback v6
 
-	controlPlane->register_command(common::icp::requestType::route_config, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::route_config, [this]() {
 		return route_config();
 	});
 
-	controlPlane->register_command(common::icp::requestType::route_summary, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::route_summary, [this]() {
 		return route_summary();
 	});
 
-	controlPlane->register_command(common::icp::requestType::route_lookup, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::route_lookup, [this](const common::icp::request& request) {
 		return route_lookup(std::get<common::icp::route_lookup::request>(std::get<1>(request)));
 	});
 
-	controlPlane->register_command(common::icp::requestType::route_get, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::route_get, [this](const common::icp::request& request) {
 		return route_get(std::get<common::icp::route_get::request>(std::get<1>(request)));
 	});
 
-	controlPlane->register_command(common::icp::requestType::route_interface, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::route_interface, [this]() {
 		return route_interface();
 	});
 
-	controlPlane->register_command(common::icp::requestType::route_tunnel_lookup, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::route_tunnel_lookup, [this](const common::icp::request& request) {
 		return route_tunnel_lookup(std::get<common::icp::route_tunnel_lookup::request>(std::get<1>(request)));
 	});
 
-	controlPlane->register_command(common::icp::requestType::route_tunnel_get, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::route_tunnel_get, [this](const common::icp::request& request) {
 		return route_tunnel_get(std::get<common::icp::route_tunnel_get::request>(std::get<1>(request)));
 	});
 
-	funcThreads.emplace_back([this]()
-	{
+	funcThreads.emplace_back([this]() {
 		tunnel_gc_thread();
 	});
 
@@ -69,7 +61,8 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 		                    std::string,
 		                    uint32_t>,
 		         std::set<std::tuple<ip_address_t,
-		                             std::vector<uint32_t>>>> interface_destination_next;
+		                             std::vector<uint32_t>>>>
+		        interface_destination_next;
 		for (const auto& [pptn_index, path_info_to_nh_ptr] : *nexthops)
 		{
 			const auto& table_name = std::get<2>(pptns[pptn_index]);
@@ -103,9 +96,10 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 				(void)large_communities;
 
 				interface_destination_next[{std::numeric_limits<decltype(local_preference)>::max() - local_preference,
-											aspath.size(),
-											origin,
-											med}].emplace(nexthop, labels);
+				                            aspath.size(),
+				                            origin,
+				                            med}]
+				        .emplace(nexthop, labels);
 			}
 		}
 
@@ -180,10 +174,12 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 		                              uint32_t>;
 
 		std::map<bgp_length,
-		         route::tunnel_destination_legacy_t> destination_legacy_next;
+		         route::tunnel_destination_legacy_t>
+		        destination_legacy_next;
 		std::map<std::variant<uint32_t, ///< override_length
 		                      bgp_length>,
-		         route::tunnel_destination_interface_t> destination_interface_next;
+		         route::tunnel_destination_interface_t>
+		        destination_interface_next;
 
 		for (const auto& [pptn_index, path_info_to_nh_ptr] : *nexthops)
 		{
@@ -195,7 +191,7 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 				(void)communities;
 
 				if ((prefix.is_ipv4() && nexthop.is_ipv4()) ||
-					(prefix.is_ipv6() && nexthop.is_ipv6()))
+				    (prefix.is_ipv6() && nexthop.is_ipv6()))
 				{
 					if (labels.size() == 1)
 					{
@@ -223,7 +219,7 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 						}
 
 						if (peer_id < 10000 ||
-							peer_id >= 11000)
+						    peer_id >= 11000)
 						{
 							continue;
 						}
@@ -231,13 +227,13 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 						for (const auto& large_community : large_communities)
 						{
 							if (large_community.value[0] == 13238 && ///< @todo: DEFINE
-								large_community.value[1] == 1) ///< @todo: DEFINE
+							    large_community.value[1] == 1) ///< @todo: DEFINE
 							{
 								weight = large_community.value[2];
 							}
 
 							if (large_community.value[0] == 13238 && ///< @todo: DEFINE
-								large_community.value[1] == 1000) ///< @todo: DEFINE
+							    large_community.value[1] == 1000) ///< @todo: DEFINE
 							{
 								override_length = large_community.value[2];
 							}
@@ -257,21 +253,23 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 						else
 						{
 							destination_interface_next[bgp_length(std::numeric_limits<decltype(local_preference)>::max() - local_preference,
-																aspath.size(),
-																origin,
-																med)].emplace(nexthop, labels[0], peer_id, origin_as, weight);
+							                                      aspath.size(),
+							                                      origin,
+							                                      med)]
+							        .emplace(nexthop, labels[0], peer_id, origin_as, weight);
 						}
 					}
 					else if (labels.size() == 0)
 					{
 						destination_legacy_next[bgp_length(std::numeric_limits<decltype(local_preference)>::max() - local_preference,
-														aspath.size(),
-														origin,
-														med)].emplace(nexthop);
+						                                   aspath.size(),
+						                                   origin,
+						                                   med)]
+						        .emplace(nexthop);
 					}
 
 					if (prefix.is_default() &&
-						labels.size() == 0)
+					    labels.size() == 0)
 					{
 						if (prefix.is_ipv4())
 						{
@@ -828,12 +826,12 @@ void route_t::reload(const controlplane::base_t& base_prev,
 			for (const auto& prefix : nat64stateless.nat64_prefixes)
 			{
 				prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
-							  prefix.get_prefix(),
-							  {}, // TODO: get rid of third parameter
+				              prefix.get_prefix(),
+				              {}, // TODO: get rid of third parameter
 				              std::monostate());
 
 				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
-									 prefix.get_prefix(),
+				                     prefix.get_prefix(),
 				                     std::monostate());
 			}
 		}
@@ -845,12 +843,12 @@ void route_t::reload(const controlplane::base_t& base_prev,
 			for (const auto& prefix : nat64stateless.nat64_prefixes)
 			{
 				prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
-							  prefix.get_prefix(),
-							  {}, // TODO: get rid of third parameter
+				              prefix.get_prefix(),
+				              {}, // TODO: get rid of third parameter
 				              uint32_t(0)); ///< @todo: VIRTUAL_PORT
 
 				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
-									 prefix.get_prefix(),
+				                     prefix.get_prefix(),
 				                     uint32_t(0)); ///< @todo: VIRTUAL_PORT
 			}
 		}
@@ -862,7 +860,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 			for (const auto& prefix : config_module.local_prefixes)
 			{
 				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
-									 prefix,
+				                     prefix,
 				                     std::monostate());
 			}
 		}
@@ -874,7 +872,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 			for (const auto& prefix : config_module.local_prefixes)
 			{
 				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
-									 prefix,
+				                     prefix,
 				                     std::tuple<>());
 			}
 		}
@@ -892,7 +890,6 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 	compile(globalbase, generations.next());
 	compile_interface(globalbase, generations.next(), generations_neighbors.next());
-
 }
 
 void route_t::reload_after()
@@ -957,10 +954,9 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 				for (const auto& update_prefix : update_prefixes)
 				{
 					current.lookup_deep(update_prefix,
-					                    [&lpm_insert](const ip_prefix_t& prefix, const uint32_t& value_id)
-					{
-						lpm_insert.emplace_back(prefix, value_id);
-					});
+					                    [&lpm_insert](const ip_prefix_t& prefix, const uint32_t& value_id) {
+						                    lpm_insert.emplace_back(prefix, value_id);
+					                    });
 				}
 			}
 
@@ -1024,10 +1020,9 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 				for (const auto& update_prefix : update_prefixes)
 				{
 					current.lookup_deep(update_prefix,
-					                    [&lpm_insert](const ip_prefix_t& prefix, const uint32_t& value_id)
-					{
-						lpm_insert.emplace_back(prefix, value_id);
-					});
+					                    [&lpm_insert](const ip_prefix_t& prefix, const uint32_t& value_id) {
+						                    lpm_insert.emplace_back(prefix, value_id);
+					                    });
 				}
 			}
 
@@ -1083,8 +1078,7 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 
 	if (const auto virtual_port_id = std::get_if<uint32_t>(&destination))
 	{
-		controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id)
-		{
+		controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
 			globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_value_update,
 			                        common::idp::updateGlobalBase::route_value_update::request(value_id,
 			                                                                                   socket_id,
@@ -1105,8 +1099,7 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 
 		if (nexthop.is_default())
 		{
-			controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id)
-			{
+			controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
 				globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_value_update,
 				                        common::idp::updateGlobalBase::route_value_update::request(value_id,
 				                                                                                   socket_id,
@@ -1198,8 +1191,7 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 		{
 			/// @todo: stats
 
-			controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id)
-			{
+			controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
 				globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_value_update,
 				                        common::idp::updateGlobalBase::route_value_update::request(value_id,
 				                                                                                   socket_id,
@@ -1226,8 +1218,7 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 		request_interface.resize(CONFIG_YADECAP_GB_ECMP_SIZE);
 	}
 
-	controlPlane->forEachSocket([this, &value_id, &request_interface, &globalbase](const tSocketId& socket_id, const std::set<tInterfaceId>& interfaces)
-	{
+	controlPlane->forEachSocket([this, &value_id, &request_interface, &globalbase](const tSocketId& socket_id, const std::set<tInterfaceId>& interfaces) {
 		common::idp::updateGlobalBase::route_value_update::interface update_interface;
 
 		/// same numa
@@ -1435,8 +1426,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		{
 			if (nexthop.is_default())
 			{
-				controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id)
-				{
+				controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
 					tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
 					                                                      "linux",
 					                                                      3, ///< @todo: DEFINE
@@ -1500,8 +1490,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		{
 			if (nexthop.is_default())
 			{
-				controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id)
-				{
+				controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
 					tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
 					                                                      "linux",
 					                                                      3, ///< @todo: DEFINE
@@ -1536,8 +1525,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 	}
 	else if (const auto virtual_port_id = std::get_if<uint32_t>(&destination))
 	{
-		controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id)
-		{
+		controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
 			tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
 			                                                      "repeat",
 			                                                      3, ///< @todo: DEFINE
@@ -1605,8 +1593,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 
 	if (request_interface.empty())
 	{
-		controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id)
-		{
+		controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
 			tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
 			                                                      "linux",
 			                                                      3, ///< @todo: DEFINE
@@ -1624,8 +1611,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		return;
 	}
 
-	controlPlane->forEachSocket([this, &value_id, &request_interface, &fallback=fallback, &globalbase](const tSocketId& socket_id, const std::set<tInterfaceId>& interfaces)
-	{
+	controlPlane->forEachSocket([this, &value_id, &request_interface, &fallback = fallback, &globalbase](const tSocketId& socket_id, const std::set<tInterfaceId>& interfaces) {
 		common::idp::updateGlobalBase::route_tunnel_value_update::interface update_interface;
 		auto& [update_weight_start, update_weight_size, update_nexthops] = update_interface;
 

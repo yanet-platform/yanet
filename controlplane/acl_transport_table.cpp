@@ -79,8 +79,7 @@ transport_table::thread_t::thread_t(transport_table_t* transport_table,
 
 void transport_table::thread_t::start()
 {
-	thread = std::thread([this]()
-	{
+	thread = std::thread([this]() {
 		try
 		{
 			prepare();
@@ -273,7 +272,7 @@ void transport_table::thread_t::compile()
 						table_indexes[3] = layer.table.get_index(3, udp_destination_id);
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1 ); /// id always start with 1
+							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
 							table_insert(layer, table_indexes, network_table_group_ids_curr);
 						}
 					}
@@ -509,8 +508,7 @@ void transport_table::thread_t::result()
 		acl_transport_table.reserve(acl_transport_table.size() + layer.table.values.size());
 
 		layer.table.for_each([&](const std::array<unsigned int, dimension>& keys,
-		                         const unsigned int value)
-		{
+		                         const unsigned int value) {
 			common::acl::transport_key_t key;
 			key.network_flags = keys[0] + 1; /// id always start with 1
 			key.protocol = keys[1] + 1; /// id always start with 1

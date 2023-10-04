@@ -14,23 +14,19 @@ eResult tun64_t::init()
 	tunnel_counters.init(&controlPlane->counter_manager);
 	mappings_counters.init(&controlPlane->counter_manager);
 
-	controlPlane->register_command(common::icp::requestType::tun64_tunnels, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::tun64_tunnels, [this]() {
 		return tun64_tunnels();
 	});
 
-	controlPlane->register_command(common::icp::requestType::tun64_prefixes, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::tun64_prefixes, [this]() {
 		return tun64_prefixes();
 	});
 
-	controlPlane->register_command(common::icp::requestType::tun64_mappings, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::tun64_mappings, [this]() {
 		return tun64_mappings();
 	});
 
-	funcThreads.emplace_back([this]()
-	{
+	funcThreads.emplace_back([this]() {
 		counters_gc_thread();
 	});
 
@@ -147,13 +143,13 @@ void tun64_t::compile(common::idp::updateGlobalBase::request& globalbase,
 
 			(void)location;
 			tun64mappings_update_request.emplace_back(tunnel.tun64Id,
-								  ipv4_address,
-					                          ipv6_address,
-								  counter_ids[0]);
+			                                          ipv4_address,
+			                                          ipv6_address,
+			                                          counter_ids[0]);
 		}
 
 		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::tun64mappings_update,
-				        tun64mappings_update_request);
+		                        tun64mappings_update_request);
 
 		generation_config.tunnels[name] = {tunnel.ipv6SourceAddress,
 		                                   tunnel.prefixes.size(),
@@ -173,4 +169,3 @@ void tun64_t::counters_gc_thread()
 		std::this_thread::sleep_for(std::chrono::seconds(3));
 	}
 }
-

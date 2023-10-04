@@ -2,10 +2,10 @@
 
 #include <inttypes.h>
 
+#include <rte_icmp.h>
 #include <rte_ip.h>
 #include <rte_tcp.h>
 #include <rte_udp.h>
-#include <rte_icmp.h>
 
 #include "type.h"
 
@@ -141,7 +141,7 @@ inline void yanet_udp_checksum_v6_to_v4(rte_udp_hdr* udpHeader,
 		csum = csum_minus(csum, checksum6);
 		csum = csum_plus(csum, checksum4);
 		csum = ~csum;
-		udpHeader->dgram_cksum = csum?:0xffff;
+		udpHeader->dgram_cksum = csum ?: 0xffff;
 	}
 }
 
@@ -175,7 +175,7 @@ inline void yanet_udp_checksum_v4_to_v6(rte_udp_hdr* udpHeader,
 		csum = csum_minus(csum, checksum4);
 		csum = csum_plus(csum, checksum6);
 		csum = ~csum;
-		udpHeader->dgram_cksum = csum?:0xffff;
+		udpHeader->dgram_cksum = csum ?: 0xffff;
 	}
 }
 

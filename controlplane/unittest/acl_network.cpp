@@ -13,10 +13,10 @@ uint128_t convert_to_uint128(const std::string& address)
 	return acl::network_t(address).addr;
 }
 
-template<typename ... args_T>
+template<typename... args_T>
 void make_filter_helper(acl::compiler::network_t<uint128_t>::filter& filter,
                         const std::string& prefix,
-                        const args_T& ... prefixes)
+                        const args_T&... prefixes)
 {
 	filter.emplace(prefix);
 
@@ -26,8 +26,8 @@ void make_filter_helper(acl::compiler::network_t<uint128_t>::filter& filter,
 	}
 }
 
-template<typename ... args_T>
-acl::compiler::network_t<uint128_t>::filter make_filter(const args_T& ... prefixes)
+template<typename... args_T>
+acl::compiler::network_t<uint128_t>::filter make_filter(const args_T&... prefixes)
 {
 	acl::compiler::network_t<uint128_t>::filter result;
 	make_filter_helper(result, prefixes...);
@@ -49,10 +49,10 @@ tAclGroupId get_by_address(acl::compiler::network_t<type_t>& network,
 	return network.get_group_ids_by_address(convert_to_uint128(address));
 }
 
-template<typename ... args_T>
+template<typename... args_T>
 void expect_group_ids_helper(std::vector<tAclGroupId>& vector,
                              const unsigned int group_id,
-                             const args_T ... group_ids)
+                             const args_T... group_ids)
 {
 	vector.emplace_back(group_id);
 
@@ -62,8 +62,8 @@ void expect_group_ids_helper(std::vector<tAclGroupId>& vector,
 	}
 }
 
-template<typename ... args_T>
-std::vector<tAclGroupId> expect_group_ids(const args_T ... group_ids)
+template<typename... args_T>
+std::vector<tAclGroupId> expect_group_ids(const args_T... group_ids)
 {
 	std::vector<tAclGroupId> result;
 	expect_group_ids_helper(result, group_ids...);

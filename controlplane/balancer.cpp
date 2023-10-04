@@ -13,50 +13,41 @@ eResult balancer_t::init()
 		reals_unordered_ids_unused.emplace(i);
 	}
 
-	controlPlane->register_command(common::icp::requestType::balancer_config, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::balancer_config, [this]() {
 		return balancer_config();
 	});
 
-	controlPlane->register_command(common::icp::requestType::balancer_summary, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::balancer_summary, [this]() {
 		return balancer_summary();
 	});
 
-	controlPlane->register_command(common::icp::requestType::balancer_service, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::balancer_service, [this](const common::icp::request& request) {
 		return balancer_service(std::get<common::icp::balancer_service::request>(std::get<1>(request)));
 	});
 
-	controlPlane->register_command(common::icp::requestType::balancer_real_find, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::balancer_real_find, [this](const common::icp::request& request) {
 		return balancer_real_find(std::get<common::icp::balancer_real_find::request>(std::get<1>(request)));
 	});
 
-    	controlPlane->register_command(common::icp::requestType::balancer_real, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::balancer_real, [this](const common::icp::request& request) {
 		return balancer_real(std::get<common::icp::balancer_real::request>(std::get<1>(request)));
 	});
 
-	controlPlane->register_command(common::icp::requestType::balancer_real_flush, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::balancer_real_flush, [this]() {
 		return balancer_real_flush();
 	});
 
-	controlPlane->register_command(common::icp::requestType::balancer_announce, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::balancer_announce, [this]() {
 		return balancer_announce();
 	});
 
 	controlPlane->register_service(this);
 
-	funcThreads.emplace_back([this]()
-	{
+	funcThreads.emplace_back([this]() {
 		counters_gc_thread();
 	});
 
-	funcThreads.emplace_back([this]()
-	{
+	funcThreads.emplace_back([this]() {
 		reconfigure_wlc_thread();
 	});
 
@@ -88,10 +79,10 @@ inline common::ip_address_t convert_to_ip_address(const common::icp_proto::IPAdd
 }
 
 void balancer_t::RealFind(
-    ::google::protobuf::RpcController* /*controller*/,
-    const ::common::icp_proto::BalancerRealFindRequest* req,
-    ::common::icp_proto::BalancerRealFindResponse* resp,
-    ::google::protobuf::Closure*)
+        ::google::protobuf::RpcController* /*controller*/,
+        const ::common::icp_proto::BalancerRealFindRequest* req,
+        ::common::icp_proto::BalancerRealFindResponse* resp,
+        ::google::protobuf::Closure*)
 {
 	auto response = balancer_real_find({!req->module().empty() ? std::optional<std::string>{req->module()} : std::nullopt,
 	                                    req->has_virtual_ip() ? std::optional<common::ip_address_t>{convert_to_ip_address(req->virtual_ip())} : std::nullopt,
@@ -114,12 +105,12 @@ void balancer_t::RealFind(
 			setip(proto_service_key->mutable_ip(), vip);
 			switch (proto)
 			{
-			case IPPROTO_TCP:
-				proto_service_key->set_proto(::common::icp_proto::NetProto::tcp);
-				break;
-			case IPPROTO_UDP:
-				proto_service_key->set_proto(::common::icp_proto::NetProto::udp);
-				break;
+				case IPPROTO_TCP:
+					proto_service_key->set_proto(::common::icp_proto::NetProto::tcp);
+					break;
+				case IPPROTO_UDP:
+					proto_service_key->set_proto(::common::icp_proto::NetProto::udp);
+					break;
 			}
 			proto_service_key->set_port(port);
 
@@ -147,32 +138,33 @@ void balancer_t::RealFind(
 }
 
 void balancer_t::Real(
-    google::protobuf::RpcController* /*controller*/,
-    const ::common::icp_proto::BalancerRealRequest* req,
-    ::common::icp_proto::Empty* /*resp*/,
-    ::google::protobuf::Closure*)
+        google::protobuf::RpcController* /*controller*/,
+        const ::common::icp_proto::BalancerRealRequest* req,
+        ::common::icp_proto::Empty* /*resp*/,
+        ::google::protobuf::Closure*)
 {
 	common::icp::balancer_real::request request;
 	request.reserve(req->reals().size());
-	for (const auto& real: req->reals()){
+	for (const auto& real : req->reals())
+	{
 		request.push_back({real.module(),
-			    convert_to_ip_address(real.virtual_ip()),
-			    real.proto() == common::icp_proto::NetProto::tcp ? IPPROTO_TCP : IPPROTO_UDP,
-			    real.virtual_port(),
-			    convert_to_ip_address(real.real_ip()),
-			    real.real_port(),
-			    real.enable(),
-			    real.has_weight() ? std::optional<uint32_t>(real.weight()) : std::nullopt});
+		                   convert_to_ip_address(real.virtual_ip()),
+		                   real.proto() == common::icp_proto::NetProto::tcp ? IPPROTO_TCP : IPPROTO_UDP,
+		                   real.virtual_port(),
+		                   convert_to_ip_address(real.real_ip()),
+		                   real.real_port(),
+		                   real.enable(),
+		                   real.has_weight() ? std::optional<uint32_t>(real.weight()) : std::nullopt});
 	}
 
 	balancer_real(request);
 }
 
 void balancer_t::RealFlush(
-    google::protobuf::RpcController* /*controller*/,
-    const ::common::icp_proto::Empty* /*req*/,
-    ::common::icp_proto::Empty* /*resp*/,
-    ::google::protobuf::Closure*)
+        google::protobuf::RpcController* /*controller*/,
+        const ::common::icp_proto::Empty* /*req*/,
+        ::common::icp_proto::Empty* /*resp*/,
+        ::google::protobuf::Closure*)
 {
 	balancer_real_flush();
 }
@@ -242,15 +234,15 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 
 				const std::tuple<std::string,
 				                 balancer::service_key_t,
-				                 balancer::real_key_t> key = {module_name,
-				                                              {virtual_ip, proto, virtual_port},
-				                                              {real_ip, real_port}};
+				                 balancer::real_key_t>
+				        key = {module_name,
+				               {virtual_ip, proto, virtual_port},
+				               {real_ip, real_port}};
 
 				real_counters.remove(key, base_prev.variables.find("balancer_real_timeout")->second.value);
 			}
 		}
 	}
-
 
 	for (const auto& [module_name, balancer] : base_next.balancers)
 	{
@@ -275,9 +267,10 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 
 				const std::tuple<std::string,
 				                 balancer::service_key_t,
-				                 balancer::real_key_t> key = {module_name,
-				                                              {virtual_ip, proto, virtual_port},
-				                                              {real_ip, real_port}};
+				                 balancer::real_key_t>
+				        key = {module_name,
+				               {virtual_ip, proto, virtual_port},
+				               {real_ip, real_port}};
 
 				real_counters.insert(key);
 			}
@@ -287,8 +280,7 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 	}
 
 	service_counters.allocate();
-	real_counters.allocate([&](const auto& key)
-	{
+	real_counters.allocate([&](const auto& key) {
 		/// new counter
 
 		std::lock_guard<std::mutex> guard(reals_unordered_mutex);
@@ -300,14 +292,12 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 	});
 
 	compile(globalbase, generations_config.next());
-
 }
 
 void balancer_t::reload_after()
 {
 	service_counters.release();
-	real_counters.release([&](const auto& key)
-	{
+	real_counters.release([&](const auto& key) {
 		/// remove counter
 
 		std::lock_guard<std::mutex> guard(reals_unordered_mutex);
@@ -595,7 +585,7 @@ common::icp::balancer_announce::response balancer_t::balancer_announce() const
 }
 
 void balancer_t::update_service(const balancer::generation_config_t& generation_config,
-				balancer::generation_services_t& generation_services)
+                                balancer::generation_services_t& generation_services)
 {
 	for (const auto& [module_name, balancer] : generation_config.config_balancers)
 	{
@@ -604,9 +594,9 @@ void balancer_t::update_service(const balancer::generation_config_t& generation_
 
 		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
 		{
-			(void) flags;
-			(void) scheduler_params;
-			(void) forwarding_method;
+			(void)flags;
+			(void)scheduler_params;
+			(void)forwarding_method;
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
@@ -678,7 +668,6 @@ void balancer_t::update_service(const balancer::generation_config_t& generation_
 	}
 }
 
-
 void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
                          const balancer::generation_config_t& generation_config)
 {
@@ -689,8 +678,8 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 	{
 		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
 		{
-			(void) scheduler_params;
-			(void) version;
+			(void)scheduler_params;
+			(void)version;
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
@@ -701,7 +690,7 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 
 			for (const auto& [real_ip, real_port, weight] : reals)
 			{
-				(void) weight;
+				(void)weight;
 
 				std::tuple<std::string, balancer::service_key_t, balancer::real_key_t> key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
 
@@ -723,34 +712,33 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 				}
 
 				req_reals.emplace_back(common::idp::updateGlobalBase::update_balancer_services::real{
-					real_unordered_id,
-					real_ip,
-					counter_ids[0]});
+				        real_unordered_id,
+				        real_ip,
+				        counter_ids[0]});
 				req_binding.emplace_back(real_unordered_id);
 			}
 
 			const auto counter_ids = service_counters.get_ids({module_name, {virtual_ip, proto, virtual_port}});
 			req_services.emplace_back(common::idp::updateGlobalBase::update_balancer_services::service{
-				service_id,
-				flags,
-				counter_ids[0],
-			    scheduler,
-				forwarding_method,
-			    balancer.default_wlc_power, //todo use scheduler_params.wlc_power when other services will be able to set it
-				(uint32_t)real_start,
-				(uint32_t)(req_reals.size() - real_start)});
+			        service_id,
+			        flags,
+			        counter_ids[0],
+			        scheduler,
+			        forwarding_method,
+			        balancer.default_wlc_power, //todo use scheduler_params.wlc_power when other services will be able to set it
+			        (uint32_t)real_start,
+			        (uint32_t)(req_reals.size() - real_start)});
 		}
-
 	}
 
 	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::update_balancer_services,
-				common::idp::updateGlobalBase::update_balancer_services::request{req_services,
-												 req_reals,
-												 req_binding});
+	                        common::idp::updateGlobalBase::update_balancer_services::request{req_services,
+	                                                                                         req_reals,
+	                                                                                         req_binding});
 }
 
 void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& balancer,
-                         const balancer::generation_config_t& generation_config)
+                             const balancer::generation_config_t& generation_config)
 {
 	common::idp::updateGlobalBaseBalancer::update_balancer_unordered_real::request balancer_unordered_real_request;
 
@@ -813,7 +801,6 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 
 	balancer.emplace_back(common::idp::updateGlobalBaseBalancer::requestType::update_balancer_unordered_real,
 	                      balancer_unordered_real_request);
-
 }
 
 void balancer_t::counters_gc_thread()

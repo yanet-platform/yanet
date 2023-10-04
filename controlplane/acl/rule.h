@@ -187,10 +187,10 @@ struct filter_network_t : filter_base_t
 	{
 		for (const auto& pref : target)
 		{
-			std::visit([&](const auto& arg)
-			{
+			std::visit([&](const auto& arg) {
 				networks.emplace_back(arg);
-			}, pref);
+			},
+			           pref);
 		}
 	}
 
@@ -465,7 +465,7 @@ static inline ref_t<filter_prm8_t> tcpflags(ipfw::rule_ptr_t rulep)
 	if (rulep->tcp_established)
 	{
 		unsigned int mask = ipfw::rule_t::tcp_flags_t::RST |
-			ipfw::rule_t::tcp_flags_t::ACK;
+		                    ipfw::rule_t::tcp_flags_t::ACK;
 
 		return tcp_established(mask);
 	}
@@ -476,15 +476,15 @@ static inline ref_t<filter_prm8_t> tcpflags(ipfw::rule_ptr_t rulep)
 static inline std::string tcpflags_to_string(const ref_t<filter_prm8_t> prm)
 {
 	static const std::map<uint8_t, std::string> flags = {
-		{ ipfw::rule_t::tcp_flags_t::FIN, "fin" },
-		{ ipfw::rule_t::tcp_flags_t::SYN, "syn" },
-		{ ipfw::rule_t::tcp_flags_t::RST, "rst" },
-		{ ipfw::rule_t::tcp_flags_t::PUSH, "psh" },
-		{ ipfw::rule_t::tcp_flags_t::ACK, "ack" },
-		{ ipfw::rule_t::tcp_flags_t::URG, "urg" },
-		/* NOTE: ipfw doesn't support ece/cwr tcpflags keywords */
-		{ ipfw::rule_t::tcp_flags_t::ECE, "ece" },
-		{ ipfw::rule_t::tcp_flags_t::CWR, "cwr" },
+	        {ipfw::rule_t::tcp_flags_t::FIN, "fin"},
+	        {ipfw::rule_t::tcp_flags_t::SYN, "syn"},
+	        {ipfw::rule_t::tcp_flags_t::RST, "rst"},
+	        {ipfw::rule_t::tcp_flags_t::PUSH, "psh"},
+	        {ipfw::rule_t::tcp_flags_t::ACK, "ack"},
+	        {ipfw::rule_t::tcp_flags_t::URG, "urg"},
+	        /* NOTE: ipfw doesn't support ece/cwr tcpflags keywords */
+	        {ipfw::rule_t::tcp_flags_t::ECE, "ece"},
+	        {ipfw::rule_t::tcp_flags_t::CWR, "cwr"},
 	};
 	std::array<bool, 256> filter;
 	filter.fill(false);
@@ -493,7 +493,8 @@ static inline std::string tcpflags_to_string(const ref_t<filter_prm8_t> prm)
 	for (const auto& range : prm->ranges)
 	{
 		unsigned int i = range.from();
-		do {
+		do
+		{
 			filter[i++] = true;
 		} while (i <= range.to() && i < 256);
 	}
@@ -502,7 +503,7 @@ static inline std::string tcpflags_to_string(const ref_t<filter_prm8_t> prm)
 	std::array<bool, 256> vals;
 	vals.fill(true);
 	unsigned int mask = ipfw::rule_t::tcp_flags_t::RST |
-		ipfw::rule_t::tcp_flags_t::ACK;
+	                    ipfw::rule_t::tcp_flags_t::ACK;
 
 	for (unsigned int i = 0; i < 256; ++i)
 	{
@@ -570,9 +571,9 @@ static inline std::string tcpflags_to_string(const ref_t<filter_prm8_t> prm)
 static inline std::string frag_to_string(const ref_t<filter_prm8_t> prm)
 {
 	static const std::map<uint8_t, std::string> frags = {
-		{ controlplane::base::acl_rule_t::fragState::notFragmented, "!mf,!offset" },
-		{ controlplane::base::acl_rule_t::fragState::firstFragment, "!offset" },
-		{ controlplane::base::acl_rule_t::fragState::notFirstFragment, "offset" },
+	        {controlplane::base::acl_rule_t::fragState::notFragmented, "!mf,!offset"},
+	        {controlplane::base::acl_rule_t::fragState::firstFragment, "!offset"},
+	        {controlplane::base::acl_rule_t::fragState::notFirstFragment, "offset"},
 	};
 	for (const auto& range : prm->ranges)
 	{
@@ -654,29 +655,29 @@ struct filter_proto_t : filter_base_t
 		{
 			switch (proto)
 			{
-			case IPPROTO_TCP:
-				has_tcpproto = true;
-				has_tcpflags = rulep->tcp_established ||
-					(rulep->tcp_setflags | rulep->tcp_clearflags) != 0;
-				[[fallthrough]];
-			case IPPROTO_UDP:
-				if (proto == IPPROTO_UDP)
-				{
-					has_udpproto = true;
-				}
-				has_sports = !(rulep->sports.empty() && rulep->sports_range.empty());
-				has_dports = !(rulep->dports.empty() && rulep->dports_range.empty());
-				break;
-			case IPPROTO_ICMP:
-				has_icmpproto = true;
-				has_icmptypes = !rulep->icmp_types.empty();
-				break;
-			case IPPROTO_ICMPV6:
-				has_icmp6proto = true;
-				has_icmp6types = !rulep->icmp6_types.empty();
-				break;
-			default:
-				has_otherproto = true;
+				case IPPROTO_TCP:
+					has_tcpproto = true;
+					has_tcpflags = rulep->tcp_established ||
+					               (rulep->tcp_setflags | rulep->tcp_clearflags) != 0;
+					[[fallthrough]];
+				case IPPROTO_UDP:
+					if (proto == IPPROTO_UDP)
+					{
+						has_udpproto = true;
+					}
+					has_sports = !(rulep->sports.empty() && rulep->sports_range.empty());
+					has_dports = !(rulep->dports.empty() && rulep->dports_range.empty());
+					break;
+				case IPPROTO_ICMP:
+					has_icmpproto = true;
+					has_icmptypes = !rulep->icmp_types.empty();
+					break;
+				case IPPROTO_ICMPV6:
+					has_icmp6proto = true;
+					has_icmp6types = !rulep->icmp6_types.empty();
+					break;
+				default:
+					has_otherproto = true;
 			}
 		}
 		// some sanity checks
@@ -760,18 +761,18 @@ struct filter_proto_t : filter_base_t
 			{
 				switch (range.from())
 				{
-				case IPPROTO_TCP:
-					has_flags = true;
-					[[fallthrough]];
-				case IPPROTO_UDP:
-					has_ports = true;
-					break;
-				case IPPROTO_ICMP:
-					has_icmptypes = true;
-					break;
-				case IPPROTO_ICMPV6:
-					has_icmp6types = true;
-					break;
+					case IPPROTO_TCP:
+						has_flags = true;
+						[[fallthrough]];
+					case IPPROTO_UDP:
+						has_ports = true;
+						break;
+					case IPPROTO_ICMP:
+						has_icmptypes = true;
+						break;
+					case IPPROTO_ICMPV6:
+						has_icmp6types = true;
+						break;
 				}
 			}
 		}
@@ -880,7 +881,7 @@ struct filter_t : filter_base_t
 		{
 			std::list<unsigned int> list;
 			const unsigned int notFragmentedBits = ipfw::rule_t::ipoff_flags_t::OFFSET |
-				ipfw::rule_t::ipoff_flags_t::MF;
+			                                       ipfw::rule_t::ipoff_flags_t::MF;
 			const unsigned int firstFragmentBits = ipfw::rule_t::ipoff_flags_t::OFFSET;
 
 			if ((rulep->ipoff_clearflags & notFragmentedBits) == notFragmentedBits)
@@ -910,12 +911,12 @@ struct filter_t : filter_base_t
 		}
 		switch (rulep->direction)
 		{
-		case ipfw::rule_t::direction_t::IN:
-			dir = new filter_id_t(0);
-			break;
-		case ipfw::rule_t::direction_t::OUT:
-			dir = new filter_id_t(1);
-			break;
+			case ipfw::rule_t::direction_t::IN:
+				dir = new filter_id_t(0);
+				break;
+			case ipfw::rule_t::direction_t::OUT:
+				dir = new filter_id_t(1);
+				break;
 		}
 		if (rulep->keepstate)
 		{
@@ -931,7 +932,6 @@ struct filter_t : filter_base_t
 	virtual std::string to_string() const
 	{
 		std::string ret;
-
 
 		if (src)
 		{
@@ -972,7 +972,7 @@ struct filter_t : filter_base_t
 	}
 };
 
-inline bool compatible(const filter_network_t *a, const filter_network_t *b)
+inline bool compatible(const filter_network_t* a, const filter_network_t* b)
 {
 	for (const auto& a_item : a->networks)
 	{
@@ -1000,7 +1000,7 @@ inline bool compatible(const filter_network_t *a, const filter_network_t *b)
 	return false;
 }
 
-inline bool compatible(const filter_t *a, const filter_t *b)
+inline bool compatible(const filter_t* a, const filter_t* b)
 {
 	if (a->dst && b->dst && !compatible(a->dst, b->dst))
 	{
@@ -1069,41 +1069,41 @@ struct rule_t
 		text = rulep->text;
 		switch (rulep->action)
 		{
-		case ipfw::rule_action_t::SKIPTO:
-			if (std::holds_alternative<std::string>(rulep->action_arg))
-			{
-				// skipto LABEL
-				const auto& name = std::get<std::string>(rulep->action_arg);
-				const auto& label_info = configp->m_labels.at(name);
-				action = std::get<unsigned int>(label_info);
-				// add a hint in the comment for user where are we jumping to
-				// add ruleno to original text
-				text += " // " + std::to_string(std::get<int64_t>(action));
-				// add label to generated text
-				comment = name;
-			}
-			else if (std::holds_alternative<int64_t>(rulep->action_arg))
-			{
-				// skipto tablearg || skipto RULENO
-				action = std::get<int64_t>(rulep->action_arg);
-			}
-			else
-			{
-				throw std::runtime_error("unexpected skipto variant");
-			}
-			break;
-		case ipfw::rule_action_t::DENY:
-			action = common::globalBase::tFlow(common::globalBase::eFlowType::drop);
-			break;
-		case ipfw::rule_action_t::ALLOW:
-			action = DISPATCHER;
-			break;
-		case ipfw::rule_action_t::DUMP:
-			action = common::acl::action_t(std::get<std::string>(rulep->action_arg));
-			break;
-		default:
-			YANET_LOG_WARNING("unexpected rule action in rule '%s'\n", rulep->text.data());
-			return;
+			case ipfw::rule_action_t::SKIPTO:
+				if (std::holds_alternative<std::string>(rulep->action_arg))
+				{
+					// skipto LABEL
+					const auto& name = std::get<std::string>(rulep->action_arg);
+					const auto& label_info = configp->m_labels.at(name);
+					action = std::get<unsigned int>(label_info);
+					// add a hint in the comment for user where are we jumping to
+					// add ruleno to original text
+					text += " // " + std::to_string(std::get<int64_t>(action));
+					// add label to generated text
+					comment = name;
+				}
+				else if (std::holds_alternative<int64_t>(rulep->action_arg))
+				{
+					// skipto tablearg || skipto RULENO
+					action = std::get<int64_t>(rulep->action_arg);
+				}
+				else
+				{
+					throw std::runtime_error("unexpected skipto variant");
+				}
+				break;
+			case ipfw::rule_action_t::DENY:
+				action = common::globalBase::tFlow(common::globalBase::eFlowType::drop);
+				break;
+			case ipfw::rule_action_t::ALLOW:
+				action = DISPATCHER;
+				break;
+			case ipfw::rule_action_t::DUMP:
+				action = common::acl::action_t(std::get<std::string>(rulep->action_arg));
+				break;
+			default:
+				YANET_LOG_WARNING("unexpected rule action in rule '%s'\n", rulep->text.data());
+				return;
 		}
 		log = rulep->log;
 		filter = new filter_t(rulep);
@@ -1179,14 +1179,14 @@ struct rule_t
 			auto arg = std::get<int64_t>(action);
 			switch (arg)
 			{
-			case DISPATCHER:
-				text = "allow";
-				break;
-			case 0:
-				text = "skipto tablearg";
-				break;
-			default:
-				text = "skipto " + std::to_string(arg);
+				case DISPATCHER:
+					text = "allow";
+					break;
+				case 0:
+					text = "skipto tablearg";
+					break;
+				default:
+					text = "skipto " + std::to_string(arg);
 			}
 		}
 

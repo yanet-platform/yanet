@@ -1,13 +1,13 @@
 #pragma once
 
-#include "type.h"
+#include "base.h"
 #include "module.h"
 #include "rib.h"
-#include "base.h"
+#include "type.h"
 
+#include "common/generation.h"
 #include "common/idataplane.h"
 #include "common/refarray.h"
-#include "common/generation.h"
 
 namespace dregress
 {
@@ -120,7 +120,8 @@ protected:
 	                                      std::size_t, ///< aspath_size
 	                                      std::string, ///< origin
 	                                      uint32_t>, ///< med
-	                           std::set<dregress::destination_t>>>> prefixes;
+	                           std::set<dregress::destination_t>>>>
+	        prefixes;
 
 	common::refarray_t<dregress::value_key_t, YANET_CONFIG_DREGRESS_VALUES_SIZE> values;
 

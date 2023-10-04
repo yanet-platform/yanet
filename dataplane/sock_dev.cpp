@@ -8,13 +8,13 @@
 
 #define ALLOW_INTERNAL_API
 
-#include <rte_malloc.h>
 #include <rte_ethdev.h>
+#include <rte_malloc.h>
 #include <rte_version.h>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20, 11, 0, 0)
-#include <ethdev_driver.h>
 #include <bus_pci_driver.h>
+#include <ethdev_driver.h>
 #else
 #include <rte_ethdev_driver.h>
 #endif
@@ -99,7 +99,7 @@ static int
 sock_dev_close(struct rte_eth_dev* dev)
 {
 	struct sock_internals* internals =
-	    (struct sock_internals*)dev->data->dev_private;
+	        (struct sock_internals*)dev->data->dev_private;
 
 	close(internals->fd);
 	unlink(internals->sockaddr.sun_path);
@@ -124,7 +124,7 @@ static void
 sock_dev_close(struct rte_eth_dev* dev)
 {
 	struct sock_internals* internals =
-	    (struct sock_internals*)dev->data->dev_private;
+	        (struct sock_internals*)dev->data->dev_private;
 
 	close(internals->fd);
 	unlink(internals->sockaddr.sun_path);
@@ -204,7 +204,7 @@ sock_dev_allmulticast_disable(struct rte_eth_dev* dev __rte_unused)
 }
 
 static int
-sock_dev_link_update(struct rte_eth_dev *dev __rte_unused,
+sock_dev_link_update(struct rte_eth_dev* dev __rte_unused,
                      int wait_to_complete __rte_unused)
 {
 	return 0;
@@ -413,7 +413,7 @@ int sock_dev_create(const char* name, uint8_t numa_node)
 	const char* path = name + strlen(SOCK_DEV_PREFIX);
 
 	struct sock_internals* internals = (struct sock_internals*)
-	    rte_zmalloc_socket(path, sizeof(struct sock_internals), 0, numa_node);
+	        rte_zmalloc_socket(path, sizeof(struct sock_internals), 0, numa_node);
 	if (internals == NULL)
 		return ENOSPC;
 

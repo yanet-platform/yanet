@@ -4,9 +4,9 @@
 
 #include <rte_common.h>
 #include <rte_ether.h>
+#include <rte_gre.h>
 #include <rte_tcp.h>
 #include <rte_udp.h>
-#include <rte_gre.h>
 
 #include "common/result.h"
 
@@ -53,7 +53,7 @@ public:
 	unsigned int ports_count;
 	tQueueId outQueueId;
 
- 	uint32_t SWNormalPriorityRateLimitPerWorker;
+	uint32_t SWNormalPriorityRateLimitPerWorker;
 	uint8_t transportSizes[256];
 
 	uint16_t nat64stateful_numa_mask;

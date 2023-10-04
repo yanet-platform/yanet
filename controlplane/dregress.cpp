@@ -9,15 +9,11 @@ dregress_t::dregress_t() :
 eResult dregress_t::init()
 {
 	dataplane.updateGlobalBase(
-		{
-			{common::idp::updateGlobalBase::requestType::dregress_prefix_clear, std::tuple<>()},
-			{common::idp::updateGlobalBase::requestType::dregress_local_prefix_update,
-				common::idp::updateGlobalBase::dregress_local_prefix_update::request()}
-		}
-	);
+	        {{common::idp::updateGlobalBase::requestType::dregress_prefix_clear, std::tuple<>()},
+	         {common::idp::updateGlobalBase::requestType::dregress_local_prefix_update,
+	          common::idp::updateGlobalBase::dregress_local_prefix_update::request()}});
 
-	controlPlane->register_command(common::icp::requestType::dregress_config, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::dregress_config, [this]() {
 		return dregress_config();
 	});
 
@@ -47,7 +43,8 @@ void dregress_t::prefix_insert(const std::tuple<std::string, uint32_t>& vrf_prio
 	generations.current_unlock();
 
 	std::map<std::tuple<uint32_t, std::size_t, std::string, uint32_t>,
-	         std::set<dregress::destination_t>> destination_next;
+	         std::set<dregress::destination_t>>
+	        destination_next;
 
 	for (const auto& [pptn_index, path_info_to_nh_ptr] : nexthops)
 	{
@@ -59,7 +56,7 @@ void dregress_t::prefix_insert(const std::tuple<std::string, uint32_t>& vrf_prio
 			(void)large_communities;
 
 			if ((prefix.is_ipv4() && nexthop.is_ipv4()) ||
-				(prefix.is_ipv6() && nexthop.is_ipv6()))
+			    (prefix.is_ipv6() && nexthop.is_ipv6()))
 			{
 				if (labels.size() == 1)
 				{
@@ -94,26 +91,27 @@ void dregress_t::prefix_insert(const std::tuple<std::string, uint32_t>& vrf_prio
 					}
 
 					destination_next[{std::numeric_limits<decltype(local_preference)>::max() - local_preference,
-									aspath.size(),
-									origin,
-									med}].emplace(nexthop,
-													labels[0],
-													communities,
-													peer_as,
-													origin_as);
+					                  aspath.size(),
+					                  origin,
+					                  med}]
+					        .emplace(nexthop,
+					                 labels[0],
+					                 communities,
+					                 peer_as,
+					                 origin_as);
 				}
 			}
 
 			if (prefix.is_default() &&
-				labels.size() == 0) ///< @todo: get from route_t
+			    labels.size() == 0) ///< @todo: get from route_t
 			{
 				if (prefix.is_ipv4() &&
-					nexthop.is_ipv4())
+				    nexthop.is_ipv4())
 				{
 					defaults_v4.emplace(nexthop);
 				}
 				else if (prefix.is_ipv6() &&
-						nexthop.is_ipv6())
+				         nexthop.is_ipv6())
 				{
 					defaults_v6.emplace(nexthop);
 				}

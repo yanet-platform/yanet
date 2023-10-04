@@ -2,21 +2,21 @@
 
 #include <memory.h>
 
-#include <rte_common.h>
 #include <rte_byteorder.h>
+#include <rte_common.h>
 #include <rte_ether.h>
 #include <rte_ip.h>
 
-#include "common/result.h"
 #include "common/counters.h"
 #include "common/idp.h"
+#include "common/result.h"
 
 #include "common.h"
-#include "lpm.h"
-#include "type.h"
-#include "hashtable.h"
 #include "dynamic_table.h"
 #include "flat.h"
+#include "hashtable.h"
+#include "lpm.h"
+#include "type.h"
 
 /// @todo: move
 #define YADECAP_GB_DSCP_FLAG_MARK ((uint8_t)1)
@@ -29,52 +29,52 @@ namespace dataplane::globalBase
 
 namespace acl
 {
-	using ipv4_states_ht = hashtable_mod_spinlock_dynamic<fw4_state_key_t, fw_state_value_t, 16>;
-	using ipv6_states_ht = hashtable_mod_spinlock_dynamic<fw6_state_key_t, fw_state_value_t, 16>;
+using ipv4_states_ht = hashtable_mod_spinlock_dynamic<fw4_state_key_t, fw_state_value_t, 16>;
+using ipv6_states_ht = hashtable_mod_spinlock_dynamic<fw6_state_key_t, fw_state_value_t, 16>;
 
-	struct transport_layer_t
+struct transport_layer_t
+{
+	flat<uint8_t> protocol;
+
+	struct
 	{
-		flat<uint8_t> protocol;
+		flat<uint16_t> source;
+		flat<uint16_t> destination;
+		flat<uint8_t> flags;
+	} tcp;
 
-		struct
-		{
-			flat<uint16_t> source;
-			flat<uint16_t> destination;
-			flat<uint8_t> flags;
-		} tcp;
+	struct
+	{
+		flat<uint16_t> source;
+		flat<uint16_t> destination;
+	} udp;
 
-		struct
-		{
-			flat<uint16_t> source;
-			flat<uint16_t> destination;
-		} udp;
-
-		struct
-		{
-			/** @todo:
+	struct
+	{
+		/** @todo:
 			flat<uint8_t> type;
 			flat<uint8_t> code;
 			*/
-			flat<uint16_t> type_code;
-			flat<uint16_t> identifier;
-		} icmp;
-	};
+		flat<uint16_t> type_code;
+		flat<uint16_t> identifier;
+	} icmp;
+};
 
-	/// @todo: move to config
-	using network_ipv4_source = lpm4_24bit_8bit_id32_dynamic;
-	using network_ipv4_destination = lpm4_24bit_8bit_id32_dynamic;
-	using network_ipv6_source = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
-	using network_ipv6_destination_ht = hashtable_mod_id32_dynamic<ipv6_address_t, 1>;
-	using network_ipv6_destination = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
-	using network_table = dynamic_table<uint32_t>;
-	using transport_table = hashtable_mod_id32_dynamic<common::acl::transport_key_t, 16>;
-	using total_table = hashtable_mod_id32_dynamic<common::acl::total_key_t, 16>;
+/// @todo: move to config
+using network_ipv4_source = lpm4_24bit_8bit_id32_dynamic;
+using network_ipv4_destination = lpm4_24bit_8bit_id32_dynamic;
+using network_ipv6_source = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
+using network_ipv6_destination_ht = hashtable_mod_id32_dynamic<ipv6_address_t, 1>;
+using network_ipv6_destination = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
+using network_table = dynamic_table<uint32_t>;
+using transport_table = hashtable_mod_id32_dynamic<common::acl::transport_key_t, 16>;
+using total_table = hashtable_mod_id32_dynamic<common::acl::total_key_t, 16>;
 }
 
 namespace nat64stateful
 {
-	using lan_ht = hashtable_mod_spinlock_dynamic<nat64stateful_lan_key, nat64stateful_lan_value, 16>;
-	using wan_ht = hashtable_mod_spinlock_dynamic<nat64stateful_wan_key, nat64stateful_wan_value, 16>;
+using lan_ht = hashtable_mod_spinlock_dynamic<nat64stateful_lan_key, nat64stateful_lan_value, 16>;
+using wan_ht = hashtable_mod_spinlock_dynamic<nat64stateful_wan_key, nat64stateful_wan_value, 16>;
 }
 
 class atomic
@@ -119,7 +119,8 @@ public: ///< @todo
 	hashtable_mod_spinlock<balancer_state_key_t,
 	                       balancer_state_value_t,
 	                       YANET_CONFIG_BALANCER_STATE_HT_SIZE,
-	                       16> balancer_state;
+	                       16>
+	        balancer_state;
 };
 
 //
@@ -280,7 +281,8 @@ public: ///< @todo
 	                  CONFIG_YADECAP_TUN64_HT_SIZE,
 	                  CONFIG_YADECAP_TUN64_HT_EXTENDED_SIZE,
 	                  4,
-	                  4> tun64mappingsTable;
+	                  4>
+	        tun64mappingsTable;
 
 	nat64stateless_translation_t nat64statelessTranslations[CONFIG_YADECAP_NAT64STATELESS_TRANSLATIONS_SIZE];
 	uint32_t balancer_services_count;

@@ -1,10 +1,10 @@
 #pragma once
 
-#include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
+#include <netinet/ip_icmp.h>
 
-#include "type.h"
 #include "checksum.h"
+#include "type.h"
 
 inline bool yanet_icmp_translate_v6_to_v4(icmp_header_t* icmpHeader,
                                           uint16_t length,

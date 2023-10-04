@@ -5,18 +5,15 @@ eResult nat64stateful_t::init()
 {
 	controlPlane->register_counter(module_counters);
 
-	controlPlane->register_command(common::icp::requestType::nat64stateful_config, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::nat64stateful_config, [this]() {
 		return nat64stateful_config();
 	});
 
-	controlPlane->register_command(common::icp::requestType::nat64stateful_announce, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::nat64stateful_announce, [this]() {
 		return nat64stateful_announce();
 	});
 
-	funcThreads.emplace_back([this]()
-	{
+	funcThreads.emplace_back([this]() {
 		counters_gc_thread();
 	});
 

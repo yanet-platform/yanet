@@ -1,12 +1,12 @@
 #pragma once
 
-#include <map>
 #include <array>
+#include <map>
 #include <vector>
 
-#include "common/type.h"
-#include "common/idp.h"
 #include "common/controlplaneconfig.h"
+#include "common/idp.h"
+#include "common/type.h"
 #include "libfwparser/fw_parser.h"
 
 #include "type.h"
@@ -42,15 +42,15 @@ class decap_t
 {
 public:
 	decap_t() :
-		dscpMarkType(common::eDscpMarkType::never),
-		dscp(0)
+	        dscpMarkType(common::eDscpMarkType::never),
+	        dscp(0)
 	{
 	}
 
 	std::set<ipv6_prefix_t> prefixes() const
 	{
 		std::set<ipv6_prefix_t> prefixes;
-		for (const auto& prefix: ipv6DestinationPrefixes)
+		for (const auto& prefix : ipv6DestinationPrefixes)
 		{
 			prefixes.emplace(prefix.prefix);
 		}
@@ -72,10 +72,10 @@ class nat64stateless_t
 {
 public:
 	nat64stateless_t() :
-		dscpMarkType(common::eDscpMarkType::never),
-		dscp(0),
-		firewall(1),
-		farm(0)
+	        dscpMarkType(common::eDscpMarkType::never),
+	        dscp(0),
+	        firewall(1),
+	        farm(0)
 	{
 	}
 
@@ -90,7 +90,8 @@ public:
 	                    std::optional<range_t>>, ///< ingressPortRange
 	         std::tuple<ipv4_address_t,
 	                    std::optional<range_t>, ///< egressPortRange
-	                    tNat64statelessTranslationId>> translations;
+	                    tNat64statelessTranslationId>>
+	        translations;
 
 	uint8_t firewall;
 	std::optional<ipv6_prefix_t> nat64_wkp_prefix;
@@ -349,7 +350,8 @@ public:
 
 public:
 	std::optional<std::variant<acl_rule_network_ipv4_t,
-	                           acl_rule_network_ipv6_t>> network;
+	                           acl_rule_network_ipv6_t>>
+	        network;
 
 	std::optional<std::set<fragState>> fragment;
 
@@ -357,7 +359,8 @@ public:
 	                           acl_rule_transport_udp_t,
 	                           acl_rule_transport_icmpv4_t,
 	                           acl_rule_transport_icmpv6_t,
-	                           acl_rule_transport_other_t>> transport;
+	                           acl_rule_transport_other_t>>
+	        transport;
 
 	/// @todo: FIREWALL. std::optional<std::string> nextModule;
 	std::optional<common::globalBase::tFlow> flow;
@@ -408,7 +411,6 @@ public:
 
 	std::set<common::ipv6_prefix_t> src6_early_decap;
 	std::set<common::ipv6_prefix_t> dst6_early_decap;
-
 };
 
 }
@@ -423,9 +425,9 @@ public:
 	        nat64statelessTranslationsCount(0),
 	        services_count(0),
 	        reals_count(0),
-		tun64MappingsCount(0),
-		storeSamples(false),
-		serial(0),
+	        tun64MappingsCount(0),
+	        storeSamples(false),
+	        serial(0),
 	        nat64stateful_pool_size(0)
 	{
 		variables["balancer_real_timeout"] = 900;
@@ -463,7 +465,8 @@ public:
 	std::map<std::string, common::uint64> variables;
 	std::map<std::string, ///< vrf
 	         std::map<common::ip_address_t,
-	                  std::vector<std::string>>> vrf_fqdns;
+	                  std::vector<std::string>>>
+	        vrf_fqdns;
 
 	uint32_t nat64stateful_pool_size;
 };

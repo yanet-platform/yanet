@@ -13,21 +13,22 @@
 //#define ACL_DEBUG
 
 #ifdef ACL_DEBUG
-#define ACL_DEBUGLEVEL	(1)
+#define ACL_DEBUGLEVEL (1)
 #else
-#define ACL_DEBUGLEVEL	(0)
+#define ACL_DEBUGLEVEL (0)
 #endif
 
-#define ACL_DBGMSG(msg)	\
-    if (ACL_DEBUGLEVEL) {	\
-	std::cerr << "ACL_DEBUG: " << __func__ << ": " << msg << std::endl; \
-    }
+#define ACL_DBGMSG(msg)                                                             \
+	if (ACL_DEBUGLEVEL)                                                         \
+	{                                                                           \
+		std::cerr << "ACL_DEBUG: " << __func__ << ": " << msg << std::endl; \
+	}
 
 #include "acl.h"
 #include "acl/bitset.h"
+#include "acl/dict.h"
 #include "acl/network.h"
 #include "acl/rule.h"
-#include "acl/dict.h"
 #include "acl_compiler.h"
 
 #include "common/acl.h"
@@ -193,36 +194,97 @@ struct firewall_rules_t
 				// skip and log rules that have failed validation
 				switch (rulep->vstatus)
 				{
-				case ipfw::rule_t::validation_status_t::UNKNOWN:
-					break;
-				default:
-					YANET_LOG_WARNING("%s: rule %u: %s: has failed validation: %s\n",
-						__func__, rulep->ruleno, configp->format_location(rulep->location).data(),
-						rulep->vstatus_to_string().data());
-					continue;
+					case ipfw::rule_t::validation_status_t::UNKNOWN:
+						break;
+					default:
+						YANET_LOG_WARNING("%s: rule %u: %s: has failed validation: %s\n",
+						                  __func__,
+						                  rulep->ruleno,
+						                  configp->format_location(rulep->location).data(),
+						                  rulep->vstatus_to_string().data());
+						continue;
 				}
 				// handle only supported actions
 				switch (rulep->action)
 				{
-				case ipfw::rule_action_t::SKIPTO:
-					// expand tablearg rules
-					if (std::holds_alternative<int64_t>(rulep->action_arg) &&
-					    std::get<int64_t>(rulep->action_arg) == 0)
-					{
-						// skipto tablearg from table(X) to any
-						// skipto tablearg from any to table(X)
-						if (rulep->src_targ || rulep->dst_targ)
+					case ipfw::rule_action_t::SKIPTO:
+						// expand tablearg rules
+						if (std::holds_alternative<int64_t>(rulep->action_arg) &&
+						    std::get<int64_t>(rulep->action_arg) == 0)
 						{
+							// skipto tablearg from table(X) to any
+							// skipto tablearg from any to table(X)
+							if (rulep->src_targ || rulep->dst_targ)
+							{
+								const auto& table = std::get<ipfw::tables::table_type_t>(
+								        configp->m_tables[rulep->targ_name]);
+								const auto& prefixes = std::get<ipfw::tables::prefix_skipto_t>(table);
+								// create single rule_t(filter, ruleno, skipto) for each prefix
+								for (const auto& [prefix, label] : prefixes)
+								{
+									if (label.empty())
+									{
+										YANET_LOG_WARNING("%s: rule %u: expanding error: empty label for prefix %s\n",
+										                  __func__,
+										                  rulep->ruleno,
+										                  prefix.toString().data());
+										continue;
+									}
+									// resolve label into ruleno
+									const auto& search = configp->m_labels.find(label);
+									if (search == configp->m_labels.end())
+									{
+										YANET_LOG_WARNING("%s: rule %u: expanding error: label %s not found\n",
+										                  __func__,
+										                  rulep->ruleno,
+										                  label.data());
+										continue;
+									}
+									auto skipto = std::get<unsigned int>(search->second);
+									// backwards skipto is not allowed
+									if (skipto <= rulep->ruleno)
+									{
+										YANET_LOG_WARNING("%s: rule %u: attempt to jump backwards: %s -> %s (%u)\n",
+										                  __func__,
+										                  rulep->ruleno,
+										                  prefix.toString().data(),
+										                  label.data(),
+										                  skipto);
+										continue;
+									}
+									// create and modify filter for rule
+									// XXX: we assume that filter's src/dst wasn't initialized
+									ref_t<filter_t> filter = new filter_t(rulep);
+									if (rulep->src_targ)
+									{
+										filter->src = new filter_network_t(prefix);
+									}
+									else
+									{
+										filter->dst = new filter_network_t(prefix);
+									}
+									auto& ruleref = yanet_rules.emplace_back(filter, rulep->ruleno, skipto);
+									ruleref.ids.push_back(auto_id++);
+									// add a hint in the comment for user where are we jumping to
+									ruleref.comment = label;
+									ACL_DBGMSG("expand rule " << rulep->ruleno << ": " << ruleref.to_string());
+								}
+								// don't insert original rule
+								continue;
+							}
+							// skipto tablearg from .... via table(X)
 							const auto& table = std::get<ipfw::tables::table_type_t>(
-								configp->m_tables[rulep->targ_name]);
-							const auto& prefixes = std::get<ipfw::tables::prefix_skipto_t>(table);
-							// create single rule_t(filter, ruleno, skipto) for each prefix
-							for (const auto& [prefix, label] : prefixes)
+							        configp->m_tables[rulep->targ_name]);
+							const auto& ifaces = std::get<ipfw::tables::ifname_t>(table);
+							// create single rule_t(filter, ruleno, skipto) for each ifname
+							for (const auto& [ifname, label] : ifaces)
 							{
 								if (label.empty())
 								{
-									YANET_LOG_WARNING("%s: rule %u: expanding error: empty label for prefix %s\n",
-										__func__, rulep->ruleno, prefix.toString().data());
+									YANET_LOG_WARNING("%s: rule %u: expanding error: empty label for ifname %s\n",
+									                  __func__,
+									                  rulep->ruleno,
+									                  ifname.data());
 									continue;
 								}
 								// resolve label into ruleno
@@ -230,7 +292,9 @@ struct firewall_rules_t
 								if (search == configp->m_labels.end())
 								{
 									YANET_LOG_WARNING("%s: rule %u: expanding error: label %s not found\n",
-										__func__, rulep->ruleno, label.data());
+									                  __func__,
+									                  rulep->ruleno,
+									                  label.data());
 									continue;
 								}
 								auto skipto = std::get<unsigned int>(search->second);
@@ -238,22 +302,17 @@ struct firewall_rules_t
 								if (skipto <= rulep->ruleno)
 								{
 									YANET_LOG_WARNING("%s: rule %u: attempt to jump backwards: %s -> %s (%u)\n",
-										__func__, rulep->ruleno, prefix.toString().data(),
-										label.data(), skipto);
+									                  __func__,
+									                  rulep->ruleno,
+									                  ifname.data(),
+									                  label.data(),
+									                  skipto);
 									continue;
 								}
-								// create and modify filter for rule
-								// XXX: we assume that filter's src/dst wasn't initialized
-								ref_t<filter_t> filter = new filter_t(rulep);
-								if (rulep->src_targ)
-								{
-									filter->src = new filter_network_t(prefix);
-								}
-								else
-								{
-									filter->dst = new filter_network_t(prefix);
-								}
-								auto& ruleref = yanet_rules.emplace_back(filter, rulep->ruleno, skipto);
+
+								auto& ruleref = yanet_rules.emplace_back(new filter_t(rulep), rulep->ruleno, skipto);
+								// add ifname to rule
+								ruleref.via.insert(ifname);
 								ruleref.ids.push_back(auto_id++);
 								// add a hint in the comment for user where are we jumping to
 								ruleref.comment = label;
@@ -262,62 +321,24 @@ struct firewall_rules_t
 							// don't insert original rule
 							continue;
 						}
-						// skipto tablearg from .... via table(X)
-						const auto& table = std::get<ipfw::tables::table_type_t>(
-							configp->m_tables[rulep->targ_name]);
-						const auto& ifaces = std::get<ipfw::tables::ifname_t>(table);
-						// create single rule_t(filter, ruleno, skipto) for each ifname
-						for (const auto& [ifname, label] : ifaces)
-						{
-							if (label.empty())
-							{
-								YANET_LOG_WARNING("%s: rule %u: expanding error: empty label for ifname %s\n",
-									__func__, rulep->ruleno, ifname.data());
-								continue;
-							}
-							// resolve label into ruleno
-							const auto& search = configp->m_labels.find(label);
-							if (search == configp->m_labels.end())
-							{
-								YANET_LOG_WARNING("%s: rule %u: expanding error: label %s not found\n",
-									__func__, rulep->ruleno, label.data());
-								continue;
-							}
-							auto skipto = std::get<unsigned int>(search->second);
-							// backwards skipto is not allowed
-							if (skipto <= rulep->ruleno)
-							{
-								YANET_LOG_WARNING("%s: rule %u: attempt to jump backwards: %s -> %s (%u)\n",
-									__func__, rulep->ruleno, ifname.data(), label.data(), skipto);
-								continue;
-							}
-
-							auto& ruleref = yanet_rules.emplace_back(new filter_t(rulep), rulep->ruleno, skipto);
-							// add ifname to rule
-							ruleref.via.insert(ifname);
-							ruleref.ids.push_back(auto_id++);
-							// add a hint in the comment for user where are we jumping to
-							ruleref.comment = label;
-							ACL_DBGMSG("expand rule " << rulep->ruleno << ": " << ruleref.to_string());
-						}
-						// don't insert original rule
-						continue;
-					}
-					// simple skipto rules are handled as usual
-					[[fallthrough]];
-				case ipfw::rule_action_t::ALLOW:
-				case ipfw::rule_action_t::DUMP:
-				case ipfw::rule_action_t::DENY: {
-					// handle only meaning rules
-					auto& ruleref = yanet_rules.emplace_back(rulep, configp);
-					ACL_DBGMSG("add rule " << rulep->ruleno << ": " << ruleref.to_original_string());
+						// simple skipto rules are handled as usual
+						[[fallthrough]];
+					case ipfw::rule_action_t::ALLOW:
+					case ipfw::rule_action_t::DUMP:
+					case ipfw::rule_action_t::DENY:
+					{
+						// handle only meaning rules
+						auto& ruleref = yanet_rules.emplace_back(rulep, configp);
+						ACL_DBGMSG("add rule " << rulep->ruleno << ": " << ruleref.to_original_string());
 					}
 					break;
-				default:
-					// skip rules with unsupported action
-					YANET_LOG_WARNING("%s: rule %u: unsupported action: %s\n",
-						__func__, rulep->ruleno, rulep->text.data());
-					continue;
+					default:
+						// skip rules with unsupported action
+						YANET_LOG_WARNING("%s: rule %u: unsupported action: %s\n",
+						                  __func__,
+						                  rulep->ruleno,
+						                  rulep->text.data());
+						continue;
 				}
 			}
 		}
@@ -332,19 +353,17 @@ struct firewall_rules_t
 	}
 };
 
-static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher, const ref_t<filter_t>& filter,
-	const std::string& iface, ids_t& ids, std::vector<rule_t>& rules, bool log);
-static bool unwind(int64_t start_from, firewall_rules_t& fw, const dispatcher_rules_t& dispatcher,
-	const ref_t<filter_t>& filter, const std::string& iface, ids_t& ids, std::vector<rule_t>& rules,
-	bool log, size_t recursion_limit);
+static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher, const ref_t<filter_t>& filter, const std::string& iface, ids_t& ids, std::vector<rule_t>& rules, bool log);
+static bool unwind(int64_t start_from, firewall_rules_t& fw, const dispatcher_rules_t& dispatcher, const ref_t<filter_t>& filter, const std::string& iface, ids_t& ids, std::vector<rule_t>& rules, bool log, size_t recursion_limit);
 std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::base::acl_t>& acls,
-        const iface_map_t& iface_map, ref_t<filter_t> filter, result_t& result);
-std::vector<rule_t> unwind_rules(firewall_rules_t& fw, const dispatcher_rules_t& dispatcher,
-	const ref_t<filter_t>& filter, const std::string& iface);
+                                      const iface_map_t& iface_map,
+                                      ref_t<filter_t> filter,
+                                      result_t& result);
+std::vector<rule_t> unwind_rules(firewall_rules_t& fw, const dispatcher_rules_t& dispatcher, const ref_t<filter_t>& filter, const std::string& iface);
 
 static inline auto skip_rule(const rule_t& rule,
-			     const ref_t<filter_t>& filter,
-			     const std::string& iface)
+                             const ref_t<filter_t>& filter,
+                             const std::string& iface)
 {
 	// skip rules that don't match given filter
 	if (filter && rule.filter && !compatible(filter, rule.filter))
@@ -375,11 +394,11 @@ static inline auto is_nonterm_action(const std::variant<int64_t, common::globalB
 
 // gather matching rules from dispatcher
 static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher,
-			      const ref_t<filter_t>& filter,
-			      const std::string& iface,
-			      ids_t& ids,
-			      std::vector<rule_t>& rules,
-			      bool log)
+                              const ref_t<filter_t>& filter,
+                              const std::string& iface,
+                              ids_t& ids,
+                              std::vector<rule_t>& rules,
+                              bool log)
 {
 	auto idSize = ids.size();
 	for (const auto& rule : dispatcher.rules)
@@ -398,8 +417,9 @@ static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher,
 
 		ids.insert(ids.end(), rule.ids.begin(), rule.ids.end());
 		rules.emplace_back(std::move(result_filter),
-				   std::get<common::globalBase::tFlow>(rule.action),
-				   ids, log || rule.log);
+		                   std::get<common::globalBase::tFlow>(rule.action),
+		                   ids,
+		                   log || rule.log);
 		ids.resize(idSize);
 
 		ACL_DBGMSG("gathered...");
@@ -415,14 +435,7 @@ static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher,
 	return true;
 }
 
-static bool unwind(int64_t start_from, firewall_rules_t& fw,
-		  const dispatcher_rules_t& dispatcher,
-		  const ref_t<filter_t>& filter,
-		  const std::string& iface,
-		  ids_t& ids,
-		  std::vector<rule_t>& rules,
-		  bool log,
-		  size_t recursion_limit)
+static bool unwind(int64_t start_from, firewall_rules_t& fw, const dispatcher_rules_t& dispatcher, const ref_t<filter_t>& filter, const std::string& iface, ids_t& ids, std::vector<rule_t>& rules, bool log, size_t recursion_limit)
 {
 	if (recursion_limit > 1000)
 	{
@@ -467,31 +480,31 @@ static bool unwind(int64_t start_from, firewall_rules_t& fw,
 				if (start_from != DISPATCHER)
 				{
 					ACL_DBGMSG("skipto " << start_from);
-					term_rule = unwind(start_from, fw, dispatcher, result_filter,
-						iface, ids, rules, log || rule.log, recursion_limit + 1);
+					term_rule = unwind(start_from, fw, dispatcher, result_filter, iface, ids, rules, log || rule.log, recursion_limit + 1);
 					// if we have reached DISPATCHER, it will be handled next
 				}
 
 				if (start_from == DISPATCHER)
 				{
 					ACL_DBGMSG("go to dispatcher...");
-					term_rule = unwind_dispatcher(dispatcher, result_filter,
-							iface, ids, rules, log || rule.log);
+					term_rule = unwind_dispatcher(dispatcher, result_filter, iface, ids, rules, log || rule.log);
 				}
 			}
 			else if (std::holds_alternative<common::globalBase::tFlow>(rule.action))
 			{
 				// handle tFlows
 				rules.emplace_back(std::move(result_filter),
-						   std::get<common::globalBase::tFlow>(rule.action),
-						   ids, log || rule.log);
+				                   std::get<common::globalBase::tFlow>(rule.action),
+				                   ids,
+				                   log || rule.log);
 				ACL_DBGMSG("tFlow gathered...");
 			}
 			else
 			{
 				rules.emplace_back(std::move(result_filter),
-						   std::get<common::acl::action_t>(rule.action),
-						   ids, log || rule.log);
+				                   std::get<common::acl::action_t>(rule.action),
+				                   ids,
+				                   log || rule.log);
 				ACL_DBGMSG("action_t gathered...");
 			}
 
@@ -507,8 +520,8 @@ static bool unwind(int64_t start_from, firewall_rules_t& fw,
 }
 
 std::vector<rule_t> unwind_rules(firewall_rules_t& fw,
-				 const dispatcher_rules_t& dispatcher,
-				 const ref_t<filter_t>& filter,
+                                 const dispatcher_rules_t& dispatcher,
+                                 const ref_t<filter_t>& filter,
                                  const std::string& iface)
 {
 	auto start_from = fw.rules.begin()->first;
@@ -521,7 +534,7 @@ std::vector<rule_t> unwind_rules(firewall_rules_t& fw,
 }
 
 iface_map_t ifaceMapping(std::map<std::string, controlplane::base::logical_port_t> logicalPorts,
-                  std::map<std::string, controlplane::route::config_t> routes)
+                         std::map<std::string, controlplane::route::config_t> routes)
 {
 	iface_map_t ret;
 
@@ -724,7 +737,7 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
 
 				std::string ids;
 				bool first = true;
-				for (auto id: rule.ids)
+				for (auto id : rule.ids)
 				{
 					if (!first)
 					{
@@ -767,7 +780,9 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
 }
 
 std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::base::acl_t>& acls,
-        const iface_map_t& iface_map, ref_t<filter_t> filter, result_t& result)
+                                      const iface_map_t& iface_map,
+                                      ref_t<filter_t> filter,
+                                      result_t& result)
 {
 	std::unordered_map<std::vector<rule_t>, tAclId> rules_map(acls.size());
 
@@ -821,10 +836,9 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 				{
 					auto orig_text = rule.to_original_string();
 					result_rules.emplace_back(std::make_tuple(
-						rule.ids[0],
-						rule.to_string(),
-						orig_text
-					));
+					        rule.ids[0],
+					        rule.to_string(),
+					        orig_text));
 				}
 				ACL_DBGMSG("rule " << ruleno << ": " << rule.to_original_string());
 			}
@@ -851,13 +865,12 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 			{
 				result.dispatcher.emplace_back(std::make_tuple(
 #ifdef ACL_DEBUG
-					rule.ids[0],
+				        rule.ids[0],
 #else
-					FW_DISPATCHER_START_ID,
+				        FW_DISPATCHER_START_ID,
 #endif
-					rule.to_string(),
-					std::string()
-				));
+				        rule.to_string(),
+				        std::string()));
 			}
 			ACL_DBGMSG("dispatcher rule: " << rule.to_string());
 		}
@@ -873,10 +886,11 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 
 			auto rules = unwind_rules(fw, dispatcher, start_filter, iface);
 
-			for (auto &rule : rules)
+			for (auto& rule : rules)
 			{
-				if (std::holds_alternative<common::globalBase::tFlow>(rule.action)) {
-					auto &flow = std::get<common::globalBase::tFlow>(rule.action);
+				if (std::holds_alternative<common::globalBase::tFlow>(rule.action))
+				{
+					auto& flow = std::get<common::globalBase::tFlow>(rule.action);
 
 					if (rule.filter->keepstate)
 					{
@@ -1095,7 +1109,7 @@ std::set<uint32_t> lookup(const unsigned int transport_layers_size,
 
 		for (const auto rule_id : compiler.used_rules)
 		{
-			for (auto id: rules_used[rule_id].ids)
+			for (auto id : rules_used[rule_id].ids)
 			{
 				result.emplace(id);
 			}

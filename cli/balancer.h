@@ -1,8 +1,8 @@
 #pragma once
 
 #include "common/icontrolplane.h"
-#include "common/idataplane.h"
 #include "common/icp_proto.h"
+#include "common/idataplane.h"
 #include "common/iproto_controlplane.h"
 #include "common/type.h"
 
@@ -91,7 +91,9 @@ void service(std::string module_string,
 			auto proto_string = controlplane::balancer::from_proto(proto);
 
 			common::idp::balancer_service_connections::service_key_t key = {module_id,
-			                                                                virtual_ip, proto, virtual_port};
+			                                                                virtual_ip,
+			                                                                proto,
+			                                                                virtual_port};
 
 			uint32_t connections = 0;
 			for (auto& [socket_id, service_connections] : balancer_service_connections)
@@ -214,55 +216,55 @@ void real_find(std::string module_string,
 	             "bytes",
 	             "version");
 
-    for (const auto& balancer : response.balancers())
-    {
-        for (const auto& service : balancer.services())
-        {
-            auto virtual_ip = convert_to_ip_address(service.key().ip());
-            auto proto = service.key().proto() == common::icp_proto::NetProto::tcp ? IPPROTO_TCP : IPPROTO_UDP;
+	for (const auto& balancer : response.balancers())
+	{
+		for (const auto& service : balancer.services())
+		{
+			auto virtual_ip = convert_to_ip_address(service.key().ip());
+			auto proto = service.key().proto() == common::icp_proto::NetProto::tcp ? IPPROTO_TCP : IPPROTO_UDP;
 
-            auto proto_string = common::icp_proto::NetProto_descriptor()->value(service.key().proto())->name();
+			auto proto_string = common::icp_proto::NetProto_descriptor()->value(service.key().proto())->name();
 
-            for (const auto& real : service.reals())
-            {
-                auto real_ip = convert_to_ip_address(real.ip());
-                common::idp::balancer_real_connections::real_key_t key = {(balancer_id_t)balancer.balancer_id(),
-                                                                          virtual_ip,
-                                                                          proto,
-                                                                          service.key().port(),
-                                                                          real_ip,
-                                                                          real.port()};
+			for (const auto& real : service.reals())
+			{
+				auto real_ip = convert_to_ip_address(real.ip());
+				common::idp::balancer_real_connections::real_key_t key = {(balancer_id_t)balancer.balancer_id(),
+				                                                          virtual_ip,
+				                                                          proto,
+				                                                          service.key().port(),
+				                                                          real_ip,
+				                                                          real.port()};
 
-                uint32_t connections = 0;
-                for (auto& [socket_id, real_connections] : balancer_real_connections)
-                {
-                    (void)socket_id;
+				uint32_t connections = 0;
+				for (auto& [socket_id, real_connections] : balancer_real_connections)
+				{
+					(void)socket_id;
 
-                    const auto& socket_connections = real_connections[key].value;
-                    if (socket_connections > connections)
-                    {
-                        connections = socket_connections;
-                    }
-                }
+					const auto& socket_connections = real_connections[key].value;
+					if (socket_connections > connections)
+					{
+						connections = socket_connections;
+					}
+				}
 
-                table.insert(balancer.module(),
-                             virtual_ip,
-                             proto_string,
-                             service.key().port(),
-                             service.scheduler(),
-                             real_ip,
-                             real.port(),
-                             real.enabled(),
-                             real.weight(),
-                             connections,
-                             real.packets(),
-                             real.bytes(),
-			     service.has_version() ? std::make_optional(service.version()) : std::nullopt);
-            }
-        }
-    }
+				table.insert(balancer.module(),
+				             virtual_ip,
+				             proto_string,
+				             service.key().port(),
+				             service.scheduler(),
+				             real_ip,
+				             real.port(),
+				             real.enabled(),
+				             real.weight(),
+				             connections,
+				             real.packets(),
+				             real.bytes(),
+				             service.has_version() ? std::make_optional(service.version()) : std::nullopt);
+			}
+		}
+	}
 
-    table.print();
+	table.print();
 }
 
 void state(std::string module,
@@ -312,7 +314,8 @@ void state(std::string module,
 	                           std::map<std::tuple<common::ip_address_t, ///< client_ip
 	                                               uint16_t>, ///< client_port
 	                                    std::tuple<uint32_t, ///< timestamp_create
-	                                               uint16_t>>>>> total_connections; ///< timestamp_last_packet
+	                                               uint16_t>>>>>
+	        total_connections; ///< timestamp_last_packet
 
 	/// @todo: OPT
 	for (const auto& [socket_id, services_real_connections] : response)
@@ -406,13 +409,13 @@ namespace real
 {
 
 void change_state(const std::string& module,
-		  const common::ip_address_t& virtual_ip,
-		  const std::string& proto,
-		  const uint16_t& virtual_port,
-		  const common::ip_address_t& real_ip,
-		  const uint16_t& real_port,
-		  const bool enable,
-		  std::optional<uint32_t> weight)
+                  const common::ip_address_t& virtual_ip,
+                  const std::string& proto,
+                  const uint16_t& virtual_port,
+                  const common::ip_address_t& real_ip,
+                  const uint16_t& real_port,
+                  const bool enable,
+                  std::optional<uint32_t> weight)
 {
 	common::icp_proto::BalancerRealRequest request;
 	auto* real = request.add_reals();
@@ -420,15 +423,15 @@ void change_state(const std::string& module,
 	setip(real->mutable_virtual_ip(), virtual_ip);
 	if (proto == "tcp")
 	{
-			real->set_proto(::common::icp_proto::NetProto::tcp);
+		real->set_proto(::common::icp_proto::NetProto::tcp);
 	}
 	else if (proto == "udp")
 	{
-			real->set_proto(::common::icp_proto::NetProto::udp);
+		real->set_proto(::common::icp_proto::NetProto::udp);
 	}
 	else
 	{
-			YANET_LOG_WARNING("undefined net protocol requested: %s", proto.c_str());
+		YANET_LOG_WARNING("undefined net protocol requested: %s", proto.c_str());
 	}
 	real->set_virtual_port(virtual_port);
 	setip(real->mutable_real_ip(), real_ip);
@@ -445,22 +448,22 @@ void change_state(const std::string& module,
 }
 
 void enable(const std::string& module,
-	    const common::ip_address_t& virtual_ip,
-	    const std::string& proto,
-	    const uint16_t& virtual_port,
-	    const common::ip_address_t& real_ip,
-	    const uint16_t& real_port,
-	    std::optional<uint32_t> weight)
+            const common::ip_address_t& virtual_ip,
+            const std::string& proto,
+            const uint16_t& virtual_port,
+            const common::ip_address_t& real_ip,
+            const uint16_t& real_port,
+            std::optional<uint32_t> weight)
 {
 	change_state(module, virtual_ip, proto, virtual_port, real_ip, real_port, true, weight);
 }
 
 void disable(const std::string& module,
-	     const common::ip_address_t& virtual_ip,
-	     const std::string& proto,
-	     const uint16_t& virtual_port,
-	     const common::ip_address_t& real_ip,
-	     const uint16_t& real_port)
+             const common::ip_address_t& virtual_ip,
+             const std::string& proto,
+             const uint16_t& virtual_port,
+             const common::ip_address_t& real_ip,
+             const uint16_t& real_port)
 {
 	change_state(module, virtual_ip, proto, virtual_port, real_ip, real_port, false, std::nullopt);
 }

@@ -108,7 +108,6 @@ public:
 	}
 
 public:
-
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
 	inline void lookup(const uint32_t (&k1s)[burst_size],
 	                   const uint32_t (&k2s)[burst_size],

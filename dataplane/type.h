@@ -3,11 +3,11 @@
 #include <rte_byteorder.h>
 #include <rte_ether.h>
 
-#include "common/type.h"
-#include "common/scheduler.h"
 #include "common/balancer.h"
-#include "common/fallback.h"
 #include "common/config.h"
+#include "common/fallback.h"
+#include "common/scheduler.h"
+#include "common/type.h"
 
 #include "common.h"
 
@@ -236,551 +236,552 @@ namespace dataplane
 
 namespace base
 {
-	class permanently;
-	class generation;
+class permanently;
+class generation;
 }
 
 namespace globalBase
 {
-	class atomic;
-	class generation;
+class atomic;
+class generation;
 
-	//
+//
 
-	struct tLogicalPort
+struct tLogicalPort
+{
+	/// @todo: uint8_t enabled;
+
+	tPortId portId;
+	uint16_t vlanId; ///< big endian
+	rte_ether_addr etherAddress;
+	uint8_t flags;
+	common::globalBase::tFlow flow;
+};
+
+struct tDecap
+{
+	/// @todo: uint8_t enabled;
+
+	uint8_t ipv4DSCPFlags;
+	uint8_t flag_ipv6_enabled;
+	common::globalBase::tFlow flow;
+};
+
+struct tun64_t
+{
+	uint8_t srcRndEnabled : 1;
+	uint8_t isConfigured : 1;
+	ipv6_address_t ipv6AddressSource;
+	common::globalBase::tFlow flow;
+	uint8_t ipv4DSCPFlags;
+};
+
+struct route_t
+{
+	ipv4_address_t ipv4AddressSource;
+	ipv6_address_t ipv6AddressSource;
+	uint16_t udpDestinationPort;
+};
+
+struct tInterface
+{
+	/// @todo: uint8_t enabled;
+
+	rte_ether_addr neighbor_ether_address_v4;
+	rte_ether_addr neighbor_ether_address_v6;
+	tAclId aclId;
+	common::globalBase::tFlow flow;
+};
+
+struct nat64stateful_t
+{
+	nat64stateful_t() :
+	        pool_size(0)
 	{
-		/// @todo: uint8_t enabled;
+		state_timeout.tcp_syn = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+		state_timeout.tcp_ack = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+		state_timeout.tcp_fin = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+		state_timeout.udp = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+		state_timeout.icmp = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+		state_timeout.other = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
+	}
 
-		tPortId portId;
-		uint16_t vlanId; ///< big endian
-		rte_ether_addr etherAddress;
-		uint8_t flags;
-		common::globalBase::tFlow flow;
-	};
+	/// @todo: uint8_t enabled;
 
-	struct tDecap
+	uint32_t pool_start;
+	uint32_t pool_size;
+	tCounterId counter_id;
+	uint8_t ipv4_dscp_flags;
+	struct
 	{
-		/// @todo: uint8_t enabled;
+		uint16_t tcp_syn;
+		uint16_t tcp_ack;
+		uint16_t tcp_fin;
+		uint16_t udp;
+		uint16_t icmp;
+		uint16_t other;
+	} state_timeout;
+	common::globalBase::tFlow flow;
+};
 
-		uint8_t ipv4DSCPFlags;
-		uint8_t flag_ipv6_enabled;
-		common::globalBase::tFlow flow;
-	};
+struct tNat64stateless
+{
+	/// @todo: uint8_t enabled;
 
-	struct tun64_t
+	uint8_t firewall; ///< @todo: FIREWALL
+	common::globalBase::tFlow flow;
+	ipv6_address_t defrag_farm_prefix;
+	ipv6_address_t defrag_source_prefix;
+	uint8_t farm;
+	uint8_t ipv4DSCPFlags;
+
+	/// @todo: ingressFlow;
+	/// @todo: egressFlow;
+};
+
+static_assert(CONFIG_YADECAP_INTERFACES_SIZE <= 0xFFFF, "invalid size");
+
+struct balancer_t
+{
+	/// @todo: uint8_t enabled;
+	/// @todo: fragmentation
+
+	// when communicating with reals
+	ipv6_address_t source_ipv6;
+	ipv4_address_t source_ipv4;
+
+	common::globalBase::tFlow flow;
+};
+
+struct dregress_t
+{
+	/// @todo: uint8_t enabled;
+
+	ipv4_address_t ipv4AddressSource;
+	ipv6_address_t ipv6AddressSource;
+	uint16_t udpDestinationPort;
+	uint8_t onlyLongest;
+	common::globalBase::tFlow flow;
+};
+
+struct nexthop ///< @todo
+{
+	tInterfaceId interfaceId : 16;
+	uint32_t labelExpTransport; ///< @todo: rename first
+	uint32_t labelExpService; ///< @todo: rename second
+};
+
+struct nexthop_tunnel_t
+{
+	union
 	{
-		uint8_t srcRndEnabled : 1;
-		uint8_t isConfigured : 1;
-		ipv6_address_t ipv6AddressSource;
-		common::globalBase::tFlow flow;
-		uint8_t ipv4DSCPFlags;
-	};
-
-	struct route_t
-	{
-		ipv4_address_t ipv4AddressSource;
-		ipv6_address_t ipv6AddressSource;
-		uint16_t udpDestinationPort;
-	};
-
-	struct tInterface
-	{
-		/// @todo: uint8_t enabled;
-
-		rte_ether_addr neighbor_ether_address_v4;
-		rte_ether_addr neighbor_ether_address_v6;
-		tAclId aclId;
-		common::globalBase::tFlow flow;
-	};
-
-	struct nat64stateful_t
-	{
-		nat64stateful_t() :
-		        pool_size(0)
-		{
-			state_timeout.tcp_syn = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
-			state_timeout.tcp_ack = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
-			state_timeout.tcp_fin = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
-			state_timeout.udp = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
-			state_timeout.icmp = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
-			state_timeout.other = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
-		}
-
-		/// @todo: uint8_t enabled;
-
-		uint32_t pool_start;
-		uint32_t pool_size;
-		tCounterId counter_id;
-		uint8_t ipv4_dscp_flags;
 		struct
 		{
-			uint16_t tcp_syn;
-			uint16_t tcp_ack;
-			uint16_t tcp_fin;
-			uint16_t udp;
-			uint16_t icmp;
-			uint16_t other;
-		} state_timeout;
-		common::globalBase::tFlow flow;
-	};
-
-	struct tNat64stateless
-	{
-		/// @todo: uint8_t enabled;
-
-		uint8_t firewall; ///< @todo: FIREWALL
-		common::globalBase::tFlow flow;
-		ipv6_address_t defrag_farm_prefix;
-		ipv6_address_t defrag_source_prefix;
-		uint8_t farm;
-		uint8_t ipv4DSCPFlags;
-
-		/// @todo: ingressFlow;
-		/// @todo: egressFlow;
-	};
-
-	static_assert(CONFIG_YADECAP_INTERFACES_SIZE <= 0xFFFF, "invalid size");
-
-	struct balancer_t
-	{
-		/// @todo: uint8_t enabled;
-		/// @todo: fragmentation
-
-		// when communicating with reals
-		ipv6_address_t source_ipv6;
-		ipv4_address_t source_ipv4;
-
-		common::globalBase::tFlow flow;
-	};
-
-	struct dregress_t
-	{
-		/// @todo: uint8_t enabled;
-
-		ipv4_address_t ipv4AddressSource;
-		ipv6_address_t ipv6AddressSource;
-		uint16_t udpDestinationPort;
-		uint8_t onlyLongest;
-		common::globalBase::tFlow flow;
-	};
-
-	struct nexthop ///< @todo
-	{
-		tInterfaceId interfaceId : 16;
-		uint32_t labelExpTransport; ///< @todo: rename first
-		uint32_t labelExpService; ///< @todo: rename second
-	};
-
-	struct nexthop_tunnel_t
-	{
-		union
-		{
-			struct
-			{
-				tInterfaceId interface_id : 8;
-				tCounterId counter_id : 24;
-			};
-
-			uint32_t atomic1;
+			tInterfaceId interface_id : 8;
+			tCounterId counter_id : 24;
 		};
 
-		uint32_t label;
-		ipv6_address_t nexthop_address;
+		uint32_t atomic1;
 	};
 
-	static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid YANET_CONFIG_COUNTERS_SIZE");
+	uint32_t label;
+	ipv6_address_t nexthop_address;
+};
 
-	struct route_value_t
+static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid YANET_CONFIG_COUNTERS_SIZE");
+
+struct route_value_t
+{
+	route_value_t() :
+	        type(common::globalBase::eNexthopType::controlPlane)
 	{
-		route_value_t() :
-		        type(common::globalBase::eNexthopType::controlPlane)
-		{
-		}
+	}
 
-		common::globalBase::eNexthopType type; ///< @todo: DELETE
+	common::globalBase::eNexthopType type; ///< @todo: DELETE
 
-		union
+	union
+	{
+		struct
 		{
-			struct
-			{
-				uint32_t ecmpCount;
-				uint32_t nop;
-				nexthop nexthops[CONFIG_YADECAP_GB_ECMP_SIZE];
-			} interface;
-		};
+			uint32_t ecmpCount;
+			uint32_t nop;
+			nexthop nexthops[CONFIG_YADECAP_GB_ECMP_SIZE];
+		} interface;
 	};
+};
 
-	static_assert(sizeof(route_value_t) == 192, "invalid size of route_value_t");
+static_assert(sizeof(route_value_t) == 192, "invalid size of route_value_t");
 
-	struct route_tunnel_value_t
+struct route_tunnel_value_t
+{
+	route_tunnel_value_t() :
+	        type(common::globalBase::eNexthopType::controlPlane)
 	{
-		route_tunnel_value_t() :
-		        type(common::globalBase::eNexthopType::controlPlane)
-		{
-		}
+	}
 
-		common::globalBase::eNexthopType type; ///< @todo: DELETE
+	common::globalBase::eNexthopType type; ///< @todo: DELETE
 
-		union
+	union
+	{
+		struct
 		{
-			struct
-			{
-				uint32_t weight_start;
-				uint32_t weight_size;
-				uint32_t nop;
-				nexthop_tunnel_t nexthops[YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE];
-			} interface;
-		};
+			uint32_t weight_start;
+			uint32_t weight_size;
+			uint32_t nop;
+			nexthop_tunnel_t nexthops[YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE];
+		} interface;
 	};
+};
 
-	static_assert(sizeof(route_tunnel_value_t) % 8 == 0, "invalid size of route_tunnel_value_t");
+static_assert(sizeof(route_tunnel_value_t) % 8 == 0, "invalid size of route_tunnel_value_t");
 
-	struct nat64stateful_lan_key
+struct nat64stateful_lan_key
+{
+	uint32_t nat64stateful_id : 24;
+	uint8_t proto;
+	ipv6_address_t ipv6_source;
+	ipv6_address_t ipv6_destination;
+	uint16_t port_source;
+	uint16_t port_destination;
+};
+
+struct nat64stateful_lan_value
+{
+	ipv4_address_t ipv4_source;
+	uint16_t port_source;
+	uint16_t timestamp_last_packet;
+	uint32_t flags;
+};
+
+struct nat64stateful_wan_key
+{
+	uint32_t nat64stateful_id : 24;
+	uint8_t proto;
+	ipv4_address_t ipv4_source;
+	ipv4_address_t ipv4_destination;
+	uint16_t port_source;
+	uint16_t port_destination;
+};
+
+struct nat64stateful_wan_value
+{
+	union
 	{
-		uint32_t nat64stateful_id : 24;
-		uint8_t proto;
 		ipv6_address_t ipv6_source;
-		ipv6_address_t ipv6_destination;
-		uint16_t port_source;
-		uint16_t port_destination;
-	};
 
-	struct nat64stateful_lan_value
-	{
-		ipv4_address_t ipv4_source;
-		uint16_t port_source;
-		uint16_t timestamp_last_packet;
-		uint32_t flags;
-	};
-
-	struct nat64stateful_wan_key
-	{
-		uint32_t nat64stateful_id : 24;
-		uint8_t proto;
-		ipv4_address_t ipv4_source;
-		ipv4_address_t ipv4_destination;
-		uint16_t port_source;
-		uint16_t port_destination;
-	};
-
-	struct nat64stateful_wan_value
-	{
-		union
+		struct
 		{
-			ipv6_address_t ipv6_source;
-
-			struct
-			{
-				uint8_t nap[12];
-				uint16_t port_destination;
-				uint16_t timestamp_last_packet;
-			};
-		};
-
-		ipv6_address_t ipv6_destination;
-		uint32_t flags;
-	};
-
-	static_assert(YANET_CONFIG_NAT64STATEFULS_SIZE <= 0xFFFFFF, "invalid size");
-
-	struct nat64stateless_translation_t
-	{
-		ipv6_address_t ipv6Address;
-
-		union
-		{
-			ipv6_address_t ipv6DestinationAddress;
-
-			struct
-			{
-				uint8_t nap1[12];
-				ipv4_address_t ipv4Address;
-			};
-		};
-
-		uint16_t diffPort;
-		uint16_t nap3;
-
-		union
-		{
-			tCounterId counter_id;
-
-			struct
-			{
-				uint8_t flags : 8;
-				uint32_t nap2 : 24;
-			};
+			uint8_t nap[12];
+			uint16_t port_destination;
+			uint16_t timestamp_last_packet;
 		};
 	};
 
-	static_assert(sizeof(nat64stateless_translation_t) % 8 == 0);
-	static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid size");
+	ipv6_address_t ipv6_destination;
+	uint32_t flags;
+};
 
-	struct tun64mapping_key_t
+static_assert(YANET_CONFIG_NAT64STATEFULS_SIZE <= 0xFFFFFF, "invalid size");
+
+struct nat64stateless_translation_t
+{
+	ipv6_address_t ipv6Address;
+
+	union
 	{
-		tun64_id_t tun64Id;
-		uint32_t ipv4Address;
+		ipv6_address_t ipv6DestinationAddress;
+
+		struct
+		{
+			uint8_t nap1[12];
+			ipv4_address_t ipv4Address;
+		};
 	};
 
-	struct tun64mapping_t
-	{
-		tun64_id_t		tun64Id;
-		tCounterId		counter_id;
-		ipv6_address_t		ipv6AddressDestination;
-	};
-	static_assert((sizeof(tun64mapping_t) + sizeof(tun64mapping_key_t)) % 8 == 0);
+	uint16_t diffPort;
+	uint16_t nap3;
 
-	struct balancer_real_t
+	union
 	{
-		ipv6_address_t destination;
-		uint8_t flags;
 		tCounterId counter_id;
-	};
 
-	struct balancer_real_state_t
-	{
-		uint8_t flags;
-		uint32_t weight : 24;
-	};
-
-	struct balancer_service_range_t
-	{
-		uint32_t start;
-		uint32_t size;
-	};
-
-	struct balancer_service_ring_t {
-		balancer_service_range_t ranges[YANET_CONFIG_BALANCER_SERVICES_SIZE];
-		balancer_real_id_t reals[YANET_CONFIG_BALANCER_WEIGHTS_SIZE];
-	};
-
-	static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid size");
-
-	struct balancer_service_t
-	{
-		/// @todo
-
-		union
+		struct
 		{
-			struct
-			{
-				uint8_t flags : 8;
-				tCounterId counter_id : 24;
-			};
+			uint8_t flags : 8;
+			uint32_t nap2 : 24;
+		};
+	};
+};
 
-			uint32_t atomic1;
+static_assert(sizeof(nat64stateless_translation_t) % 8 == 0);
+static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid size");
+
+struct tun64mapping_key_t
+{
+	tun64_id_t tun64Id;
+	uint32_t ipv4Address;
+};
+
+struct tun64mapping_t
+{
+	tun64_id_t tun64Id;
+	tCounterId counter_id;
+	ipv6_address_t ipv6AddressDestination;
+};
+static_assert((sizeof(tun64mapping_t) + sizeof(tun64mapping_key_t)) % 8 == 0);
+
+struct balancer_real_t
+{
+	ipv6_address_t destination;
+	uint8_t flags;
+	tCounterId counter_id;
+};
+
+struct balancer_real_state_t
+{
+	uint8_t flags;
+	uint32_t weight : 24;
+};
+
+struct balancer_service_range_t
+{
+	uint32_t start;
+	uint32_t size;
+};
+
+struct balancer_service_ring_t
+{
+	balancer_service_range_t ranges[YANET_CONFIG_BALANCER_SERVICES_SIZE];
+	balancer_real_id_t reals[YANET_CONFIG_BALANCER_WEIGHTS_SIZE];
+};
+
+static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid size");
+
+struct balancer_service_t
+{
+	/// @todo
+
+	union
+	{
+		struct
+		{
+			uint8_t flags : 8;
+			tCounterId counter_id : 24;
 		};
 
-		uint32_t real_start;
-		uint32_t real_size;
-		::balancer::scheduler scheduler;
-		::balancer::forwarding_method forwarding_method;
-		uint32_t wlc_power;
+		uint32_t atomic1;
 	};
 
-	static_assert(YANET_CONFIG_BALANCER_REALS_SIZE <= 0xFFFFFFFF, "invalid YANET_CONFIG_BALANCER_REALS_SIZE");
-	static_assert(YANET_CONFIG_BALANCER_WEIGHTS_SIZE <= 0xFFFFFFFF, "invalid YANET_CONFIG_BALANCER_WEIGHTS_SIZE");
-	static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid YANET_CONFIG_COUNTERS_SIZE");
+	uint32_t real_start;
+	uint32_t real_size;
+	::balancer::scheduler scheduler;
+	::balancer::forwarding_method forwarding_method;
+	uint32_t wlc_power;
+};
 
-	struct fw_state_config_t
+static_assert(YANET_CONFIG_BALANCER_REALS_SIZE <= 0xFFFFFFFF, "invalid YANET_CONFIG_BALANCER_REALS_SIZE");
+static_assert(YANET_CONFIG_BALANCER_WEIGHTS_SIZE <= 0xFFFFFFFF, "invalid YANET_CONFIG_BALANCER_WEIGHTS_SIZE");
+static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid YANET_CONFIG_COUNTERS_SIZE");
+
+struct fw_state_config_t
+{
+	uint32_t tcp_timeout;
+	uint32_t udp_timeout;
+	uint32_t other_protocols_timeout;
+	uint32_t sync_timeout;
+};
+
+/// Stateful firewall key for ipv4.
+struct fw4_state_key_t
+{
+	uint16_t proto;
+	uint16_t __nap;
+	ipv4_address_t src_addr;
+	ipv4_address_t dst_addr;
+	uint16_t src_port;
+	uint16_t dst_port;
+};
+
+/// Stateful firewall key for ipv6.
+struct fw6_state_key_t
+{
+	uint16_t proto;
+	uint16_t __nap;
+	ipv6_address_t src_addr;
+	ipv6_address_t dst_addr;
+	uint16_t src_port;
+	uint16_t dst_port;
+};
+
+enum class fw_state_type : uint8_t
+{
+	tcp = IPPROTO_TCP,
+	udp = IPPROTO_UDP,
+};
+
+using fw_state_owner_e = common::fwstate::owner_e;
+
+/// Stateful firewall value for UDP protocol.
+struct fw_udp_state_value_t
+{};
+
+/// Stateful firewall value for TCP protocol.
+struct fw_tcp_state_value_t
+{
+	uint8_t src_flags : 4;
+	uint8_t dst_flags : 4;
+
+	uint8_t pack() const
 	{
-		uint32_t tcp_timeout;
-		uint32_t udp_timeout;
-		uint32_t other_protocols_timeout;
-		uint32_t sync_timeout;
-	};
+		return src_flags | (dst_flags << 4);
+	}
 
-	/// Stateful firewall key for ipv4.
-	struct fw4_state_key_t
+	void unpack(uint8_t flags)
 	{
-		uint16_t proto;
-		uint16_t __nap;
-		ipv4_address_t src_addr;
-		ipv4_address_t dst_addr;
-		uint16_t src_port;
-		uint16_t dst_port;
-	};
+		src_flags = flags & 15;
+		dst_flags = flags >> 4;
+	}
+};
 
-	/// Stateful firewall key for ipv6.
-	struct fw6_state_key_t
-	{
-		uint16_t proto;
-		uint16_t __nap;
-		ipv6_address_t src_addr;
-		ipv6_address_t dst_addr;
-		uint16_t src_port;
-		uint16_t dst_port;
-	};
-
-	enum class fw_state_type : uint8_t
-	{
-		tcp = IPPROTO_TCP,
-		udp = IPPROTO_UDP,
-	};
-
-	using fw_state_owner_e = common::fwstate::owner_e;
-
-	/// Stateful firewall value for UDP protocol.
-	struct fw_udp_state_value_t
-	{};
-
-	/// Stateful firewall value for TCP protocol.
-	struct fw_tcp_state_value_t
-	{
-		uint8_t src_flags : 4;
-		uint8_t dst_flags : 4;
-
-		uint8_t pack() const
-		{
-			return src_flags | (dst_flags << 4);
-		}
-
-		void unpack(uint8_t flags)
-		{
-			src_flags = flags & 15;
-			dst_flags = flags >> 4;
-		}
-	};
-
-	struct fw_state_value_t
-	{
-		/// Transport protocol type.
-		///
-		/// Requires to distinguish between transport protocols to
-		/// properly handle state "expire" condition.
-		/// For example, UDP state is kept alive for a specific duration,
-		/// while TCP requires state-machine handling (ideally).
-		fw_state_type type;
-		/// State owner.
-		fw_state_owner_e owner;
-
-		/// Additional transport protocol-specific state variables.
-		union
-		{
-			fw_udp_state_value_t udp;
-			fw_tcp_state_value_t tcp;
-		};
-
-		/// Unix time of when the last packet was seen.
-		///
-		/// Depending on transport protocol type this field is used (additionally
-		/// to specific state variables if any) to figure out when it's time to
-		/// collect inactive sessions.
-		uint32_t last_seen;
-		/// Flow value of the corresponding rule.
-		common::globalBase::tFlow flow;
-		/// Unix time of when the last sync packet was emitted.
-		///
-		/// Must be updated during emitting a sync packet, no matter
-		/// immediate or periodic.
-		///
-		/// In conjunction with the counter below, the periodic state
-		/// update conditions are:
-		///  - If "last_sync" >= some interval.
-		///  - And if "packets_since_last_sync" since last sync packet > 0.
-		uint32_t last_sync;
-		/// Number of packets since last sync.
-		///
-		/// Note, that 32 bit counter seems enough even if sync interval is 1m,
-		/// because then a packet rate should be ~143'000'000 PPS, which
-		/// is still a big number.
-		///
-		/// Must be reset just before emitting a new sync packet.
-		uint32_t packets_since_last_sync;
-		/// Number of backward packets matched this state.
-		uint64_t packets_backward;
-		/// Number of forward packets matched this state.
-		uint64_t packets_forward;
-		/// Acl ID used to determine synchronization ports
-		uint8_t acl_id;
-
-		fw_state_value_t()
-		{}
-	};
-
-	/// From FreeBSD `sys/netinet/ip_fw.h`.
+struct fw_state_value_t
+{
+	/// Transport protocol type.
 	///
-	/// Note that all fields except IPv6 addresses are little-endian.
-	struct fw_state_sync_frame_t
+	/// Requires to distinguish between transport protocols to
+	/// properly handle state "expire" condition.
+	/// For example, UDP state is kept alive for a specific duration,
+	/// while TCP requires state-machine handling (ideally).
+	fw_state_type type;
+	/// State owner.
+	fw_state_owner_e owner;
+
+	/// Additional transport protocol-specific state variables.
+	union
 	{
-		uint32_t dst_ip;
-		uint32_t src_ip;
-		uint16_t dst_port;
-		uint16_t src_port;
-		uint8_t fib;
-		uint8_t proto;
-		uint8_t flags; // protocol-specific flags.
-		uint8_t addr_type; // 4=ip4, 6=ip6.
-		ipv6_address_t dst_ip6;
-		ipv6_address_t src_ip6;
-		uint32_t flow_id6;
-		uint32_t extra;
-
-		static inline fw_state_sync_frame_t from_state_key(const fw4_state_key_t& key)
-		{
-			fw_state_sync_frame_t sync_frame{};
-			sync_frame.proto = uint8_t(key.proto);
-			sync_frame.addr_type = 4;
-			sync_frame.src_ip = key.dst_addr.address; // Note that ipfwsync keeps initial 5-tuple.
-			sync_frame.dst_ip = key.src_addr.address;
-			sync_frame.src_port = key.dst_port;
-			sync_frame.dst_port = key.src_port;
-
-			return sync_frame;
-		}
-
-		static inline fw_state_sync_frame_t from_state_key(const fw6_state_key_t& key)
-		{
-			fw_state_sync_frame_t sync_frame{};
-			sync_frame.proto = uint8_t(key.proto);
-			sync_frame.addr_type = 6;
-			sync_frame.src_ip6 = key.dst_addr; // Note that ipfwsync keeps initial 5-tuple.
-			sync_frame.dst_ip6 = key.src_addr;
-			sync_frame.src_port = key.dst_port;
-			sync_frame.dst_port = key.src_port;
-
-			return sync_frame;
-		}
+		fw_udp_state_value_t udp;
+		fw_tcp_state_value_t tcp;
 	};
 
-	struct fw_state_sync_config_t
+	/// Unix time of when the last packet was seen.
+	///
+	/// Depending on transport protocol type this field is used (additionally
+	/// to specific state variables if any) to figure out when it's time to
+	/// collect inactive sessions.
+	uint32_t last_seen;
+	/// Flow value of the corresponding rule.
+	common::globalBase::tFlow flow;
+	/// Unix time of when the last sync packet was emitted.
+	///
+	/// Must be updated during emitting a sync packet, no matter
+	/// immediate or periodic.
+	///
+	/// In conjunction with the counter below, the periodic state
+	/// update conditions are:
+	///  - If "last_sync" >= some interval.
+	///  - And if "packets_since_last_sync" since last sync packet > 0.
+	uint32_t last_sync;
+	/// Number of packets since last sync.
+	///
+	/// Note, that 32 bit counter seems enough even if sync interval is 1m,
+	/// because then a packet rate should be ~143'000'000 PPS, which
+	/// is still a big number.
+	///
+	/// Must be reset just before emitting a new sync packet.
+	uint32_t packets_since_last_sync;
+	/// Number of backward packets matched this state.
+	uint64_t packets_backward;
+	/// Number of forward packets matched this state.
+	uint64_t packets_forward;
+	/// Acl ID used to determine synchronization ports
+	uint8_t acl_id;
+
+	fw_state_value_t()
+	{}
+};
+
+/// From FreeBSD `sys/netinet/ip_fw.h`.
+///
+/// Note that all fields except IPv6 addresses are little-endian.
+struct fw_state_sync_frame_t
+{
+	uint32_t dst_ip;
+	uint32_t src_ip;
+	uint16_t dst_port;
+	uint16_t src_port;
+	uint8_t fib;
+	uint8_t proto;
+	uint8_t flags; // protocol-specific flags.
+	uint8_t addr_type; // 4=ip4, 6=ip6.
+	ipv6_address_t dst_ip6;
+	ipv6_address_t src_ip6;
+	uint32_t flow_id6;
+	uint32_t extra;
+
+	static inline fw_state_sync_frame_t from_state_key(const fw4_state_key_t& key)
 	{
-		rte_ether_addr ether_address_destination;
-		ipv6_address_t ipv6_address_source;
-		ipv6_address_t ipv6_address_multicast;
-		ipv6_address_t ipv6_address_unicast_source;
-		ipv6_address_t ipv6_address_unicast;
-		uint16_t port_multicast;
-		uint16_t port_unicast;
+		fw_state_sync_frame_t sync_frame{};
+		sync_frame.proto = uint8_t(key.proto);
+		sync_frame.addr_type = 4;
+		sync_frame.src_ip = key.dst_addr.address; // Note that ipfwsync keeps initial 5-tuple.
+		sync_frame.dst_ip = key.src_addr.address;
+		sync_frame.src_port = key.dst_port;
+		sync_frame.dst_port = key.src_port;
 
-		unsigned int flows_size;
-		common::globalBase::tFlow flows[CONFIG_YADECAP_GB_ECMP_SIZE];
-		common::globalBase::tFlow ingress_flow;
-	};
+		return sync_frame;
+	}
 
-	struct balancer_state_key_t
+	static inline fw_state_sync_frame_t from_state_key(const fw6_state_key_t& key)
 	{
-		uint8_t balancer_id;
-		uint8_t protocol;
-		uint16_t addr_type; // 4=ip4, 6=ip6.
+		fw_state_sync_frame_t sync_frame{};
+		sync_frame.proto = uint8_t(key.proto);
+		sync_frame.addr_type = 6;
+		sync_frame.src_ip6 = key.dst_addr; // Note that ipfwsync keeps initial 5-tuple.
+		sync_frame.dst_ip6 = key.src_addr;
+		sync_frame.src_port = key.dst_port;
+		sync_frame.dst_port = key.src_port;
 
-		ipv6_address_t ip_source;
-		ipv6_address_t ip_destination;
+		return sync_frame;
+	}
+};
 
-		uint16_t port_source;
-		uint16_t port_destination;
-	};
+struct fw_state_sync_config_t
+{
+	rte_ether_addr ether_address_destination;
+	ipv6_address_t ipv6_address_source;
+	ipv6_address_t ipv6_address_multicast;
+	ipv6_address_t ipv6_address_unicast_source;
+	ipv6_address_t ipv6_address_unicast;
+	uint16_t port_multicast;
+	uint16_t port_unicast;
 
-	static_assert(YANET_CONFIG_BALANCERS_SIZE <= 0x7F, "invalid size");
+	unsigned int flows_size;
+	common::globalBase::tFlow flows[CONFIG_YADECAP_GB_ECMP_SIZE];
+	common::globalBase::tFlow ingress_flow;
+};
 
-	struct balancer_state_value_t
-	{
-		uint32_t real_unordered_id;
-		uint32_t timestamp_create; ///< @todo: 16bit
-		uint16_t timestamp_last_packet;
-		uint16_t timestamp_gc;
-		uint32_t nap0; ///< @todo: DELETE
-	};
+struct balancer_state_key_t
+{
+	uint8_t balancer_id;
+	uint8_t protocol;
+	uint16_t addr_type; // 4=ip4, 6=ip6.
+
+	ipv6_address_t ip_source;
+	ipv6_address_t ip_destination;
+
+	uint16_t port_source;
+	uint16_t port_destination;
+};
+
+static_assert(YANET_CONFIG_BALANCERS_SIZE <= 0x7F, "invalid size");
+
+struct balancer_state_value_t
+{
+	uint32_t real_unordered_id;
+	uint32_t timestamp_create; ///< @todo: 16bit
+	uint16_t timestamp_last_packet;
+	uint16_t timestamp_gc;
+	uint32_t nap0; ///< @todo: DELETE
+};
 }
 
 }

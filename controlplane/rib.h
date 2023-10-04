@@ -1,29 +1,29 @@
 #pragma once
 
-#include <atomic>
-#include <mutex>
-#include <map>
-#include <tuple>
 #include <array>
+#include <atomic>
 #include <functional>
+#include <map>
+#include <mutex>
 #include <set>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
-#include "common/idp.h"
-#include "common/idataplane.h"
 #include "common/icp.h"
+#include "common/idataplane.h"
+#include "common/idp.h"
 
+#include "isystem.h"
 #include "module.h"
 #include "type.h"
-#include "isystem.h"
 
 namespace rib
 {
 
 using nexthop_t = common::rib::nexthop_t;
 
-using vrf_priority_t  = common::rib::vrf_priority_t;
+using vrf_priority_t = common::rib::vrf_priority_t;
 
 using pptn_t = common::rib::pptn_t;
 
@@ -63,7 +63,6 @@ private:
 	void rib_thread();
 
 protected:
-
 	mutable std::mutex rib_update_mutex;
 
 	std::atomic<bool> need_flushing = false;
@@ -76,24 +75,24 @@ protected:
 	std::vector<rib::pptn_t> proto_peer_table_name;
 
 	std::unordered_map<rib::vrf_priority_t,
-					   std::unordered_map<ip_prefix_t,
-										  rib::nexthop_map_t
-										 >
-					  > prefixes_to_path_info_to_nh_ptr;
+	                   std::unordered_map<ip_prefix_t,
+	                                      rib::nexthop_map_t>>
+	        prefixes_to_path_info_to_nh_ptr;
 
 	std::unordered_map<rib::nexthop_stuff_t, uint32_t> nh_to_ref_count;
 
 	std::unordered_map<rib::vrf_priority_t,
-	         		   std::unordered_set<ip_prefix_t>> prefixes_reb;
+	                   std::unordered_set<ip_prefix_t>>
+	        prefixes_reb;
 
 	mutable std::mutex summary_mutex;
 	std::unordered_map<std::tuple<std::string, ///< vrf
-	                   			  uint32_t, ///< priority
-	                    		  std::string, ///< protocol
-	                    		  ip_address_t, ///< peer
-	                    		  std::string>, ///< table_name
-					   std::tuple<common::uint64,
-								  common::uint64,
-								  common::uint8>
- 					  > summary;
+	                              uint32_t, ///< priority
+	                              std::string, ///< protocol
+	                              ip_address_t, ///< peer
+	                              std::string>, ///< table_name
+	                   std::tuple<common::uint64,
+	                              common::uint64,
+	                              common::uint8>>
+	        summary;
 };

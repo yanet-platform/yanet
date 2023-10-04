@@ -40,7 +40,7 @@ struct result_t
 };
 
 iface_map_t ifaceMapping(std::map<std::string, controlplane::base::logical_port_t> logicalPorts,
-                  std::map<std::string, controlplane::route::config_t> routes);
+                         std::map<std::string, controlplane::route::config_t> routes);
 
 using unwind_result = std::vector<std::tuple<std::optional<std::string>,
                                              std::optional<std::string>,

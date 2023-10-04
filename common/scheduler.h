@@ -24,18 +24,18 @@ constexpr const char* to_string(const scheduler& scheduler)
 {
 	switch (scheduler)
 	{
-	case scheduler::rr:
-	{
-		return "rr";
-	}
-	case scheduler::wrr:
-	{
-		return "wrr";
-	}
-	case scheduler::wlc:
-	{
-		return "wlc";
-	}
+		case scheduler::rr:
+		{
+			return "rr";
+		}
+		case scheduler::wrr:
+		{
+			return "wrr";
+		}
+		case scheduler::wlc:
+		{
+			return "wlc";
+		}
 	}
 
 	return "unknown";

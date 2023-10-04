@@ -1,17 +1,17 @@
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/stat.h>
-#include <netinet/in.h>
 #include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include "common/stream.h"
 
-#include "common.h"
 #include "bus.h"
-#include "dataplane.h"
+#include "common.h"
 #include "controlplane.h"
+#include "dataplane.h"
 
 cBus::cBus(cDataPlane* dataPlane) :
         dataPlane(dataPlane),
@@ -34,7 +34,7 @@ eResult cBus::init()
 
 void cBus::run()
 {
-	thread = std::thread([this]{mainLoop();});
+	thread = std::thread([this] { mainLoop(); });
 }
 
 void cBus::stop()
@@ -131,7 +131,7 @@ void cBus::mainLoop()
 			continue;
 		}
 
-		std::thread([this, clientSocket]{clientThread(clientSocket);}).detach();
+		std::thread([this, clientSocket] { clientThread(clientSocket); }).detach();
 	}
 
 	serverSocket = -1;
@@ -148,11 +148,12 @@ void cBus::clientThread(int clientSocket)
 		uint64_t messageSize;
 		if (!recvAll(clientSocket, (char*)&messageSize, sizeof(messageSize)))
 		{
-			stats.errors[(uint32_t) common::idp::errorType::busRead]++;
+			stats.errors[(uint32_t)common::idp::errorType::busRead]++;
 			break;
 		}
 
-		auto startTime = std::chrono::system_clock::now();;
+		auto startTime = std::chrono::system_clock::now();
+		;
 
 		if (messageSize > BigMessage)
 		{
@@ -161,7 +162,7 @@ void cBus::clientThread(int clientSocket)
 		buffer.resize(messageSize);
 		if (!recvAll(clientSocket, (char*)buffer.data(), buffer.size()))
 		{
-			stats.errors[(uint32_t) common::idp::errorType::busRead]++;
+			stats.errors[(uint32_t)common::idp::errorType::busRead]++;
 			break;
 		}
 
@@ -178,7 +179,7 @@ void cBus::clientThread(int clientSocket)
 			stream.pop(request);
 			if (stream.isFailed())
 			{
-				stats.errors[(uint32_t) common::idp::errorType::busParse]++;
+				stats.errors[(uint32_t)common::idp::errorType::busParse]++;
 				break;
 			}
 		}
@@ -340,7 +341,7 @@ void cBus::clientThread(int clientSocket)
 		}
 		else
 		{
-			stats.errors[(uint32_t) common::idp::errorType::busParse]++;
+			stats.errors[(uint32_t)common::idp::errorType::busParse]++;
 			break;
 		}
 
@@ -356,14 +357,15 @@ void cBus::clientThread(int clientSocket)
 		if ((!sendAll(clientSocket, (const char*)&messageSize, sizeof(messageSize))) ||
 		    (!sendAll(clientSocket, (const char*)stream.getBuffer().data(), messageSize)))
 		{
-			stats.errors[(uint32_t) common::idp::errorType::busWrite]++;
+			stats.errors[(uint32_t)common::idp::errorType::busWrite]++;
 			break;
 		}
 
 		std::chrono::duration<double> duration = std::chrono::system_clock::now() - startTime;
 
 		YANET_LOG_DEBUG("request type %d processed - %.3f sec\n",
-		                (int)type, duration.count());
+		                (int)type,
+		                duration.count());
 	}
 
 	close(clientSocket);

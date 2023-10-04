@@ -1,16 +1,16 @@
 #pragma once
 
-#include "type.h"
-#include "module.h"
 #include "base.h"
 #include "counter.h"
+#include "module.h"
+#include "type.h"
 
-#include "common/refarray.h"
+#include "common/controlplaneconfig.h"
+#include "common/counters.h"
+#include "common/generation.h"
 #include "common/icp.h"
 #include "common/idataplane.h"
-#include "common/controlplaneconfig.h"
-#include "common/generation.h"
-#include "common/counters.h"
+#include "common/refarray.h"
 #include "libprotobuf/controlplane.pb.h"
 
 namespace balancer
@@ -100,10 +100,11 @@ public:
 	void compile(common::idp::updateGlobalBase::request& globalbase, const balancer::generation_config_t& generation_config);
 
 	void flush_reals(common::idp::updateGlobalBaseBalancer::request& balancer,
-			 const balancer::generation_config_t& generation_config);
+	                 const balancer::generation_config_t& generation_config);
 
 	void update_service(const balancer::generation_config_t& generation_config,
-			    balancer::generation_services_t& generation_services);
+	                    balancer::generation_services_t& generation_services);
+
 protected:
 	void counters_gc_thread();
 	void reconfigure_wlc_thread();
@@ -118,14 +119,16 @@ protected:
 	std::map<std::tuple<std::string, ///< module
 	                    balancer::service_key_t,
 	                    balancer::real_key_t>,
-			    std::optional<uint32_t>> reals_enabled;
+	         std::optional<uint32_t>>
+	        reals_enabled;
 
 	mutable std::mutex reals_unordered_mutex;
 	mutable std::mutex config_switch_mutex;
 	std::map<std::tuple<std::string, ///< module
 	                    balancer::service_key_t,
 	                    balancer::real_key_t>,
-	         uint32_t> reals_unordered;
+	         uint32_t>
+	        reals_unordered;
 	std::set<id_t> reals_unordered_ids_unused;
 
 	friend class telegraf_t;

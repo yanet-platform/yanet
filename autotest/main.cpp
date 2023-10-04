@@ -4,8 +4,8 @@
 
 #include "common/result.h"
 
-#include "common.h"
 #include "autotest.h"
+#include "common.h"
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_DEBUG;
 

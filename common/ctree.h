@@ -2,8 +2,8 @@
 
 #include <functional>
 
-#include "type.h"
 #include "stream.h"
+#include "type.h"
 
 namespace common
 {
@@ -325,10 +325,12 @@ public:
 
 	public:
 		std::map<next_counter_T,
-		         node_base_t*> next;
+		         node_base_t*>
+		        next;
 
 		mutable std::map<next_counter_T,
-		                 std::string> convert;
+		                 std::string>
+		        convert;
 	};
 
 	node_base_t* root_node;

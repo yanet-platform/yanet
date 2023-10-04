@@ -1,8 +1,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "../acl_tree.h"
 #include "../acl/network.h"
+#include "../acl_tree.h"
 
 namespace
 {

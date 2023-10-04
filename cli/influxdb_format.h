@@ -1,9 +1,9 @@
 #pragma once
 
+#include <iostream>
+#include <map>
 #include <optional>
 #include <vector>
-#include <map>
-#include <iostream>
 
 #include "converter.h"
 
@@ -22,9 +22,12 @@ static void replace_all(std::string& string,
 	}
 }
 
-template<typename value_T> std::string to_string(const char* key, const std::map<std::string, value_T>& map, const char* suffix, const converter::config_t& config);
-template<typename value_T> std::string to_string(const char* key, const std::optional<value_T>& value, const char* suffix, const converter::config_t& config);
-template<typename value_T> std::string to_string(const char* key, const value_T& value, const char* suffix, const converter::config_t& config);
+template<typename value_T>
+std::string to_string(const char* key, const std::map<std::string, value_T>& map, const char* suffix, const converter::config_t& config);
+template<typename value_T>
+std::string to_string(const char* key, const std::optional<value_T>& value, const char* suffix, const converter::config_t& config);
+template<typename value_T>
+std::string to_string(const char* key, const value_T& value, const char* suffix, const converter::config_t& config);
 
 template<typename value_T>
 std::string to_string(const char* key,

@@ -1,16 +1,16 @@
 #pragma once
 
-#include "type.h"
+#include "base.h"
+#include "counter.h"
 #include "module.h"
 #include "rib.h"
-#include "counter.h"
-#include "base.h"
+#include "type.h"
 
-#include "common/idataplane.h"
 #include "common/btree.h"
-#include "common/weight.h"
-#include "common/refarray.h"
 #include "common/generation.h"
+#include "common/idataplane.h"
+#include "common/refarray.h"
+#include "common/weight.h"
 
 namespace route
 {
@@ -34,22 +34,22 @@ using lookup_t = std::tuple<ip_address_t, ///< nexthop
                             std::vector<uint32_t>>; ///< labels
 
 using tunnel_destination_interface_t = std::set<
-                                           std::tuple<
-                                               ip_address_t, ///< nexthop
-                                               uint32_t, ///< label
-                                               uint32_t, ///< peer_id
-                                               uint32_t, ///< origin_as
-                                               uint32_t>>; ///< weight
+        std::tuple<
+                ip_address_t, ///< nexthop
+                uint32_t, ///< label
+                uint32_t, ///< peer_id
+                uint32_t, ///< origin_as
+                uint32_t>>; ///< weight
 
 using tunnel_destination_legacy_t = std::set<ip_address_t>; ///< nexthop
 
 using tunnel_destination_default_t = std::tuple<>;
 
 using tunnel_destination_t = std::variant<
-                                 tunnel_destination_interface_t,
-                                 tunnel_destination_legacy_t,
-                                 tunnel_destination_default_t,
-                                 uint32_t>; ///< virtual_port_id
+        tunnel_destination_interface_t,
+        tunnel_destination_legacy_t,
+        tunnel_destination_default_t,
+        uint32_t>; ///< virtual_port_id
 
 using tunnel_value_key_t = std::tuple<std::tuple<std::string, ///< vrf
                                                  uint32_t>, ///< priority
@@ -164,7 +164,8 @@ public:
 	std::map<std::tuple<std::string, ///< route_name
 	                    std::string, ///< interface_name
 	                    common::ip_address_t>, ///< neighbor
-	         common::mac_address_t> mac_addresses;
+	         common::mac_address_t>
+	        mac_addresses;
 };
 
 }
@@ -232,30 +233,35 @@ protected:
 	                             common::btree<ip_address_t,
 	                                           uint32_t>>, ///< value_id
 	                    common::btree<ip_address_t,
-	                                  std::tuple<>>>> prefixes;
+	                                  std::tuple<>>>>
+	        prefixes;
 
 	std::map<std::string, ///< vrf
 	         std::tuple<std::map<uint32_t, ///< priority
 	                             common::btree<ip_address_t,
 	                                           uint32_t>>, ///< value_id
 	                    common::btree<ip_address_t,
-	                                  std::tuple<>>>> tunnel_prefixes;
+	                                  std::tuple<>>>>
+	        tunnel_prefixes;
 
 	common::refarray_t<route::value_key_t, YANET_CONFIG_ROUTE_VALUES_SIZE> values;
 	common::refarray_t<route::tunnel_value_key_t, YANET_CONFIG_ROUTE_TUNNEL_VALUES_SIZE> tunnel_values;
 
 	std::map<uint32_t,
 	         std::map<tSocketId,
-	                  std::vector<route::lookup_t>>> value_lookup;
+	                  std::vector<route::lookup_t>>>
+	        value_lookup;
 
 	std::map<uint32_t,
 	         std::map<tSocketId,
-	                  std::vector<route::tunnel_lookup_t>>> tunnel_value_lookup;
+	                  std::vector<route::tunnel_lookup_t>>>
+	        tunnel_value_lookup;
 
 	common::weight_t<YANET_CONFIG_ROUTE_TUNNEL_WEIGHTS_SIZE> tunnel_weights;
 
 	std::map<ip_prefix_t,
-	         std::set<ip_address_t>> linux_routes;
+	         std::set<ip_address_t>>
+	        linux_routes;
 
 	std::set<ipv4_address_t> tunnel_defaults_v4; ///< @todo: VRF
 	std::set<ipv6_address_t> tunnel_defaults_v6; ///< @todo: VRF

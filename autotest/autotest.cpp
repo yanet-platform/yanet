@@ -28,7 +28,7 @@ namespace
 template<std::size_t N>
 constexpr std::size_t str_length(char const (&)[N])
 {
-    return N - 1;
+	return N - 1;
 }
 
 } // namespace
@@ -47,7 +47,7 @@ static const std::tuple<ip_address_t,
                         std::set<community_t>,
                         std::set<large_community_t>,
                         uint32_t>
-    attribute_default = {{}, "incomplete", 0, {}, {}, {}, 0};
+        attribute_default = {{}, "incomplete", 0, {}, {}, {}, 0};
 
 tAutotest::tAutotest() :
         dumpPackets(true), flagStop(false)
@@ -82,7 +82,7 @@ eResult tAutotest::init(const std::string& binaryPath,
 
 eResult tAutotest::initSockets()
 {
-    dataPlaneConfig = dataPlane.getConfig();
+	dataPlaneConfig = dataPlane.getConfig();
 
 	for (const auto& port : std::get<0>(dataPlaneConfig))
 	{
@@ -129,13 +129,15 @@ eResult tAutotest::initSharedMemory()
 		ipcKey = std::get<6>(shmInfo);
 
 		shmid = shmget(ipcKey, 0, 0);
-		if (shmid == -1) {
+		if (shmid == -1)
+		{
 			YANET_LOG_ERROR("shmget(%d, 0, 0) = %d\n", ipcKey, errno);
 			return eResult::errorInitSharedMemory;
 		}
 
 		shmaddr = shmat(shmid, NULL, 0);
-		if (shmaddr == (void*) -1) {
+		if (shmaddr == (void*)-1)
+		{
 			YANET_LOG_ERROR("shmat(%d, NULL, 0) = %d\n", shmid, errno);
 			return eResult::errorInitSharedMemory;
 		}
@@ -149,7 +151,8 @@ eResult tAutotest::initSharedMemory()
 	if (shm_by_key.size() > 0)
 	{
 		struct shmid_ds shm_info;
-		if (shmctl(shmid, IPC_STAT, &shm_info) == -1) {
+		if (shmctl(shmid, IPC_STAT, &shm_info) == -1)
+		{
 			YANET_LOG_ERROR("shmctl(%d, IPC_STAT, &shm_info) = %d\n", shmid, errno);
 			return eResult::errorInitSharedMemory;
 		}
@@ -473,7 +476,7 @@ public:
 	        has_packet(other.has_packet),
 	        packetsCount(other.packetsCount),
 	        pcap(other.pcap),
-		buffer(other.buffer)
+	        buffer(other.buffer)
 	{
 		memcpy(&header, &other.header, sizeof(struct pcap_pkthdr));
 		other.pcap = nullptr;
@@ -1202,9 +1205,9 @@ static common::icp::loadConfig::request prepareLoadConfig(std::string configFile
 {
 
 #ifdef __cpp_lib_filesystem
-    namespace fs = std::filesystem;
+	namespace fs = std::filesystem;
 #else
-    namespace fs = std::experimental::filesystem;
+	namespace fs = std::experimental::filesystem;
 #endif
 
 	common::icp::loadConfig::request request;
@@ -1242,7 +1245,7 @@ static common::icp::loadConfig::request prepareLoadConfig(std::string configFile
 void tAutotest::mainThread()
 {
 #ifdef __cpp_lib_filesystem
-    namespace fs = std::filesystem;
+	namespace fs = std::filesystem;
 #else
 	namespace fs = std::experimental::filesystem;
 #endif
@@ -1703,7 +1706,8 @@ bool tAutotest::step_diff_with_kept_counter_value(const YAML::Node& yamlStep)
 	if (counter_name != memorized_counter_name)
 	{
 		YANET_LOG_ERROR("  cannot make a diff for different counters (%s is memorized, %s is provided in this step)\n",
-						 memorized_counter_name.data(), counter_name.data());
+		                memorized_counter_name.data(),
+		                counter_name.data());
 		return false;
 	}
 
@@ -1720,7 +1724,8 @@ bool tAutotest::step_diff_with_kept_counter_value(const YAML::Node& yamlStep)
 	if (coreId != memorized_coreId)
 	{
 		YANET_LOG_ERROR("  cannot make a diff for counters of different coreIds (%u coreId is memorized, %u coreId is provided in this step)\n",
-						 memorized_coreId, coreId);
+		                memorized_coreId,
+		                coreId);
 		return false;
 	}
 
@@ -1878,7 +1883,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 			position++;
 
 			if (shm_packet && header.len == shm_packet->header.size &&
-				memcmp(shm_packet->memory, pcap_packet, header.len) == 0)
+			    memcmp(shm_packet->memory, pcap_packet, header.len) == 0)
 			{ /// packets are the same
 				continue;
 			}

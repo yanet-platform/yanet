@@ -1,16 +1,13 @@
 #include "fqdn.h"
 #include "controlplane.h"
 
-
 eResult fqdn_t::init()
 {
-	controlPlane->register_command(common::icp::requestType::resolve_ip_to_fqdn, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::resolve_ip_to_fqdn, [this](const common::icp::request& request) {
 		return resolve_ip_to_fqdn(std::get<common::icp::resolve_ip_to_fqdn::request>(std::get<1>(request)));
 	});
 
-	controlPlane->register_command(common::icp::requestType::resolve_fqdn_to_ip, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::resolve_fqdn_to_ip, [this](const common::icp::request& request) {
 		return resolve_fqdn_to_ip(std::get<common::icp::resolve_fqdn_to_ip::request>(std::get<1>(request)));
 	});
 

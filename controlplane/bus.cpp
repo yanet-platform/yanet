@@ -1,11 +1,11 @@
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/stat.h>
-#include <netinet/in.h>
 #include <fcntl.h>
 #include <memory.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
 
 #include <vector>
 
@@ -14,12 +14,11 @@
 #include "common/icp.h"
 #include "common/stream.h"
 
-#include "common.h"
 #include "bus.h"
+#include "common.h"
 #include "controlplane.h"
 
 using controlplane::module::bus;
-
 
 bus::bus() :
         serverSocket(-1)
@@ -44,7 +43,7 @@ eResult bus::init()
 		return eResult::errorSocket;
 	}
 
-	funcThreads.emplace_back([this](){serverThread();});
+	funcThreads.emplace_back([this]() { serverThread(); });
 
 	return eResult::success;
 }
@@ -93,7 +92,7 @@ void bus::serverThread()
 			continue;
 		}
 
-		std::thread([this, clientSocket]{clientThread(clientSocket);}).detach();
+		std::thread([this, clientSocket] { clientThread(clientSocket); }).detach();
 	}
 
 	serverSocket = -1;

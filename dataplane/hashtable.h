@@ -8,9 +8,9 @@
 #include <rte_mbuf.h>
 #include <rte_spinlock.h>
 
-#include "common/type.h"
-#include "common/result.h"
 #include "common/generation.h"
+#include "common/result.h"
+#include "common/type.h"
 
 #include "common.h"
 

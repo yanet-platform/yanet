@@ -1,20 +1,20 @@
 #include <fstream>
 #include <netdb.h>
 
-#include "common/stream.h"
 #include "common/idp.h"
+#include "common/stream.h"
 #include "common/version.h"
 
-#include "common.h"
-#include "controlplane.h"
-#include "telegraf.h"
-#include "rib.h"
-#include "bus.h"
-#include "protobus.h"
-#include "configparser.h"
-#include "configconverter.h"
-#include "errors.h"
 #include "acl.h"
+#include "bus.h"
+#include "common.h"
+#include "configconverter.h"
+#include "configparser.h"
+#include "controlplane.h"
+#include "errors.h"
+#include "protobus.h"
+#include "rib.h"
+#include "telegraf.h"
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_INFO;
 
@@ -65,103 +65,83 @@ eResult cControlPlane::init(const std::string& jsonFilePath)
 		}
 	}
 
-	register_command(common::icp::requestType::getPhysicalPorts, [this]()
-	{
+	register_command(common::icp::requestType::getPhysicalPorts, [this]() {
 		return getPhysicalPorts();
 	});
 
-	register_command(common::icp::requestType::getLogicalPorts, [this]()
-	{
+	register_command(common::icp::requestType::getLogicalPorts, [this]() {
 		return getLogicalPorts();
 	});
 
-	register_command(common::icp::requestType::getDecaps, [this]()
-	{
+	register_command(common::icp::requestType::getDecaps, [this]() {
 		return getDecaps();
 	});
 
-	register_command(common::icp::requestType::getNat64statelesses, [this]()
-	{
+	register_command(common::icp::requestType::getNat64statelesses, [this]() {
 		return getNat64statelesses();
 	});
 
-	register_command(common::icp::requestType::getDefenders, [this]()
-	{
+	register_command(common::icp::requestType::getDefenders, [this]() {
 		return getDefenders();
 	});
 
-	register_command(common::icp::requestType::limit_summary, [this]()
-	{
+	register_command(common::icp::requestType::limit_summary, [this]() {
 		return limit_summary();
 	});
 
-	register_command(common::icp::requestType::controlplane_values, [this]()
-	{
+	register_command(common::icp::requestType::controlplane_values, [this]() {
 		return controlplane_values();
 	});
 
-	register_command(common::icp::requestType::getPortStatsEx, [this]()
-	{
+	register_command(common::icp::requestType::getPortStatsEx, [this]() {
 		return getPortStatsEx();
 	});
 
-	register_command(common::icp::requestType::getDecapPrefixes, [this]()
-	{
+	register_command(common::icp::requestType::getDecapPrefixes, [this]() {
 		return command_getDecapPrefixes();
 	});
 
-	register_command(common::icp::requestType::getNat64statelessTranslations, [this]()
-	{
+	register_command(common::icp::requestType::getNat64statelessTranslations, [this]() {
 		return command_getNat64statelessTranslations();
 	});
 
-	register_command(common::icp::requestType::getNat64statelessPrefixes, [this]()
-	{
+	register_command(common::icp::requestType::getNat64statelessPrefixes, [this]() {
 		return command_getNat64statelessPrefixes();
 	});
 
-	register_command(common::icp::requestType::getFwLabels, [this]()
-	{
+	register_command(common::icp::requestType::getFwLabels, [this]() {
 		return command_getFwLabels();
 	});
 
-	register_command(common::icp::requestType::getFwList, [this](const common::icp::request& request)
-	{
+	register_command(common::icp::requestType::getFwList, [this](const common::icp::request& request) {
 		return command_getFwList(std::get<common::icp::getFwList::request>(std::get<1>(request)));
 	});
 
-	register_command(common::icp::requestType::loadConfig, [this](const common::icp::request& request)
-	{
+	register_command(common::icp::requestType::loadConfig, [this](const common::icp::request& request) {
 		return command_loadConfig(std::get<common::icp::loadConfig::request>(std::get<1>(request)));
 	});
 
-	register_command(common::icp::requestType::acl_unwind, [this](const common::icp::request& request)
-	{
+	register_command(common::icp::requestType::acl_unwind, [this](const common::icp::request& request) {
 		return acl_unwind(std::get<common::icp::acl_unwind::request>(std::get<1>(request)));
 	});
 
-	register_command(common::icp::requestType::acl_lookup, [this](const common::icp::request& request)
-	{
+	register_command(common::icp::requestType::acl_lookup, [this](const common::icp::request& request) {
 		return acl_lookup(std::get<common::icp::acl_lookup::request>(std::get<1>(request)));
 	});
 
-	register_command(common::icp::requestType::clearFWState, [this]()
-	{
+	register_command(common::icp::requestType::clearFWState, [this]() {
 		return command_clearFWState();
 	});
 
-	register_command(common::icp::requestType::getSamples, [this]()
-	{
+	register_command(common::icp::requestType::getSamples, [this]() {
 		return command_getSamples();
 	});
 
-	register_command(common::icp::requestType::getAclConfig, [this](const common::icp::request& request)
-	{
+	register_command(common::icp::requestType::getAclConfig, [this](const common::icp::request& request) {
 		return command_getAclConfig(std::get<common::icp::getAclConfig::request>(std::get<1>(request)));
 	});
 
-	register_command(common::icp::requestType::version, [this]()
-	{
+	register_command(common::icp::requestType::version, [this]() {
 		return command_version();
 	});
 
@@ -211,11 +191,11 @@ void cControlPlane::start()
 		module->moduleStart();
 	}
 
-	threads.emplace_back([this]{main_thread();});
+	threads.emplace_back([this] { main_thread(); });
 
 #ifdef CONFIG_YADECAP_AUTOTEST
 #else // CONFIG_YADECAP_AUTOTEST
-	threads.emplace_back([this]{mac_address_resolve_thread();});
+	threads.emplace_back([this] { mac_address_resolve_thread(); });
 #endif // CONFIG_YADECAP_AUTOTEST
 }
 
@@ -468,17 +448,7 @@ common::icp::acl_unwind::response cControlPlane::acl_unwind(const common::icp::a
 		acls.swap(acls_next);
 	}
 
-	return acl::unwind(acls, iface_map,
-	                   module,
-	                   direction,
-	                   network_source,
-	                   network_destination,
-	                   fragment,
-	                   protocol,
-	                   transport_source,
-	                   transport_destination,
-	                   transport_flags,
-	                   keepstate);
+	return acl::unwind(acls, iface_map, module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, keepstate);
 }
 
 common::icp::acl_lookup::response cControlPlane::acl_lookup(const common::icp::acl_lookup::request& request) const
@@ -508,7 +478,8 @@ common::icp::acl_lookup::response cControlPlane::acl_lookup(const common::icp::a
 	(void)dataplane_workers;
 
 	auto ids = acl::lookup(dataplane_values[(unsigned int)common::idp::getConfig::value_type::acl_transport_layers_size],
-	                       acls, iface_map,
+	                       acls,
+	                       iface_map,
 	                       module,
 	                       direction,
 	                       network_source,
@@ -680,8 +651,7 @@ common::icp::getFwList::response cControlPlane::command_getFwList(const common::
 			auto& response_rules = response[ruleno];
 			for (const auto& [id, gen_text, orig_text] : rules)
 			{
-				response_rules.emplace_back(id, counters_map[id],
-					need_orig ? orig_text : gen_text);
+				response_rules.emplace_back(id, counters_map[id], need_orig ? orig_text : gen_text);
 			}
 		}
 	}
@@ -708,11 +678,11 @@ common::icp::getFwList::response cControlPlane::command_getFwList(const common::
 
 		// Cache some commonly used protocols to avoid looking into /etc/protocols.
 		static std::map<std::uint8_t, std::string> protocols{
-		    {IPPROTO_TCP, "tcp"},
-		    {IPPROTO_UDP, "udp"},
-		    {IPPROTO_ESP, "esp"},
-		    {IPPROTO_ICMP, "icmp"},
-		    {IPPROTO_ICMPV6, "ipv6-icmp"},
+		        {IPPROTO_TCP, "tcp"},
+		        {IPPROTO_UDP, "udp"},
+		        {IPPROTO_ESP, "esp"},
+		        {IPPROTO_ICMP, "icmp"},
+		        {IPPROTO_ICMPV6, "ipv6-icmp"},
 		};
 
 		for (const auto& [key, value] : dataPlane.getFWState())
@@ -743,9 +713,8 @@ common::icp::getFwList::response cControlPlane::command_getFwList(const common::
 				text << "own, ";
 			}
 			text << "last seen: " << last_seen << "s ago flags "
-				<< common::fwstate::flags_to_string(flags) << ":" << common::fwstate::flags_to_string(flags >> 4) << "]"
-				<< "[packets: " << counter_forward << "/" << counter_backward << "]";
-
+			     << common::fwstate::flags_to_string(flags) << ":" << common::fwstate::flags_to_string(flags >> 4) << "]"
+			     << "[packets: " << counter_forward << "/" << counter_backward << "]";
 
 			// XXX: provide correct ruleno from parent rule
 			response[acl::FW_STATES_START_ID].emplace_back(id++, counter_backward + counter_forward, text.str());
@@ -771,7 +740,7 @@ common::icp::getSamples::response cControlPlane::command_getSamples()
 	response.reserve(samples.size());
 
 	std::string unknownIface("unknown");
-	for (auto& sample: samples)
+	for (auto& sample : samples)
 	{
 		auto& [proto, in_logicalport_id, out_logicalport_id, src_port, dst_port, src_addr, dst_addr] = sample;
 
@@ -817,7 +786,7 @@ common::icp::loadConfig::response cControlPlane::command_loadConfig(const common
 			if (jsons[iter.first].is_discarded())
 			{
 				YANET_LOG_ERROR("invalid json format\n");
-				result =  eResult::invalidConfigurationFile;
+				result = eResult::invalidConfigurationFile;
 				break;
 			}
 		}
@@ -833,8 +802,8 @@ common::icp::loadConfig::response cControlPlane::command_loadConfig(const common
 			else
 			{
 				result = loadConfig(std::get<0>(request),
-								  rootJson,
-								  jsons);
+				                    rootJson,
+				                    jsons);
 			}
 		}
 	}

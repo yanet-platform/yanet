@@ -1,9 +1,9 @@
 #pragma once
 
+#include "acl/bitset.h"
+#include "acl/network.h"
 #include "acl_base.h"
 #include "acl_tree.h"
-#include "acl/network.h"
-#include "acl/bitset.h"
 
 namespace acl::compiler
 {

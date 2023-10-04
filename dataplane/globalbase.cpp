@@ -234,14 +234,14 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 			YADECAP_LOG_ERROR("invalid request type\n");
 			return eResult::invalidType;
 		}
-		YADECAP_LOG_DEBUG("done update of type %d %i\n", (int)type, result != eResult::success ? 0: 1);
+		YADECAP_LOG_DEBUG("done update of type %d %i\n", (int)type, result != eResult::success ? 0 : 1);
 
 		if (result != eResult::success)
 		{
 			return result;
 		}
 	}
-	YADECAP_LOG_DEBUG("done update %i\n", result != eResult::success ? 0: 1);
+	YADECAP_LOG_DEBUG("done update %i\n", result != eResult::success ? 0 : 1);
 
 	return result;
 }
@@ -444,7 +444,7 @@ static bool checkFlow(const common::globalBase::tFlow& flow)
 		}
 	}
 	else if (flow.type == common::globalBase::eFlowType::tun64_ipv4_checked ||
-		 flow.type == common::globalBase::eFlowType::tun64_ipv6_checked)
+	         flow.type == common::globalBase::eFlowType::tun64_ipv6_checked)
 	{
 		if (flow.data.tun64Id >= CONFIG_YADECAP_TUN64_SIZE)
 		{
@@ -1198,8 +1198,8 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		if (real_start + real_size > YANET_CONFIG_BALANCER_REALS_SIZE)
 		{
 			YADECAP_LOG_WARNING("invalid real. real_start: '%u', real_size: '%u'\n",
-				            real_start,
-					    real_size);
+			                    real_start,
+			                    real_size);
 			return eResult::invalidCount;
 		}
 
@@ -1219,7 +1219,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 	if (reals.size() > YANET_CONFIG_BALANCER_REALS_SIZE)
 	{
 		YADECAP_LOG_WARNING("invalid real. real_sise: '%lu'\n",
-			            reals.size());
+		                    reals.size());
 		return eResult::invalidCount;
 	}
 
@@ -1242,8 +1242,9 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		auto addr = ipv6_address_t::convert(destination);
 		if (real_unordered.counter_id != counter_id || real_unordered.destination != addr)
 		{
-			for (tCounterId i = 0; i < (tCounterId)balancer::real_counter::size; ++i){
-				uint64_t sum_worker = 0, sum_gc =0;
+			for (tCounterId i = 0; i < (tCounterId)balancer::real_counter::size; ++i)
+			{
+				uint64_t sum_worker = 0, sum_gc = 0;
 				for (const auto& [core_id, worker] : dataPlane->workers)
 				{
 					(void)core_id;
@@ -1254,7 +1255,8 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 					(void)core_id;
 					sum_gc += worker_gc->counters[counter_id + i];
 				}
-				for (const auto& item : dataPlane->globalBaseAtomics){
+				for (const auto& item : dataPlane->globalBaseAtomics)
+				{
 					item.second->counter_shifts[counter_id + i] = sum_worker;
 					item.second->gc_counter_shifts[counter_id + i] = sum_gc;
 				}
@@ -1273,7 +1275,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 	if (binding.size() >= YANET_CONFIG_BALANCER_REALS_SIZE)
 	{
 		YADECAP_LOG_WARNING("invalid real binding. real_sise: '%lu'\n",
-			            reals.size());
+		                    reals.size());
 		return eResult::invalidCount;
 	}
 
@@ -1356,11 +1358,11 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 
 void generation::evaluate_service_ring(uint32_t balancer_service_ring_id)
 {
-	balancer_service_ring_t *ring = balancer_service_rings + balancer_service_ring_id;
+	balancer_service_ring_t* ring = balancer_service_rings + balancer_service_ring_id;
 	uint32_t weight_pos = 0;
 	for (uint32_t service_idx = 0; service_idx < balancer_services_count; ++service_idx)
 	{
-		balancer_service_t *service = balancer_services + balancer_active_services[service_idx];
+		balancer_service_t* service = balancer_services + balancer_active_services[service_idx];
 		uint64_t connection_sum = 0;
 		uint32_t weight_sum = 0;
 		if (service->scheduler == ::balancer::scheduler::wlc)
@@ -1382,14 +1384,15 @@ void generation::evaluate_service_ring(uint32_t balancer_service_ring_id)
 				connection_sum += count_real_connections(real.counter_id);
 			}
 		}
-		balancer_service_range_t *range = ring->ranges + balancer_active_services[service_idx];
+		balancer_service_range_t* range = ring->ranges + balancer_active_services[service_idx];
 		range->start = weight_pos;
 		for (uint32_t real_idx = service->real_start;
-		     real_idx < service->real_start + service->real_size; ++real_idx)
+		     real_idx < service->real_start + service->real_size;
+		     ++real_idx)
 		{
 			uint32_t real_id = balancer_service_reals[real_idx];
 			const balancer_real_t& real = balancer_reals[real_id];
-			balancer_real_state_t *state = balancer_real_states + real_id;
+			balancer_real_state_t* state = balancer_real_states + real_id;
 			if (state->weight == 0)
 			{
 				continue;
@@ -1735,7 +1738,7 @@ eResult generation::route_tunnel_value_update(const common::idp::updateGlobalBas
 	return result;
 }
 
-eResult generation::update_early_decap_flags(const common::idp::updateGlobalBase::update_early_decap_flags::request &request)
+eResult generation::update_early_decap_flags(const common::idp::updateGlobalBase::update_early_decap_flags::request& request)
 {
 	eResult result = eResult::success;
 

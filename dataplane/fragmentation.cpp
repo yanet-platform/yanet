@@ -1,5 +1,5 @@
-#include "common.h"
 #include "fragmentation.h"
+#include "common.h"
 #include "controlplane.h"
 #include "dataplane.h"
 
@@ -306,4 +306,3 @@ bool fragmentation_t::isIntersect(const fragmentation::value_t& value,
 
 	return false;
 }
-

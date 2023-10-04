@@ -4,10 +4,10 @@
 
 #include <sys/un.h>
 
-#include "result.h"
-#include "idp.h"
-#include "sendrecv.h"
 #include "define.h"
+#include "idp.h"
+#include "result.h"
+#include "sendrecv.h"
 
 namespace interface
 {
@@ -15,7 +15,7 @@ namespace interface
 class dataPlane
 {
 public:
-	dataPlane():
+	dataPlane() :
 	        clientSocket(-1)
 	{
 	}

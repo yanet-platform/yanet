@@ -1,11 +1,11 @@
 #pragma once
 
+#include <list>
 #include <mutex>
 #include <queue>
-#include <list>
 
-#include "common.h"
 #include "base.h"
+#include "common.h"
 #include "globalbase.h"
 #include "samples.h"
 

@@ -1,26 +1,26 @@
-#include <unistd.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/stat.h>
 #include <arpa/inet.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
 
+#include <fstream>
 #include <iostream>
 #include <thread>
-#include <fstream>
 
 #include <rte_eal.h>
+#include <rte_eth_ring.h>
 #include <rte_launch.h>
 #include <rte_lcore.h>
 #include <rte_malloc.h>
 #include <rte_ring.h>
-#include <rte_eth_ring.h>
 
-#include <sys/ipc.h>
-#include <sys/shm.h>
 #include <numa.h>
 #include <numaif.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -188,10 +188,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		return eResult::invalidPortsCount;
 	}
 
-	mempool_log = rte_mempool_create("log", YANET_CONFIG_SAMPLES_SIZE,
-					sizeof(samples::sample_t), 0, 0,
-					NULL, NULL, NULL, NULL,
-					SOCKET_ID_ANY, MEMPOOL_F_NO_IOVA_CONTIG);
+	mempool_log = rte_mempool_create("log", YANET_CONFIG_SAMPLES_SIZE, sizeof(samples::sample_t), 0, 0, NULL, NULL, NULL, NULL, SOCKET_ID_ANY, MEMPOOL_F_NO_IOVA_CONTIG);
 
 	result = initGlobalBases();
 	if (result != eResult::success)
@@ -317,10 +314,10 @@ eResult cDataPlane::initPorts()
 		}
 
 		YADECAP_LOG_INFO("portId: %u, socketId: %u, interfaceName: %s, pci: %s\n",
-		                  portId,
-		                  rte_eth_dev_socket_id(portId),
-		                  interfaceName.data(),
-		                  pci.data());
+		                 portId,
+		                 rte_eth_dev_socket_id(portId),
+		                 interfaceName.data(),
+		                 pci.data());
 
 		std::get<0>(ports[portId]) = interfaceName;
 		std::get<3>(ports[portId]) = pci;
@@ -355,7 +352,8 @@ eResult cDataPlane::initPorts()
 			else
 			{
 				YADECAP_LOG_WARNING("config.rssFlags 0x%lx not supported, fallback to 0x%lx\n",
-									config.rssFlags, (uint64_t)RTE_ETH_RSS_IP);
+				                    config.rssFlags,
+				                    (uint64_t)RTE_ETH_RSS_IP);
 				portConf.rx_adv_conf.rss_conf.rss_hf = RTE_ETH_RSS_IP;
 			}
 		}
@@ -425,7 +423,6 @@ eResult cDataPlane::initPorts()
 			YADECAP_LOG_ERROR("invalid portId: '%u'\n", port_id);
 			return eResult::invalidPortId;
 		}
-
 	}
 
 	return eResult::success;
@@ -435,41 +432,37 @@ eResult cDataPlane::initGlobalBases()
 {
 	eResult result = eResult::success;
 
-	auto create_globalbase_atomics = [this](const tSocketId& socket_id) -> eResult
-	{
+	auto create_globalbase_atomics = [this](const tSocketId& socket_id) -> eResult {
 		if (globalBaseAtomics.find(socket_id) == globalBaseAtomics.end())
 		{
 			auto* globalbase_atomic = hugepage_create_static<dataplane::globalBase::atomic>(socket_id,
-			                                                                                this, socket_id);
+			                                                                                this,
+			                                                                                socket_id);
 			if (!globalbase_atomic)
 			{
 				return eResult::errorAllocatingMemory;
 			}
 
 			{
-				auto* ipv4_states_ht = hugepage_create_dynamic<dataplane::globalBase::acl::ipv4_states_ht>(socket_id, getConfigValue(eConfigType::acl_states4_ht_size),
-				                                                                                           globalbase_atomic->updater.fw4_state);
+				auto* ipv4_states_ht = hugepage_create_dynamic<dataplane::globalBase::acl::ipv4_states_ht>(socket_id, getConfigValue(eConfigType::acl_states4_ht_size), globalbase_atomic->updater.fw4_state);
 				if (!ipv4_states_ht)
 				{
 					return eResult::errorAllocatingMemory;
 				}
 
-				auto* ipv6_states_ht = hugepage_create_dynamic<dataplane::globalBase::acl::ipv6_states_ht>(socket_id, getConfigValue(eConfigType::acl_states6_ht_size),
-				                                                                                           globalbase_atomic->updater.fw6_state);
+				auto* ipv6_states_ht = hugepage_create_dynamic<dataplane::globalBase::acl::ipv6_states_ht>(socket_id, getConfigValue(eConfigType::acl_states6_ht_size), globalbase_atomic->updater.fw6_state);
 				if (!ipv6_states_ht)
 				{
 					return eResult::errorAllocatingMemory;
 				}
 
-				auto* nat64stateful_lan_state = hugepage_create_dynamic<dataplane::globalBase::nat64stateful::lan_ht>(socket_id, getConfigValue(eConfigType::nat64stateful_states_size),
-				                                                                                                      globalbase_atomic->updater.nat64stateful_lan_state);
+				auto* nat64stateful_lan_state = hugepage_create_dynamic<dataplane::globalBase::nat64stateful::lan_ht>(socket_id, getConfigValue(eConfigType::nat64stateful_states_size), globalbase_atomic->updater.nat64stateful_lan_state);
 				if (!nat64stateful_lan_state)
 				{
 					return eResult::errorAllocatingMemory;
 				}
 
-				auto* nat64stateful_wan_state = hugepage_create_dynamic<dataplane::globalBase::nat64stateful::wan_ht>(socket_id, getConfigValue(eConfigType::nat64stateful_states_size),
-				                                                                                                      globalbase_atomic->updater.nat64stateful_wan_state);
+				auto* nat64stateful_wan_state = hugepage_create_dynamic<dataplane::globalBase::nat64stateful::wan_ht>(socket_id, getConfigValue(eConfigType::nat64stateful_states_size), globalbase_atomic->updater.nat64stateful_wan_state);
 				if (!nat64stateful_wan_state)
 				{
 					return eResult::errorAllocatingMemory;
@@ -487,53 +480,47 @@ eResult cDataPlane::initGlobalBases()
 		return eResult::success;
 	};
 
-	auto create_globalbase = [this](const tSocketId& socket_id) -> dataplane::globalBase::generation*
-	{
+	auto create_globalbase = [this](const tSocketId& socket_id) -> dataplane::globalBase::generation* {
 		auto* globalbase = hugepage_create_static<dataplane::globalBase::generation>(socket_id,
-		                                                                             this, socket_id);
+		                                                                             this,
+		                                                                             socket_id);
 		if (!globalbase)
 		{
 			return nullptr;
 		}
 
 		{
-			auto* acl_network_ipv4_source = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv4_source>(socket_id, getConfigValue(eConfigType::acl_network_lpm4_chunks_size),
-			                                                                                                         globalbase->updater.acl.network_ipv4_source);
+			auto* acl_network_ipv4_source = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv4_source>(socket_id, getConfigValue(eConfigType::acl_network_lpm4_chunks_size), globalbase->updater.acl.network_ipv4_source);
 			if (!acl_network_ipv4_source)
 			{
 				return nullptr;
 			}
 
-			auto* acl_network_ipv4_destination = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv4_destination>(socket_id, getConfigValue(eConfigType::acl_network_lpm4_chunks_size),
-			                                                                                                                   globalbase->updater.acl.network_ipv4_destination);
+			auto* acl_network_ipv4_destination = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv4_destination>(socket_id, getConfigValue(eConfigType::acl_network_lpm4_chunks_size), globalbase->updater.acl.network_ipv4_destination);
 			if (!acl_network_ipv4_destination)
 			{
 				return nullptr;
 			}
 
-			auto* acl_network_ipv6_source = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_source>(socket_id, getConfigValue(eConfigType::acl_network_source_lpm6_chunks_size),
-			                                                                                                         globalbase->updater.acl.network_ipv6_source);
+			auto* acl_network_ipv6_source = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_source>(socket_id, getConfigValue(eConfigType::acl_network_source_lpm6_chunks_size), globalbase->updater.acl.network_ipv6_source);
 			if (!acl_network_ipv6_source)
 			{
 				return nullptr;
 			}
 
-			auto* acl_network_ipv6_destination_ht = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_destination_ht>(socket_id, getConfigValue(eConfigType::acl_network_destination_ht_size),
-			                                                                                                                         globalbase->updater.acl.network_ipv6_destination_ht);
+			auto* acl_network_ipv6_destination_ht = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_destination_ht>(socket_id, getConfigValue(eConfigType::acl_network_destination_ht_size), globalbase->updater.acl.network_ipv6_destination_ht);
 			if (!acl_network_ipv6_destination_ht)
 			{
 				return nullptr;
 			}
 
-			auto* acl_network_ipv6_destination = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_destination>(socket_id, getConfigValue(eConfigType::acl_network_destination_lpm6_chunks_size),
-			                                                                                                                   globalbase->updater.acl.network_ipv6_destination);
+			auto* acl_network_ipv6_destination = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_destination>(socket_id, getConfigValue(eConfigType::acl_network_destination_lpm6_chunks_size), globalbase->updater.acl.network_ipv6_destination);
 			if (!acl_network_ipv6_destination)
 			{
 				return nullptr;
 			}
 
-			auto* acl_network_table = hugepage_create_dynamic<dataplane::globalBase::acl::network_table>(socket_id, getConfigValue(eConfigType::acl_network_table_size),
-			                                                                                             globalbase->updater.acl.network_table);
+			auto* acl_network_table = hugepage_create_dynamic<dataplane::globalBase::acl::network_table>(socket_id, getConfigValue(eConfigType::acl_network_table_size), globalbase->updater.acl.network_table);
 			if (!acl_network_table)
 			{
 				return nullptr;
@@ -559,15 +546,13 @@ eResult cDataPlane::initGlobalBases()
 				return nullptr;
 			}
 
-			auto* acl_transport_table = hugepage_create_dynamic<dataplane::globalBase::acl::transport_table>(socket_id, getConfigValue(eConfigType::acl_transport_ht_size),
-			                                                                                                 globalbase->updater.acl.transport_table);
+			auto* acl_transport_table = hugepage_create_dynamic<dataplane::globalBase::acl::transport_table>(socket_id, getConfigValue(eConfigType::acl_transport_ht_size), globalbase->updater.acl.transport_table);
 			if (!acl_transport_table)
 			{
 				return nullptr;
 			}
 
-			auto* acl_total_table = hugepage_create_dynamic<dataplane::globalBase::acl::total_table>(socket_id, getConfigValue(eConfigType::acl_total_ht_size),
-			                                                                                         globalbase->updater.acl.total_table);
+			auto* acl_total_table = hugepage_create_dynamic<dataplane::globalBase::acl::total_table>(socket_id, getConfigValue(eConfigType::acl_total_ht_size), globalbase->updater.acl.total_table);
 			if (!acl_total_table)
 			{
 				return nullptr;
@@ -602,8 +587,7 @@ eResult cDataPlane::initGlobalBases()
 		return globalbase;
 	};
 
-	auto create_globalbases = [&](const tSocketId& socket_id) -> eResult
-	{
+	auto create_globalbases = [&](const tSocketId& socket_id) -> eResult {
 		if (globalBases.find(socket_id) == globalBases.end())
 		{
 			auto* globalbase = create_globalbase(socket_id);
@@ -642,7 +626,7 @@ eResult cDataPlane::initGlobalBases()
 		}
 	}
 
-	for (const auto& configWorkerIter: config.workers)
+	for (const auto& configWorkerIter : config.workers)
 	{
 		const tCoreId& coreId = configWorkerIter.first;
 		tSocketId socketId = rte_lcore_to_socket_id(coreId);
@@ -706,7 +690,7 @@ eResult cDataPlane::initWorkers()
 		outQueueId++;
 	}
 
-	for (const auto& configWorkerIter: config.workers)
+	for (const auto& configWorkerIter : config.workers)
 	{
 		const tCoreId& coreId = configWorkerIter.first;
 		const tSocketId socket_id = rte_lcore_to_socket_id(coreId);
@@ -800,7 +784,7 @@ eResult cDataPlane::initWorkers()
 	}
 
 	/// worker_gc
-	for (const auto& core_id: config.workerGCs)
+	for (const auto& core_id : config.workerGCs)
 	{
 		const tSocketId socket_id = rte_lcore_to_socket_id(core_id);
 
@@ -879,14 +863,14 @@ eResult cDataPlane::initWorkers()
 	return eResult::success;
 }
 
-std::optional<uint64_t> cDataPlane::getCounterValueByName(const std::string &counter_name, uint32_t coreId)
+std::optional<uint64_t> cDataPlane::getCounterValueByName(const std::string& counter_name, uint32_t coreId)
 {
 	if (coreId_to_stats_tables.count(coreId) == 0)
 	{
 		return std::optional<uint64_t>();
 	}
 
-	const auto &specific_core_table = coreId_to_stats_tables[coreId];
+	const auto& specific_core_table = coreId_to_stats_tables[coreId];
 
 	if (specific_core_table.count(counter_name) == 0)
 	{
@@ -1020,12 +1004,12 @@ eResult cDataPlane::allocateSharedMemory()
 
 		if (number_of_workers_per_socket.find(socket_id) == number_of_workers_per_socket.end())
 		{
-            number_of_workers_per_socket[socket_id] = 1;
-        }
+			number_of_workers_per_socket[socket_id] = 1;
+		}
 		else
 		{
-            number_of_workers_per_socket[socket_id]++;
-        }
+			number_of_workers_per_socket[socket_id]++;
+		}
 	}
 
 	std::map<tSocketId, uint64_t> shm_size_per_socket;
@@ -1071,13 +1055,15 @@ eResult cDataPlane::allocateSharedMemory()
 		}
 
 		int shmid = shmget(key, size, flags);
-		if (shmid == -1) {
+		if (shmid == -1)
+		{
 			YADECAP_LOG_ERROR("shmget(%d, %lu, %d) = %d\n", key, size, flags, errno);
 			return eResult::errorInitSharedMemory;
 		}
 
 		void* shmaddr = shmat(shmid, NULL, 0);
-		if (shmaddr == (void*) -1) {
+		if (shmaddr == (void*)-1)
+		{
 			YADECAP_LOG_ERROR("shmat(%d, NULL, %d) = %d\n", shmid, 0, errno);
 			return eResult::errorInitSharedMemory;
 		}
@@ -1158,7 +1144,6 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 
 	return eResult::success;
 }
-
 
 common::idp::get_shm_info::response cDataPlane::getShmInfo()
 {
@@ -1355,7 +1340,7 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 	auto it = rootJson.find("ealArgs");
 	if (it != rootJson.end())
 	{
-		for (auto& arg: *it)
+		for (auto& arg : *it)
 		{
 			config.ealArgs.emplace_back(arg);
 		}
@@ -1550,7 +1535,7 @@ eResult cDataPlane::parseRateLimits(const nlohmann::json& json)
 	{
 		config.SWNormalPriorityRateLimitPerWorker = json.find("InNormalPriorityRing").value();
 		config.SWNormalPriorityRateLimitPerWorker /= config.workers.size();
-	    config.SWNormalPriorityRateLimitPerWorker /= config.rateLimitDivisor;
+		config.SWNormalPriorityRateLimitPerWorker /= config.rateLimitDivisor;
 	}
 
 	config.SWICMPOutRateLimit = json.value("OutICMP", 0);
@@ -1643,11 +1628,13 @@ eResult cDataPlane::checkConfig()
 eResult cDataPlane::initEal(const std::string& binaryPath,
                             const std::string& filePrefix)
 {
-#define insert_eal_arg(args ...) do { \
-eal_argv[eal_argc++] = &buffer[bufferPosition]; \
-bufferPosition += snprintf(&buffer[bufferPosition], sizeof(buffer) - bufferPosition, ## args); \
-bufferPosition++; \
-} while (0)
+#define insert_eal_arg(args...)                                                                               \
+	do                                                                                                    \
+	{                                                                                                     \
+		eal_argv[eal_argc++] = &buffer[bufferPosition];                                               \
+		bufferPosition += snprintf(&buffer[bufferPosition], sizeof(buffer) - bufferPosition, ##args); \
+		bufferPosition++;                                                                             \
+	} while (0)
 
 	unsigned int bufferPosition = 0;
 	char buffer[8192];
@@ -1657,7 +1644,7 @@ bufferPosition++; \
 
 	insert_eal_arg("%s", binaryPath.data());
 
-	for(auto& arg: config.ealArgs)
+	for (auto& arg : config.ealArgs)
 	{
 		insert_eal_arg("%s", arg.c_str());
 	}

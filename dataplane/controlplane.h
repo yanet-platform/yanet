@@ -2,27 +2,27 @@
 
 #include <arpa/inet.h>
 
-#include <vector>
+#include <array>
+#include <functional>
 #include <map>
 #include <mutex>
-#include <functional>
 #include <queue>
-#include <array>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include <rte_ether.h>
 
-#include "common/result.h"
-#include "common/idp.h"
-#include "common/type.h"
 #include "common/btree.h"
 #include "common/ctree.h"
+#include "common/idp.h"
+#include "common/result.h"
+#include "common/type.h"
 
-#include "type.h"
+#include "dregress.h"
 #include "fragmentation.h"
 #include "hashtable.h"
-#include "dregress.h"
+#include "type.h"
 
 class cControlPlane ///< @todo: move to cDataPlane
 {
@@ -124,8 +124,8 @@ protected:
 		uint64_t odropped;
 	};
 
-	void flushKni(rte_kni* kni, sKniStats& stats, rte_mbuf **mbufs, uint32_t& count);
-	void flushDump(rte_kni* kni, rte_mbuf **mbufs, uint32_t& count);
+	void flushKni(rte_kni* kni, sKniStats& stats, rte_mbuf** mbufs, uint32_t& count);
+	void flushDump(rte_kni* kni, rte_mbuf** mbufs, uint32_t& count);
 
 	cDataPlane* dataPlane;
 
@@ -140,33 +140,21 @@ protected:
 
 	rte_mempool* mempool;
 	bool useKni;
-	std::map<tPortId, std::tuple<std::string,
-	                             rte_kni*,
-	                             sKniStats,
-	                             std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>,
-	                             uint32_t>> knis;
+	std::map<tPortId, std::tuple<std::string, rte_kni*, sKniStats, std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>, uint32_t>> knis;
 
-	std::map<tPortId, std::tuple<std::string,
-	                             rte_kni*,
-	                             std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>,
-	                             uint32_t>> ingress_dump_knis;
+	std::map<tPortId, std::tuple<std::string, rte_kni*, std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>, uint32_t>> ingress_dump_knis;
 
-	std::map<tPortId, std::tuple<std::string,
-	                             rte_kni*,
-	                             std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>,
-	                             uint32_t>> egress_dump_knis;
+	std::map<tPortId, std::tuple<std::string, rte_kni*, std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>, uint32_t>> egress_dump_knis;
 
-	std::map<tPortId, std::tuple<std::string,
-	                             rte_kni*,
-	                             std::array<rte_mbuf*, 64 * CONFIG_YADECAP_MBUFS_BURST_SIZE>,
-	                             uint32_t>> drop_dump_knis;
+	std::map<tPortId, std::tuple<std::string, rte_kni*, std::array<rte_mbuf*, 64 * CONFIG_YADECAP_MBUFS_BURST_SIZE>, uint32_t>> drop_dump_knis;
 
 	common::slowworker::stats_t stats;
 	common::idp::getErrors::response errors; ///< @todo: class errorsManager
 
 	cWorker* slowWorker;
 	std::queue<std::tuple<rte_mbuf*,
-	                      common::globalBase::tFlow>> slowWorkerMbufs;
+	                      common::globalBase::tFlow>>
+	        slowWorkerMbufs;
 	std::mutex fw_state_multicast_acl_ids_mutex;
 	std::map<common::ipv6_address_t, tAclId> fw_state_multicast_acl_ids;
 

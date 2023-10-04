@@ -1,12 +1,12 @@
 #pragma once
 
+#include <functional>
 #include <thread>
 #include <vector>
-#include <functional>
 
-#include "common/result.h"
-#include "common/idp.h"
 #include "common/icp.h"
+#include "common/idp.h"
+#include "common/result.h"
 
 #include "common.h"
 #include "type.h"

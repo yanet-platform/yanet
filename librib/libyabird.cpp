@@ -1,18 +1,18 @@
-#include <string>
 #include <fstream>
 #include <iostream>
+#include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
-#include <mutex>
 
-#include "common/type.h"
 #include "common/define.h"
-#include "common/result.h"
 #include "common/icontrolplane.h"
+#include "common/result.h"
+#include "common/type.h"
 
 #include "libyabird.h"
 
-#define	YANET_LOG_PATH  "/var/log/yanet-bird.log"
+#define YANET_LOG_PATH "/var/log/yanet-bird.log"
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_DEBUG;
 
@@ -22,8 +22,8 @@ public:
 	libyabird_t();
 	~libyabird_t();
 
-	void set_state(const char *peer, int state);
-	void update(yanet_data_t *data);
+	void set_state(const char* peer, int state);
+	void update(yanet_data_t* data);
 
 protected:
 	void worker_proc();
@@ -57,7 +57,7 @@ libyabird_t::libyabird_t()
 	/* connect to controlplane */
 	controlPlane.rib_update({common::icp::rib_update::clear("bgp", std::nullopt)});
 
-	threads.emplace_back([this]{ worker_proc(); });
+	threads.emplace_back([this] { worker_proc(); });
 }
 
 libyabird_t::~libyabird_t()
@@ -68,7 +68,7 @@ libyabird_t::~libyabird_t()
 	log.close();
 }
 
-void libyabird_t::set_state(const char *peer, int state)
+void libyabird_t::set_state(const char* peer, int state)
 {
 	const common::ip_address_t peer_address = std::string(peer);
 	std::time_t current_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -107,33 +107,46 @@ void libyabird_t::set_state(const char *peer, int state)
 static const char*
 afi2str(uint32_t afi)
 {
-	switch(afi) {
-	case 0x01: return ("ipv4");
-	case 0x02: return ("ipv6");
-	case 0x19: return ("l2vpn");
-	case 0x4004: return ("bgp-ls");
+	switch (afi)
+	{
+		case 0x01:
+			return ("ipv4");
+		case 0x02:
+			return ("ipv6");
+		case 0x19:
+			return ("l2vpn");
+		case 0x4004:
+			return ("bgp-ls");
 	}
 	return ("unknown");
 }
 
-#define	IS_VPN_SAFI(s)	((s) == 0x80 || (s) == 0x81 || (s) == 0x86)
+#define IS_VPN_SAFI(s) ((s) == 0x80 || (s) == 0x81 || (s) == 0x86)
 
 static const char*
 safi2str(uint16_t safi)
 {
-	switch(safi) {
-	case 0x01: return ("unicast");
-	case 0x02: return ("multicast");
-	case 0x04: return ("nlri-mpls");
-	case 0x80: return ("mpls-vpn");
-	case 0x81: return ("multicast-vpn");
-	case 0x85: return ("flow");
-	case 0x86: return ("flow-vpn");
+	switch (safi)
+	{
+		case 0x01:
+			return ("unicast");
+		case 0x02:
+			return ("multicast");
+		case 0x04:
+			return ("nlri-mpls");
+		case 0x80:
+			return ("mpls-vpn");
+		case 0x81:
+			return ("multicast-vpn");
+		case 0x85:
+			return ("flow");
+		case 0x86:
+			return ("flow-vpn");
 	}
 	return ("unknown");
 }
 
-void libyabird_t::update(yanet_data_t *data)
+void libyabird_t::update(yanet_data_t* data)
 {
 	const common::ip_address_t peer_address = std::string(data->peer);
 	const auto& table_name = std::string(afi2str(data->afi)) +
@@ -167,9 +180,9 @@ void libyabird_t::update(yanet_data_t *data)
 		std::set<common::community_t> attribute_communities;
 		std::set<common::large_community_t> attribute_large_communities;
 		std::vector<uint32_t> labels;
-		node *n;
-		yanet_prefix_t *p;
-		yanet_u32_t *uptr;
+		node* n;
+		yanet_prefix_t* p;
+		yanet_u32_t* uptr;
 		uint32_t attribute_local_preference = 0;
 		uint32_t attribute_med = 0;
 		uint32_t i;
@@ -241,21 +254,23 @@ void libyabird_t::update(yanet_data_t *data)
 			{
 				auto& request_announce_table = request_announce[table_name];
 				const common::ip_address_t nexthop = std::string(
-				    (data->flags & YANET_NH) ? data->next_hop : data->peer);
+				        (data->flags & YANET_NH) ? data->next_hop : data->peer);
 
 				WALK_LIST(n, data->prefixes)
 				{
 					common::ip_prefix_t prefix;
 					size_t pos;
 
-					p = reinterpret_cast<yanet_prefix_t *>(n);
+					p = reinterpret_cast<yanet_prefix_t*>(n);
 
 					if (IS_VPN_SAFI(data->safi) &&
-					    (pos = std::string(p->prefix).find(' ')) != std::string::npos) {
+					    (pos = std::string(p->prefix).find(' ')) != std::string::npos)
+					{
 						/* prefix string is prepended with RD value */
 						path_information = std::string(p->prefix).substr(0, pos);
 						prefix = std::string(p->prefix).substr(pos + 1);
-					} else
+					}
+					else
 						prefix = std::string(p->prefix);
 
 					if (p->path_id != 0)
@@ -271,7 +286,8 @@ void libyabird_t::update(yanet_data_t *data)
 			}
 		}
 
-		if (!EMPTY_LIST(data->withdraw)) {
+		if (!EMPTY_LIST(data->withdraw))
+		{
 			std::lock_guard<std::mutex> guard(rib_request_mutex);
 
 			if (!(rib_request.size() &&
@@ -292,14 +308,16 @@ void libyabird_t::update(yanet_data_t *data)
 				common::ip_prefix_t prefix;
 				size_t pos;
 
-				p = reinterpret_cast<yanet_prefix_t *>(n);
+				p = reinterpret_cast<yanet_prefix_t*>(n);
 
 				if (IS_VPN_SAFI(data->safi) &&
-				    (pos = std::string(p->prefix).find(' ')) != std::string::npos) {
+				    (pos = std::string(p->prefix).find(' ')) != std::string::npos)
+				{
 					/* prefix string is prepended with RD value */
 					path_information = std::string(p->prefix).substr(0, pos);
 					prefix = std::string(p->prefix).substr(pos + 1);
-				} else
+				}
+				else
 					prefix = std::string(p->prefix);
 
 				if (p->path_id != 0)
@@ -342,17 +360,16 @@ void libyabird_t::worker_proc()
 	}
 }
 
-
 extern "C" struct libyabird_t*
 yanet_open(void)
 {
-	try {
+	try
+	{
 		return new libyabird_t;
 	}
 	catch (const std::string& error)
 	{
-		std::cerr << __func__ << " failed: " <<
-			error.data() << std::endl;
+		std::cerr << __func__ << " failed: " << error.data() << std::endl;
 	}
 	catch (...)
 	{
@@ -362,13 +379,13 @@ yanet_open(void)
 }
 
 extern "C" void
-yanet_close(struct libyabird_t *lh)
+yanet_close(struct libyabird_t* lh)
 {
 	delete lh;
 }
 
 extern "C" void
-yanet_update(struct libyabird_t *lh, yanet_data_t *data)
+yanet_update(struct libyabird_t* lh, yanet_data_t* data)
 {
 	try
 	{
@@ -376,8 +393,7 @@ yanet_update(struct libyabird_t *lh, yanet_data_t *data)
 	}
 	catch (const std::string& error)
 	{
-		std::cerr << __func__ << " failed: " <<
-			error.data() << std::endl;
+		std::cerr << __func__ << " failed: " << error.data() << std::endl;
 	}
 	catch (...)
 	{
@@ -386,7 +402,7 @@ yanet_update(struct libyabird_t *lh, yanet_data_t *data)
 }
 
 extern "C" void
-yanet_set_state(struct libyabird_t *lh, const char *peer, int state)
+yanet_set_state(struct libyabird_t* lh, const char* peer, int state)
 {
 	try
 	{
@@ -394,8 +410,7 @@ yanet_set_state(struct libyabird_t *lh, const char *peer, int state)
 	}
 	catch (const std::string& error)
 	{
-		std::cerr << __func__ << " failed: " <<
-			error.data() << std::endl;
+		std::cerr << __func__ << " failed: " << error.data() << std::endl;
 	}
 	catch (...)
 	{

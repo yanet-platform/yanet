@@ -100,8 +100,7 @@ const std::string& tcp_flags_to_string(const uint8_t flags)
 		if (result.empty())
 		{
 			auto check_and_insert = [&](const uint8_t flag,
-			                            const char* name)
-			{
+			                            const char* name) {
 				if (flags & flag)
 				{
 					result += name;

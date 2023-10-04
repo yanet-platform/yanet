@@ -18,8 +18,8 @@ namespace acl
 
 namespace
 {
-	template<typename... Args>
-	void UNUSED(Args&&...) {}
+template<typename... Args>
+void UNUSED(Args&&...) {}
 }
 
 template<typename Addr>
@@ -67,11 +67,12 @@ bool is_mask_simple(uint128_t mask)
 uint8_t mask_len(common::ipv6_address_t mask)
 {
 	uint8_t len = 128;
-	const uint8_t *data = mask.data();
+	const uint8_t* data = mask.data();
 	for (unsigned int i = 0; i < 16; ++i)
 	{
 		const uint8_t byte = data[15 - i];
-		if (byte != 0x00) {
+		if (byte != 0x00)
+		{
 			len -= __builtin_ctz(byte);
 			break;
 		}

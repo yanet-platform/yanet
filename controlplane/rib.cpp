@@ -1,5 +1,5 @@
-#include "common.h"
 #include "rib.h"
+#include "common.h"
 #include "controlplane.h"
 
 using namespace controlplane::module;
@@ -14,43 +14,35 @@ rib_t::~rib_t()
 
 eResult rib_t::init()
 {
-	controlPlane->register_command(common::icp::requestType::rib_update, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::rib_update, [this](const common::icp::request& request) {
 		rib_update(std::get<common::icp::rib_update::request>(std::get<1>(request)));
 	});
 
-	controlPlane->register_command(common::icp::requestType::rib_flush, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::rib_flush, [this]() {
 		rib_flush(true);
 	});
 
-	controlPlane->register_command(common::icp::requestType::rib_summary, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::rib_summary, [this]() {
 		return rib_summary();
 	});
 
-	controlPlane->register_command(common::icp::requestType::rib_prefixes, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::rib_prefixes, [this]() {
 		return rib_prefixes();
 	});
 
-	controlPlane->register_command(common::icp::requestType::rib_lookup, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::rib_lookup, [this](const common::icp::request& request) {
 		return rib_lookup(std::get<common::icp::rib_lookup::request>(std::get<1>(request)));
 	});
 
-	controlPlane->register_command(common::icp::requestType::rib_get, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::rib_get, [this](const common::icp::request& request) {
 		return rib_get(std::get<common::icp::rib_get::request>(std::get<1>(request)));
 	});
 
-	controlPlane->register_command(common::icp::requestType::rib_save, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::rib_save, [this]() {
 		return rib_save();
 	});
 
-	controlPlane->register_command(common::icp::requestType::rib_load, [this](const common::icp::request& request)
-	{
+	controlPlane->register_command(common::icp::requestType::rib_load, [this](const common::icp::request& request) {
 		rib_load(std::get<common::icp::rib_load::request>(std::get<1>(request)));
 	});
 
@@ -74,8 +66,7 @@ eResult rib_t::init()
 		rib_update({request_insert, request_eor});
 	}
 
-	funcThreads.emplace_back([this]()
-	{
+	funcThreads.emplace_back([this]() {
 		rib_thread();
 	});
 
@@ -158,13 +149,13 @@ void rib_t::rib_insert(const common::icp::rib_update::insert& request)
 					unsigned int nxthp_stff_diff = 1;
 
 					rib::nexthop_stuff_t nxthp_stff = {nexthop,
-													   labels,
-													   origin,
-													   med,
-													   aspath,
-													   communities,
-													   large_communities,
-													   local_preference};
+					                                   labels,
+					                                   origin,
+					                                   med,
+					                                   aspath,
+					                                   communities,
+					                                   large_communities,
+					                                   local_preference};
 
 					if (prefixes_to_path_info_to_nh_ptr.count(vrf_priority))
 					{
@@ -180,7 +171,7 @@ void rib_t::rib_insert(const common::icp::rib_update::insert& request)
 									// path_info exists for this prefix + vppptn, time to update nexthop_stuff (obviously, if path_info exists, it is an update)
 									paths_diff = 0;
 
-									const rib::nexthop_stuff_t *old_nh_ptr = prefixes_to_path_info_to_nh_ptr[vrf_priority][prefix][current_pptn_index][path_information];
+									const rib::nexthop_stuff_t* old_nh_ptr = prefixes_to_path_info_to_nh_ptr[vrf_priority][prefix][current_pptn_index][path_information];
 
 									// if nexthop_stuff from the table and from request match, nothing to update
 									if (*old_nh_ptr != nxthp_stff)
@@ -205,11 +196,11 @@ void rib_t::rib_insert(const common::icp::rib_update::insert& request)
 					// this nexthop stuff may have existed for some other path_info
 					auto [nh_to_ref_count_it, insert_result] = nh_to_ref_count.insert({nxthp_stff, 1});
 
-					const rib::nexthop_stuff_t *nh_ptr = &(nh_to_ref_count_it->first);
+					const rib::nexthop_stuff_t* nh_ptr = &(nh_to_ref_count_it->first);
 
 					if (!insert_result) // nh already existed in table
 					{
-						auto &ref_count = nh_to_ref_count_it->second;
+						auto& ref_count = nh_to_ref_count_it->second;
 						++ref_count;
 					}
 
@@ -250,7 +241,6 @@ void rib_t::rib_remove(const common::icp::rib_update::remove& request)
 
 			auto& [summary_prefixes, summary_paths, summary_eor] = this->summary[{vrf, priority, protocol, peer, table_name}];
 			(void)summary_eor;
-
 
 			rib::pptn_t current_pptn = {protocol, peer, table_name};
 
@@ -391,10 +381,10 @@ void rib_t::rib_clear(const common::icp::rib_update::clear& request)
 			}
 
 			std::vector<ip_prefix_t> prefixes_to_remove;
-			for (auto &[prefix, pptn_to_path_info_to_nh_ptr] : prefixes_to_pptn_to_path_info_to_nh_ptr)
+			for (auto& [prefix, pptn_to_path_info_to_nh_ptr] : prefixes_to_pptn_to_path_info_to_nh_ptr)
 			{
 				std::vector<pptn_index_t> pptns_to_remove;
-				for (auto &[pptn_index, path_info_to_nh_ptr] : pptn_to_path_info_to_nh_ptr)
+				for (auto& [pptn_index, path_info_to_nh_ptr] : pptn_to_path_info_to_nh_ptr)
 				{
 					const auto& [protocol, peer, table_name] = proto_peer_table_name[pptn_index];
 					(void)table_name;
@@ -415,7 +405,7 @@ void rib_t::rib_clear(const common::icp::rib_update::clear& request)
 						}
 					}
 
-					for (auto &[path_info, nh_ptr] : path_info_to_nh_ptr)
+					for (auto& [path_info, nh_ptr] : path_info_to_nh_ptr)
 					{
 						(void)path_info;
 						--nh_to_ref_count[*nh_ptr];
@@ -472,7 +462,8 @@ void rib_t::rib_clear(const common::icp::rib_update::clear& request)
 		                       uint32_t,
 		                       std::string,
 		                       ip_address_t,
-		                       std::string>> summary_keys;
+		                       std::string>>
+		        summary_keys;
 		summary_keys.reserve(this->summary.size());
 
 		for (auto& [summary_key, summary_value] : this->summary)
@@ -560,7 +551,6 @@ void rib_t::rib_flush(bool force_flush)
 
 		flush = prefixes_reb.size();
 		prefixes_reb.clear();
-
 	}
 
 	if (force_flush ||
@@ -622,7 +612,7 @@ common::icp::rib_lookup::response rib_t::rib_lookup(const common::icp::rib_looku
 			break;
 		}
 
-		ip_prefix_t prefix (request_address.applyMask(mask), mask);
+		ip_prefix_t prefix(request_address.applyMask(mask), mask);
 
 		for (const auto& [vrf_priority, prefixes_to_pptn_to_path_info_to_nh_ptr] : prefixes_to_path_info_to_nh_ptr)
 		{
@@ -723,14 +713,12 @@ common::icp::rib_save::response rib_t::rib_save()
 		stream.push(nh_to_index_ref_count_pair);
 
 		std::unordered_map<rib::vrf_priority_t,
-						   std::unordered_map<ip_prefix_t,
-						   					  std::unordered_map<uint32_t, // index from proto_peer_table_name
-																 std::unordered_map<std::string,
-																					uint32_t // index from nh_ptr_to_index
-																				   >
-																>
-											 >
-						   > prefixes_to_save;
+		                   std::unordered_map<ip_prefix_t,
+		                                      std::unordered_map<uint32_t, // index from proto_peer_table_name
+		                                                         std::unordered_map<std::string,
+		                                                                            uint32_t // index from nh_ptr_to_index
+		                                                                            >>>>
+		        prefixes_to_save;
 
 		for (const auto& [vrf_priority, prefixes_to_pptn_to_path_info_to_nh_ptr] : prefixes_to_path_info_to_nh_ptr)
 		{
@@ -762,14 +750,12 @@ void rib_t::rib_load(const common::icp::rib_load::request& request)
 	decltype(this->proto_peer_table_name) proto_peer_table_name_loaded;
 	std::unordered_map<rib::nexthop_stuff_t, std::pair<uint32_t, uint32_t>> nh_to_index_ref_count_pair_loaded;
 	std::unordered_map<rib::vrf_priority_t,
-					std::unordered_map<ip_prefix_t,
-										std::unordered_map<uint32_t, // index from proto_peer_table_name
-															std::unordered_map<std::string,
-																			uint32_t // index from nh_ptr_to_index
-																			>
-														>
-										>
-					> prefixes_loaded;
+	                   std::unordered_map<ip_prefix_t,
+	                                      std::unordered_map<uint32_t, // index from proto_peer_table_name
+	                                                         std::unordered_map<std::string,
+	                                                                            uint32_t // index from nh_ptr_to_index
+	                                                                            >>>>
+	        prefixes_loaded;
 
 	stream.pop(proto_peer_table_name_loaded);
 	stream.pop(nh_to_index_ref_count_pair_loaded);
@@ -801,17 +787,16 @@ void rib_t::rib_load(const common::icp::rib_load::request& request)
 		nh_to_ref_count.clear();
 
 		// getting relation between loaded nexthop_stuff_t objects and its indexes (to insert correct pointers to prefixes_to_path_info_to_nh_ptr)
-		std::vector<const rib::nexthop_stuff_t *> nh_to_index(nh_to_index_ref_count_pair_loaded.size());
+		std::vector<const rib::nexthop_stuff_t*> nh_to_index(nh_to_index_ref_count_pair_loaded.size());
 		for (const auto& [nh, index_ref_count_pair] : nh_to_index_ref_count_pair_loaded)
 		{
 			const auto& [index, ref_count] = index_ref_count_pair;
 			auto [nh_to_ref_count_it, insert_result] = this->nh_to_ref_count.insert({nh, ref_count});
 			(void)insert_result;
 
-			const rib::nexthop_stuff_t *nh_ptr = &(nh_to_ref_count_it->first);
+			const rib::nexthop_stuff_t* nh_ptr = &(nh_to_ref_count_it->first);
 
 			nh_to_index[index] = nh_ptr;
-
 		}
 
 		// replace indexes with pointers from nh_to_ref_count, obtained on previous step

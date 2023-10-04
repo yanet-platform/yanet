@@ -3,8 +3,8 @@
 
 #include "errors.h"
 
-#include "configparser.h"
 #include "common/idataplane.h"
+#include "configparser.h"
 
 namespace
 {
@@ -627,9 +627,9 @@ void config_parser_t::loadConfig_tun64(controlplane::base_t& baseNext,
 	{
 		loadConfig_tun64mappings(baseNext,
 		                         tunnel,
-					 moduleJson["mappings"],
-					 rootFilePath,
-					 jsons);
+		                         moduleJson["mappings"],
+		                         rootFilePath,
+		                         jsons);
 	}
 
 	if (exist(moduleJson, "dscpMarkType"))
@@ -733,10 +733,11 @@ void config_parser_t::loadConfig_tun64mappings(controlplane::base_t& baseNext,
 
 		ipv4_address_t ipv4Address = ipv4_address_t(std::string(mappingJsonIter.key()));
 
-		if (exist(mappingJson, "addr6") && exist(mappingJson, "net_loc")) {
+		if (exist(mappingJson, "addr6") && exist(mappingJson, "net_loc"))
+		{
 			ipv6_address_t ipv6Address = mappingJson["addr6"].get<std::string>();
 			tunnel.mappings[ipv4Address] = {ipv6Address,
-				                        mappingJson["net_loc"].get<std::string>()};
+			                                mappingJson["net_loc"].get<std::string>()};
 
 			if (++baseNext.tun64MappingsCount >= CONFIG_YADECAP_TUN64_MAPPINGS_SIZE)
 			{
@@ -1650,8 +1651,8 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 		                               service_version,
 		                               scheduler,
 		                               scheduler_params,
-									   forwarding_method,
-					       			   flags,
+		                               forwarding_method,
+		                               flags,
 		                               reals);
 
 		baseNext.services_count++;
@@ -1662,7 +1663,7 @@ void config_parser_t::loadConfig_balancer_unrdup(controlplane::balancer::config_
 {
 	std::string absolute_unrdup_cfg_path;
 
-	if (unrdup_cfg_path.find("/") != 0)  ///< relative path
+	if (unrdup_cfg_path.find("/") != 0) ///< relative path
 	{
 		YANET_LOG_DEBUG("Not an absolute path, trying in current directory\n");
 		absolute_unrdup_cfg_path = dirname(rootFilePath) + "/" + unrdup_cfg_path;

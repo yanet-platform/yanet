@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common/idataplane.h"
 #include "common/icontrolplane.h"
+#include "common/idataplane.h"
 
 #include "helper.h"
 
@@ -28,14 +28,17 @@ static inline void printValue(const common::idp::value& value)
 				{
 					printf("  interfaceId: %u,\ttransport: [label: %u, exp: %u],\tservice: [label: %u, exp: %u]\n",
 					       std::get<0>(iter),
-					       std::get<0>(std::get<1>(iter)), std::get<1>(std::get<1>(iter)),
-					       std::get<0>(std::get<2>(iter)), std::get<1>(std::get<2>(iter)));
+					       std::get<0>(std::get<1>(iter)),
+					       std::get<1>(std::get<1>(iter)),
+					       std::get<0>(std::get<2>(iter)),
+					       std::get<1>(std::get<2>(iter)));
 				}
 				else
 				{
 					printf("  interfaceId: %u,\ttransport: [label: %u, exp: %u]\n",
 					       std::get<0>(iter),
-					       std::get<0>(std::get<1>(iter)), std::get<1>(std::get<1>(iter)));
+					       std::get<0>(std::get<1>(iter)),
+					       std::get<1>(std::get<1>(iter)));
 				}
 			}
 			else
@@ -109,7 +112,7 @@ void getErrors()
 	const auto response = dataPlane.getErrors();
 
 	printf("errors:\n");
-	for (const auto& iter: response)
+	for (const auto& iter : response)
 	{
 		printf("  (%lu) %s\n",
 		       iter.second.value,

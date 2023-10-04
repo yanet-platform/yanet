@@ -3,8 +3,8 @@
 #include <rte_mbuf.h>
 #include <rte_tcp.h>
 
-#include "type.h"
 #include "metadata.h"
+#include "type.h"
 
 #include "common/type.h"
 
@@ -164,7 +164,6 @@ public:
 	{
 		return drops;
 	}
-
 
 	template<typename F>
 	void visit6(F f) const

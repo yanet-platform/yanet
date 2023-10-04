@@ -47,9 +47,9 @@ add skipto :IN ip from any to any in
 	for (unsigned i = 0; i < size; ++i)
 	{
 		std::ostringstream s;
-		s << "add allow tcp from any to { " << "2abc:123:ff1c:" << std::setw(4) <<
-			std::setfill('0') << std::hex << i + 1 << "::/ffff:ffff:ffff:ffff::" <<
-			" } dst-port " << std::dec << i + 1 << std::endl;
+		s << "add allow tcp from any to { "
+		  << "2abc:123:ff1c:" << std::setw(4) << std::setfill('0') << std::hex << i + 1 << "::/ffff:ffff:ffff:ffff::"
+		  << " } dst-port " << std::dec << i + 1 << std::endl;
 		rules.append(s.str());
 	}
 
@@ -280,17 +280,7 @@ add allow ip from any to any in // id 5
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 
-	auto ret = acl::unwind(acls, {{1, {{false, "port0"}, {false, "port1"}, {false, "port2"}, {false, "port3"}, {true, "port0"}}}},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {});
+	auto ret = acl::unwind(acls, {{1, {{false, "port0"}, {false, "port1"}, {false, "port2"}, {false, "port3"}, {true, "port0"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 6);
 
 	std::set<std::string> expect = {"port2 port3 |1|any|any|any|any|any|any|any|false|drop(0)|1, 4|false|",
@@ -300,7 +290,7 @@ add allow ip from any to any in // id 5
 	                                "port1 |1|1.2.3.5/255.255.255.255|any|any|any|any|any|any|false|logicalPort_egress(0)|1, 3|true|",
 	                                "port1 |1|any|any|any|any|any|any|any|false|drop(0)|1, 4|false|"};
 
-	auto stringify = [] (auto& v) { return std::apply([]( auto... e ){ return ( ((e ? *e : "any") + "|") + ... ); }, v );};
+	auto stringify = [](auto& v) { return std::apply([](auto... e) { return (((e ? *e : "any") + "|") + ...); }, v); };
 
 	for (const auto& r : ret)
 	{
@@ -320,20 +310,10 @@ add 1 allow icmp from { 1.2.3.4 } to any in
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 
-	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}, {false, "vlan1"}}}},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {});
+	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}, {false, "vlan1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 3);
 
-	auto stringify = [] (auto& v) { return std::apply([]( auto... e ){ return ( ((e ? *e : "any") + "|") + ... ); }, v );};
+	auto stringify = [](auto& v) { return std::apply([](auto... e) { return (((e ? *e : "any") + "|") + ...); }, v); };
 
 	EXPECT_THAT(stringify(ret[0]), ::testing::Eq("vlan1 |0|1.2.3.4/255.255.255.255|any|any|1|any|any|any|false|route(0)|1|false|"));
 	EXPECT_THAT(stringify(ret[1]), ::testing::Eq("vlan1 |0|any|any|any|any|any|any|any|false|route(0)||false|"));
@@ -361,20 +341,10 @@ add 300 deny ip from any to any
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 
-	auto ret = acl::unwind(acls, {{1, {{true, "port0"}, {true, "port1"}}}},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {});
+	auto ret = acl::unwind(acls, {{1, {{true, "port0"}, {true, "port1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 3);
 
-	auto stringify = [] (auto& v) { return std::apply([]( auto... e ){ return ( ((e ? *e : "any") + "|") + ... ); }, v );};
+	auto stringify = [](auto& v) { return std::apply([](auto... e) { return (((e ? *e : "any") + "|") + ...); }, v); };
 
 	EXPECT_THAT(stringify(ret[0]), ::testing::Eq("port1 |0|any|any|any|any|any|any|any|false|drop(0)|2|true|"));
 	EXPECT_THAT(stringify(ret[1]), ::testing::Eq("port0 |0|1.2.3.4/255.255.255.255|any|any|any|any|any|any|false|route(0)|1|true|"));
@@ -422,17 +392,7 @@ add 300 allow proto tcp dst-addr 1234567@2abc:123:c00::/40
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 
-	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {});
+	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 4);
 
 	acl::result_t result;
@@ -457,17 +417,7 @@ add 500 allow tcp from any to any established
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 
-	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {});
+	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 7);
 
 	acl::result_t result;
@@ -494,17 +444,7 @@ add 300 allow ip from any to any icmp6types 133,134,135,136
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 
-	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {});
+	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 4);
 
 	acl::result_t result;
@@ -525,17 +465,7 @@ add 200 deny ip from any to any
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 
-	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {},
-	                   {});
+	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 1);
 
 	acl::result_t result;

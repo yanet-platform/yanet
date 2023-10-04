@@ -1,16 +1,16 @@
 #pragma once
 
 #include <string>
-#include <vector>
 #include <thread>
+#include <vector>
 
-#include <yaml-cpp/yaml.h>
 #include <pcap.h>
+#include <yaml-cpp/yaml.h>
 
-#include "common/result.h"
-#include "common/idataplane.h"
-#include "common/icontrolplane.h"
 #include "common/bufferring.h"
+#include "common/icontrolplane.h"
+#include "common/idataplane.h"
+#include "common/result.h"
 
 using ipv4_address_t = common::ipv4_address_t;
 using ipv6_address_t = common::ipv6_address_t;
@@ -39,7 +39,7 @@ public:
 
 protected:
 	void sendThread(std::string interfaceName, std::string sendFilePath);
-        void recvThread(std::string interfaceName, std::vector<std::string> expectFilePaths);
+	void recvThread(std::string interfaceName, std::vector<std::string> expectFilePaths);
 	void dumpThread(std::string interfaceName, std::string dumpFilePath);
 
 	bool step_ipv4Update(const YAML::Node& yamlStep);
@@ -95,7 +95,7 @@ protected:
 
 	std::map<std::string, ///< interfaceName
 	         int>
-	    pcaps;
+	        pcaps;
 
 	std::tuple<size_t, void*> rawShmInfo;
 	std::map<std::string, common::bufferring> dumpRings;
@@ -104,13 +104,16 @@ protected:
 	volatile bool flagStop;
 
 	std::map<ipv4_prefix_t,
-	         std::set<std::string>> pathInformations_ipv4Update;
+	         std::set<std::string>>
+	        pathInformations_ipv4Update;
 
 	std::map<ipv4_prefix_t,
-	         std::set<std::string>> pathInformations_ipv4LabelledUpdate;
+	         std::set<std::string>>
+	        pathInformations_ipv4LabelledUpdate;
 
 	std::map<ipv6_prefix_t,
-	         std::set<std::string>> pathInformations_ipv6Update; ///< @todo
+	         std::set<std::string>>
+	        pathInformations_ipv6Update; ///< @todo
 
 	common::icp::loadConfig::request request;
 

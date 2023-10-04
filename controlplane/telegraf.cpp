@@ -1,9 +1,9 @@
-#include "common.h"
 #include "telegraf.h"
+#include "common.h"
 #include "controlplane.h"
 
-using controlplane::module::telegraf;
 using common::int64;
+using controlplane::module::telegraf;
 
 YANET_UNUSED
 static inline double perSecond(const int64_t& valueDiff, const uint64_t& timeDiff)
@@ -59,33 +59,27 @@ telegraf_t::~telegraf_t()
 
 eResult telegraf_t::init()
 {
-	controlPlane->register_command(common::icp::requestType::telegraf_unsafe, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::telegraf_unsafe, [this]() {
 		return telegraf_unsafe();
 	});
 
-	controlPlane->register_command(common::icp::requestType::telegraf_dregress, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::telegraf_dregress, [this]() {
 		return telegraf_dregress();
 	});
 
-	controlPlane->register_command(common::icp::requestType::telegraf_dregress_traffic, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::telegraf_dregress_traffic, [this]() {
 		return telegraf_dregress_traffic();
 	});
 
-	controlPlane->register_command(common::icp::requestType::telegraf_balancer_service, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::telegraf_balancer_service, [this]() {
 		return telegraf_balancer_service();
 	});
 
-	controlPlane->register_command(common::icp::requestType::telegraf_other, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::telegraf_other, [this]() {
 		return telegraf_other();
 	});
 
-	controlPlane->register_command(common::icp::requestType::telegraf_mappings, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::telegraf_mappings, [this]() {
 		return telegraf_mappings();
 	});
 
@@ -124,8 +118,7 @@ common::icp::telegraf_unsafe::response telegraf_t::telegraf_unsafe()
 	const auto tun64Stats = controlPlane->tun64.tunnel_counters.get_counters();
 
 	common::icp::telegraf_unsafe::response response;
-	auto& [responseWorkers, responseWorkerGCs, responseSlowWorker,
-	       responseFragmentation, responseFWState, responseTun64, response_nat64stateful, responseControlplaneStats] = response;
+	auto& [responseWorkers, responseWorkerGCs, responseSlowWorker, responseFragmentation, responseFWState, responseTun64, response_nat64stateful, responseControlplaneStats] = response;
 
 	for (const auto& [coreId, stats] : workersStats)
 	{
@@ -151,13 +144,10 @@ common::icp::telegraf_unsafe::response telegraf_t::telegraf_unsafe()
 		auto current_guard = controlPlane->tun64.generations_config.current_lock_guard();
 		for (const auto& [name, tunnel] : controlPlane->tun64.generations_config.current().config_tunnels)
 		{
-			const auto& [encap_packets, encap_bytes, encap_dropped,
-			             decap_packets, decap_bytes, decap_unknown] = tun64Stats.at(name);
+			const auto& [encap_packets, encap_bytes, encap_dropped, decap_packets, decap_bytes, decap_unknown] = tun64Stats.at(name);
 
-			(void) tunnel;
-			responseTun64[name] = { encap_packets, encap_bytes,encap_dropped,
-			                        decap_packets, decap_bytes, decap_unknown };
-
+			(void)tunnel;
+			responseTun64[name] = {encap_packets, encap_bytes, encap_dropped, decap_packets, decap_bytes, decap_unknown};
 		}
 	}
 
@@ -192,7 +182,7 @@ common::icp::telegraf_mappings::response telegraf_t::telegraf_mappings()
 				const auto& [encap_packets, encap_bytes, decap_packets, decap_bytes] = counters.at({name, ipv4_address});
 				const common::tun64mapping::stats_t stats = {encap_packets, encap_bytes, decap_packets, decap_bytes};
 
-				(void) location;
+				(void)location;
 				response.emplace_back(name, ipv4_address, ipv6_address, stats);
 			}
 		}
@@ -282,7 +272,8 @@ common::icp::telegraf_balancer_service::response telegraf_t::telegraf_balancer_s
 	common::icp::telegraf_balancer_service::response response;
 
 	controlPlane->balancer.generations_config.current_lock();
-	std::map<std::string, balancer_id_t> name_id = controlPlane->balancer.generations_config.current().name_id;;
+	std::map<std::string, balancer_id_t> name_id = controlPlane->balancer.generations_config.current().name_id;
+	;
 	controlPlane->balancer.generations_config.current_unlock();
 
 	const auto counters = controlPlane->balancer.service_counters.get_counters();

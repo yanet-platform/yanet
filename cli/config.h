@@ -37,7 +37,6 @@ void disallow4(const std::string& module,
                const std::string& prefixRaw,
                const std::string& announceRaw);
 
-
 // removes @prefixRaw in nat64stateless @module
 void remove4(const std::string& module,
              const std::string& prefixRaw);

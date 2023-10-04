@@ -1,28 +1,28 @@
 #pragma once
 
-#include <pthread.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
 
-#include <rte_mempool.h>
-#include <rte_kni.h>
-#include <rte_mbuf.h>
 #include <rte_ethdev.h>
+#include <rte_kni.h>
 #include <rte_malloc.h>
+#include <rte_mbuf.h>
+#include <rte_mempool.h>
 
 #include <nlohmann/json.hpp>
 
-#include "common/result.h"
 #include "common/idp.h"
+#include "common/result.h"
 #include "common/type.h"
 
-#include "report.h"
+#include "bus.h"
 #include "controlplane.h"
 #include "globalbase.h"
-#include "bus.h"
+#include "report.h"
 #include "type.h"
 #include "worker_gc.h"
 
@@ -62,9 +62,9 @@ enum class eConfigType
 struct tDataPlaneConfig
 {
 	std::map<std::string, ///< interfaceName
-	         std::tuple<std::string,///< pci
-	         bool>>///< bind driver
-	    ports;
+	         std::tuple<std::string, ///< pci
+	                    bool>> ///< bind driver
+	        ports;
 	std::set<tCoreId> workerGCs;
 	tCoreId controlPlaneCoreId;
 	tCoreId dumpKniCoreId;
@@ -134,13 +134,13 @@ protected:
 	eResult allocateSharedMemory();
 	eResult splitSharedMemoryPerWorkers();
 
-	std::optional<uint64_t> getCounterValueByName(const std::string &counter_name, uint32_t coreId);
+	std::optional<uint64_t> getCounterValueByName(const std::string& counter_name, uint32_t coreId);
 	common::idp::get_shm_info::response getShmInfo();
 
 	template<typename type,
-	         typename ... args_t>
+	         typename... args_t>
 	type* hugepage_create_static(int socket_id,
-	                             const args_t& ... args)
+	                             const args_t&... args)
 	{
 		size_t size = sizeof(type) + 2 * RTE_CACHE_LINE_SIZE;
 
@@ -160,12 +160,11 @@ protected:
 			return nullptr;
 		}
 
-		type* result = new((type*)pointer) type(args ...);
+		type* result = new ((type*)pointer) type(args...);
 
 		{
 			std::lock_guard<std::mutex> guard(hugepage_pointers_mutex);
-			hugepage_pointers.try_emplace(result, size, [result]()
-			{
+			hugepage_pointers.try_emplace(result, size, [result]() {
 				YADECAP_LOG_INFO("yanet_free()\n");
 				result->~type();
 				rte_free(result);
@@ -176,9 +175,8 @@ protected:
 	}
 
 	template<typename type,
-	         typename ... args_t>
-	type* hugepage_create_static_array(int socket_id, const size_t count,
-	                                   const args_t& ... args)
+	         typename... args_t>
+	type* hugepage_create_static_array(int socket_id, const size_t count, const args_t&... args)
 	{
 		size_t size = count * sizeof(type) + 2 * RTE_CACHE_LINE_SIZE;
 
@@ -202,13 +200,12 @@ protected:
 		     i < count;
 		     i++)
 		{
-			new(((type*)pointer) + i) type(args ...);
+			new (((type*)pointer) + i) type(args...);
 		}
 
 		{
 			std::lock_guard<std::mutex> guard(hugepage_pointers_mutex);
-			hugepage_pointers.try_emplace(pointer, size, [pointer, count]()
-			{
+			hugepage_pointers.try_emplace(pointer, size, [pointer, count]() {
 				YADECAP_LOG_INFO("yanet_free()\n");
 				for (size_t i = 0;
 				     i < count;
@@ -227,11 +224,11 @@ protected:
 	template<typename type,
 	         typename elems_t,
 	         typename updater_type,
-	         typename ... args_t>
+	         typename... args_t>
 	type* hugepage_create_dynamic(int socket_id,
 	                              elems_t elems,
 	                              updater_type& updater,
-	                              const args_t& ... args)
+	                              const args_t&... args)
 	{
 		size_t size = type::calculate_sizeof(elems);
 		if (!size)
@@ -257,19 +254,18 @@ protected:
 			return nullptr;
 		}
 
-		type* result = new((type*)pointer) type(args ...);
+		type* result = new ((type*)pointer) type(args...);
 
 		{
 			std::lock_guard<std::mutex> guard(hugepage_pointers_mutex);
-			hugepage_pointers.try_emplace(result, size, [result]()
-			{
+			hugepage_pointers.try_emplace(result, size, [result]() {
 				YADECAP_LOG_INFO("yanet_free()\n");
 				result->~type();
 				rte_free(result);
 			});
 		}
 
-		updater.update_pointer(result, socket_id, elems, args ...);
+		updater.update_pointer(result, socket_id, elems, args...);
 
 		return result;
 	}
@@ -295,7 +291,7 @@ protected:
 	                    std::array<uint8_t, 6>, ///< address
 	                    std::string ///< pci
 	                    >>
-	    ports;
+	        ports;
 	std::map<tCoreId, cWorker*> workers;
 	std::map<tCoreId, worker_gc_t*> worker_gcs;
 
@@ -311,7 +307,8 @@ protected:
 	std::map<std::string,
 	         std::tuple<int, ///< socket
 	                    rte_ring*,
-	                    rte_ring*>> ringPorts;
+	                    rte_ring*>>
+	        ringPorts;
 
 	pthread_barrier_t initPortBarrier;
 	pthread_barrier_t runBarrier;

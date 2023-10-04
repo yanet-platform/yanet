@@ -1,16 +1,16 @@
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#include <rte_mempool.h>
 #include <rte_ethdev.h>
 #include <rte_kni.h>
+#include <rte_mempool.h>
 
 #include "common.h"
-#include "report.h"
 #include "dataplane.h"
+#include "report.h"
 #include "worker.h"
 
 namespace
@@ -89,7 +89,7 @@ eResult cReport::init()
 
 void cReport::run()
 {
-	thread = std::thread([this]{mainLoop();});
+	thread = std::thread([this] { mainLoop(); });
 }
 
 void cReport::stop()
@@ -227,40 +227,17 @@ std::string pointerToHex(const void* pointer)
 	return buffer;
 }
 
-[[maybe_unused]]
-static inline std::string convertIPv6AddressToString(const in6_addr& ipv6Address) ///< @todo: to common.h
+[[maybe_unused]] static inline std::string convertIPv6AddressToString(const in6_addr& ipv6Address) ///< @todo: to common.h
 {
 	char buffer[512];
-	snprintf(buffer, 512, "%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X",
-	         ipv6Address.__in6_u.__u6_addr8[0],
-	         ipv6Address.__in6_u.__u6_addr8[1],
-	         ipv6Address.__in6_u.__u6_addr8[2],
-	         ipv6Address.__in6_u.__u6_addr8[3],
-	         ipv6Address.__in6_u.__u6_addr8[4],
-	         ipv6Address.__in6_u.__u6_addr8[5],
-	         ipv6Address.__in6_u.__u6_addr8[6],
-	         ipv6Address.__in6_u.__u6_addr8[7],
-	         ipv6Address.__in6_u.__u6_addr8[8],
-	         ipv6Address.__in6_u.__u6_addr8[9],
-	         ipv6Address.__in6_u.__u6_addr8[10],
-	         ipv6Address.__in6_u.__u6_addr8[11],
-	         ipv6Address.__in6_u.__u6_addr8[12],
-	         ipv6Address.__in6_u.__u6_addr8[13],
-	         ipv6Address.__in6_u.__u6_addr8[14],
-	         ipv6Address.__in6_u.__u6_addr8[15]);
+	snprintf(buffer, 512, "%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X:%2.2X%2.2X", ipv6Address.__in6_u.__u6_addr8[0], ipv6Address.__in6_u.__u6_addr8[1], ipv6Address.__in6_u.__u6_addr8[2], ipv6Address.__in6_u.__u6_addr8[3], ipv6Address.__in6_u.__u6_addr8[4], ipv6Address.__in6_u.__u6_addr8[5], ipv6Address.__in6_u.__u6_addr8[6], ipv6Address.__in6_u.__u6_addr8[7], ipv6Address.__in6_u.__u6_addr8[8], ipv6Address.__in6_u.__u6_addr8[9], ipv6Address.__in6_u.__u6_addr8[10], ipv6Address.__in6_u.__u6_addr8[11], ipv6Address.__in6_u.__u6_addr8[12], ipv6Address.__in6_u.__u6_addr8[13], ipv6Address.__in6_u.__u6_addr8[14], ipv6Address.__in6_u.__u6_addr8[15]);
 	return buffer;
 }
 
 static inline std::string convertEtherAddressToString(const rte_ether_addr& etherAddress) ///< @todo: to common.h
 {
 	char buffer[512];
-	snprintf(buffer, 512, "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
-	         etherAddress.addr_bytes[0],
-	         etherAddress.addr_bytes[1],
-	         etherAddress.addr_bytes[2],
-	         etherAddress.addr_bytes[3],
-	         etherAddress.addr_bytes[4],
-	         etherAddress.addr_bytes[5]);
+	snprintf(buffer, 512, "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X", etherAddress.addr_bytes[0], etherAddress.addr_bytes[1], etherAddress.addr_bytes[2], etherAddress.addr_bytes[3], etherAddress.addr_bytes[4], etherAddress.addr_bytes[5]);
 	return buffer;
 }
 

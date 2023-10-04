@@ -2,8 +2,8 @@
 
 #include "acl_base.h"
 
-#include "common/type.h"
 #include "common/acl.h"
+#include "common/type.h"
 
 namespace acl::compiler
 {
