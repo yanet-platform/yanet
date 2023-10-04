@@ -1,0 +1,15 @@
+:BEGIN
+add skipto :IN ip from any to any in
+
+:IN
+add skipto :NAT64STATELESS ip from any to { 5555:5555:5555:5555:5555:5555::/96 or 10.88.88.88 }
+add allow ip from any to any
+
+:NAT64STATELESS
+add allow ip from ::/0 to ::/0
+add allow tcp from any to any established
+add allow icmp from any to any icmptypes 0,8,3,11,12
+
+add allow udp from any to any src-port 53
+
+add deny ip from any to any
