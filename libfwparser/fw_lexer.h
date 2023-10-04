@@ -2,7 +2,6 @@
 
 #include <algorithm>
 
-#include "libfwparser/fw_config.h"
 #include "libfwparser/fw_parser.h"
 
 /* rename yyFlexLexer generated class to fwFlexLexer */
@@ -13,6 +12,8 @@
 
 namespace ipfw
 {
+
+class fw_config_t;
 
 class fw_lexer_t : public fwFlexLexer
 {
