@@ -12,6 +12,7 @@
 
 #include "common/type.h"
 #include "libfwparser/fw_lexer.h"
+#include "libfwparser/fw_parser.h"
 
 #define FW_CONFIG_MAX_NESTED 5
 
@@ -371,6 +372,8 @@ struct rule_t
 	std::string comment; // rule comment
 	std::string text; // original rule text
 };
+
+class fw_config_t;
 
 using rule_ptr_t = std::shared_ptr<rule_t>;
 using istream_ptr_t = std::shared_ptr<std::istream>;

@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include "define.h"
 #include "stream.h"
 #include "type.h"
 

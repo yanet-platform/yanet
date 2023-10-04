@@ -56,9 +56,9 @@
 %parse-param { ipfw::fw_config_t& cfg }
 
 %code provides {
-  #include "libfwparser/fw_parser.h"
   #include "libfwparser/fw_config.h"
   #include "libfwparser/fw_lexer.h"
+  #include "libfwparser/fw_parser.h"
 
   // replace yylex() function call
   #define yylex cfg.Lex

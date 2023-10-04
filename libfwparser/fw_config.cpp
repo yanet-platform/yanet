@@ -3,8 +3,9 @@
 #include <netdb.h>
 #include <stdexcept>
 
-#include "libfwparser/fw_config.h"
 #include "libfwparser/fw_parser.h"
+
+#include "fw_config.h"
 
 using namespace ipfw;
 

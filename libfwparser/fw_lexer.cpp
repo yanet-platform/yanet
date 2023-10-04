@@ -1,6 +1,7 @@
-#include "fw_lexer.h"
+#include "libfwparser/fw_parser.h"
+
 #include "fw_config.h"
-#include "fw_parser.h"
+#include "fw_lexer.h"
 
 using namespace ipfw;
 
