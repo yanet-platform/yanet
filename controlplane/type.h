@@ -41,9 +41,9 @@ class base_t;
 
 namespace module
 {
-	class telegraf;
-	class bus;
-	class protoBus;
+class telegraf;
+class bus;
+class protoBus;
 }
 
 }

@@ -7,7 +7,7 @@ namespace balancer
 
 enum class forwarding_method : uint8_t
 {
-	ipip,  // in services.conf it means lvs_method: TUN
+	ipip, // in services.conf it means lvs_method: TUN
 	gre,
 };
 

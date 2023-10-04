@@ -1,8 +1,8 @@
 #pragma once
 
+#include "common/counters.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
-#include "common/counters.h"
 
 #include "helper.h"
 #include "influxdb_format.h"
@@ -30,8 +30,8 @@ void ports_stats()
 	(void)values;
 
 	const std::vector<std::tuple<const char*, common::idp::port_stats_t>> ports_stats_per_type{
-	    {"port", dataplane.get_ports_stats()},
-	    {"controlPlanePort", dataplane.getControlPlanePortStats({})},
+	        {"port", dataplane.get_ports_stats()},
+	        {"controlPlanePort", dataplane.getControlPlanePortStats({})},
 	};
 
 	for (const auto& [type, ports_stats] : ports_stats_per_type)
@@ -91,15 +91,13 @@ void print_static_counters(const std::vector<uint64_t>& static_counters,
 	}
 
 	influxdb_format::print("worker", {}, values);
-
 }
 
 void unsafe()
 {
 	interface::controlPlane controlplane;
 	interface::dataPlane dataplane;
-	const auto [responseWorkers, responseWorkerGCs, responseSlowWorkerHashtableGC,
-	            responseFragmentation, responseFWState, responseTun64, response_nat64stateful, responseControlplane] = controlplane.telegraf_unsafe();
+	const auto [responseWorkers, responseWorkerGCs, responseSlowWorkerHashtableGC, responseFragmentation, responseFWState, responseTun64, response_nat64stateful, responseControlplane] = controlplane.telegraf_unsafe();
 	const auto& [responseSlowWorker, hashtable_gc] = responseSlowWorkerHashtableGC;
 
 	const auto static_counters = dataplane.getCounters(vector_range(0, (tCounterId)common::globalBase::static_counter_type::size));
@@ -187,33 +185,32 @@ void unsafe()
 		print_static_counters(static_counters,
 		                      {{"balancer_state_insert_failed", static_counter_type::balancer_state_insert_failed},
 		                       {"balancer_state_insert_done", static_counter_type::balancer_state_insert_done},
-								{"balancer_icmp_generated_echo_reply_ipv4", static_counter_type::balancer_icmp_generated_echo_reply_ipv4},
-								{"balancer_icmp_generated_echo_reply_ipv6", static_counter_type::balancer_icmp_generated_echo_reply_ipv6},
-								{"balancer_icmp_sent_to_real", static_counter_type::balancer_icmp_sent_to_real},
-								{"balancer_icmp_drop_icmpv4_payload_too_short_ip", static_counter_type::balancer_icmp_drop_icmpv4_payload_too_short_ip},
-								{"balancer_icmp_drop_icmpv4_payload_too_short_port", static_counter_type::balancer_icmp_drop_icmpv4_payload_too_short_port},
-								{"balancer_icmp_drop_icmpv6_payload_too_short_ip", static_counter_type::balancer_icmp_drop_icmpv6_payload_too_short_ip},
-								{"balancer_icmp_drop_icmpv6_payload_too_short_port", static_counter_type::balancer_icmp_drop_icmpv6_payload_too_short_port},
-								{"balancer_icmp_unmatching_src_from_original_ipv4", static_counter_type::balancer_icmp_unmatching_src_from_original_ipv4},
-								{"balancer_icmp_unmatching_src_from_original_ipv6", static_counter_type::balancer_icmp_unmatching_src_from_original_ipv6},
-								{"balancer_icmp_drop_real_disabled", static_counter_type::balancer_icmp_drop_real_disabled},
-								{"balancer_icmp_no_balancer_src_ipv4", static_counter_type::balancer_icmp_no_balancer_src_ipv4},
-								{"balancer_icmp_no_balancer_src_ipv6", static_counter_type::balancer_icmp_no_balancer_src_ipv6},
-								{"balancer_icmp_out_rate_limit_reached", static_counter_type::balancer_icmp_out_rate_limit_reached},
-								{"balancer_icmp_drop_already_cloned", static_counter_type::balancer_icmp_drop_already_cloned},
-								{"balancer_icmp_drop_no_unrdup_table_for_balancer_id", static_counter_type::balancer_icmp_drop_no_unrdup_table_for_balancer_id},
-								{"balancer_icmp_drop_unrdup_vip_not_found", static_counter_type::balancer_icmp_drop_unrdup_vip_not_found},
-								{"balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id", static_counter_type::balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id},
-								{"balancer_icmp_drop_unexpected_transport_protocol", static_counter_type::balancer_icmp_drop_unexpected_transport_protocol},
-								{"balancer_icmp_drop_unknown_service", static_counter_type::balancer_icmp_drop_unknown_service},
-								{"balancer_icmp_failed_to_clone", static_counter_type::balancer_icmp_failed_to_clone},
-								{"balancer_icmp_clone_forwarded", static_counter_type::balancer_icmp_clone_forwarded},
-								{"acl_ingress_v4_broken_packet", static_counter_type::acl_ingress_v4_broken_packet},
-								{"acl_ingress_v6_broken_packet", static_counter_type::acl_ingress_v6_broken_packet},
-								{"acl_egress_v4_broken_packet", static_counter_type::acl_egress_v4_broken_packet},
-								{"acl_egress_v6_broken_packet", static_counter_type::acl_egress_v6_broken_packet},
-								{"slow_worker_normal_priority_rate_limit_exceeded", static_counter_type::slow_worker_normal_priority_rate_limit_exceeded}
-							   });
+		                       {"balancer_icmp_generated_echo_reply_ipv4", static_counter_type::balancer_icmp_generated_echo_reply_ipv4},
+		                       {"balancer_icmp_generated_echo_reply_ipv6", static_counter_type::balancer_icmp_generated_echo_reply_ipv6},
+		                       {"balancer_icmp_sent_to_real", static_counter_type::balancer_icmp_sent_to_real},
+		                       {"balancer_icmp_drop_icmpv4_payload_too_short_ip", static_counter_type::balancer_icmp_drop_icmpv4_payload_too_short_ip},
+		                       {"balancer_icmp_drop_icmpv4_payload_too_short_port", static_counter_type::balancer_icmp_drop_icmpv4_payload_too_short_port},
+		                       {"balancer_icmp_drop_icmpv6_payload_too_short_ip", static_counter_type::balancer_icmp_drop_icmpv6_payload_too_short_ip},
+		                       {"balancer_icmp_drop_icmpv6_payload_too_short_port", static_counter_type::balancer_icmp_drop_icmpv6_payload_too_short_port},
+		                       {"balancer_icmp_unmatching_src_from_original_ipv4", static_counter_type::balancer_icmp_unmatching_src_from_original_ipv4},
+		                       {"balancer_icmp_unmatching_src_from_original_ipv6", static_counter_type::balancer_icmp_unmatching_src_from_original_ipv6},
+		                       {"balancer_icmp_drop_real_disabled", static_counter_type::balancer_icmp_drop_real_disabled},
+		                       {"balancer_icmp_no_balancer_src_ipv4", static_counter_type::balancer_icmp_no_balancer_src_ipv4},
+		                       {"balancer_icmp_no_balancer_src_ipv6", static_counter_type::balancer_icmp_no_balancer_src_ipv6},
+		                       {"balancer_icmp_out_rate_limit_reached", static_counter_type::balancer_icmp_out_rate_limit_reached},
+		                       {"balancer_icmp_drop_already_cloned", static_counter_type::balancer_icmp_drop_already_cloned},
+		                       {"balancer_icmp_drop_no_unrdup_table_for_balancer_id", static_counter_type::balancer_icmp_drop_no_unrdup_table_for_balancer_id},
+		                       {"balancer_icmp_drop_unrdup_vip_not_found", static_counter_type::balancer_icmp_drop_unrdup_vip_not_found},
+		                       {"balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id", static_counter_type::balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id},
+		                       {"balancer_icmp_drop_unexpected_transport_protocol", static_counter_type::balancer_icmp_drop_unexpected_transport_protocol},
+		                       {"balancer_icmp_drop_unknown_service", static_counter_type::balancer_icmp_drop_unknown_service},
+		                       {"balancer_icmp_failed_to_clone", static_counter_type::balancer_icmp_failed_to_clone},
+		                       {"balancer_icmp_clone_forwarded", static_counter_type::balancer_icmp_clone_forwarded},
+		                       {"acl_ingress_v4_broken_packet", static_counter_type::acl_ingress_v4_broken_packet},
+		                       {"acl_ingress_v6_broken_packet", static_counter_type::acl_ingress_v6_broken_packet},
+		                       {"acl_egress_v4_broken_packet", static_counter_type::acl_egress_v4_broken_packet},
+		                       {"acl_egress_v6_broken_packet", static_counter_type::acl_egress_v6_broken_packet},
+		                       {"slow_worker_normal_priority_rate_limit_exceeded", static_counter_type::slow_worker_normal_priority_rate_limit_exceeded}});
 	}
 
 	/// worker gc
@@ -298,13 +295,13 @@ void unsafe()
 	for (const auto& [moduleName, stats] : responseTun64)
 	{
 		influxdb_format::print("tun64",
-				       {{"name", moduleName}},
-				       {{"encap_packets", stats.encap_packets},
-				        {"encap_bytes", stats.encap_bytes},
-				        {"encap_dropped", stats.encap_dropped},
-					{"decap_packets", stats.decap_packets},
-					{"decap_bytes", stats.decap_bytes},
-					{"decap_unknown", stats.decap_unknown}});
+		                       {{"name", moduleName}},
+		                       {{"encap_packets", stats.encap_packets},
+		                        {"encap_bytes", stats.encap_bytes},
+		                        {"encap_dropped", stats.encap_dropped},
+		                        {"decap_packets", stats.decap_packets},
+		                        {"decap_bytes", stats.decap_bytes},
+		                        {"decap_unknown", stats.decap_unknown}});
 	}
 
 	for (const auto& [name, stats] : response_nat64stateful)
@@ -331,23 +328,26 @@ void unsafe()
 
 		influxdb_format::print_histogram("nat64stateful",
 		                                 {{"name", name}},
-		                                 "try", "state_insert_collision", stats, module_counter::tries_array_start, module_counter::tries_array_end);
+		                                 "try",
+		                                 "state_insert_collision",
+		                                 stats,
+		                                 module_counter::tries_array_start,
+		                                 module_counter::tries_array_end);
 	}
 
 	for (const auto& [name, duration] : durations)
 	{
 		influxdb_format::print("duration",
-				       {{"name", name}},
-				       {{"duration", duration, ""}});
+		                       {{"name", name}},
+		                       {{"duration", duration, ""}});
 	}
 
 	for (const auto& [name, counter] : responseControlplane)
 	{
 		influxdb_format::print("controlplane",
-				       {{"name", name}},
-				       {{"value", counter}});
+		                       {{"name", name}},
+		                       {{"value", counter}});
 	}
-
 }
 
 void dregress()
@@ -381,11 +381,17 @@ void dregress()
 	counters_v4.convert_update(communities,
 	                           {{true, "best"},
 	                            {false, "alternative"}},
-	                           {}, {}, {}, {});
+	                           {},
+	                           {},
+	                           {},
+	                           {});
 	counters_v6.convert_update(communities,
 	                           {{true, "best"},
 	                            {false, "alternative"}},
-	                           {}, {}, {}, {});
+	                           {},
+	                           {},
+	                           {},
+	                           {});
 
 	counters_v4.print({"link_id", // along with peer_name
 	                   "route",
@@ -394,48 +400,46 @@ void dregress()
 	                   "origin_as",
 	                   "prefix"},
 	                  [](const std::string& key,
-	                     const std::array<uint64_t, 4>& values)
-	{
-		printf("dregress_v4%s ack=%luu,loss=%luu\n",
-		       key.data(),
-		       values[0],
-		       values[1]);
+	                     const std::array<uint64_t, 4>& values) {
+		                  printf("dregress_v4%s ack=%luu,loss=%luu\n",
+		                         key.data(),
+		                         values[0],
+		                         values[1]);
 
-		if (values[3])
-		{
-			printf("dregress_rtt_v4%s "
-			       "rtt_sum=%luu,"
-			       "rtt_count=%luu\n",
-			       key.data(),
-			       values[2],
-			       values[3]);
-		}
-	});
+		                  if (values[3])
+		                  {
+			                  printf("dregress_rtt_v4%s "
+			                         "rtt_sum=%luu,"
+			                         "rtt_count=%luu\n",
+			                         key.data(),
+			                         values[2],
+			                         values[3]);
+		                  }
+	                  });
 
-	counters_v6.print({"link_id",  // along with peer_name
+	counters_v6.print({"link_id", // along with peer_name
 	                   "route",
 	                   "label",
 	                   "peer_as",
 	                   "origin_as",
 	                   "prefix"},
 	                  [](const std::string& key,
-	                     const std::array<uint64_t, 4>& values)
-	{
-		printf("dregress_v6%s ack=%luu,loss=%luu\n",
-		       key.data(),
-		       values[0],
-		       values[1]);
+	                     const std::array<uint64_t, 4>& values) {
+		                  printf("dregress_v6%s ack=%luu,loss=%luu\n",
+		                         key.data(),
+		                         values[0],
+		                         values[1]);
 
-		if (values[3])
-		{
-			printf("dregress_rtt_v6%s "
-			       "rtt_sum=%luu,"
-			       "rtt_count=%luu\n",
-			       key.data(),
-			       values[2],
-			       values[3]);
-		}
-	});
+		                  if (values[3])
+		                  {
+			                  printf("dregress_rtt_v6%s "
+			                         "rtt_sum=%luu,"
+			                         "rtt_count=%luu\n",
+			                         key.data(),
+			                         values[2],
+			                         values[3]);
+		                  }
+	                  });
 }
 
 void dregress_traffic()
@@ -449,8 +453,7 @@ void dregress_traffic()
 		replaceAll(peer_name, " ", "\\ ");
 
 		influxdb_format::print(is_ipv4 ? "dregress_traffic_v4" : "dregress_traffic_v6",
-		                       {{"peer_link", peer_name, {.optional_null = "n/s",
-		                                                  .string_empty = "empty"}}},
+		                       {{"peer_link", peer_name, {.optional_null = "n/s", .string_empty = "empty"}}},
 		                       {{"packets", packets},
 		                        {"bytes", bytes}});
 	}
@@ -458,15 +461,15 @@ void dregress_traffic()
 	std::map<std::tuple<bool, ///< is_ipv4
 	                    std::string>, ///< link_name
 	         std::tuple<common::uint64, ///< packets
-	                    common::uint64>> peer_only;
+	                    common::uint64>>
+	        peer_only;
 	for (const auto& [is_ipv4, peer_name_orig, origin_as, packets, bytes] : peer_as)
 	{
 		std::string peer_name = peer_name_orig;
 		replaceAll(peer_name, " ", "\\ ");
 
 		influxdb_format::print(is_ipv4 ? "dregress_traffic_as_v4" : "dregress_traffic_as_v6",
-		                       {{"peer_link", peer_name, {.optional_null = "n/s",
-		                                                  .string_empty = "empty"}},
+		                       {{"peer_link", peer_name, {.optional_null = "n/s", .string_empty = "empty"}},
 		                        {"origin_as", origin_as}},
 		                       {{"packets", packets},
 		                        {"bytes", bytes}});
@@ -482,8 +485,7 @@ void dregress_traffic()
 		const auto& [packets, bytes] = value;
 
 		influxdb_format::print(is_ipv4 ? "dregress_traffic_as_v4" : "dregress_traffic_as_v6",
-		                       {{"peer_link", peer_name, {.optional_null = "n/s",
-		                                                  .string_empty = "empty"}}},
+		                       {{"peer_link", peer_name, {.optional_null = "n/s", .string_empty = "empty"}}},
 		                       {{"packets", packets},
 		                        {"bytes", bytes}});
 	}
@@ -521,8 +523,7 @@ void other()
 		                        {"priority", priority},
 		                        {"protocol", protocol},
 		                        {"peer", peer},
-		                        {"table_name", table_name, {.optional_null = "n/s",
-		                                                    .string_empty = "n/s"}}},
+		                        {"table_name", table_name, {.optional_null = "n/s", .string_empty = "n/s"}}},
 		                       {{"prefixes", prefixes},
 		                        {"paths", paths},
 		                        {"eor", (uint32_t)eor}});
@@ -548,13 +549,13 @@ void mappings()
 		const auto& [module, ipv4_address, ipv6_address, stats] = mapping;
 
 		influxdb_format::print("tun64",
-				       {{"name", module},
-				        {"ipv4", ipv4_address},
-					{"ipv6", ipv6_address}},
-				       {{"encap_packets", stats.encap_packets},
-				        {"encap_bytes", stats.encap_bytes},
-					{"decap_packets", stats.decap_packets},
-					{"decap_bytes", stats.decap_bytes}});
+		                       {{"name", module},
+		                        {"ipv4", ipv4_address},
+		                        {"ipv6", ipv6_address}},
+		                       {{"encap_packets", stats.encap_packets},
+		                        {"encap_bytes", stats.encap_bytes},
+		                        {"decap_packets", stats.decap_packets},
+		                        {"decap_bytes", stats.decap_bytes}});
 	}
 }
 
@@ -578,7 +579,9 @@ void service()
 			(void)nap_connections;
 
 			common::idp::balancer_service_connections::service_key_t key = {module_id,
-			                                                                virtual_ip, proto, virtual_port};
+			                                                                virtual_ip,
+			                                                                proto,
+			                                                                virtual_port};
 
 			uint32_t connections = 0;
 			for (auto& [socket_id, service_connections] : balancer_service_connections)

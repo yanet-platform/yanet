@@ -1,23 +1,23 @@
 #include <sys/un.h>
 
+#include <rte_errno.h>
+#include <rte_ethdev.h>
+#include <rte_ip.h>
+#include <rte_kni.h>
 #include <rte_lcore.h>
 #include <rte_malloc.h>
-#include <rte_ethdev.h>
-#include <rte_kni.h>
-#include <rte_ip.h>
-#include <rte_errno.h>
 
 #include "common/version.h"
 
+#include "checksum.h"
 #include "common.h"
 #include "controlplane.h"
 #include "dataplane.h"
-#include "worker.h"
-#include "metadata.h"
-#include "checksum.h"
-#include "icmp.h"
-#include "prepare.h"
 #include "debug_latch.h"
+#include "icmp.h"
+#include "metadata.h"
+#include "prepare.h"
+#include "worker.h"
 
 cControlPlane::cControlPlane(cDataPlane* dataPlane) :
         dataPlane(dataPlane),
@@ -26,7 +26,7 @@ cControlPlane::cControlPlane(cDataPlane* dataPlane) :
         mempool(nullptr),
         useKni(false),
         slowWorker(nullptr),
-		prevTimePointForSWRateLimiter(std::chrono::high_resolution_clock::now())
+        prevTimePointForSWRateLimiter(std::chrono::high_resolution_clock::now())
 {
 	memset(&stats, 0, sizeof(stats));
 }
@@ -259,7 +259,6 @@ eResult cControlPlane::updateGlobalBaseBalancer(const common::idp::updateGlobalB
 
 	return eResult::success;
 }
-
 
 common::idp::getGlobalBase::response cControlPlane::getGlobalBase(const common::idp::getGlobalBase::request& request)
 {
@@ -626,7 +625,7 @@ common::idp::getAclCounters::response cControlPlane::getAclCounters()
 	response.resize(YANET_CONFIG_ACL_COUNTERS_SIZE);
 	for (const auto& [coreId, worker] : dataPlane->workers)
 	{
-		(void) coreId;
+		(void)coreId;
 
 		for (size_t i = 0; i < YANET_CONFIG_ACL_COUNTERS_SIZE; i++)
 		{
@@ -1023,8 +1022,7 @@ common::idp::balancer_connection::response cControlPlane::balancer_connection(co
 		auto& response_connections = response[worker_gc->socket_id];
 
 		uint32_t offset = 0;
-		worker_gc->run_on_this_thread([&, worker_gc = worker_gc]()
-		{
+		worker_gc->run_on_this_thread([&, worker_gc = worker_gc]() {
 			const auto& [filter_balancer_id, filter_virtual_ip, filter_proto, filter_virtual_port, filter_real_ip, filter_real_port] = request;
 
 			const auto& base = worker_gc->bases[worker_gc->local_base_id & 1];
@@ -1085,10 +1083,10 @@ common::idp::balancer_connection::response cControlPlane::balancer_connection(co
 					(void)filter_real_port;
 
 					auto& connections = response_connections[{balancer_id,
-					                                         virtual_ip,
-					                                         proto,
-					                                         rte_be_to_cpu_16(virtual_port),
-					                                         {real_ip, rte_be_to_cpu_16(real_port)}}];
+					                                          virtual_ip,
+					                                          proto,
+					                                          rte_be_to_cpu_16(virtual_port),
+					                                          {real_ip, rte_be_to_cpu_16(real_port)}}];
 
 					connections.emplace_back(client_ip,
 					                         rte_be_to_cpu_16(client_port),
@@ -1340,7 +1338,7 @@ void cControlPlane::waitAllWorkers()
 
 		uint64_t startIteration = worker->iteration;
 		uint64_t nextIteration = startIteration;
-		while(nextIteration - startIteration <= (uint64_t)16)
+		while (nextIteration - startIteration <= (uint64_t)16)
 		{
 			YADECAP_MEMORY_BARRIER_COMPILE;
 			nextIteration = worker->iteration;
@@ -1353,7 +1351,7 @@ void cControlPlane::waitAllWorkers()
 
 		uint64_t startIteration = worker->iteration;
 		uint64_t nextIteration = startIteration;
-		while(nextIteration - startIteration <= (uint64_t)16)
+		while (nextIteration - startIteration <= (uint64_t)16)
 		{
 			YADECAP_MEMORY_BARRIER_COMPILE;
 			nextIteration = worker->iteration;
@@ -1366,10 +1364,7 @@ void cControlPlane::waitAllWorkers()
 eResult cControlPlane::initMempool()
 {
 	mempool = rte_mempool_create("cp",
-	                             CONFIG_YADECAP_MBUFS_COUNT + dataPlane->getConfigValue(eConfigType::fragmentation_size)
-	                             + dataPlane->getConfigValue(eConfigType::master_mempool_size)
-	                             + 4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE
-	                             + 4 * dataPlane->ports.size() * 4096, ///< for KNI (in/out/drop/kni)
+	                             CONFIG_YADECAP_MBUFS_COUNT + dataPlane->getConfigValue(eConfigType::fragmentation_size) + dataPlane->getConfigValue(eConfigType::master_mempool_size) + 4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE + 4 * dataPlane->ports.size() * 4096, ///< for KNI (in/out/drop/kni)
 	                             CONFIG_YADECAP_MBUF_SIZE,
 	                             0,
 	                             sizeof(struct rte_pktmbuf_pool_private),
@@ -1675,7 +1670,7 @@ eResult cControlPlane::initKnis()
 	return eResult::success;
 }
 
-void cControlPlane::flushKni(rte_kni* kni, sKniStats& stats, rte_mbuf **mbufs, uint32_t& count)
+void cControlPlane::flushKni(rte_kni* kni, sKniStats& stats, rte_mbuf** mbufs, uint32_t& count)
 {
 	uint32_t packetsLength = 0;
 
@@ -1699,7 +1694,7 @@ void cControlPlane::flushKni(rte_kni* kni, sKniStats& stats, rte_mbuf **mbufs, u
 	count = 0;
 }
 
-void cControlPlane::flushDump(rte_kni* kni, rte_mbuf **mbufs, uint32_t& count)
+void cControlPlane::flushDump(rte_kni* kni, rte_mbuf** mbufs, uint32_t& count)
 {
 	if (!count)
 	{
@@ -1721,7 +1716,7 @@ void cControlPlane::mainThread()
 
 	uint32_t prevTime = 0;
 
-	for(;;)
+	for (;;)
 	{
 		currentTime = time(nullptr);
 
@@ -1780,26 +1775,26 @@ void cControlPlane::mainThread()
 
 		for (auto& iter : knis)
 		{
-			auto &[name, kni, stats, mbufs, count] = iter.second;
-			(void) name;
+			auto& [name, kni, stats, mbufs, count] = iter.second;
+			(void)name;
 			flushKni(kni, stats, mbufs.data(), count);
 		}
 		for (auto& iter : ingress_dump_knis)
 		{
-			auto &[name, kni, mbufs, count] = iter.second;
-			(void) name;
+			auto& [name, kni, mbufs, count] = iter.second;
+			(void)name;
 			flushDump(kni, mbufs.data(), count);
 		}
 		for (auto& iter : egress_dump_knis)
 		{
-			auto &[name, kni, mbufs, count] = iter.second;
-			(void) name;
+			auto& [name, kni, mbufs, count] = iter.second;
+			(void)name;
 			flushDump(kni, mbufs.data(), count);
 		}
 		for (auto& iter : drop_dump_knis)
 		{
-			auto &[name, kni, mbufs, count] = iter.second;
-			(void) name;
+			auto& [name, kni, mbufs, count] = iter.second;
+			(void)name;
 			flushDump(kni, mbufs.data(), count);
 		}
 
@@ -1893,8 +1888,8 @@ void cControlPlane::mainThread()
 			rte_kni_handle_request(kni);
 
 			unsigned rxSize = rte_kni_rx_burst(kni,
-							   mbufs,
-							   CONFIG_YADECAP_MBUFS_BURST_SIZE);
+			                                   mbufs,
+			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
 			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
 			{
 				rte_mbuf* mbuf = mbufs[mbuf_i];
@@ -1936,7 +1931,7 @@ void cControlPlane::mainThread()
 }
 
 unsigned cControlPlane::ring_handle(rte_ring* ring_to_free_mbuf,
-                                rte_ring* ring)
+                                    rte_ring* ring)
 {
 	rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 
@@ -2038,7 +2033,6 @@ void cControlPlane::handlePacketFromForwardingPlane(rte_mbuf* mbuf)
 
 #endif
 
-
 	auto iter = knis.find(metadata->fromPortId);
 	if (iter == knis.end())
 	{
@@ -2051,8 +2045,8 @@ void cControlPlane::handlePacketFromForwardingPlane(rte_mbuf* mbuf)
 		return;
 	}
 
-	auto &[name, kni, stats, mbufs, count] = iter->second;
-	(void) name;
+	auto& [name, kni, stats, mbufs, count] = iter->second;
+	(void)name;
 	mbufs[count++] = mbuf;
 	if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
 	{
@@ -2263,7 +2257,7 @@ static bool do_icmp_translate_v6_to_v4(rte_mbuf* mbuf,
 		nextPayloadHeader = IPPROTO_ICMP;
 	}
 
-	rte_ipv4_hdr* ipv4PayloadHeader = (rte_ipv4_hdr*)((char *)ipv6PayloadHeader + ipv6PayloadHeaderSize - sizeof(rte_ipv4_hdr));
+	rte_ipv4_hdr* ipv4PayloadHeader = (rte_ipv4_hdr*)((char*)ipv6PayloadHeader + ipv6PayloadHeaderSize - sizeof(rte_ipv4_hdr));
 
 	ipv4PayloadHeader->version_ihl = 0x45;
 	ipv4PayloadHeader->type_of_service = (rte_be_to_cpu_32(ipv6PayloadHeader->vtc_flow) >> 20) & 0xFF;
@@ -2433,13 +2427,13 @@ static bool do_icmp_translate_v4_to_v6(rte_mbuf* mbuf,
 			return false;
 		}
 	}
-	else if(type == ICMP_TIME_EXCEEDED)
+	else if (type == ICMP_TIME_EXCEEDED)
 	{
 		type = ICMP6_TIME_EXCEEDED;
 	}
-	else if(type == ICMP_PARAMETERPROB)
+	else if (type == ICMP_PARAMETERPROB)
 	{
-		if (code !=0 && code != 2)
+		if (code != 0 && code != 2)
 		{
 			return false;
 		}
@@ -2552,7 +2546,8 @@ static bool do_icmp_translate_v4_to_v6(rte_mbuf* mbuf,
 
 	ipv6PayloadHeader->vtc_flow = rte_cpu_to_be_32((0x6 << 28) | (ipv4PayloadHeader->type_of_service << 20));
 	ipv6PayloadHeader->payload_len = rte_cpu_to_be_16(rte_be_to_cpu_16(ipv4PayloadHeader->total_length) - 20 + (ipv6PayloadHeaderSize - 40));
-	ipv6PayloadHeader->hop_limits = ipv4PayloadHeader->time_to_live;;
+	ipv6PayloadHeader->hop_limits = ipv4PayloadHeader->time_to_live;
+	;
 
 	memcpy(ipv6PayloadHeader->src_addr, translation.ipv6Address.bytes, 16);
 
@@ -2675,9 +2670,7 @@ void cControlPlane::handlePacket_fragment(rte_mbuf* mbuf)
 	const auto& base = slowWorker->bases[slowWorker->localBaseId & 1];
 	const auto& nat64stateless = base.globalBase->nat64statelesses[metadata->flow.data.nat64stateless.id];
 
-	if (nat64stateless.defrag_farm_prefix.empty()
-		|| metadata->network_headerType != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)
-		|| nat64stateless.farm)
+	if (nat64stateless.defrag_farm_prefix.empty() || metadata->network_headerType != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4) || nat64stateless.farm)
 	{
 		fragmentation.insert(mbuf);
 		return;
@@ -2770,8 +2763,8 @@ void cControlPlane::handlePacket_fw_state_sync(rte_mbuf* mbuf)
 			*YADECAP_METADATA(mbuf_clone) = *YADECAP_METADATA(mbuf);
 
 			memcpy(rte_pktmbuf_mtod(mbuf_clone, char*),
-				   rte_pktmbuf_mtod(mbuf, char*),
-				   mbuf->data_len);
+			       rte_pktmbuf_mtod(mbuf, char*),
+			       mbuf->data_len);
 			mbuf_clone->data_len = mbuf->data_len;
 			mbuf_clone->pkt_len = mbuf->pkt_len;
 
@@ -2849,9 +2842,9 @@ bool cControlPlane::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 	for (size_t idx = 0; idx < udp_payload_len / sizeof(dataplane::globalBase::fw_state_sync_frame_t); ++idx)
 	{
 		dataplane::globalBase::fw_state_sync_frame_t* payload = rte_pktmbuf_mtod_offset(
-		    mbuf,
-		    dataplane::globalBase::fw_state_sync_frame_t*,
-		    sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + sizeof(rte_ipv6_hdr) + sizeof(rte_udp_hdr) + idx * sizeof(dataplane::globalBase::fw_state_sync_frame_t));
+		        mbuf,
+		        dataplane::globalBase::fw_state_sync_frame_t*,
+		        sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + sizeof(rte_ipv6_hdr) + sizeof(rte_udp_hdr) + idx * sizeof(dataplane::globalBase::fw_state_sync_frame_t));
 
 		if (payload->addr_type == 6)
 		{
@@ -3084,9 +3077,9 @@ void cControlPlane::handlePacket_balancer_icmp_forward(rte_mbuf* mbuf)
 		return;
 	}
 
-	const auto & neighbor_balancers = vip_to_balancers[balancer_id][original_src_from_icmp_payload];
+	const auto& neighbor_balancers = vip_to_balancers[balancer_id][original_src_from_icmp_payload];
 
-	for (const auto &neighbor_balancer : neighbor_balancers)
+	for (const auto& neighbor_balancer : neighbor_balancers)
 	{
 		// will not send a cloned packet if source address in "balancer" section of controlplane.conf is absent
 		if (neighbor_balancer.is_ipv4() && !base.globalBase->balancers[metadata->flow.data.balancer.id].source_ipv4.address)
@@ -3112,8 +3105,8 @@ void cControlPlane::handlePacket_balancer_icmp_forward(rte_mbuf* mbuf)
 		dataplane::metadata* clone_metadata = YADECAP_METADATA(mbuf_clone);
 
 		rte_memcpy(rte_pktmbuf_mtod(mbuf_clone, char*),
-		       rte_pktmbuf_mtod(mbuf, char*),
-		       mbuf->data_len);
+		           rte_pktmbuf_mtod(mbuf, char*),
+		           mbuf->data_len);
 
 		if (neighbor_balancer.is_ipv4())
 		{
@@ -3166,19 +3159,19 @@ void cControlPlane::handlePacket_balancer_icmp_forward(rte_mbuf* mbuf)
 		{
 			rte_pktmbuf_prepend(mbuf_clone, sizeof(rte_ipv6_hdr));
 			memmove(rte_pktmbuf_mtod(mbuf_clone, char*),
-		           rte_pktmbuf_mtod_offset(mbuf_clone, char*, sizeof(rte_ipv6_hdr)),
-		           clone_metadata->network_headerOffset);
+			        rte_pktmbuf_mtod_offset(mbuf_clone, char*, sizeof(rte_ipv6_hdr)),
+			        clone_metadata->network_headerOffset);
 
 			rte_ipv6_hdr* outerIpv6Header = rte_pktmbuf_mtod_offset(mbuf_clone, rte_ipv6_hdr*, clone_metadata->network_headerOffset);
 
 			rte_memcpy(outerIpv6Header->src_addr, base.globalBase->balancers[metadata->flow.data.balancer.id].source_ipv6.bytes, sizeof(outerIpv6Header->src_addr));
 			if (src_from_ip_header.is_ipv6())
 			{
-				((uint32_t *)outerIpv6Header->src_addr)[2] = ((uint32_t *)src_from_ip_header.get_ipv6().data())[2] ^ ((uint32_t *)src_from_ip_header.get_ipv6().data())[3];
+				((uint32_t*)outerIpv6Header->src_addr)[2] = ((uint32_t*)src_from_ip_header.get_ipv6().data())[2] ^ ((uint32_t*)src_from_ip_header.get_ipv6().data())[3];
 			}
 			else
 			{
-				((uint32_t *)outerIpv6Header->src_addr)[2] = src_from_ip_header.get_ipv4();
+				((uint32_t*)outerIpv6Header->src_addr)[2] = src_from_ip_header.get_ipv4();
 			}
 			rte_memcpy(outerIpv6Header->dst_addr, neighbor_balancer.get_ipv6().data(), sizeof(outerIpv6Header->dst_addr));
 
@@ -3362,11 +3355,10 @@ void cControlPlane::SWRateLimiterTimeTracker()
 	std::chrono::high_resolution_clock::time_point curTimePointForSWRateLimiter = std::chrono::high_resolution_clock::now();
 
 	// is it time to reset icmpPacketsToSW counters?
-	if (std::chrono::duration_cast<std::chrono::milliseconds>(curTimePointForSWRateLimiter - prevTimePointForSWRateLimiter)
-		 >= std::chrono::milliseconds(1000 / dataPlane->config.rateLimitDivisor))
+	if (std::chrono::duration_cast<std::chrono::milliseconds>(curTimePointForSWRateLimiter - prevTimePointForSWRateLimiter) >= std::chrono::milliseconds(1000 / dataPlane->config.rateLimitDivisor))
 	{
 		// the only place thread-shared variable icmpPacketsToSW is changed
-		for (auto &[coreId, worker]: dataPlane->workers)
+		for (auto& [coreId, worker] : dataPlane->workers)
 		{
 			(void)coreId;
 

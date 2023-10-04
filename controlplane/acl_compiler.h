@@ -3,13 +3,13 @@
 #include "acl/rule.h"
 
 #include "acl_base.h"
-#include "acl_rule.h"
+#include "acl_flat.h"
 #include "acl_network.h"
 #include "acl_network_table.h"
-#include "acl_flat.h"
+#include "acl_rule.h"
+#include "acl_total_table.h"
 #include "acl_transport.h"
 #include "acl_transport_table.h"
-#include "acl_total_table.h"
 #include "acl_value.h"
 
 namespace acl

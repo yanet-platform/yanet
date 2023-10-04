@@ -1,11 +1,11 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
+#include "checksum.h"
+#include "controlplane.h"
 #include "dregress.h"
 #include "metadata.h"
-#include "controlplane.h"
 #include "worker.h"
-#include "checksum.h"
 
 dregress_t::dregress_t(cControlPlane* controlplane,
                        cDataPlane* dataplane) :
@@ -145,17 +145,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 			{
 				stats.tcp_insert_sessions++;
 
-				connections->insert(key, {loss_count,
-				                          ack_count,
-				                          labelled_nexthop,
-				                          label,
-				                          community,
-				                          prefix_address,
-				                          peer_as,
-				                          origin_as,
-				                          (uint16_t)controlplane->currentTime,
-				                          (is_best ? YANET_DREGRESS_FLAG_IS_BEST : (uint8_t)0),
-				                          prefix_mask});
+				connections->insert(key, {loss_count, ack_count, labelled_nexthop, label, community, prefix_address, peer_as, origin_as, (uint16_t)controlplane->currentTime, (is_best ? YANET_DREGRESS_FLAG_IS_BEST : (uint8_t)0), prefix_mask});
 
 				if (tcpHeader->tcp_flags & TCP_FIN_FLAG)
 				{
@@ -447,7 +437,8 @@ std::optional<dregress::direction_t> dregress_t::lookup(rte_mbuf* mbuf)
 
 	std::map<std::tuple<common::ip_address_t, ///< nexthop
 	                    uint32_t>, ///< label
-	         dregress::direction_t> directions;
+	         dregress::direction_t>
+	        directions;
 
 	uint8_t mask_max = 0;
 
@@ -489,8 +480,7 @@ std::optional<dregress::direction_t> dregress_t::lookup(rte_mbuf* mbuf)
 			}
 		}
 
-		auto append = [this, &directions, &prefix, &mask_max](const uint32_t& value_id, const uint32_t mask)
-		{
+		auto append = [this, &directions, &prefix, &mask_max](const uint32_t& value_id, const uint32_t mask) {
 			auto it = values.find(value_id);
 			if (it != values.end())
 			{

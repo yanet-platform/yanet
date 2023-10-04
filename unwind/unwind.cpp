@@ -40,7 +40,8 @@ void dump_result(const acl::result_t& result)
 		}
 		std::cout << " ]";
 	}
-	std::cout << std::endl << "rules:" << std::endl;
+	std::cout << std::endl
+	          << "rules:" << std::endl;
 	for (const auto& [ruleno, rules] : result.rules)
 	{
 		for (const auto& [id, gen_text, orig_text] : rules)
@@ -49,26 +50,32 @@ void dump_result(const acl::result_t& result)
 			std::cout << "\t" << gen_text << std::endl;
 		}
 	}
-	std::cout << std::endl << "dispatcher:" << std::endl;
+	std::cout << std::endl
+	          << "dispatcher:" << std::endl;
 	for (const auto& [id, gen_text, orig_text] : result.dispatcher)
 	{
 		std::cout << id << ": " << gen_text << std::endl;
 	}
-	std::cout << std::endl << "in_iface_map:" << std::endl;
+	std::cout << std::endl
+	          << "in_iface_map:" << std::endl;
 	for (const auto& [name, id] : result.in_iface_map)
 	{
 		std::cout << name << ": " << id << std::endl;
 	}
-	std::cout << std::endl << "out_iface_map:" << std::endl;
+	std::cout << std::endl
+	          << "out_iface_map:" << std::endl;
 	for (const auto& [name, id] : result.out_iface_map)
 	{
 		std::cout << name << ": " << id << std::endl;
 	}
 }
 
-namespace acl {
+namespace acl
+{
 std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::base::acl_t>& acls,
-        const iface_map_t& iface_map, ref_t<filter_t> filter, result_t& result);
+                                      const iface_map_t& iface_map,
+                                      ref_t<filter_t> filter,
+                                      result_t& result);
 };
 
 void usage(const std::string& name)
@@ -89,21 +96,21 @@ int main(int argc, char* argv[])
 	{
 		switch (ch)
 		{
-		case 'f':
-			fname = optarg;
-			break;
-		case 'i':
-			iif.emplace(optarg);
-			break;
-		case 'I':
-			// default input interface
-			iif.emplace("vlan1");
-			break;
-		case 'o':
-			oif.emplace(optarg);
-			break;
-		default:
-			usage(argv[0]);
+			case 'f':
+				fname = optarg;
+				break;
+			case 'i':
+				iif.emplace(optarg);
+				break;
+			case 'I':
+				// default input interface
+				iif.emplace("vlan1");
+				break;
+			case 'o':
+				oif.emplace(optarg);
+				break;
+			default:
+				usage(argv[0]);
 		}
 	}
 
@@ -132,7 +139,8 @@ int main(int argc, char* argv[])
 	auto rules_used = acl::unwind_used_rules(acls, ifmap, nullptr, result);
 
 	dump_result(result);
-	std::cout << std::endl << "Used rules:" << std::endl;
+	std::cout << std::endl
+	          << "Used rules:" << std::endl;
 	for (auto& rule : rules_used)
 	{
 		std::cout << rule.to_string() << std::endl;

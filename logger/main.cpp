@@ -1,18 +1,18 @@
+#include <fstream>
 #include <signal.h>
 #include <systemd/sd-daemon.h>
 #include <thread>
-#include <fstream>
 
 #include <iostream>
 #include <rte_eal.h>
-#include <rte_ring.h>
 #include <rte_mempool.h>
+#include <rte_ring.h>
 #include <rte_version.h>
 
-#include "common/result.h"
-#include "common/type.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
+#include "common/result.h"
+#include "common/type.h"
 
 #include "dataplane/samples.h"
 
@@ -42,7 +42,7 @@ int initLogger()
 	auto response = dataplane.getConfig();
 	auto& workers = std::get<1>(response);
 
-	for (auto it: workers)
+	for (auto it : workers)
 	{
 		auto coreId = it.first;
 		auto ring = rte_ring_lookup(("r_log_" + std::to_string(coreId)).c_str());
@@ -91,28 +91,26 @@ int runLogger()
 	interface::controlPlane controlplane;
 
 	uint32_t size = 1024;
-	samples::sample_t * samples[size];
+	samples::sample_t* samples[size];
 
 	std::map<uint32_t, common::icp::getAclConfig::response> configs;
 
 	common::icp::getAclConfig::response* aclConfig = nullptr;
-	for(;;)
+	for (;;)
 	{
 		uint32_t packets = 0;
 
-		for (auto ring: rings)
+		for (auto ring : rings)
 		{
 			auto count = rte_ring_dequeue_burst(ring, (void**)&samples, size, nullptr);
 			packets += count;
 
 			for (uint32_t i = 0; i < count; i++)
 			{
-				samples::sample_t * sample = samples[i];
+				samples::sample_t* sample = samples[i];
 
-				common::ip_address_t src_addr = sample->is_ipv6 ?
-					common::ip_address_t(sample->ipv6_src_addr.bytes) : common::ip_address_t(rte_be_to_cpu_32(sample->ipv4_src_addr.address));
-				common::ip_address_t dst_addr = sample->is_ipv6 ?
-						common::ip_address_t(sample->ipv6_dst_addr.bytes) : common::ip_address_t(rte_be_to_cpu_32(sample->ipv4_dst_addr.address));
+				common::ip_address_t src_addr = sample->is_ipv6 ? common::ip_address_t(sample->ipv6_src_addr.bytes) : common::ip_address_t(rte_be_to_cpu_32(sample->ipv4_src_addr.address));
+				common::ip_address_t dst_addr = sample->is_ipv6 ? common::ip_address_t(sample->ipv6_dst_addr.bytes) : common::ip_address_t(rte_be_to_cpu_32(sample->ipv4_dst_addr.address));
 
 				if (aclConfig == nullptr || sample->serial != std::get<0>(*aclConfig))
 				{
@@ -133,11 +131,15 @@ int runLogger()
 							}
 							configs[sample->serial] = conf;
 							aclConfig = &configs[sample->serial];
-						} else {
+						}
+						else
+						{
 							YANET_LOG_WARNING("can not get acl config for serial %d\n", sample->serial);
 							aclConfig = nullptr;
 						}
-					} else {
+					}
+					else
+					{
 						aclConfig = &it->second;
 					}
 				}
@@ -152,30 +154,30 @@ int runLogger()
 					(void)serial;
 
 					auto it = ifaces.find(sample->acl_id);
-					if (it != ifaces.end()) {
+					if (it != ifaces.end())
+					{
 						direction = std::get<0>(*it->second.begin());
 						iface = std::get<1>(*it->second.begin());
 					}
 					if (sample->counter_id < rules.size() && !rules[sample->counter_id].empty())
 					{
 						auto& v = rules[sample->counter_id];
-						rule_ids = std::accumulate(v.begin() + 1, v.end(), std::to_string(v[0]),
-								[](const std::string& a, int b){
+						rule_ids = std::accumulate(v.begin() + 1, v.end(), std::to_string(v[0]), [](const std::string& a, int b) {
 							return a + ',' + std::to_string(b);
 						});
 					}
 				}
 
 				std::cout << "{"
-						<< "\"action\":\"" << common::globalBase::eFlowType_toString(sample->action) << "\","
-						<< "\"rule_ids\":[" << rule_ids << "],"
-						<< "\"direction\":" << (direction ? "\"in\"" : "\"out\"") << ","
-						<< "\"iface\":\"" << iface << "\","
-						<< "\"proto\":" << (int)sample->proto << ","
-						<< "\"src_addr\":\"" << src_addr.toString() << "\","
-						<< "\"src_port\":" << sample->src_port << ","
-						<< "\"dst_addr\":\"" << dst_addr.toString() << "\","
-						<< "\"dst_port\":" << sample->dst_port << "}\n";
+				          << "\"action\":\"" << common::globalBase::eFlowType_toString(sample->action) << "\","
+				          << "\"rule_ids\":[" << rule_ids << "],"
+				          << "\"direction\":" << (direction ? "\"in\"" : "\"out\"") << ","
+				          << "\"iface\":\"" << iface << "\","
+				          << "\"proto\":" << (int)sample->proto << ","
+				          << "\"src_addr\":\"" << src_addr.toString() << "\","
+				          << "\"src_port\":" << sample->src_port << ","
+				          << "\"dst_addr\":\"" << dst_addr.toString() << "\","
+				          << "\"dst_port\":" << sample->dst_port << "}\n";
 
 				rte_mempool_put(mempool, sample);
 			}
@@ -234,7 +236,7 @@ int main(int argc,
          char** argv)
 {
 	int config = argc;
-	for (int i = 1 ; i < argc; i++)
+	for (int i = 1; i < argc; i++)
 	{
 		if (strcmp(argv[i], "-d") == 0)
 		{
@@ -244,7 +246,6 @@ int main(int argc,
 		{
 			config = i + 1;
 		}
-
 	}
 	if (config >= argc)
 	{

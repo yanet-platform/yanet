@@ -2,13 +2,13 @@
 
 #include <mutex>
 
-#include "common/type.h"
-#include "common/result.h"
 #include "common/btree.h"
 #include "common/idp.h"
+#include "common/result.h"
+#include "common/type.h"
 
-#include "type.h"
 #include "hashtable.h"
+#include "type.h"
 
 namespace dregress
 {

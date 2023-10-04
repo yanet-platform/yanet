@@ -27,7 +27,7 @@ nlohmann::json loadConfig()
 		throw error.str();
 	}
 
-	return  nlohmann::json::parse(stream);
+	return nlohmann::json::parse(stream);
 }
 
 // saves config to fs and send command to controlplane for reloading it
@@ -111,15 +111,14 @@ bool allowPrefix(nlohmann::json& prefixes,
 			// replace simple string prefix by prefix/announces object
 			prefixes.erase(it);
 			prefixes.emplace_back(nlohmann::json{
-				{"prefix", prefixRaw},
-				{"announces", nlohmann::json::array_t{prefixRaw, announceRaw}},
+			        {"prefix", prefixRaw},
+			        {"announces", nlohmann::json::array_t{prefixRaw, announceRaw}},
 			});
 			return true;
 		}
 		else if (it->is_object())
 		{
-			const auto& curPrefix = [&]()
-			{
+			const auto& curPrefix = [&]() {
 				auto prefixIt = it->find("prefix");
 				if (prefixIt == it->end())
 					throw std::string{"invalid prefix item. Object doesn't 'prefix' field."};
@@ -149,7 +148,7 @@ bool allowPrefix(nlohmann::json& prefixes,
 				}
 
 				// announce already presented within the prefix
-				if (announceIt->get_ref<const std::string &>() == announceRaw)
+				if (announceIt->get_ref<const std::string&>() == announceRaw)
 				{
 					return false;
 				}
@@ -167,8 +166,8 @@ bool allowPrefix(nlohmann::json& prefixes,
 
 	// @prefixRaw wasn't found within current prefixes, so add it
 	prefixes.emplace_back(nlohmann::json{
-		{"prefix", prefixRaw},
-		{"announces", nlohmann::json::array_t{announceRaw}},
+	        {"prefix", prefixRaw},
+	        {"announces", nlohmann::json::array_t{announceRaw}},
 	});
 
 	return true;
@@ -185,7 +184,7 @@ bool disallowPrefix(nlohmann::json& prefixes,
 		if (it->is_string())
 		{
 			// if prefix is a string it means that this prefix has only one announce which is equal to the prefix
-			const auto &curPrefix = it->get_ref<std::string &>();
+			const auto& curPrefix = it->get_ref<std::string&>();
 			// skip prefixes other than @prefixRaw
 			if (curPrefix != prefixRaw)
 			{
@@ -201,15 +200,14 @@ bool disallowPrefix(nlohmann::json& prefixes,
 			// the only prefix was disallowed
 			prefixes.erase(it);
 			prefixes.emplace_back(nlohmann::json{
-				{"prefix", prefixRaw},
-				{"announces", nlohmann::json::array_t{}},
+			        {"prefix", prefixRaw},
+			        {"announces", nlohmann::json::array_t{}},
 			});
 			return true;
 		}
 		else if (it->is_object())
 		{
-			const auto& curPrefix = [&]()
-			{
+			const auto& curPrefix = [&]() {
 				auto prefixIt = it->find("prefix");
 				if (prefixIt == it->end())
 					throw std::string{"invalid prefix item. Object doesn't 'prefix' field."};
@@ -273,8 +271,7 @@ bool removePrefix(nlohmann::json& prefixes,
 		}
 		else if (it->is_object())
 		{
-			const auto& curPrefix = [&]()
-			{
+			const auto& curPrefix = [&]() {
 				auto prefixIt = it->find("prefix");
 				if (prefixIt == it->end())
 					throw std::string{"invalid prefix item. Object doesn't 'prefix' field."};
@@ -299,10 +296,9 @@ bool removePrefix(nlohmann::json& prefixes,
 	throw std::string{"module doesn't have such prefix"};
 }
 
-void validateIPv4Prefix(const std::string &prefixRaw, const std::string& announceRaw)
+void validateIPv4Prefix(const std::string& prefixRaw, const std::string& announceRaw)
 {
-	auto parse = [](const std::string &value, std::string name)
-	{
+	auto parse = [](const std::string& value, std::string name) {
 		common::ipv4_prefix_t tmp{value};
 		if (!tmp.isValid())
 		{
@@ -325,10 +321,9 @@ void validateIPv4Prefix(const std::string &prefixRaw, const std::string& announc
 	}
 }
 
-void validateIPv6Prefix(const std::string &prefixRaw, const std::string &announceRaw)
+void validateIPv6Prefix(const std::string& prefixRaw, const std::string& announceRaw)
 {
-	auto parse = [](const std::string &value, std::string name)
-	{
+	auto parse = [](const std::string& value, std::string name) {
 		common::ipv6_prefix_t tmp{value};
 		if (!tmp.isValid())
 		{

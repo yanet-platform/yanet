@@ -17,8 +17,8 @@
 #include "dataplane.h"
 #include "icmp.h"
 #include "metadata.h"
-#include "worker.h"
 #include "prepare.h"
+#include "worker.h"
 
 //
 
@@ -37,7 +37,7 @@ cWorker::cWorker(cDataPlane* dataPlane) :
         ring_lowPriority(nullptr),
         ring_toFreePackets(nullptr),
         ring_log(nullptr),
-		packetsToSWNPRemainder(dataPlane->config.SWNormalPriorityRateLimitPerWorker)
+        packetsToSWNPRemainder(dataPlane->config.SWNormalPriorityRateLimitPerWorker)
 {
 	memset(bursts, 0, sizeof(bursts));
 	memset(counters, 0, sizeof(counters));
@@ -153,9 +153,9 @@ eResult cWorker::init(const tCoreId& coreId,
 	}
 
 	ring_log = rte_ring_create(("r_log_" + std::to_string(coreId)).c_str(),
-	                                     dataPlane->getConfigValue(eConfigType::ring_log_size),
-	                                     socketId,
-	                                     RING_F_SP_ENQ | RING_F_SC_DEQ);
+	                           dataPlane->getConfigValue(eConfigType::ring_log_size),
+	                           socketId,
+	                           RING_F_SP_ENQ | RING_F_SC_DEQ);
 	if (!ring_log)
 	{
 		return eResult::errorInitRing;
@@ -723,7 +723,7 @@ inline void cWorker::logicalPort_ingress_handle()
 	logicalPort_ingress_stack.clear();
 }
 
-inline void cWorker::early_decap(rte_mbuf *mbuf)
+inline void cWorker::early_decap(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 	metadata->already_early_decapped = 1;
@@ -735,8 +735,8 @@ inline void cWorker::early_decap(rte_mbuf *mbuf)
 		if (ipv4OuterHeader->next_proto_id == IPPROTO_IPIP)
 		{
 			rte_memcpy(rte_pktmbuf_mtod_offset(mbuf, char*, metadata->transport_headerOffset - metadata->network_headerOffset),
-					rte_pktmbuf_mtod(mbuf, char*),
-					metadata->network_headerOffset);
+			           rte_pktmbuf_mtod(mbuf, char*),
+			           metadata->network_headerOffset);
 			rte_pktmbuf_adj(mbuf, metadata->transport_headerOffset - metadata->network_headerOffset);
 
 			uint16_t* nextHeaderType = rte_pktmbuf_mtod_offset(mbuf, uint16_t*, metadata->network_headerOffset - 2); // metadata->network_headerOffset - 2 == metadata->network_headerType?
@@ -747,8 +747,8 @@ inline void cWorker::early_decap(rte_mbuf *mbuf)
 		else if (ipv4OuterHeader->next_proto_id == IPPROTO_IPV6)
 		{
 			rte_memcpy(rte_pktmbuf_mtod_offset(mbuf, char*, metadata->transport_headerOffset - metadata->network_headerOffset),
-					rte_pktmbuf_mtod(mbuf, char*),
-					metadata->network_headerOffset);
+			           rte_pktmbuf_mtod(mbuf, char*),
+			           metadata->network_headerOffset);
 			rte_pktmbuf_adj(mbuf, metadata->transport_headerOffset - metadata->network_headerOffset);
 
 			uint16_t* nextHeaderType = rte_pktmbuf_mtod_offset(mbuf, uint16_t*, metadata->network_headerOffset - 2); // metadata->network_headerOffset - 2 == metadata->network_headerType?
@@ -764,8 +764,8 @@ inline void cWorker::early_decap(rte_mbuf *mbuf)
 		if (ipv6OuterHeader->proto == IPPROTO_IPIP)
 		{
 			rte_memcpy(rte_pktmbuf_mtod_offset(mbuf, char*, metadata->transport_headerOffset - metadata->network_headerOffset),
-					rte_pktmbuf_mtod(mbuf, char*),
-					metadata->network_headerOffset);
+			           rte_pktmbuf_mtod(mbuf, char*),
+			           metadata->network_headerOffset);
 			rte_pktmbuf_adj(mbuf, metadata->transport_headerOffset - metadata->network_headerOffset);
 
 			uint16_t* nextHeaderType = rte_pktmbuf_mtod_offset(mbuf, uint16_t*, metadata->network_headerOffset - 2); // metadata->network_headerOffset - 2 == metadata->network_headerType?
@@ -776,8 +776,8 @@ inline void cWorker::early_decap(rte_mbuf *mbuf)
 		else if (ipv6OuterHeader->proto == IPPROTO_IPV6)
 		{
 			rte_memcpy(rte_pktmbuf_mtod_offset(mbuf, char*, metadata->transport_headerOffset - metadata->network_headerOffset),
-					rte_pktmbuf_mtod(mbuf, char*),
-					metadata->network_headerOffset);
+			           rte_pktmbuf_mtod(mbuf, char*),
+			           metadata->network_headerOffset);
 			rte_pktmbuf_adj(mbuf, metadata->transport_headerOffset - metadata->network_headerOffset);
 
 			uint16_t* nextHeaderType = rte_pktmbuf_mtod_offset(mbuf, uint16_t*, metadata->network_headerOffset - 2); // metadata->network_headerOffset - 2 == metadata->network_headerType?
@@ -1506,10 +1506,10 @@ inline void cWorker::tun64_ipv4_handle()
 
 		if (tunnel.srcRndEnabled)
 		{
-			((uint32_t *)ipv6Header->src_addr)[2] = ipv4Header->src_addr;
+			((uint32_t*)ipv6Header->src_addr)[2] = ipv4Header->src_addr;
 		}
 
-		counters[tun64_values[mbuf_i]->counter_id]++;	///< common::tun64mapping::stats_t.encap_packets
+		counters[tun64_values[mbuf_i]->counter_id]++; ///< common::tun64mapping::stats_t.encap_packets
 		counters[tun64_values[mbuf_i]->counter_id + 1] += mbuf->pkt_len; ///< common::tun64mapping::stats_t.encap_bytes
 		counters[tunnel.flow.counter_id]++; ///< common::tun64::stats_t.encap_packets
 		counters[tunnel.flow.counter_id + 1] += mbuf->pkt_len; ///< common::tun64::stats_t.encap_bytes
@@ -1538,8 +1538,8 @@ inline void cWorker::tun64_ipv6_handle()
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
 		rte_memcpy(rte_pktmbuf_mtod_offset(mbuf, char*, metadata->transport_headerOffset - metadata->network_headerOffset),
-	                   rte_pktmbuf_mtod(mbuf, char*),
-			   metadata->network_headerOffset);
+		           rte_pktmbuf_mtod(mbuf, char*),
+		           metadata->network_headerOffset);
 		rte_pktmbuf_adj(mbuf, metadata->transport_headerOffset - metadata->network_headerOffset);
 
 		uint16_t* nextHeaderType = rte_pktmbuf_mtod_offset(mbuf, uint16_t*, metadata->network_headerOffset - 2);
@@ -1590,7 +1590,7 @@ inline void cWorker::tun64_ipv6_handle()
 		}
 		else
 		{
-			counters[tun64_values[mbuf_i]->counter_id + 2]++;	///< common::tun64mapping::stats_t.decap_packets
+			counters[tun64_values[mbuf_i]->counter_id + 2]++; ///< common::tun64mapping::stats_t.decap_packets
 			counters[tun64_values[mbuf_i]->counter_id + 3] += mbuf->pkt_len; ///< common::tun64mapping::stats_t.decap_bytes
 		}
 
@@ -1669,7 +1669,7 @@ inline void cWorker::decap_handle()
 				rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 
 				uint16_t sum = ~rte_be_to_cpu_16(ipv4Header->hdr_checksum);
-				 // removing previous value of dscp from checksum to replace its with value from config
+				// removing previous value of dscp from checksum to replace its with value from config
 				sum = csum_minus(sum, ipv4Header->type_of_service & 0xFC);
 				sum = csum_plus(sum, decap.ipv4DSCPFlags & 0xFC);
 
@@ -3625,8 +3625,8 @@ inline void balancer_set_mss(rte_mbuf* mbuf)
 inline void cWorker::balancer_handle()
 {
 	const auto& base = bases[localBaseId & 1];
-	const auto *ring =
-		base.globalBase->balancer_service_rings + base.globalBase->balancer_service_ring_id;
+	const auto* ring =
+	        base.globalBase->balancer_service_rings + base.globalBase->balancer_service_ring_id;
 
 	if (unlikely(balancer_stack.mbufsCount == 0))
 	{
@@ -3788,7 +3788,7 @@ inline void cWorker::balancer_handle()
 
 		if (!value || rescheduleReal)
 		{
-			auto *range = ring->ranges + service_id;
+			auto* range = ring->ranges + service_id;
 			if (!range->size)
 			{
 				locker->unlock();
@@ -3849,7 +3849,7 @@ inline void cWorker::balancer_handle()
 }
 
 inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
-									 const dataplane::globalBase::balancer_service_t& service,
+                                     const dataplane::globalBase::balancer_service_t& service,
                                      const dataplane::globalBase::balancer_real_t& real,
                                      const tCounterId& real_counter_id)
 {
@@ -3893,7 +3893,7 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 			ipv6Header->hop_limits = ipv4HeaderInner->time_to_live;
 
 			rte_memcpy(ipv6Header->src_addr, balancer.source_ipv6.bytes, 16);
-			((uint32_t *)ipv6Header->src_addr)[2] = ipv4HeaderInner->src_addr;
+			((uint32_t*)ipv6Header->src_addr)[2] = ipv4HeaderInner->src_addr;
 			rte_memcpy(ipv6Header->dst_addr, real.destination.bytes, 16);
 		}
 		else
@@ -3904,7 +3904,7 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 			ipv6Header->hop_limits = ipv6HeaderInner->hop_limits;
 
 			rte_memcpy(ipv6Header->src_addr, balancer.source_ipv6.bytes, 16);
-			((uint32_t *)ipv6Header->src_addr)[2] = ((uint32_t *)ipv6HeaderInner->src_addr)[2] ^ ((uint32_t *)ipv6HeaderInner->src_addr)[3];
+			((uint32_t*)ipv6Header->src_addr)[2] = ((uint32_t*)ipv6HeaderInner->src_addr)[2] ^ ((uint32_t*)ipv6HeaderInner->src_addr)[3];
 			rte_memcpy(ipv6Header->dst_addr, real.destination.bytes, 16);
 		}
 	}
@@ -3967,7 +3967,7 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 			ipv6_header->proto = IPPROTO_GRE;
 			ipv6_header->payload_len = rte_cpu_to_be_16(rte_be_to_cpu_16(ipv6_header->payload_len) + sizeof(rte_gre_hdr));
 		}
-		else  // ipv4
+		else // ipv4
 		{
 			metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv4_hdr);
 
@@ -3984,7 +3984,7 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 		// add gre data
 		rte_gre_hdr* gre_header = rte_pktmbuf_mtod_offset(mbuf, rte_gre_hdr*, metadata->transport_headerOffset);
 		memset(gre_header, 0, sizeof(rte_gre_hdr));
-		gre_header->ver= 0;  // default version
+		gre_header->ver = 0; // default version
 		if (ipv4HeaderInner)
 		{
 			gre_header->proto = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
@@ -4077,7 +4077,7 @@ inline void cWorker::balancer_icmp_reply_handle()
 			rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
 
 			uint8_t tmp_for_swap[sizeof(ipv6Header->src_addr)];
-			memcpy(tmp_for_swap,ipv6Header->src_addr, sizeof(tmp_for_swap));
+			memcpy(tmp_for_swap, ipv6Header->src_addr, sizeof(tmp_for_swap));
 			memcpy(ipv6Header->src_addr, ipv6Header->dst_addr, sizeof(ipv6Header->src_addr));
 			memcpy(ipv6Header->dst_addr, tmp_for_swap, sizeof(tmp_for_swap));
 
@@ -4260,8 +4260,8 @@ inline void cWorker::balancer_icmp_forward_handle()
 	}
 
 	for (uint32_t mbuf_i = 0;
-		mbuf_i < balancer_icmp_forward_stack.mbufsCount;
-		mbuf_i++)
+	     mbuf_i < balancer_icmp_forward_stack.mbufsCount;
+	     mbuf_i++)
 	{
 		rte_mbuf* mbuf = balancer_icmp_forward_stack.mbufs[mbuf_i];
 
@@ -5126,7 +5126,6 @@ void cWorker::acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAc
 		sample->src_port = 0;
 		sample->dst_port = 0;
 	}
-
 
 	if (rte_ring_enqueue(ring_log, sample) != 0)
 	{

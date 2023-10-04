@@ -65,7 +65,7 @@ void value_t::compile()
 			if (auto action = std::get_if<common::acl::action_t>(&it))
 			{
 				if (dumps_counter >= YANET_CONFIG_DUMP_ID_SIZE ||
-					action->dump_id >= YANET_CONFIG_DUMP_ID_TO_TAG_SIZE)
+				    action->dump_id >= YANET_CONFIG_DUMP_ID_TO_TAG_SIZE)
 				{
 					continue;
 				}

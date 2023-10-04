@@ -25,8 +25,8 @@ public:
 	{
 	}
 	bufferring(void* memory, int unit_size, int units_number) :
-		unit_size(unit_size),
-		units_number(units_number)
+	        unit_size(unit_size),
+	        units_number(units_number)
 	{
 		ring = (ring_t*)memory;
 	}
@@ -35,7 +35,7 @@ public:
 	{
 		uint64_t before;
 		uint64_t after;
-	}__attribute__((__aligned__(64)));
+	} __attribute__((__aligned__(64)));
 
 	struct ring_t
 	{
@@ -47,7 +47,7 @@ public:
 	{
 		uint32_t size;
 		uint32_t tag;
-	}__attribute__((__aligned__(64)));
+	} __attribute__((__aligned__(64)));
 
 	struct item_t
 	{

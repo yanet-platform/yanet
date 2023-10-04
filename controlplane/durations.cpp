@@ -1,11 +1,9 @@
 #include "durations.h"
 #include "controlplane.h"
 
-
 eResult durations_t::init()
 {
-	controlPlane->register_command(common::icp::requestType::controlplane_durations, [this]()
-	{
+	controlPlane->register_command(common::icp::requestType::controlplane_durations, [this]() {
 		return getDurations();
 	});
 
@@ -25,4 +23,3 @@ common::icp::controlplane_durations::response durations_t::getDurations() const
 
 	return durations;
 }
-

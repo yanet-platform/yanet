@@ -206,7 +206,7 @@ protected:
 	std::map<value_T,
 	         std::tuple<uint64_t, ///< refcount
 	                    id_t>>
-	    values;
+	        values;
 
 	std::map<id_t, value_T> ids;
 

@@ -10,7 +10,7 @@
 class counter_manager_t
 {
 public:
-	static_assert ((uint32_t)common::globalBase::static_counter_type::size <= YANET_CONFIG_COUNTERS_SIZE);
+	static_assert((uint32_t)common::globalBase::static_counter_type::size <= YANET_CONFIG_COUNTERS_SIZE);
 
 	counter_manager_t()
 	{
@@ -37,7 +37,7 @@ protected:
 	template<size_t size_T>
 	std::array<tCounterId, size_T> counter_reserve()
 	{
-		static_assert (size_T <= YANET_CONFIG_COUNTER_FALLBACK_SIZE);
+		static_assert(size_T <= YANET_CONFIG_COUNTER_FALLBACK_SIZE);
 
 		std::lock_guard<std::mutex> guard(counter_mutex);
 
@@ -165,7 +165,7 @@ class counter_t
 {
 public:
 	counter_t() :
-		manager(nullptr)
+	        manager(nullptr)
 	{
 	}
 
@@ -198,7 +198,7 @@ public:
 
 	void allocate()
 	{
-		allocate([](const key_T& key){(void)key;});
+		allocate([](const key_T& key) { (void)key; });
 	}
 
 	template<typename callback_T>
@@ -226,7 +226,7 @@ public:
 
 	void release()
 	{
-		release([](const key_T& key){(void)key;});
+		release([](const key_T& key) { (void)key; });
 	}
 
 	void insert(const key_T& key)
@@ -303,8 +303,7 @@ public:
 					uint32_t timestamp = time(nullptr);
 					timestamp += timeout;
 
-					counters_removed.emplace(key, std::tuple<std::array<tCounterId, size_T>,
-					                                                    uint32_t>(counter_ids_array, timestamp));
+					counters_removed.emplace(key, std::tuple<std::array<tCounterId, size_T>, uint32_t>(counter_ids_array, timestamp));
 				}
 			}
 		}
@@ -394,8 +393,7 @@ public:
 			uint32_t current_time = time(nullptr);
 
 			for (auto counters_removed_it = counters_removed.begin();
-			     counters_removed_it != counters_removed.end();
-			     )
+			     counters_removed_it != counters_removed.end();)
 			{
 				const auto& [key, ids_timestamp] = *counters_removed_it;
 				const auto& [counter_ids_array, timestamp] = ids_timestamp;
@@ -420,18 +418,23 @@ protected:
 
 	std::map<key_T,
 	         std::tuple<std::array<tCounterId, size_T>,
-	                    uint32_t>> counters; ///< refcount
+	                    uint32_t>>
+	        counters; ///< refcount
 
 	std::map<key_T,
-	         std::array<tCounterId, size_T>> counters_inserted;
+	         std::array<tCounterId, size_T>>
+	        counters_inserted;
 
 	std::map<key_T,
 	         std::tuple<std::array<tCounterId, size_T>,
-	                    uint32_t>> counters_removed; ///< timestamp
+	                    uint32_t>>
+	        counters_removed; ///< timestamp
 
 	std::map<key_T,
-	         std::array<tCounterId, size_T>> counters_gc_removed;
+	         std::array<tCounterId, size_T>>
+	        counters_gc_removed;
 
 	std::map<key_T,
-	         std::array<tCounterId, size_T>> counters_allocated;
+	         std::array<tCounterId, size_T>>
+	        counters_allocated;
 };

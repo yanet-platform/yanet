@@ -7,8 +7,8 @@
 #include "common/result.h"
 #include "common/type.h"
 
-#include "type.h"
 #include "hashtable.h"
+#include "type.h"
 
 class cReport
 {

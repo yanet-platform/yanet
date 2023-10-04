@@ -250,8 +250,8 @@ TEST(LPM, LookupOverlappedSimple)
 	auto t = std::make_unique<lpm6_8x16bit_atomic<64>>();
 
 	const std::vector<std::tuple<std::string, uint8_t, uint32_t>> entries{
-	    {"::", 0, 1},
-	    {"10:20::", 32, 2},
+	        {"::", 0, 1},
+	        {"10:20::", 32, 2},
 	};
 
 	for (auto [net, mask, value] : entries)
@@ -312,8 +312,8 @@ TEST(LPM, LookupOverlappedExt)
 	auto t = std::make_unique<lpm6_8x16bit_atomic<64>>();
 
 	const std::vector<std::tuple<std::string, std::string, uint32_t>> entries{
-	    {"2222:777:aabc:1234::", "ffff:ffff:ffff:ffff::", 4299},
-	    {"2222:777:aabc:1234:4800::", "ffff:ffff:ffff:ffff:f800::", 589},
+	        {"2222:777:aabc:1234::", "ffff:ffff:ffff:ffff::", 4299},
+	        {"2222:777:aabc:1234:4800::", "ffff:ffff:ffff:ffff:f800::", 589},
 	};
 
 	for (auto [net, mask, value] : entries)
@@ -368,12 +368,12 @@ TEST(LPM, LookupManyProjectIDsExtMask)
 	auto t = std::make_unique<lpm6_8x16bit_atomic<64>>();
 
 	const std::vector<std::tuple<std::string, std::string, uint32_t>> entries{
-	    {"2222:777:aabc::1234:0:0", "ffff:ffff:ffff:0:ffff:ffff::", 100},
-	    {"2222:777:aabc::1122:0:0", "ffff:ffff:ffff:0:ffff:ffff::", 101},
-	    {"2222:777:ff1d::", "ffff:ffff:ffff::", 102},
-	    {"2222:777:c00:0:add:8765::", "ffff:ffff:ff00:0:ffff:ffff::", 103},
-	    {"2222:777:c00:0:add:8005::", "ffff:ffff:ff00:0:ffff:ffff::", 104},
-	    {"2222:770:c00::f800:0:0", "ffff:ffff:ff00:0:ffff:f800::", 105},
+	        {"2222:777:aabc::1234:0:0", "ffff:ffff:ffff:0:ffff:ffff::", 100},
+	        {"2222:777:aabc::1122:0:0", "ffff:ffff:ffff:0:ffff:ffff::", 101},
+	        {"2222:777:ff1d::", "ffff:ffff:ffff::", 102},
+	        {"2222:777:c00:0:add:8765::", "ffff:ffff:ff00:0:ffff:ffff::", 103},
+	        {"2222:777:c00:0:add:8005::", "ffff:ffff:ff00:0:ffff:ffff::", 104},
+	        {"2222:770:c00::f800:0:0", "ffff:ffff:ff00:0:ffff:f800::", 105},
 	};
 
 	for (auto [net, mask, value] : entries)
@@ -382,54 +382,54 @@ TEST(LPM, LookupManyProjectIDsExtMask)
 	}
 
 	const std::vector<std::tuple<std::string, uint32_t>> cases{
-	    /// Value 100
-	    {"2222:777:aabc:1234:0:1234::", 100},
-	    {"2222:777:aabc:1234:0:1234:0:1", 100},
-	    {"2222:777:aabc:1234:0:1234::", 100},
-	    {"2222:777:aabc:1234:0:1234:0:ffff", 100},
-	    {"2222:777:aabc:1234:0:1234:ffff:ffff", 100},
+	        /// Value 100
+	        {"2222:777:aabc:1234:0:1234::", 100},
+	        {"2222:777:aabc:1234:0:1234:0:1", 100},
+	        {"2222:777:aabc:1234:0:1234::", 100},
+	        {"2222:777:aabc:1234:0:1234:0:ffff", 100},
+	        {"2222:777:aabc:1234:0:1234:ffff:ffff", 100},
 
-	    /// Value 101
-	    {"2222:777:aabc::1122:0:0", 101},
-	    {"2222:777:aabc::1122:0:1", 101},
-	    {"2222:777:aabc:ff00:0:1122:0:1", 101},
-	    {"2222:777:aabc:ffff:0:1122:0:1", 101},
+	        /// Value 101
+	        {"2222:777:aabc::1122:0:0", 101},
+	        {"2222:777:aabc::1122:0:1", 101},
+	        {"2222:777:aabc:ff00:0:1122:0:1", 101},
+	        {"2222:777:aabc:ffff:0:1122:0:1", 101},
 
-	    /// Value 102
-	    {"2222:777:ff1d::1", 102},
-	    {"2222:777:ff1d:ff00::1", 102},
-	    {"2222:777:ff1d:ff00:0:1234:0:1", 102},
+	        /// Value 102
+	        {"2222:777:ff1d::1", 102},
+	        {"2222:777:ff1d:ff00::1", 102},
+	        {"2222:777:ff1d:ff00:0:1234:0:1", 102},
 
-	    /// Value 103
-	    {"2222:777:c00:0:add:8765::", 103},
-	    {"2222:777:c00:0:add:8765:0:1", 103},
-	    {"2222:777:c00:0:add:8765:0:2211", 103},
-	    {"2222:777:c00:0:add:8765:4433:0", 103},
-	    {"2222:777:c77:6655:add:8765:4433:2211", 103},
+	        /// Value 103
+	        {"2222:777:c00:0:add:8765::", 103},
+	        {"2222:777:c00:0:add:8765:0:1", 103},
+	        {"2222:777:c00:0:add:8765:0:2211", 103},
+	        {"2222:777:c00:0:add:8765:4433:0", 103},
+	        {"2222:777:c77:6655:add:8765:4433:2211", 103},
 
-	    /// Value 104
-	    {"2222:777:c00:0:add:8005::", 104},
-	    {"2222:777:c00:0:add:8005:0:1", 104},
-	    {"2222:777:c00:0:add:8005:0:2211", 104},
-	    {"2222:777:c00:0:add:8005:4433:0", 104},
-	    {"2222:777:c77:6655:add:8005:4433:2211", 104},
+	        /// Value 104
+	        {"2222:777:c00:0:add:8005::", 104},
+	        {"2222:777:c00:0:add:8005:0:1", 104},
+	        {"2222:777:c00:0:add:8005:0:2211", 104},
+	        {"2222:777:c00:0:add:8005:4433:0", 104},
+	        {"2222:777:c77:6655:add:8005:4433:2211", 104},
 
-	    /// Value 105
-	    {"2222:770:c00::f800:0:0", 105},
-	    {"2222:770:c00::f800:0:11", 105},
-	    {"2222:770:c00::f800:4433:2211", 105},
-	    {"2222:770:c00::f900:4433:2211", 105},
-	    {"2222:770:c00::ff00:4433:2211", 105},
-	    {"2222:770:c00::ff01:4433:2211", 105},
-	    {"2222:770:c00::fffe:4433:2211", 105},
-	    {"2222:770:c00::ffff:4433:2211", 105},
-	    {"2222:770:c00:8877:0:ffff:4433:2211", 105},
-	    {"2222:770:c99:8877:0:ffff:4433:2211", 105},
+	        /// Value 105
+	        {"2222:770:c00::f800:0:0", 105},
+	        {"2222:770:c00::f800:0:11", 105},
+	        {"2222:770:c00::f800:4433:2211", 105},
+	        {"2222:770:c00::f900:4433:2211", 105},
+	        {"2222:770:c00::ff00:4433:2211", 105},
+	        {"2222:770:c00::ff01:4433:2211", 105},
+	        {"2222:770:c00::fffe:4433:2211", 105},
+	        {"2222:770:c00::ffff:4433:2211", 105},
+	        {"2222:770:c00:8877:0:ffff:4433:2211", 105},
+	        {"2222:770:c99:8877:0:ffff:4433:2211", 105},
 
-	    /// Invalid
-	    {"2222:777:aabc::1134:0:1", dataplane::lpmValueIdInvalid},
-	    {"2222:777:ff1f::1234:0:1", dataplane::lpmValueIdInvalid},
-	    {"2222:770:c00::f7ff:4433:2211", dataplane::lpmValueIdInvalid},
+	        /// Invalid
+	        {"2222:777:aabc::1134:0:1", dataplane::lpmValueIdInvalid},
+	        {"2222:777:ff1f::1234:0:1", dataplane::lpmValueIdInvalid},
+	        {"2222:770:c00::f7ff:4433:2211", dataplane::lpmValueIdInvalid},
 	};
 
 	for (auto [addr, value] : cases)
@@ -447,11 +447,11 @@ TEST(LPM, LookupTrouble)
 	auto t = std::make_unique<lpm6_8x16bit_atomic<64>>();
 
 	const std::vector<std::tuple<std::string, std::string, uint32_t>> entries{
-	    {"2222:777:aabc:2030::", "ffff:ffff:ffff:fff0::", 589},
-	    {"2222:777:aabc:2030::", "ffff:ffff:ffff:ffff::", 42},
-	    {"2222:777:aabc:2030:0:1234::", "ffff:ffff:ffff:fff0:ffff:ffff::", 4299},
-	    {"2222:777:aabc:2030:0:5678::", "ffff:ffff:ffff:fff0:ffff:ffff::", 4298},
-	    {"2222:777:aabc:2030:aabb:5678::", "ffff:ffff:ffff:fff0:ffff:ffff::", 4297},
+	        {"2222:777:aabc:2030::", "ffff:ffff:ffff:fff0::", 589},
+	        {"2222:777:aabc:2030::", "ffff:ffff:ffff:ffff::", 42},
+	        {"2222:777:aabc:2030:0:1234::", "ffff:ffff:ffff:fff0:ffff:ffff::", 4299},
+	        {"2222:777:aabc:2030:0:5678::", "ffff:ffff:ffff:fff0:ffff:ffff::", 4298},
+	        {"2222:777:aabc:2030:aabb:5678::", "ffff:ffff:ffff:fff0:ffff:ffff::", 4297},
 	};
 
 	for (auto [net, mask, value] : entries)
@@ -461,82 +461,82 @@ TEST(LPM, LookupTrouble)
 	}
 
 	const std::vector<std::tuple<std::string, uint32_t>> cases{
-	    {"2222:777:aabc:2030::1", 42},
-	    {"2222:777:aabc:2030:0:0:ffff:1", 42},
-	    {"2222:777:aabc:2030:0:ffff:0:1", 42},
-	    {"2222:777:aabc:2030:0:ffff:ffff:1", 42},
-	    {"2222:777:aabc:2030:aabb:ffff:ffff:1", 42},
+	        {"2222:777:aabc:2030::1", 42},
+	        {"2222:777:aabc:2030:0:0:ffff:1", 42},
+	        {"2222:777:aabc:2030:0:ffff:0:1", 42},
+	        {"2222:777:aabc:2030:0:ffff:ffff:1", 42},
+	        {"2222:777:aabc:2030:aabb:ffff:ffff:1", 42},
 
-	    {"2222:777:aabc:2031::1", 589},
-	    {"2222:777:aabc:2032::1", 589},
-	    {"2222:777:aabc:2033::1", 589},
-	    {"2222:777:aabc:2034::1", 589},
-	    {"2222:777:aabc:2035::1", 589},
-	    {"2222:777:aabc:2036::1", 589},
-	    {"2222:777:aabc:2037::1", 589},
-	    {"2222:777:aabc:2038::1", 589},
-	    {"2222:777:aabc:2039::1", 589},
-	    {"2222:777:aabc:203a::1", 589},
-	    {"2222:777:aabc:203b::1", 589},
-	    {"2222:777:aabc:203c::1", 589},
-	    {"2222:777:aabc:203d::1", 589},
-	    {"2222:777:aabc:203e::1", 589},
-	    {"2222:777:aabc:203f::1", 589},
-	    {"2222:777:aabc:2031:0:0:ffff:1", 589},
-	    {"2222:777:aabc:2032:0:ffff:0:1", 589},
-	    {"2222:777:aabc:2033:0:ffff:ffff:1", 589},
-	    {"2222:777:aabc:2034:aabb:ffff:ffff:1", 589},
+	        {"2222:777:aabc:2031::1", 589},
+	        {"2222:777:aabc:2032::1", 589},
+	        {"2222:777:aabc:2033::1", 589},
+	        {"2222:777:aabc:2034::1", 589},
+	        {"2222:777:aabc:2035::1", 589},
+	        {"2222:777:aabc:2036::1", 589},
+	        {"2222:777:aabc:2037::1", 589},
+	        {"2222:777:aabc:2038::1", 589},
+	        {"2222:777:aabc:2039::1", 589},
+	        {"2222:777:aabc:203a::1", 589},
+	        {"2222:777:aabc:203b::1", 589},
+	        {"2222:777:aabc:203c::1", 589},
+	        {"2222:777:aabc:203d::1", 589},
+	        {"2222:777:aabc:203e::1", 589},
+	        {"2222:777:aabc:203f::1", 589},
+	        {"2222:777:aabc:2031:0:0:ffff:1", 589},
+	        {"2222:777:aabc:2032:0:ffff:0:1", 589},
+	        {"2222:777:aabc:2033:0:ffff:ffff:1", 589},
+	        {"2222:777:aabc:2034:aabb:ffff:ffff:1", 589},
 
-	    {"2222:777:aabc:2030:0:1234:0:1", 4299},
-	    {"2222:777:aabc:2031:0:1234:0:1", 4299},
-	    {"2222:777:aabc:2032:0:1234:0:1", 4299},
-	    {"2222:777:aabc:2033:0:1234:0:1", 4299},
-	    {"2222:777:aabc:2034:0:1234:0:1", 4299},
-	    {"2222:777:aabc:2035:0:1234:0:1", 4299},
-	    {"2222:777:aabc:2036:0:1234:0:1", 4299},
-	    {"2222:777:aabc:2037:0:1234:0:1", 4299},
-	    {"2222:777:aabc:2038:0:1234:0:1", 4299},
-	    {"2222:777:aabc:2039:0:1234:0:1", 4299},
-	    {"2222:777:aabc:203a:0:1234:0:1", 4299},
-	    {"2222:777:aabc:203b:0:1234:0:1", 4299},
-	    {"2222:777:aabc:203c:0:1234:0:1", 4299},
-	    {"2222:777:aabc:203d:0:1234:0:1", 4299},
-	    {"2222:777:aabc:203e:0:1234:0:1", 4299},
-	    {"2222:777:aabc:203f:0:1234:0:1", 4299},
+	        {"2222:777:aabc:2030:0:1234:0:1", 4299},
+	        {"2222:777:aabc:2031:0:1234:0:1", 4299},
+	        {"2222:777:aabc:2032:0:1234:0:1", 4299},
+	        {"2222:777:aabc:2033:0:1234:0:1", 4299},
+	        {"2222:777:aabc:2034:0:1234:0:1", 4299},
+	        {"2222:777:aabc:2035:0:1234:0:1", 4299},
+	        {"2222:777:aabc:2036:0:1234:0:1", 4299},
+	        {"2222:777:aabc:2037:0:1234:0:1", 4299},
+	        {"2222:777:aabc:2038:0:1234:0:1", 4299},
+	        {"2222:777:aabc:2039:0:1234:0:1", 4299},
+	        {"2222:777:aabc:203a:0:1234:0:1", 4299},
+	        {"2222:777:aabc:203b:0:1234:0:1", 4299},
+	        {"2222:777:aabc:203c:0:1234:0:1", 4299},
+	        {"2222:777:aabc:203d:0:1234:0:1", 4299},
+	        {"2222:777:aabc:203e:0:1234:0:1", 4299},
+	        {"2222:777:aabc:203f:0:1234:0:1", 4299},
 
-	    {"2222:777:aabc:2030:0:5678:0:1", 4298},
-	    {"2222:777:aabc:2031:0:5678:0:1", 4298},
-	    {"2222:777:aabc:2032:0:5678:0:1", 4298},
-	    {"2222:777:aabc:2033:0:5678:0:1", 4298},
-	    {"2222:777:aabc:2034:0:5678:0:1", 4298},
-	    {"2222:777:aabc:2035:0:5678:0:1", 4298},
-	    {"2222:777:aabc:2036:0:5678:0:1", 4298},
-	    {"2222:777:aabc:2037:0:5678:0:1", 4298},
-	    {"2222:777:aabc:2038:0:5678:0:1", 4298},
-	    {"2222:777:aabc:2039:0:5678:0:1", 4298},
-	    {"2222:777:aabc:203a:0:5678:0:1", 4298},
-	    {"2222:777:aabc:203b:0:5678:0:1", 4298},
-	    {"2222:777:aabc:203c:0:5678:0:1", 4298},
-	    {"2222:777:aabc:203d:0:5678:0:1", 4298},
-	    {"2222:777:aabc:203e:0:5678:0:1", 4298},
-	    {"2222:777:aabc:203f:0:5678:0:1", 4298},
+	        {"2222:777:aabc:2030:0:5678:0:1", 4298},
+	        {"2222:777:aabc:2031:0:5678:0:1", 4298},
+	        {"2222:777:aabc:2032:0:5678:0:1", 4298},
+	        {"2222:777:aabc:2033:0:5678:0:1", 4298},
+	        {"2222:777:aabc:2034:0:5678:0:1", 4298},
+	        {"2222:777:aabc:2035:0:5678:0:1", 4298},
+	        {"2222:777:aabc:2036:0:5678:0:1", 4298},
+	        {"2222:777:aabc:2037:0:5678:0:1", 4298},
+	        {"2222:777:aabc:2038:0:5678:0:1", 4298},
+	        {"2222:777:aabc:2039:0:5678:0:1", 4298},
+	        {"2222:777:aabc:203a:0:5678:0:1", 4298},
+	        {"2222:777:aabc:203b:0:5678:0:1", 4298},
+	        {"2222:777:aabc:203c:0:5678:0:1", 4298},
+	        {"2222:777:aabc:203d:0:5678:0:1", 4298},
+	        {"2222:777:aabc:203e:0:5678:0:1", 4298},
+	        {"2222:777:aabc:203f:0:5678:0:1", 4298},
 
-	    {"2222:777:aabc:2030:aabb:5678::1", 4297},
-	    {"2222:777:aabc:2031:aabb:5678::1", 4297},
-	    {"2222:777:aabc:2032:aabb:5678::1", 4297},
-	    {"2222:777:aabc:2033:aabb:5678::1", 4297},
-	    {"2222:777:aabc:2034:aabb:5678::1", 4297},
-	    {"2222:777:aabc:2035:aabb:5678::1", 4297},
-	    {"2222:777:aabc:2036:aabb:5678::1", 4297},
-	    {"2222:777:aabc:2037:aabb:5678::1", 4297},
-	    {"2222:777:aabc:2038:aabb:5678::1", 4297},
-	    {"2222:777:aabc:2039:aabb:5678::1", 4297},
-	    {"2222:777:aabc:203a:aabb:5678::1", 4297},
-	    {"2222:777:aabc:203b:aabb:5678::1", 4297},
-	    {"2222:777:aabc:203c:aabb:5678::1", 4297},
-	    {"2222:777:aabc:203d:aabb:5678::1", 4297},
-	    {"2222:777:aabc:203e:aabb:5678::1", 4297},
-	    {"2222:777:aabc:203f:aabb:5678::1", 4297},
+	        {"2222:777:aabc:2030:aabb:5678::1", 4297},
+	        {"2222:777:aabc:2031:aabb:5678::1", 4297},
+	        {"2222:777:aabc:2032:aabb:5678::1", 4297},
+	        {"2222:777:aabc:2033:aabb:5678::1", 4297},
+	        {"2222:777:aabc:2034:aabb:5678::1", 4297},
+	        {"2222:777:aabc:2035:aabb:5678::1", 4297},
+	        {"2222:777:aabc:2036:aabb:5678::1", 4297},
+	        {"2222:777:aabc:2037:aabb:5678::1", 4297},
+	        {"2222:777:aabc:2038:aabb:5678::1", 4297},
+	        {"2222:777:aabc:2039:aabb:5678::1", 4297},
+	        {"2222:777:aabc:203a:aabb:5678::1", 4297},
+	        {"2222:777:aabc:203b:aabb:5678::1", 4297},
+	        {"2222:777:aabc:203c:aabb:5678::1", 4297},
+	        {"2222:777:aabc:203d:aabb:5678::1", 4297},
+	        {"2222:777:aabc:203e:aabb:5678::1", 4297},
+	        {"2222:777:aabc:203f:aabb:5678::1", 4297},
 	};
 
 	for (auto [addr, value] : cases)
@@ -554,8 +554,8 @@ TEST(LPM, LookupMixedNetworksWithSamePrefix)
 	auto t = std::make_unique<lpm6_8x16bit_atomic<64>>();
 
 	const std::vector<std::tuple<std::string, std::string, uint32_t>> entries{
-	    {"2222:777:c00::", "ffff:ffff:ff00::", 589},
-	    {"2222:777:c00:0:add:8765::", "ffff:ffff:ff00:0:ffff:ffff::", 4299},
+	        {"2222:777:c00::", "ffff:ffff:ff00::", 589},
+	        {"2222:777:c00:0:add:8765::", "ffff:ffff:ff00:0:ffff:ffff::", 4299},
 	};
 
 	for (auto [net, mask, value] : entries)
@@ -564,8 +564,8 @@ TEST(LPM, LookupMixedNetworksWithSamePrefix)
 	}
 
 	const std::vector<std::tuple<std::string, uint32_t>> cases{
-	    {"2222:777:c00:0:add:8765:0:1", 4299},
-	    {"2222:777:c00:0:10d:4d60:0:1", 589},
+	        {"2222:777:c00:0:add:8765:0:1", 4299},
+	        {"2222:777:c00:0:10d:4d60:0:1", 589},
 	};
 
 	for (auto [addr, value] : cases)
@@ -583,13 +583,13 @@ TEST(LPM, LookupSummary)
 	auto t = std::make_unique<lpm6_8x16bit_atomic<64>>();
 
 	const std::vector<std::tuple<std::string, std::string, uint32_t>> entries{
-	    {"::", "::", 1001},
-	    {"1111:2222::", "ffff:ffff::", 1002},
-	    {"3333:4444:5555::", "ffff:ffff:ffff::", 1003},
-	    {"3333:4444:5555:0:aaaa:bbbb::", "ffff:ffff:ffff:0:ffff:ffff::", 1004},
-	    {"3333:4444:5555:6666::", "ffff:ffff:ffff:ffff::", 1005},
-	    {"3333:4444:5555:6666:aaaa:bbbb::", "ffff:ffff:ffff:ffff:ffff:ffff::", 1006},
-	    {"3333:4444:5555:6666:aaaa:bbbb:cccc:dddd", "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", 1007},
+	        {"::", "::", 1001},
+	        {"1111:2222::", "ffff:ffff::", 1002},
+	        {"3333:4444:5555::", "ffff:ffff:ffff::", 1003},
+	        {"3333:4444:5555:0:aaaa:bbbb::", "ffff:ffff:ffff:0:ffff:ffff::", 1004},
+	        {"3333:4444:5555:6666::", "ffff:ffff:ffff:ffff::", 1005},
+	        {"3333:4444:5555:6666:aaaa:bbbb::", "ffff:ffff:ffff:ffff:ffff:ffff::", 1006},
+	        {"3333:4444:5555:6666:aaaa:bbbb:cccc:dddd", "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", 1007},
 	};
 
 	for (auto [net, mask, value] : entries)
@@ -599,17 +599,17 @@ TEST(LPM, LookupSummary)
 	}
 
 	const std::vector<std::tuple<std::string, uint32_t>> cases{
-	    {"::1", 1001},
-	    {"1111:2222:c00::1", 1002},
-	    {"3333:4444:5555::1", 1003},
-	    {"3333:4444:5555:0:aaaa:bbbb:0:1", 1004},
-	    {"3333:4444:5555:1:aaaa:bbbb:0:1", 1004},
-	    {"3333:4444:5555:ffff:aaaa:bbbb:0:1", 1004},
-	    {"3333:4444:5555:6666::1", 1005},
-	    {"3333:4444:5555:6666:aaaa::1", 1005},
-	    {"3333:4444:5555:6666:0:bbbb:0:1", 1005},
-	    {"3333:4444:5555:6666:aaaa:bbbb:0:1", 1006},
-	    {"3333:4444:5555:6666:aaaa:bbbb:cccc:dddd", 1007},
+	        {"::1", 1001},
+	        {"1111:2222:c00::1", 1002},
+	        {"3333:4444:5555::1", 1003},
+	        {"3333:4444:5555:0:aaaa:bbbb:0:1", 1004},
+	        {"3333:4444:5555:1:aaaa:bbbb:0:1", 1004},
+	        {"3333:4444:5555:ffff:aaaa:bbbb:0:1", 1004},
+	        {"3333:4444:5555:6666::1", 1005},
+	        {"3333:4444:5555:6666:aaaa::1", 1005},
+	        {"3333:4444:5555:6666:0:bbbb:0:1", 1005},
+	        {"3333:4444:5555:6666:aaaa:bbbb:0:1", 1006},
+	        {"3333:4444:5555:6666:aaaa:bbbb:cccc:dddd", 1007},
 	};
 
 	for (auto [addr, value] : cases)
@@ -671,7 +671,7 @@ TEST(LPM, LookupCruelRealWorld)
 	for (auto [net, mask, value] : entries)
 	{
 		EXPECT_EQ(eResult::success, t->insert(common::ipv6_address_t(net), common::ipv6_address_t(mask), value))
-		    << "Failed to insert " << value;
+		        << "Failed to insert " << value;
 	}
 
 	t->print();
@@ -791,12 +791,12 @@ TEST(LPM, LookupSummaryWithClear)
 	auto t = std::make_unique<lpm6_8x16bit_atomic<64>>();
 
 	const std::vector<std::tuple<std::string, std::string, uint32_t>> entries{
-	    {"::", "::", 1001},
-	    {"1111:2222::", "ffff:ffff::", 1002},
-	    {"3333:4444:5555::", "ffff:ffff:ffff::", 1003},
-	    {"3333:4444:5555:0:aaaa:bbbb::", "ffff:ffff:ffff:0:ffff:ffff::", 1004},
-	    {"3333:4444:5555:6666::", "ffff:ffff:ffff:ffff::", 1005},
-	    {"3333:4444:5555:6666:aaaa:bbbb::", "ffff:ffff:ffff:ffff:ffff:ffff::", 1006},
+	        {"::", "::", 1001},
+	        {"1111:2222::", "ffff:ffff::", 1002},
+	        {"3333:4444:5555::", "ffff:ffff:ffff::", 1003},
+	        {"3333:4444:5555:0:aaaa:bbbb::", "ffff:ffff:ffff:0:ffff:ffff::", 1004},
+	        {"3333:4444:5555:6666::", "ffff:ffff:ffff:ffff::", 1005},
+	        {"3333:4444:5555:6666:aaaa:bbbb::", "ffff:ffff:ffff:ffff:ffff:ffff::", 1006},
 	};
 
 	for (auto [net, mask, value] : entries)
@@ -815,14 +815,17 @@ TEST(LPM, InsertCorruption)
 	auto t = std::make_unique<lpm6_8x16bit_atomic<64>>();
 
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777::00af"),
-		  common::ipv6_address_t("ffff:ffff::ffff:ffff:ffff:ffff"), 4299));
+	          t->insert(common::ipv6_address_t("2222:777::00af"),
+	                    common::ipv6_address_t("ffff:ffff::ffff:ffff:ffff:ffff"),
+	                    4299));
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777:1a::a1"),
-		  common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), 589));
+	          t->insert(common::ipv6_address_t("2222:777:1a::a1"),
+	                    common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+	                    589));
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777:2a::a1"),
-		  common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), 105));
+	          t->insert(common::ipv6_address_t("2222:777:2a::a1"),
+	                    common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+	                    105));
 
 	uint32_t valueId{0};
 	EXPECT_TRUE(t->lookup(common::ipv6_address_t("2222:777:1a::a1"), &valueId));
@@ -832,23 +835,29 @@ TEST(LPM, InsertCorruption)
 
 	t->clear();
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777::00af"),
-		  common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), 456));
+	          t->insert(common::ipv6_address_t("2222:777::00af"),
+	                    common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+	                    456));
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777:1a::00af"),
-		  common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), 890));
+	          t->insert(common::ipv6_address_t("2222:777:1a::00af"),
+	                    common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+	                    890));
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777:2a::00af"),
-		  common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), 999));
+	          t->insert(common::ipv6_address_t("2222:777:2a::00af"),
+	                    common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+	                    999));
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777::00af"),
-		  common::ipv6_address_t("ffff:ffff::ffff:ffff:ffff:ffff"), 4299));
+	          t->insert(common::ipv6_address_t("2222:777::00af"),
+	                    common::ipv6_address_t("ffff:ffff::ffff:ffff:ffff:ffff"),
+	                    4299));
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777:1a::a1"),
-		  common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), 589));
+	          t->insert(common::ipv6_address_t("2222:777:1a::a1"),
+	                    common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+	                    589));
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777:2a::a1"),
-		  common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), 105));
+	          t->insert(common::ipv6_address_t("2222:777:2a::a1"),
+	                    common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+	                    105));
 
 	EXPECT_TRUE(t->lookup(common::ipv6_address_t("2222:777::af"), &valueId));
 	EXPECT_EQ(4299, valueId);
@@ -860,11 +869,13 @@ TEST(LPM, InsertCorruption)
 	t->print();
 
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777:1a::a1"),
-		  common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), 1112));
+	          t->insert(common::ipv6_address_t("2222:777:1a::a1"),
+	                    common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+	                    1112));
 	EXPECT_EQ(eResult::success,
-		  t->insert(common::ipv6_address_t("2222:777:2a::a1"),
-		  common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), 1221));
+	          t->insert(common::ipv6_address_t("2222:777:2a::a1"),
+	                    common::ipv6_address_t("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"),
+	                    1221));
 
 	EXPECT_TRUE(t->lookup(common::ipv6_address_t("2222:777::af"), &valueId));
 	EXPECT_EQ(4299, valueId);
@@ -874,9 +885,6 @@ TEST(LPM, InsertCorruption)
 	EXPECT_EQ(1221, valueId);
 
 	t->print();
-
-
 }
-
 
 } // namespace

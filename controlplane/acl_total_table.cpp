@@ -100,7 +100,6 @@ void total_table_t::compile()
 			}
 		}
 
-
 		if (used)
 		{
 			compiler->used_rules.emplace_back(rule.rule_id);

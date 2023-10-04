@@ -2,8 +2,8 @@
 
 #include <atomic>
 
-#include "type.h"
 #include "refarray.h"
+#include "type.h"
 
 namespace common
 {
@@ -13,7 +13,7 @@ template<uint32_t size_T,
          uint32_t fallback_size_T = 256> ///< @todo
 class weight_t
 {
-	static_assert (size_T > 256, "invalid size_T");
+	static_assert(size_T > 256, "invalid size_T");
 
 public:
 	weight_t() :
@@ -106,10 +106,12 @@ public:
 
 protected:
 	refarray_t<std::vector<uint32_t>,
-	           size_T> values;
+	           size_T>
+	        values;
 
 	std::map<uint64_t, ///< refarray_t::id_t
-	         std::tuple<uint32_t, uint32_t>> ranges;
+	         std::tuple<uint32_t, uint32_t>>
+	        ranges;
 
 	mutable std::vector<index_type_T> base;
 

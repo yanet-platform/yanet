@@ -32,12 +32,12 @@ struct metadata
 	common::globalBase::flow_t flow;
 };
 
-static_assert(sizeof(metadata)
-                + sizeof(rte_ipv6_hdr) ///< encap
-                + sizeof(rte_ipv6_hdr) + sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE ///< route tunnel
-                + (2 * YADECAP_MPLS_HEADER_SIZE) ///< route
-                + 4 ///< vlan
-                + 8 ///< secret area
-              <= RTE_PKTMBUF_HEADROOM, "invalid size of headroom");
+static_assert(sizeof(metadata) + sizeof(rte_ipv6_hdr) ///< encap
+                              + sizeof(rte_ipv6_hdr) + sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE ///< route tunnel
+                              + (2 * YADECAP_MPLS_HEADER_SIZE) ///< route
+                              + 4 ///< vlan
+                              + 8 ///< secret area
+                      <= RTE_PKTMBUF_HEADROOM,
+              "invalid size of headroom");
 
 }

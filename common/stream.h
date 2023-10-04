@@ -1,17 +1,17 @@
 #pragma once
 
-#include <string.h>
 #include <inttypes.h>
+#include <string.h>
 
-#include <string>
-#include <vector>
 #include <map>
-#include <type_traits>
-#include <variant>
-#include <set>
 #include <optional>
+#include <set>
+#include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
+#include <variant>
+#include <vector>
 
 namespace common
 {
@@ -46,11 +46,11 @@ public:
 	template<typename TFirst, typename TSecond, typename TCompare>
 	inline void pop(std::unordered_map<TFirst, TSecond, TCompare>& unordered_map);
 
-	template<typename ... TArgs>
-	inline void pop(std::tuple<TArgs ...>& tuple);
+	template<typename... TArgs>
+	inline void pop(std::tuple<TArgs...>& tuple);
 
-	template<typename ... TArgs>
-	inline void pop(std::variant<TArgs ...>& variant);
+	template<typename... TArgs>
+	inline void pop(std::variant<TArgs...>& variant);
 
 	template<typename TType>
 	inline void pop(std::set<TType>& set);
@@ -64,11 +64,11 @@ public:
 	inline bool isFailed();
 
 protected:
-	template<size_t TTupleIndex, typename ... TArgs>
-	inline void popTuple(std::tuple<TArgs ...>& tuple);
+	template<size_t TTupleIndex, typename... TArgs>
+	inline void popTuple(std::tuple<TArgs...>& tuple);
 
-	template<size_t TVariantIndex, typename ... TArgs>
-	inline void popVariant(std::variant<TArgs ...>& variant, uint32_t index);
+	template<size_t TVariantIndex, typename... TArgs>
+	inline void popVariant(std::variant<TArgs...>& variant, uint32_t index);
 
 protected:
 	const std::vector<uint8_t>& inBuffer;
@@ -157,32 +157,32 @@ public:
 		}
 	}
 
-	template<typename ... TArgs>
-	inline void push(const std::tuple<TArgs ...>& tuple)
+	template<typename... TArgs>
+	inline void push(const std::tuple<TArgs...>& tuple)
 	{
-		pushTuple<0, TArgs ...>(tuple);
+		pushTuple<0, TArgs...>(tuple);
 	}
 
-	template<typename ... TArgs>
-	inline void push(std::tuple<TArgs ...>&& tuple)
+	template<typename... TArgs>
+	inline void push(std::tuple<TArgs...>&& tuple)
 	{
-		pushTupleMove<0, TArgs ...>(std::move(tuple));
+		pushTupleMove<0, TArgs...>(std::move(tuple));
 	}
 
-	template<typename ... TArgs>
-	inline void push(const std::variant<TArgs ...>& variant)
+	template<typename... TArgs>
+	inline void push(const std::variant<TArgs...>& variant)
 	{
 		integer_t index = variant.index();
 		push(index);
-		std::visit([&](auto&& arg){push(arg);}, variant);
+		std::visit([&](auto&& arg) { push(arg); }, variant);
 	}
 
-	template<typename ... TArgs>
-	inline void push(std::variant<TArgs ...>&& variant)
+	template<typename... TArgs>
+	inline void push(std::variant<TArgs...>&& variant)
 	{
 		integer_t index = variant.index();
 		push(index);
-		std::visit([&](auto&& arg){push(std::move(arg));}, variant);
+		std::visit([&](auto&& arg) { push(std::move(arg)); }, variant);
 	}
 
 	template<typename TType>
@@ -227,8 +227,8 @@ public:
 	}
 
 protected:
-	template<size_t TTupleIndex, typename ... TArgs>
-	inline void pushTuple(const std::tuple<TArgs ...>& tuple)
+	template<size_t TTupleIndex, typename... TArgs>
+	inline void pushTuple(const std::tuple<TArgs...>& tuple)
 	{
 		if constexpr (TTupleIndex < sizeof...(TArgs))
 		{
@@ -237,8 +237,8 @@ protected:
 		}
 	}
 
-	template<size_t TTupleIndex, typename ... TArgs>
-	inline void pushTupleMove(std::tuple<TArgs ...>&& tuple)
+	template<size_t TTupleIndex, typename... TArgs>
+	inline void pushTupleMove(std::tuple<TArgs...>&& tuple)
 	{
 		if constexpr (TTupleIndex < sizeof...(TArgs))
 		{
@@ -385,14 +385,14 @@ inline void stream_in_t::pop(std::unordered_map<TFirst, TSecond, TCompare>& unor
 	}
 }
 
-template<typename ... TArgs>
-inline void stream_in_t::pop(std::tuple<TArgs ...>& tuple)
+template<typename... TArgs>
+inline void stream_in_t::pop(std::tuple<TArgs...>& tuple)
 {
 	popTuple<0>(tuple);
 }
 
-template<typename ... TArgs>
-inline void stream_in_t::pop(std::variant<TArgs ...>& variant)
+template<typename... TArgs>
+inline void stream_in_t::pop(std::variant<TArgs...>& variant)
 {
 	integer_t index = 0;
 
@@ -455,8 +455,8 @@ inline bool stream_in_t::isFailed()
 	return failed;
 }
 
-template<size_t TTupleIndex, typename ... TArgs>
-inline void stream_in_t::popTuple(std::tuple<TArgs ...>& tuple)
+template<size_t TTupleIndex, typename... TArgs>
+inline void stream_in_t::popTuple(std::tuple<TArgs...>& tuple)
 {
 	if constexpr (TTupleIndex < sizeof...(TArgs))
 	{
@@ -465,15 +465,15 @@ inline void stream_in_t::popTuple(std::tuple<TArgs ...>& tuple)
 	}
 }
 
-template<size_t TVariantIndex, typename ... TArgs>
-inline void stream_in_t::popVariant(std::variant<TArgs ...>& variant,
+template<size_t TVariantIndex, typename... TArgs>
+inline void stream_in_t::popVariant(std::variant<TArgs...>& variant,
                                     uint32_t index)
 {
 	if constexpr (TVariantIndex < sizeof...(TArgs))
 	{
 		if (index == TVariantIndex)
 		{
-			typename std::tuple_element<TVariantIndex, std::tuple<TArgs ...>>::type value;
+			typename std::tuple_element<TVariantIndex, std::tuple<TArgs...>>::type value;
 
 			pop(value);
 			if (isFailed())

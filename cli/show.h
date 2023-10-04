@@ -1,8 +1,8 @@
 #pragma once
 
+#include <iostream>
 #include <netdb.h>
 #include <unordered_map>
-#include <iostream>
 
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
@@ -124,9 +124,9 @@ void summary(std::optional<std::string> module)
 	table_t table;
 	table.insert("module",
 	             "source_address",
-		     "prefixes",
-		     "randomization",
-		     "next_module");
+	             "prefixes",
+	             "randomization",
+	             "next_module");
 
 	for (const auto& [tunnelName, tunnel] : response)
 	{
@@ -139,10 +139,10 @@ void summary(std::optional<std::string> module)
 		const auto& [ipv6Src, pfxCnt, rndFlag, nxtModule] = tunnel;
 
 		table.insert(tunnelName,
-			     ipv6Src,
-			     pfxCnt,
-			     rndFlag ? "true" : "false",
-			     nxtModule);
+		             ipv6Src,
+		             pfxCnt,
+		             rndFlag ? "true" : "false",
+		             nxtModule);
 	}
 
 	table.print();
@@ -155,8 +155,8 @@ void announce(std::optional<std::string> module)
 
 	table_t table;
 	table.insert("module",
-		     "prefix",
-		     "announces");
+	             "prefix",
+	             "announces");
 
 	for (const auto& [tunnelName, prefixes] : response)
 	{
@@ -182,9 +182,9 @@ void mappings(std::optional<std::string> module)
 
 	table_t table;
 	table.insert("module",
-		     "ipv4Address",
-		     "ipv6Address",
-		     "location");
+	             "ipv4Address",
+	             "ipv6Address",
+	             "location");
 
 	for (const auto& v : response)
 	{
@@ -197,9 +197,9 @@ void mappings(std::optional<std::string> module)
 		}
 
 		table.insert(tunnelName,
-			     ipv4Address,
-			     ipv6Address,
-			     location);
+		             ipv4Address,
+		             ipv6Address,
+		             location);
 	}
 
 	table.print();
@@ -351,14 +351,12 @@ void announce()
 		for (const auto& prefix : prefixes)
 		{
 			std::visit(
-				[&, &moduleName=moduleName](auto&& value)
-				{
-					table.insert(moduleName,
-					             value.prefix,
-					             value.announces);
-				},
-				(const common::ip_prefix_with_announces_t::variant_t&)prefix
-			);
+			        [&, &moduleName = moduleName](auto&& value) {
+				        table.insert(moduleName,
+				                     value.prefix,
+				                     value.announces);
+			        },
+			        (const common::ip_prefix_with_announces_t::variant_t&)prefix);
 		}
 	}
 
@@ -378,7 +376,7 @@ void snmp()
 
 	for (const auto& portIter : response)
 	{
-		if(!first)
+		if (!first)
 		{
 			printf(", ");
 		}
@@ -392,13 +390,10 @@ void snmp()
 		printf("  \"ifName\" : \"%s\",\n", std::get<0>(port).data());
 		printf("  \"ifDescr\" : \"%s\",\n", std::get<0>(port).data());
 
-
-		auto f = [](const char* dir, auto& data)
-		{
+		auto f = [](const char* dir, auto& data) {
 			printf("  \"if%sOctets\" : %u,\n", dir, (uint32_t)std::get<0>(data));
 			printf("  \"if%sUcastPkts\" : %u,\n", dir, (uint32_t)std::get<1>(data));
-			printf("  \"if%sNUcastPkts\" : %u,\n", dir, (uint32_t)(std::get<2>(data) +
-			                                                       std::get<3>(data)));
+			printf("  \"if%sNUcastPkts\" : %u,\n", dir, (uint32_t)(std::get<2>(data) + std::get<3>(data)));
 			printf("  \"if%sDiscards\" : %u,\n", dir, (uint32_t)std::get<4>(data));
 			printf("  \"if%sErrors\" : %u,\n", dir, (uint32_t)std::get<5>(data));
 
@@ -411,14 +406,13 @@ void snmp()
 			printf("  \"ifHC%sBroadcastPkts\" : %lu,\n", dir, std::get<3>(data));
 		};
 
-
 		f("In", std::get<2>(port));
 		f("Out", std::get<3>(port));
 
 		printf("  \"ifAdminStatus\" : 1,\n"); ///< 'up'
 		printf("  \"ifOperStatus\" : %u\n", std::get<1>(port) ? 1 : 2);
 
-/*
+		/*
 +        { 'name' : 'ifIndex',                 'type' : 'integer', },
 +        { 'name' : 'ifDescr',                 'type' : 'string', },
 -        { 'name' : 'ifType',                  'type' : 'integer', },
@@ -470,15 +464,15 @@ void snmp()
 }
 
 static const std::map<std::string, unsigned int> rule_types = {
-	{ "original",  0x01 }, // default for `fw show`
-	{ "orig",      0x01 },
-	{ "generated", 0x02 }, // default for `fw list`
-	{ "gen",       0x02 },
-	{ "states",    0x04 }, // dynamic states
-	{ "state",     0x04 },
-	{ "all",       0x06 }, // original + states
-	{ "dispatcher",0x08 }, // dispatcher rules
-	{ "disp",      0x08 },
+        {"original", 0x01}, // default for `fw show`
+        {"orig", 0x01},
+        {"generated", 0x02}, // default for `fw list`
+        {"gen", 0x02},
+        {"states", 0x04}, // dynamic states
+        {"state", 0x04},
+        {"all", 0x06}, // original + states
+        {"dispatcher", 0x08}, // dispatcher rules
+        {"disp", 0x08},
 };
 
 static void list_fw_rules(unsigned int mask, bool list)
@@ -486,10 +480,10 @@ static void list_fw_rules(unsigned int mask, bool list)
 	// we need labels only for orig or gen rules
 	unsigned int need_labels = 0x03;
 	static const common::icp::getFwList::requestType type[] = {
-		common::icp::getFwList::requestType::static_rules_original,
-		common::icp::getFwList::requestType::static_rules_generated,
-		common::icp::getFwList::requestType::dynamic_states,
-		common::icp::getFwList::requestType::dispatcher_rules,
+	        common::icp::getFwList::requestType::static_rules_original,
+	        common::icp::getFwList::requestType::static_rules_generated,
+	        common::icp::getFwList::requestType::dynamic_states,
+	        common::icp::getFwList::requestType::dispatcher_rules,
 	};
 	common::icp::getFwLabels::response labels;
 	interface::controlPlane controlPlane;
@@ -520,7 +514,7 @@ static void list_fw_rules(unsigned int mask, bool list)
 			need_labels = 0;
 		}
 	}
-	for (size_t i = 0; i < sizeof(type)/sizeof(type[0]); ++i)
+	for (size_t i = 0; i < sizeof(type) / sizeof(type[0]); ++i)
 	{
 		if ((mask & (1 << i)) == 0)
 		{
@@ -587,8 +581,7 @@ void fw(std::optional<std::string> str)
 	else
 	{
 		std::string args;
-		std::for_each(rule_types.cbegin(), rule_types.cend(),
-			[&](const auto& e) { args += " " + e.first;});
+		std::for_each(rule_types.cbegin(), rule_types.cend(), [&](const auto& e) { args += " " + e.first; });
 		throw std::string("invalid argument: ") + type + ", supported types:" + args;
 	}
 }
@@ -604,8 +597,7 @@ void fwlist(std::optional<std::string> str)
 	else
 	{
 		std::string args;
-		std::for_each(rule_types.cbegin(), rule_types.cend(),
-			[&](const auto& e) { args += " " + e.first;});
+		std::for_each(rule_types.cbegin(), rule_types.cend(), [&](const auto& e) { args += " " + e.first; });
 		throw std::string("invalid argument: ") + type + ", supported types:" + args;
 	}
 }
@@ -618,7 +610,7 @@ void errors()
 	interface::dataPlane dataPlane;
 	const auto response = dataPlane.getErrors();
 
-	for (const auto& [name, counter]: response)
+	for (const auto& [name, counter] : response)
 	{
 		table.insert(name, counter);
 	}
@@ -786,7 +778,7 @@ void version()
 }
 
 void counter_by_name(std::string counter_name,
-             		 const std::optional<tCoreId>& core_id)
+                     const std::optional<tCoreId>& core_id)
 {
 	interface::dataPlane dataplane;
 
@@ -806,7 +798,7 @@ void counter_by_name(std::string counter_name,
 
 	table_t table;
 	table.insert("core_id",
-				 "counter_value");
+	             "counter_value");
 
 	for (const auto& [core_id, counter_value] : response)
 	{
@@ -825,11 +817,11 @@ void shm_info()
 	table.insert("ring name",
 	             "dump tag",
 	             "dump size",
-				 "dump count",
-				 "core id",
-				 "socket id",
-				 "ipc key",
-				 "offset");
+	             "dump count",
+	             "core id",
+	             "socket id",
+	             "ipc key",
+	             "offset");
 
 	for (const auto& [name, tag, size, count, core, socket, ipc_key, offset] : response)
 	{

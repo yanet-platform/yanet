@@ -13,7 +13,8 @@ auto parse_rules(const std::string& rules, bool validation = false)
 	ipfw::fw_config_t firewall;
 	firewall.schedule_string(rules);
 	ret = firewall.parse();
-	if (ret && validation) {
+	if (ret && validation)
+	{
 		return firewall.validate();
 	}
 	return ret;
@@ -740,7 +741,7 @@ add skipto :WIN ip from any to any { via o19 or via o20 } in
 
 TEST(Parser, 065_SkiptoDotDash)
 {
-		const auto rules = R"IPFW(
+	const auto rules = R"IPFW(
 add skipto :BEGIN-section.service ip from any to any
 :BEGIN-section.service
 )IPFW";

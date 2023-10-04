@@ -1,9 +1,9 @@
 #pragma once
 
-#include "acl_base.h"
-#include "acl_flat.h"
-#include "acl_filter.h"
 #include "acl/bitset.h"
+#include "acl_base.h"
+#include "acl_filter.h"
+#include "acl_flat.h"
 
 namespace acl::compiler
 {
@@ -78,7 +78,8 @@ public:
 
 	std::map<std::tuple<size_t,
 	                    std::set<unsigned int>>,
-	         std::vector<unsigned int>> variation;
+	         std::vector<unsigned int>>
+	        variation;
 };
 
 }

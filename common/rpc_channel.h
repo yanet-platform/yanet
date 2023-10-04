@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include <sys/un.h>
 #include <google/protobuf/message.h>
 #include <google/protobuf/service.h>
+#include <sys/un.h>
 
 #include "libprotobuf/meta.pb.h"
 
@@ -85,7 +85,6 @@ public:
 		}
 
 		// single response
-
 
 		uint64_t messageSize;
 		if (auto err = common::recvAll(clientSocket, (char*)&messageSize, sizeof(messageSize)); err != 0)

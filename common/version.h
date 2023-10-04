@@ -2,7 +2,6 @@
 
 #include <string>
 
-
 #ifndef YANET_VERSION_MAJOR
 #define YANET_VERSION_MAJOR 0
 #endif
@@ -22,7 +21,6 @@
 #ifndef YANET_VERSION_CUSTOM
 #define YANET_VERSION_CUSTOM develop
 #endif
-
 
 namespace
 {

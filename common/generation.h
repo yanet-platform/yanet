@@ -1,9 +1,9 @@
 #pragma once
 
+#include <array>
+#include <atomic>
 #include <mutex>
 #include <shared_mutex>
-#include <atomic>
-#include <array>
 
 template<typename Type>
 class generation_manager

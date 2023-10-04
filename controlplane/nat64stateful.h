@@ -1,16 +1,16 @@
 #pragma once
 
-#include "type.h"
-#include "module.h"
 #include "base.h"
 #include "counter.h"
+#include "module.h"
+#include "type.h"
 
-#include "common/refarray.h"
+#include "common/controlplaneconfig.h"
+#include "common/counters.h"
+#include "common/generation.h"
 #include "common/icp.h"
 #include "common/idataplane.h"
-#include "common/controlplaneconfig.h"
-#include "common/generation.h"
-#include "common/counters.h"
+#include "common/refarray.h"
 
 namespace nat64stateful
 {

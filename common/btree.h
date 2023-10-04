@@ -156,7 +156,7 @@ protected:
 	{
 	public:
 		node_t() :
-			nexts{nullptr, nullptr}
+		        nexts{nullptr, nullptr}
 		{
 		}
 
@@ -528,19 +528,17 @@ public:
 		{
 			btree_v4.lookup_deep(prefix.get_ipv4().address(),
 			                     prefix.get_ipv4().mask(),
-			                     [&callback](const ipv4_address_t& address, const uint32_t mask, const value_T& value)
-			{
-				callback({address, (uint8_t)mask}, value);
-			});
+			                     [&callback](const ipv4_address_t& address, const uint32_t mask, const value_T& value) {
+				                     callback({address, (uint8_t)mask}, value);
+			                     });
 		}
 		else
 		{
 			btree_v6.lookup_deep(prefix.get_ipv6().address(),
 			                     prefix.get_ipv6().mask(),
-			                     [&callback](const ipv6_address_t& address, const uint32_t mask, const value_T& value)
-			{
-				callback({address, (uint8_t)mask}, value);
-			});
+			                     [&callback](const ipv6_address_t& address, const uint32_t mask, const value_T& value) {
+				                     callback({address, (uint8_t)mask}, value);
+			                     });
 		}
 	}
 

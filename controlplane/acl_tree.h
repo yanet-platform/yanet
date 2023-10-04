@@ -400,24 +400,31 @@ public:
 	std::vector<common::acl::tree_chunk_t<bits>> chunks;
 
 	std::set<std::tuple<unsigned int, ///< gap_size
-	                    type_t, type_t>> prefixes;
+	                    type_t,
+	                    type_t>>
+	        prefixes;
 	std::map<std::tuple<type_t, type_t>,
-	         type_t> intersection_prefixes;
+	         type_t>
+	        intersection_prefixes;
 
 	std::map<std::tuple<type_t, type_t>,
-	         std::vector<uint8_t>> saved_group_ids;
+	         std::vector<uint8_t>>
+	        saved_group_ids;
 	std::map<std::tuple<type_t, type_t>,
-	         std::set<unsigned int>> multirefs_chunk_ids;
+	         std::set<unsigned int>>
+	        multirefs_chunk_ids;
 
 	std::map<std::tuple<type_t, type_t>,
 	         std::tuple<unsigned int, ///< shift
-	                    unsigned int>> warp_chunk_ids;
+	                    unsigned int>>
+	        warp_chunk_ids;
 
 	unsigned int merge_group_id; ///< only for check
 	std::map<common::acl::tree_value_t, unsigned int> merge_warp_extended_chunk_ids;
 	std::map<std::tuple<common::acl::tree_value_t, ///< left
 	                    common::acl::tree_value_t>, ///< right
-	         common::acl::tree_value_t> merge_remap_chunks;
+	         common::acl::tree_value_t>
+	        merge_remap_chunks;
 
 protected:
 	inline static bool is_mask_gapped(const type_t& mask)

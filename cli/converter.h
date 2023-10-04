@@ -1,11 +1,11 @@
 #pragma once
 
-#include <string>
 #include <optional>
-#include <vector>
 #include <set>
-#include <variant>
 #include <sstream>
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace converter
 {
@@ -18,13 +18,18 @@ struct config_t
 	std::string set_empty = "n/s";
 };
 
-template<typename arg_T> std::string to_string(const std::optional<arg_T>& value, const config_t config = {});
-template<typename ... args_T> std::string to_string(const std::variant<args_T ...>& value, const config_t config = {});
-template<typename arg_T> std::string to_string(const std::vector<arg_T>& vector, const config_t config = {});
-template<typename arg_T> std::string to_string(const std::set<arg_T>& set, const config_t config = {});
+template<typename arg_T>
+std::string to_string(const std::optional<arg_T>& value, const config_t config = {});
+template<typename... args_T>
+std::string to_string(const std::variant<args_T...>& value, const config_t config = {});
+template<typename arg_T>
+std::string to_string(const std::vector<arg_T>& vector, const config_t config = {});
+template<typename arg_T>
+std::string to_string(const std::set<arg_T>& set, const config_t config = {});
 std::string to_string(const bool& value, const config_t config = {});
 std::string to_string(const std::string& string, const config_t config = {});
-template<typename arg_T> std::string to_string(const arg_T& value, const config_t config = {});
+template<typename arg_T>
+std::string to_string(const arg_T& value, const config_t config = {});
 
 template<typename arg_T>
 std::string to_string(const std::optional<arg_T>& value,
@@ -40,11 +45,11 @@ std::string to_string(const std::optional<arg_T>& value,
 	}
 };
 
-template<typename ... args_T>
-std::string to_string(const std::variant<args_T ...>& value,
+template<typename... args_T>
+std::string to_string(const std::variant<args_T...>& value,
                       const config_t config)
 {
-	return std::visit([&config](const auto& value) -> std::string {return to_string(value, config);}, value);
+	return std::visit([&config](const auto& value) -> std::string { return to_string(value, config); }, value);
 };
 
 template<typename arg_T>
@@ -58,7 +63,7 @@ std::string to_string(const std::vector<arg_T>& vector,
 
 	bool first = true;
 	std::ostringstream result;
-	for (const auto& item: vector)
+	for (const auto& item : vector)
 	{
 		if (!first)
 		{

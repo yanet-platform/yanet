@@ -130,8 +130,6 @@ TEST(HashtableTest, Extended)
 	EXPECT_EQ(t.getStats().extendedChunksCount, 0);
 	EXPECT_EQ(t.getStats().pairs, 0);
 
-
-
 	for (int k = 0; k < 100500; ++k)
 	{
 		t.insert(k, k);
@@ -333,7 +331,8 @@ TEST(hashtable_mod_spinlock, basic)
 	dataplane::hashtable_mod_spinlock<ipv6_address_t,
 	                                  uint32_t,
 	                                  1024,
-	                                  4> ht;
+	                                  4>
+	        ht;
 
 	const ipv6_address_t key = ipv6_address_t::convert(common::ipv6_address_t("abcd::1234"));
 	const uint32_t value1 = 12345u;
@@ -413,7 +412,8 @@ TEST(hashtable_mod_spinlock, collision)
 	dataplane::hashtable_mod_spinlock<uint32_t,
 	                                  uint32_t,
 	                                  64,
-	                                  32> ht;
+	                                  32>
+	        ht;
 
 	uint32_t* value;
 	dataplane::spinlock_nonrecursive_t* locker;

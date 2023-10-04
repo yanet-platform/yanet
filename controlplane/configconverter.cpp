@@ -1,15 +1,15 @@
 #include <chrono>
 
+#include <netinet/icmp6.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
-#include <netinet/icmp6.h>
 
 #include "acl.h"
-#include "errors.h"
 #include "configconverter.h"
-#include "isystem.h"
 #include "controlplane.h"
+#include "errors.h"
+#include "isystem.h"
 
 eResult config_converter_t::process(uint32_t serial)
 {
@@ -584,7 +584,7 @@ void config_converter_t::processBalancer()
 		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::update_balancer,
 		                        common::idp::updateGlobalBase::update_balancer::request{balancer.balancer_id,
 		                                                                                balancer.source_ipv6,
-																						balancer.source_ipv4,
+		                                                                                balancer.source_ipv4,
 		                                                                                balancer.flow});
 
 		for (const auto& [service_id, vip, proto, vport, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
@@ -675,8 +675,7 @@ void config_converter_t::processAcl()
 			throw error_result_t(eResult::invalidAclId, "invalid aclId: " + std::to_string(acl.aclId));
 		}
 
-		if ((!acl.src4_early_decap.empty() && !acl.dst4_early_decap.empty())
-			 || (!acl.src6_early_decap.empty() && !acl.dst6_early_decap.empty()))
+		if ((!acl.src4_early_decap.empty() && !acl.dst4_early_decap.empty()) || (!acl.src6_early_decap.empty() && !acl.dst6_early_decap.empty()))
 		{
 			acl_rules_early_decap(acl);
 		}
@@ -767,11 +766,10 @@ void config_converter_t::acl_rules_early_decap(controlplane::base::acl_t& acl) c
 		rule_transport.protocolTypes.insert(IPPROTO_IPIP);
 		rule_transport.protocolTypes.insert(IPPROTO_IPV6);
 
-
 		controlplane::base::acl_rule_t rule = {rule_network,
-									 		   controlplane::base::acl_rule_t::fragState::notFragmented,
-											   rule_transport,
-											   flow};
+		                                       controlplane::base::acl_rule_t::fragState::notFragmented,
+		                                       rule_transport,
+		                                       flow};
 
 		acl.nextModuleRules.emplace_back(rule);
 	}
@@ -785,9 +783,9 @@ void config_converter_t::acl_rules_early_decap(controlplane::base::acl_t& acl) c
 		rule_transport.protocolTypes.insert(IPPROTO_IPV6);
 
 		controlplane::base::acl_rule_t rule = {rule_network,
-											   controlplane::base::acl_rule_t::fragState::notFragmented,
-											   rule_transport,
-											   flow};
+		                                       controlplane::base::acl_rule_t::fragState::notFragmented,
+		                                       rule_transport,
+		                                       flow};
 
 		acl.nextModuleRules.emplace_back(rule);
 	}
@@ -843,7 +841,7 @@ void config_converter_t::acl_rules_tun64(controlplane::base::acl_t& acl,
 	std::set<common::ipv4_prefix_t> ipv4_prefixes;
 	std::set<common::ipv6_prefix_t> ipv6_prefixes;
 
-	for (const auto& prefix: tunnel.prefixes)
+	for (const auto& prefix : tunnel.prefixes)
 	{
 		if (prefix.is_ipv4())
 		{
@@ -858,14 +856,14 @@ void config_converter_t::acl_rules_tun64(controlplane::base::acl_t& acl,
 	{ /// from any IPv4 to tun64 prefixes
 		auto flow = convertToFlow(nextModule, "ipv4_checked");
 		controlplane::base::acl_rule_network_ipv4_t rule_network({common::ipv4_prefix_default},
-		                                                          ipv4_prefixes);
+		                                                         ipv4_prefixes);
 		controlplane::base::acl_rule_t rule = {rule_network, flow};
 		acl.nextModuleRules.emplace_back(rule);
 	}
 	{ /// from any IPv6 and proto IPIP to tunnel's source address
 		auto flow = convertToFlow(nextModule, "ipv6_checked");
 		controlplane::base::acl_rule_network_ipv6_t rule_network({common::ipv6_prefix_default},
-		                                                          ipv6_prefixes);
+		                                                         ipv6_prefixes);
 		controlplane::base::acl_rule_transport_other_t rule_transport{IPPROTO_IPIP};
 		controlplane::base::acl_rule_t rule = {rule_network, rule_transport, flow};
 		rule.fragment = {controlplane::base::acl_rule_t::fragState::notFragmented};
@@ -1751,18 +1749,18 @@ void config_converter_t::buildAcl()
 				fwstate_synchronization_flows.emplace_back(convertToFlow(logicalPort));
 			}
 
-			for (auto aclId: result.acl_map[acl.aclId])
+			for (auto aclId : result.acl_map[acl.aclId])
 			{
 				fwstate_sync_request.emplace_back(
-					aclId,
-					acl.synchronization->ipv6SourceAddress,
-					acl.synchronization->multicastIpv6Address,
-					acl.synchronization->unicastIpv6SourceAddress,
-					acl.synchronization->unicastIpv6Address,
-					acl.synchronization->multicastDestinationPort,
-					acl.synchronization->unicastDestinationPort,
-					fwstate_synchronization_flows,
-					convertToFlow(acl.synchronization->ingressNextModule));
+				        aclId,
+				        acl.synchronization->ipv6SourceAddress,
+				        acl.synchronization->multicastIpv6Address,
+				        acl.synchronization->unicastIpv6SourceAddress,
+				        acl.synchronization->unicastIpv6Address,
+				        acl.synchronization->multicastDestinationPort,
+				        acl.synchronization->unicastDestinationPort,
+				        fwstate_synchronization_flows,
+				        convertToFlow(acl.synchronization->ingressNextModule));
 			}
 		}
 	}
@@ -1776,8 +1774,7 @@ void config_converter_t::buildAcl()
 		(void)moduleName;
 
 		// if at least one acl module has early_decap config section, early_decap feature is globally switched on
-		if ((!acl.src4_early_decap.empty() && !acl.dst4_early_decap.empty())
-			 || (!acl.src6_early_decap.empty() && !acl.dst6_early_decap.empty()))
+		if ((!acl.src4_early_decap.empty() && !acl.dst4_early_decap.empty()) || (!acl.src6_early_decap.empty() && !acl.dst6_early_decap.empty()))
 		{
 			early_decap_flags_request = true;
 			break;

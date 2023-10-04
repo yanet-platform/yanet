@@ -1,7 +1,7 @@
 #pragma once
 
-#include <rte_version.h>
 #include <rte_ether.h>
+#include <rte_version.h>
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20, 11, 0, 0)
 
@@ -28,7 +28,8 @@ using generic_rte_ether_hdr = rte_ether_hdr;
 #define RTE_ETH_MQ_RX_RSS ETH_MQ_RX_RSS
 #define CALL_MAIN CALL_MASTER
 
-struct generic_rte_ether_hdr {
+struct generic_rte_ether_hdr
+{
 	struct rte_ether_addr dst_addr; /**< Destination address. */
 	struct rte_ether_addr src_addr; /**< Source address. */
 	rte_be16_t ether_type; /**< Frame type. */

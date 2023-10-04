@@ -88,7 +88,7 @@ protected:
 	inline void logicalPort_egress_entry(rte_mbuf* mbuf);
 	inline void logicalPort_egress_handle();
 
-	inline void early_decap(rte_mbuf *mbuf);
+	inline void early_decap(rte_mbuf* mbuf);
 	inline void after_early_decap_entry(rte_mbuf* mbuf);
 
 	inline void acl_ingress_entry(rte_mbuf* mbuf);

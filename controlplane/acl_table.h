@@ -2,8 +2,8 @@
 
 #include <functional>
 
-#include "acl_base.h"
 #include "acl/bitset.h"
+#include "acl_base.h"
 
 #include "common/acl.h"
 
@@ -14,7 +14,7 @@ template<unsigned int dimension>
 class table_t
 {
 public:
-	static_assert (dimension > 0);
+	static_assert(dimension > 0);
 
 	table_t()
 	{
@@ -28,10 +28,10 @@ public:
 		sizes.fill(0);
 	}
 
-	template<typename ... sizes_t>
-	void prepare(const sizes_t& ... sizes)
+	template<typename... sizes_t>
+	void prepare(const sizes_t&... sizes)
 	{
-		this->sizes = {sizes ...};
+		this->sizes = {sizes...};
 
 		size_t total_size = 1;
 		for (const auto& size : this->sizes)

@@ -2,13 +2,13 @@
 
 #include <array>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <type_traits>
 #include <variant>
 #include <vector>
-#include <set>
 
 #include <nlohmann/json.hpp>
 
@@ -37,7 +37,8 @@ void fillValue(std::optional<uint8_t>& value, const std::string& string)
 	}
 	else if (string != "")
 	{
-		value = std::stoull(string, nullptr, 0);;
+		value = std::stoull(string, nullptr, 0);
+		;
 	}
 	else
 	{
@@ -53,7 +54,8 @@ void fillValue(std::optional<uint16_t>& value, const std::string& string)
 	}
 	else if (string != "")
 	{
-		value = std::stoull(string, nullptr, 0);;
+		value = std::stoull(string, nullptr, 0);
+		;
 	}
 	else
 	{
@@ -69,7 +71,8 @@ void fillValue(std::optional<uint32_t>& value, const std::string& string)
 	}
 	else if (string != "")
 	{
-		value = std::stoull(string, nullptr, 0);;
+		value = std::stoull(string, nullptr, 0);
+		;
 	}
 	else
 	{
@@ -148,15 +151,15 @@ void fillTuple(TTuple& tuple, const std::vector<std::string>& stringArgs)
 	}
 }
 
-template<typename ... TArgs>
-void call(void(*func)(TArgs ... args),
+template<typename... TArgs>
+void call(void (*func)(TArgs... args),
           const std::vector<std::string>& stringArgs)
 {
 	if (stringArgs.size() > sizeof...(TArgs))
 	{
 		throw std::string("invalid arguments count: '") + std::to_string(stringArgs.size()) + "', need: '" + std::to_string(sizeof...(TArgs)) + "'";
 	}
-	std::tuple<std::decay_t<TArgs> ...> tuple;
+	std::tuple<std::decay_t<TArgs>...> tuple;
 	fillTuple<0, sizeof...(TArgs)>(tuple, stringArgs);
 	std::apply(func, tuple);
 }
@@ -177,7 +180,7 @@ void getDiffTuple(TDiffTuple& diff,
 }
 
 template<typename TFirst,
-         typename ... TSecondArgs>
+         typename... TSecondArgs>
 std::map<TFirst, std::array<int64_t, sizeof...(TSecondArgs)>> getDiff(const std::map<TFirst, std::tuple<TSecondArgs...>>& curr,
                                                                       const std::map<TFirst, std::tuple<TSecondArgs...>>& prev)
 {
@@ -204,10 +207,10 @@ public:
 	{
 	}
 
-	template<typename ... args_T>
-	void insert(const args_T& ... args)
+	template<typename... args_T>
+	void insert(const args_T&... args)
 	{
-		std::vector<std::string> row = {converter::to_string(args, config) ...};
+		std::vector<std::string> row = {converter::to_string(args, config)...};
 
 		if (row.size() > columnLengths.size())
 		{
@@ -245,12 +248,12 @@ public:
 			if (header)
 			{
 				for (uint32_t string_i = 0;
-						string_i < row.size();
-						string_i++)
+				     string_i < row.size();
+				     string_i++)
 				{
 					for (uint32_t format_i = 0;
-							format_i < format_keys.size();
-							format_i++)
+					     format_i < format_keys.size();
+					     format_i++)
 					{
 						if (row[string_i] == format_keys[format_i])
 						{
@@ -269,8 +272,8 @@ public:
 
 			nlohmann::json json_row;
 			for (uint32_t string_i = 0;
-					string_i < row.size();
-					string_i++)
+			     string_i < row.size();
+			     string_i++)
 			{
 				if (format_keys_i.count(string_i))
 				{
@@ -310,8 +313,7 @@ public:
 		}
 
 		/* header row contains table's column names */
-		auto &header_row = table[0];
-
+		auto& header_row = table[0];
 
 		/* If the user listed only specific columns of the table to be printed in specific order,
 		   need to build a relation between index of column in user-provided order and its index in the table (only if it does exist in the table):
@@ -366,24 +368,24 @@ public:
 			row.resize(columns_order.size());
 
 			printf("%-*s",
-					columnLengths[columns_order[0]],
-					row[columns_order[0]].data());
+			       columnLengths[columns_order[0]],
+			       row[columns_order[0]].data());
 
 			for (uint32_t string_i = 1;
-					string_i < columns_order.size();
-					string_i++)
+			     string_i < columns_order.size();
+			     string_i++)
 			{
 				if (string_i != columns_order.size() - 1)
 				{
 					printf("  %-*s",
-							columnLengths[columns_order[string_i]],
-							row[columns_order[string_i]].data());
+					       columnLengths[columns_order[string_i]],
+					       row[columns_order[string_i]].data());
 				}
 				else
 				{
 					// Do not explode the last column with padding whitespace bytes.
 					printf("  %s",
-							row[columns_order[string_i]].data());
+					       row[columns_order[string_i]].data());
 				}
 			}
 
@@ -394,8 +396,8 @@ public:
 				printf("%s", std::string(columnLengths[columns_order[0]], '-').data());
 
 				for (uint32_t string_i = 1;
-						string_i < columns_order.size();
-						string_i++)
+				     string_i < columns_order.size();
+				     string_i++)
 				{
 					printf("  %s", std::string(columnLengths[columns_order[string_i]], '-').data());
 				}

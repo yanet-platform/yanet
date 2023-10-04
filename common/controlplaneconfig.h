@@ -2,10 +2,10 @@
 
 #include <nlohmann/json.hpp>
 
-#include "stream.h"
-#include "type.h"
 #include "balancer.h"
 #include "scheduler.h"
+#include "stream.h"
+#include "type.h"
 
 namespace controlplane
 {
@@ -37,9 +37,8 @@ public:
 	uint16_t other;
 };
 
-[[maybe_unused]]
-static void from_json(const nlohmann::json& json,
-                      controlplane::state_timeout& state_timeout)
+[[maybe_unused]] static void from_json(const nlohmann::json& json,
+                                       controlplane::state_timeout& state_timeout)
 {
 	state_timeout.tcp_syn = json.value("tcp_syn", state_timeout.tcp_syn);
 	state_timeout.tcp_ack = json.value("tcp_ack", state_timeout.tcp_ack);
@@ -375,57 +374,58 @@ class config_t
 {
 public:
 	config_t() :
-		dscpMarkType(common::eDscpMarkType::never),
-		dscp(0),
-		srcRndEnabled(false)
+	        dscpMarkType(common::eDscpMarkType::never),
+	        dscp(0),
+	        srcRndEnabled(false)
 	{
 	}
 
-       /** @todo: tag:CP_MODULES
+	/** @todo: tag:CP_MODULES
        void load(const nlohmann::json& json);
        nlohmann::json save() const;
        */
 
-       void pop(common::stream_in_t& stream)
-       {
-               stream.pop(tun64Id);
-               stream.pop(dscpMarkType);
-               stream.pop(dscp);
-               stream.pop(ipv6SourceAddress);
-               stream.pop(srcRndEnabled);
-               stream.pop(prefixes);
-               stream.pop(mappings);
-               stream.pop(nextModule);
-       }
+	void pop(common::stream_in_t& stream)
+	{
+		stream.pop(tun64Id);
+		stream.pop(dscpMarkType);
+		stream.pop(dscp);
+		stream.pop(ipv6SourceAddress);
+		stream.pop(srcRndEnabled);
+		stream.pop(prefixes);
+		stream.pop(mappings);
+		stream.pop(nextModule);
+	}
 
-       void push(common::stream_out_t& stream) const
-       {
-               stream.push(tun64Id);
-               stream.push(dscpMarkType);
-               stream.push(dscp);
-               stream.push(ipv6SourceAddress);
-               stream.push(srcRndEnabled);
-               stream.push(prefixes);
-               stream.push(mappings);
-               stream.push(nextModule);
-       }
+	void push(common::stream_out_t& stream) const
+	{
+		stream.push(tun64Id);
+		stream.push(dscpMarkType);
+		stream.push(dscp);
+		stream.push(ipv6SourceAddress);
+		stream.push(srcRndEnabled);
+		stream.push(prefixes);
+		stream.push(mappings);
+		stream.push(nextModule);
+	}
 
 public:
-       tun64_id_t tun64Id;
+	tun64_id_t tun64Id;
 
-       common::eDscpMarkType dscpMarkType;
-       uint8_t dscp;
+	common::eDscpMarkType dscpMarkType;
+	uint8_t dscp;
 
-       common::ipv6_address_t ipv6SourceAddress;
-       bool srcRndEnabled; /// < IPv6 Source address randomization
+	common::ipv6_address_t ipv6SourceAddress;
+	bool srcRndEnabled; /// < IPv6 Source address randomization
 
-       std::set<common::ip_prefix_t> prefixes;
-       std::map<common::ipv4_address_t,
-                std::tuple<common::ipv6_address_t,
-                           std::string>> mappings;
+	std::set<common::ip_prefix_t> prefixes;
+	std::map<common::ipv4_address_t,
+	         std::tuple<common::ipv6_address_t,
+	                    std::string>>
+	        mappings;
 
-       std::string nextModule;
-       common::globalBase::tFlow flow;
+	std::string nextModule;
+	common::globalBase::tFlow flow;
 };
 
 }

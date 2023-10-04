@@ -1,35 +1,35 @@
 #pragma once
 
-#include <thread>
-#include <vector>
+#include <atomic>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <shared_mutex>
-#include <functional>
-#include <atomic>
+#include <thread>
 #include <type_traits>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
-#include "common/result.h"
-#include "common/idp.h"
-#include "common/idataplane.h"
-#include "common/icp.h"
 #include "common/generation.h"
+#include "common/icp.h"
+#include "common/idataplane.h"
+#include "common/idp.h"
+#include "common/result.h"
 #include "libprotobuf/controlplane.pb.h"
 
-#include "module.h"
-#include "type.h"
-#include "base.h"
-#include "dregress.h"
-#include "route.h"
-#include "isystem.h"
-#include "counter.h"
 #include "balancer.h"
-#include "tun64.h"
-#include "fqdn.h"
+#include "base.h"
+#include "counter.h"
+#include "dregress.h"
 #include "durations.h"
+#include "fqdn.h"
+#include "isystem.h"
+#include "module.h"
 #include "nat64stateful.h"
+#include "route.h"
+#include "tun64.h"
+#include "type.h"
 
 class cControlPlane
 {
@@ -58,24 +58,21 @@ public:
 		}
 		else if constexpr (std::is_invocable_r_v<void, decltype(function), common::icp::request>)
 		{
-			commands[type] = [function](const common::icp::request& request)
-			{
+			commands[type] = [function](const common::icp::request& request) {
 				function(request);
 				return std::tuple<>{};
 			};
 		}
 		else if constexpr (std::is_invocable_r_v<common::icp::response, decltype(function)>)
 		{
-			commands[type] = [function](const common::icp::request& request)
-			{
+			commands[type] = [function](const common::icp::request& request) {
 				(void)request;
 				return function();
 			};
 		}
 		else if constexpr (std::is_invocable_r_v<void, decltype(function)>)
 		{
-			commands[type] = [function](const common::icp::request& request)
-			{
+			commands[type] = [function](const common::icp::request& request) {
 				(void)request;
 				function();
 				return std::tuple<>{};
@@ -170,7 +167,7 @@ protected:
 	std::vector<cModule*> modules;
 	std::map<common::icp::requestType,
 	         std::function<common::icp::response(const common::icp::request&)>>
-	    commands;
+	        commands;
 	std::map<std::string, google::protobuf::Service*> services;
 
 	common::idp::getConfig::response dataPlaneConfig;
@@ -212,6 +209,7 @@ private:
 	std::map<std::tuple<std::string, ///< vrf
 	                    std::string, ///< interface_name
 	                    common::ip_address_t>, ///< neighbor
-	         std::optional<common::mac_address_t>> mac_addresses;
+	         std::optional<common::mac_address_t>>
+	        mac_addresses;
 	void register_service(google::protobuf::Service* service);
 };

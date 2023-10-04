@@ -1,9 +1,9 @@
 #pragma once
 
-#include "type.h"
-#include "module.h"
 #include "base.h"
 #include "counter.h"
+#include "module.h"
+#include "type.h"
 
 #include "common/generation.h"
 
@@ -39,11 +39,13 @@ public:
 public:
 	std::map<std::string, ///< vrf
 	         std::map<common::ip_address_t,
-	                  std::vector<std::string>>> vrf_fqdns;
+	                  std::vector<std::string>>>
+	        vrf_fqdns;
 
 	std::map<std::string, ///< vrf
 	         std::map<std::string,
-	                  std::vector<common::ip_address_t>>> vrf_ips;
+	                  std::vector<common::ip_address_t>>>
+	        vrf_ips;
 };
 
 }

@@ -7,8 +7,8 @@ namespace latch
 {
 
 void dataplane_update(
-             std::string name,
-	     uint32_t state)
+        std::string name,
+        uint32_t state)
 {
 	common::idp::debug_latch_update::id id = common::idp::debug_latch_update::id::size;
 	if (name == "GB_PREUPDATE")

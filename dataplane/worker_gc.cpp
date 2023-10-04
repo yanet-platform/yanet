@@ -3,8 +3,6 @@
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 
-#include "worker_gc.h"
-#include "dataplane.h"
 #include "controlplane.h"
 #include "dataplane.h"
 #include "worker.h"
@@ -531,13 +529,13 @@ void worker_gc_t::handle_acl_gc()
 
 			common::idp::getFWState::key_t fw_key(std::uint8_t(key.proto), {rte_be_to_cpu_32(key.src_addr.address)}, {rte_be_to_cpu_32(key.dst_addr.address)}, key.src_port, key.dst_port);
 			fw_state_insert_stack.emplace_back(
-			    fw_key,
-			    std::make_tuple(
-			        static_cast<std::uint8_t>(value.owner),
-			        value.tcp.pack(),
-			        current_time - value.last_seen,
-			        value.packets_backward,
-			        value.packets_forward));
+			        fw_key,
+			        std::make_tuple(
+			                static_cast<std::uint8_t>(value.owner),
+			                value.tcp.pack(),
+			                current_time - value.last_seen,
+			                value.packets_backward,
+			                value.packets_forward));
 
 			if (value.type == dataplane::globalBase::fw_state_type::tcp)
 			{
@@ -554,8 +552,8 @@ void worker_gc_t::handle_acl_gc()
 					auto frame = dataplane::globalBase::fw_state_sync_frame_t::from_state_key(key);
 					frame.flags = value.tcp.pack();
 					fw_state_sync_events.emplace(
-					    frame,
-					    value.acl_id);
+					        frame,
+					        value.acl_id);
 
 					iter.lock();
 					iter.value()->last_sync = current_time;
@@ -579,8 +577,8 @@ void worker_gc_t::handle_acl_gc()
 				         value.packets_since_last_sync > 0)
 				{
 					fw_state_sync_events.emplace(
-					    dataplane::globalBase::fw_state_sync_frame_t::from_state_key(key),
-					    value.acl_id);
+					        dataplane::globalBase::fw_state_sync_frame_t::from_state_key(key),
+					        value.acl_id);
 
 					iter.lock();
 					iter.value()->last_sync = current_time;
@@ -604,8 +602,8 @@ void worker_gc_t::handle_acl_gc()
 				         value.packets_since_last_sync > 0)
 				{
 					fw_state_sync_events.emplace(
-					    dataplane::globalBase::fw_state_sync_frame_t::from_state_key(key),
-					    value.acl_id);
+					        dataplane::globalBase::fw_state_sync_frame_t::from_state_key(key),
+					        value.acl_id);
 
 					iter.lock();
 					iter.value()->last_sync = current_time;
@@ -639,13 +637,13 @@ void worker_gc_t::handle_acl_gc()
 
 			common::idp::getFWState::key_t fw_key(std::uint8_t(key.proto), {key.src_addr.bytes}, {key.dst_addr.bytes}, key.src_port, key.dst_port);
 			fw_state_insert_stack.emplace_back(
-			    fw_key,
-			    std::make_tuple(
-			        static_cast<std::uint8_t>(value.owner),
-			        value.tcp.pack(),
-			        current_time - value.last_seen,
-			        value.packets_backward,
-			        value.packets_forward));
+			        fw_key,
+			        std::make_tuple(
+			                static_cast<std::uint8_t>(value.owner),
+			                value.tcp.pack(),
+			                current_time - value.last_seen,
+			                value.packets_backward,
+			                value.packets_forward));
 
 			if (value.type == dataplane::globalBase::fw_state_type::tcp)
 			{
@@ -662,8 +660,8 @@ void worker_gc_t::handle_acl_gc()
 					auto frame = dataplane::globalBase::fw_state_sync_frame_t::from_state_key(key);
 					frame.flags = value.tcp.pack();
 					fw_state_sync_events.emplace(
-					    frame,
-					    value.acl_id);
+					        frame,
+					        value.acl_id);
 
 					iter.lock();
 					iter.value()->last_sync = current_time;
@@ -687,8 +685,8 @@ void worker_gc_t::handle_acl_gc()
 				         value.packets_since_last_sync > 0)
 				{
 					fw_state_sync_events.emplace(
-					    dataplane::globalBase::fw_state_sync_frame_t::from_state_key(key),
-					    value.acl_id);
+					        dataplane::globalBase::fw_state_sync_frame_t::from_state_key(key),
+					        value.acl_id);
 
 					iter.lock();
 					iter.value()->last_sync = current_time;
@@ -709,11 +707,11 @@ void worker_gc_t::handle_acl_gc()
 					iter.unset_valid();
 				}
 				else if (current_time - value.last_sync >= globalbase_atomic->fw_state_config.sync_timeout &&
-					 value.packets_since_last_sync > 0)
+				         value.packets_since_last_sync > 0)
 				{
 					fw_state_sync_events.emplace(
-					    dataplane::globalBase::fw_state_sync_frame_t::from_state_key(key),
-					    value.acl_id);
+					        dataplane::globalBase::fw_state_sync_frame_t::from_state_key(key),
+					        value.acl_id);
 
 					iter.lock();
 					iter.value()->last_sync = current_time;
@@ -862,8 +860,8 @@ void worker_gc_t::handle_acl_sync()
 					*YADECAP_METADATA(mbuf_clone) = *YADECAP_METADATA(mbuf);
 
 					memcpy(rte_pktmbuf_mtod(mbuf_clone, char*),
-						   rte_pktmbuf_mtod(mbuf, char*),
-						   mbuf->data_len);
+					       rte_pktmbuf_mtod(mbuf, char*),
+					       mbuf->data_len);
 					mbuf_clone->data_len = mbuf->data_len;
 					mbuf_clone->pkt_len = mbuf->pkt_len;
 
@@ -1035,7 +1033,6 @@ void worker_gc_t::handle_samples()
 		auto& sampler = iter.second->sampler;
 
 		sampler.visit6([this](auto& sample) {
-
 			if (samples.size() < YANET_CONFIG_SAMPLES_SIZE * 8)
 			{
 				samples.emplace(sample.proto, sample.in_logicalport_id, sample.out_logicalport_id, sample.src_port, sample.dst_port, sample.src_addr.bytes, sample.dst_addr.bytes);
@@ -1071,8 +1068,7 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
                                       common::idp::nat64stateful_state::response& response)
 {
 	uint32_t offset = 0;
-	run_on_this_thread([&]()
-	{
+	run_on_this_thread([&]() {
 		const auto& [filter_nat64stateful_id] = request;
 		auto& globalbase_atomic = base_permanently.globalBaseAtomic;
 

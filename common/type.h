@@ -1,21 +1,21 @@
 #pragma once
 
-#include <tuple>
 #include <map>
-#include <variant>
-#include <vector>
 #include <set>
 #include <sstream>
+#include <tuple>
+#include <variant>
+#include <vector>
 
+#include <arpa/inet.h>
 #include <inttypes.h>
 #include <memory.h>
-#include <arpa/inet.h>
 #include <nlohmann/json.hpp>
 
 #include "config.h"
-#include "stream.h"
-#include "define.h"
 #include "ctree.h"
+#include "define.h"
+#include "stream.h"
 #include "uint128.h"
 
 using tCoreId = uint32_t;
@@ -166,8 +166,12 @@ public:
 		unsigned int bytes[6];
 		auto rc = std::sscanf(string.data(),
 		                      "%02x:%02x:%02x:%02x:%02x:%02x",
-		                      &bytes[0], &bytes[1], &bytes[2],
-		                      &bytes[3], &bytes[4], &bytes[5]);
+		                      &bytes[0],
+		                      &bytes[1],
+		                      &bytes[2],
+		                      &bytes[3],
+		                      &bytes[4],
+		                      &bytes[5]);
 		if (rc == 6)
 		{
 			address = {(uint8_t)bytes[0], (uint8_t)bytes[1], (uint8_t)bytes[2], (uint8_t)bytes[3], (uint8_t)bytes[4], (uint8_t)bytes[5]};
@@ -198,12 +202,12 @@ public:
 		return address < second.address;
 	}
 
-	constexpr operator const std::array<uint8_t, 6>&() const
+	constexpr operator const std::array<uint8_t, 6> &() const
 	{
 		return address;
 	}
 
-	constexpr operator std::array<uint8_t, 6>&()
+	constexpr operator std::array<uint8_t, 6> &()
 	{
 		return address;
 	}
@@ -222,13 +226,7 @@ public:
 	std::string toString() const
 	{
 		char buffer[64];
-		snprintf(buffer, 64, "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X",
-		         address[0],
-		         address[1],
-		         address[2],
-		         address[3],
-		         address[4],
-		         address[5]);
+		snprintf(buffer, 64, "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X", address[0], address[1], address[2], address[3], address[4], address[5]);
 		return buffer;
 	}
 
@@ -268,10 +266,10 @@ public:
 	{
 		// inet_aton() is able to handle octal numbers in IPv4 octets
 		// i.e. 192.168.0.010
-		if (inet_aton(string.data(), (struct in_addr *)&address) != 1)
+		if (inet_aton(string.data(), (struct in_addr*)&address) != 1)
 		{
 			std::ostringstream error;
-			error << "'" << string <<"' is not a valid IPv4 address";
+			error << "'" << string << "' is not a valid IPv4 address";
 			YANET_THROW(error.str());
 		}
 		address = ntohl(address);
@@ -306,11 +304,7 @@ public:
 	std::string toString() const
 	{
 		char buffer[64];
-		snprintf(buffer, 64, "%u.%u.%u.%u",
-		         (address >> 24) & 0xFF,
-		         (address >> 16) & 0xFF,
-		         (address >> 8) & 0xFF,
-		         address & 0xFF);
+		snprintf(buffer, 64, "%u.%u.%u.%u", (address >> 24) & 0xFF, (address >> 16) & 0xFF, (address >> 8) & 0xFF, address & 0xFF);
 		return buffer;
 	}
 
@@ -426,12 +420,12 @@ public:
 		return !memcmp(address.data(), second.address.data(), address.size());
 	}
 
-	constexpr operator const std::array<uint8_t, 16>&() const
+	constexpr operator const std::array<uint8_t, 16> &() const
 	{
 		return address;
 	}
 
-	constexpr operator std::array<uint8_t, 16>&()
+	constexpr operator std::array<uint8_t, 16> &()
 	{
 		return address;
 	}
@@ -616,12 +610,12 @@ public:
 		return !(address == second.address);
 	}
 
-	constexpr operator const std::variant<ipv4_address_t, ipv6_address_t>&() const
+	constexpr operator const std::variant<ipv4_address_t, ipv6_address_t> &() const
 	{
 		return address;
 	}
 
-	constexpr operator std::variant<ipv4_address_t, ipv6_address_t>&()
+	constexpr operator std::variant<ipv4_address_t, ipv6_address_t> &()
 	{
 		return address;
 	}
@@ -636,10 +630,10 @@ public:
 	{
 		std::string string;
 
-		std::visit([&string](const auto& address)
-		{
+		std::visit([&string](const auto& address) {
 			string = address.toString();
-		}, address);
+		},
+		           address);
 
 		return string;
 	}
@@ -682,7 +676,7 @@ public:
 			return true;
 		}
 		else if (is_ipv6() &&
-			 get_ipv6() == ipv6_address_t())
+		         get_ipv6() == ipv6_address_t())
 		{
 			return true;
 		}
@@ -761,12 +755,12 @@ public:
 		return prefix > second.prefix;
 	}
 
-	constexpr operator const std::tuple<ipv4_address_t, uint8_t>&() const
+	constexpr operator const std::tuple<ipv4_address_t, uint8_t> &() const
 	{
 		return prefix;
 	}
 
-	constexpr operator std::tuple<ipv4_address_t, uint8_t>&()
+	constexpr operator std::tuple<ipv4_address_t, uint8_t> &()
 	{
 		return prefix;
 	}
@@ -901,14 +895,13 @@ public:
 		}
 	}
 
-	ipv4_prefix_with_announces_t(ipv4_prefix_t prefix)
-	: prefix(std::move(prefix))
+	ipv4_prefix_with_announces_t(ipv4_prefix_t prefix) :
+	        prefix(std::move(prefix))
 	{
 	}
 
-	ipv4_prefix_with_announces_t(ipv4_prefix_t prefix, std::vector<ipv4_prefix_t> announces)
-	: prefix(std::move(prefix))
-	, announces(std::move(announces))
+	ipv4_prefix_with_announces_t(ipv4_prefix_t prefix, std::vector<ipv4_prefix_t> announces) :
+	        prefix(std::move(prefix)), announces(std::move(announces))
 	{
 	}
 
@@ -977,12 +970,12 @@ public:
 		return prefix > second.prefix;
 	}
 
-	constexpr operator const std::tuple<ipv6_address_t, uint8_t>&() const
+	constexpr operator const std::tuple<ipv6_address_t, uint8_t> &() const
 	{
 		return prefix;
 	}
 
-	constexpr operator std::tuple<ipv6_address_t, uint8_t>&()
+	constexpr operator std::tuple<ipv6_address_t, uint8_t> &()
 	{
 		return prefix;
 	}
@@ -1125,9 +1118,8 @@ protected:
 class ipv6_prefix_with_announces_t
 {
 public:
-	ipv6_prefix_with_announces_t()
-	: prefix{}
-	, announces{}
+	ipv6_prefix_with_announces_t() :
+	        prefix{}, announces{}
 	{
 	}
 
@@ -1159,7 +1151,7 @@ public:
 				{
 					std::ostringstream error;
 					error << "prefix: '" << prefix.toString() << "' has announce: '"
-					      << announce.toString()  << "' that isn' t a subnet of prefix ";
+					      << announce.toString() << "' that isn' t a subnet of prefix ";
 					YANET_THROW(error.str());
 				}
 				announces.emplace_back(std::move(announce));
@@ -1171,14 +1163,13 @@ public:
 		}
 	}
 
-	ipv6_prefix_with_announces_t(ipv6_prefix_t prefix)
-		: prefix(std::move(prefix))
+	ipv6_prefix_with_announces_t(ipv6_prefix_t prefix) :
+	        prefix(std::move(prefix))
 	{
 	}
 
-	ipv6_prefix_with_announces_t(ipv6_prefix_t prefix, std::vector<ipv6_prefix_t> announces)
-		: prefix(std::move(prefix))
-		, announces(std::move(announces))
+	ipv6_prefix_with_announces_t(ipv6_prefix_t prefix, std::vector<ipv6_prefix_t> announces) :
+	        prefix(std::move(prefix)), announces(std::move(announces))
 	{
 	}
 
@@ -1260,12 +1251,12 @@ public:
 		return prefix == second.prefix;
 	}
 
-	constexpr operator const std::variant<ipv4_prefix_t, ipv6_prefix_t>&() const
+	constexpr operator const std::variant<ipv4_prefix_t, ipv6_prefix_t> &() const
 	{
 		return prefix;
 	}
 
-	constexpr operator std::variant<ipv4_prefix_t, ipv6_prefix_t>&()
+	constexpr operator std::variant<ipv4_prefix_t, ipv6_prefix_t> &()
 	{
 		return prefix;
 	}
@@ -1421,8 +1412,7 @@ public:
 
 	ip_prefix_with_announces_t(const nlohmann::json& prefixJson)
 	{
-		auto prefixString = [&]() -> std::string
-		{
+		auto prefixString = [&]() -> std::string {
 			// prefix could be either a string (for old configs support) or an object
 			if (prefixJson.is_string())
 			{
@@ -1445,13 +1435,13 @@ public:
 		}
 	}
 
-	ip_prefix_with_announces_t(const ipv4_prefix_with_announces_t& prefix)
-	: prefix(prefix)
+	ip_prefix_with_announces_t(const ipv4_prefix_with_announces_t& prefix) :
+	        prefix(prefix)
 	{
 	}
 
-	ip_prefix_with_announces_t(const ipv6_prefix_with_announces_t& prefix)
-	: prefix(prefix)
+	ip_prefix_with_announces_t(const ipv6_prefix_with_announces_t& prefix) :
+	        prefix(prefix)
 	{
 	}
 
@@ -1624,12 +1614,12 @@ public:
 		return value == second.value;
 	}
 
-	constexpr operator const std::array<uint32_t, 3>&() const
+	constexpr operator const std::array<uint32_t, 3> &() const
 	{
 		return value;
 	}
 
-	constexpr operator std::array<uint32_t, 3>&()
+	constexpr operator std::array<uint32_t, 3> &()
 	{
 		return value;
 	}
@@ -1666,18 +1656,18 @@ public:
 	{
 	}
 
-	template<typename ... args_T>
-	values_t(const args_T& ... args)
+	template<typename... args_T>
+	values_t(const args_T&... args)
 	{
-		insertHelper(args ...);
+		insertHelper(args...);
 	}
 
-	operator const std::set<uint64_t>&() const
+	operator const std::set<uint64_t> &() const
 	{
 		return values;
 	}
 
-	operator std::set<uint64_t>&()
+	operator std::set<uint64_t> &()
 	{
 		return values;
 	}
@@ -1693,15 +1683,15 @@ public:
 	}
 
 protected:
-	template<typename arg0_T, typename ... args_T>
+	template<typename arg0_T, typename... args_T>
 	void insertHelper(const arg0_T& arg0,
-	                  const args_T& ... args)
+	                  const args_T&... args)
 	{
 		values.emplace(arg0);
 
 		if constexpr (sizeof...(args_T))
 		{
-			insertHelper(args ...);
+			insertHelper(args...);
 		}
 	}
 
@@ -1756,12 +1746,12 @@ public:
 		return range < second.range;
 	}
 
-	constexpr operator const std::tuple<uint64_t, uint64_t>&() const
+	constexpr operator const std::tuple<uint64_t, uint64_t> &() const
 	{
 		return range;
 	}
 
-	constexpr operator std::tuple<uint64_t, uint64_t>&()
+	constexpr operator std::tuple<uint64_t, uint64_t> &()
 	{
 		return range;
 	}
@@ -1774,8 +1764,7 @@ public:
 public:
 	std::string toString() const
 	{
-		return std::to_string(from())
-		+ (from() == to() ? "" : "-" + std::to_string(to()));
+		return std::to_string(from()) + (from() == to() ? "" : "-" + std::to_string(to()));
 	}
 
 	uint64_t& from()
@@ -1984,360 +1973,398 @@ constexpr ipv6_prefix_t ipv6_prefix_default = {ipv6_address_default, 0};
 
 namespace worker
 {
-	namespace stats
+namespace stats
+{
+struct common
+{
+	uint64_t brokenPackets;
+	uint64_t dropPackets;
+	uint64_t ring_highPriority_drops;
+	uint64_t ring_normalPriority_drops;
+	uint64_t ring_lowPriority_drops;
+	uint64_t ring_highPriority_packets;
+	uint64_t ring_normalPriority_packets;
+	uint64_t ring_lowPriority_packets;
+
+	/// @todo: use counters
+	uint64_t decap_packets;
+	uint64_t decap_fragments;
+	uint64_t decap_unknownExtensions;
+	uint64_t interface_lookupMisses;
+	uint64_t interface_hopLimits;
+	uint64_t interface_neighbor_invalid;
+	uint64_t nat64stateless_ingressPackets;
+	uint64_t nat64stateless_ingressFragments;
+	uint64_t nat64stateless_ingressUnknownICMP;
+	uint64_t nat64stateless_egressPackets;
+	uint64_t nat64stateless_egressFragments;
+	uint64_t nat64stateless_egressUnknownICMP;
+	uint64_t balancer_invalid_reals_count;
+	uint64_t fwsync_multicast_egress_drops;
+	uint64_t fwsync_multicast_egress_packets;
+	uint64_t fwsync_multicast_egress_imm_packets;
+	uint64_t fwsync_no_config_drops;
+	uint64_t fwsync_unicast_egress_drops;
+	uint64_t fwsync_unicast_egress_packets;
+	uint64_t acl_ingress_dropPackets;
+	uint64_t acl_egress_dropPackets;
+	uint64_t repeat_ttl;
+	uint64_t leakedMbufs;
+	uint64_t logs_packets;
+	uint64_t logs_drops;
+};
+
+struct port
+{
+	port()
 	{
-		struct common
-		{
-			uint64_t brokenPackets;
-			uint64_t dropPackets;
-			uint64_t ring_highPriority_drops;
-			uint64_t ring_normalPriority_drops;
-			uint64_t ring_lowPriority_drops;
-			uint64_t ring_highPriority_packets;
-			uint64_t ring_normalPriority_packets;
-			uint64_t ring_lowPriority_packets;
-
-			/// @todo: use counters
-			uint64_t decap_packets;
-			uint64_t decap_fragments;
-			uint64_t decap_unknownExtensions;
-			uint64_t interface_lookupMisses;
-			uint64_t interface_hopLimits;
-			uint64_t interface_neighbor_invalid;
-			uint64_t nat64stateless_ingressPackets;
-			uint64_t nat64stateless_ingressFragments;
-			uint64_t nat64stateless_ingressUnknownICMP;
-			uint64_t nat64stateless_egressPackets;
-			uint64_t nat64stateless_egressFragments;
-			uint64_t nat64stateless_egressUnknownICMP;
-			uint64_t balancer_invalid_reals_count;
-			uint64_t fwsync_multicast_egress_drops;
-			uint64_t fwsync_multicast_egress_packets;
-			uint64_t fwsync_multicast_egress_imm_packets;
-			uint64_t fwsync_no_config_drops;
-			uint64_t fwsync_unicast_egress_drops;
-			uint64_t fwsync_unicast_egress_packets;
-			uint64_t acl_ingress_dropPackets;
-			uint64_t acl_egress_dropPackets;
-			uint64_t repeat_ttl;
-			uint64_t leakedMbufs;
-			uint64_t logs_packets;
-			uint64_t logs_drops;
-		};
-
-		struct port
-		{
-			port()
-			{
-				memset(this, 0, sizeof(*this));
-			}
-
-			void pop(stream_in_t& stream)
-			{
-				stream.pop((char*)this, sizeof(*this));
-			}
-
-			void push(stream_out_t& stream) const
-			{
-				stream.push((char*)this, sizeof(*this));
-			}
-
-			uint64_t physicalPort_egress_drops;
-			uint64_t controlPlane_drops; ///< @todo: DELETE
-		};
+		memset(this, 0, sizeof(*this));
 	}
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop((char*)this, sizeof(*this));
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push((char*)this, sizeof(*this));
+	}
+
+	uint64_t physicalPort_egress_drops;
+	uint64_t controlPlane_drops; ///< @todo: DELETE
+};
+}
 }
 
 namespace worker_gc
 {
-	struct stats_t
-	{
-		/// @todo
-		uint64_t broken_packets;
-		uint64_t drop_packets;
-		uint64_t ring_to_slowworker_packets;
-		uint64_t ring_to_slowworker_drops;
-		uint64_t fwsync_multicast_egress_packets;
-		uint64_t fwsync_multicast_egress_drops;
-		uint64_t fwsync_unicast_egress_packets;
-		uint64_t fwsync_unicast_egress_drops;
-		uint64_t drop_samples;
-		uint64_t balancer_state_insert_failed;
-		uint64_t balancer_state_insert_done;
-	};
+struct stats_t
+{
+	/// @todo
+	uint64_t broken_packets;
+	uint64_t drop_packets;
+	uint64_t ring_to_slowworker_packets;
+	uint64_t ring_to_slowworker_drops;
+	uint64_t fwsync_multicast_egress_packets;
+	uint64_t fwsync_multicast_egress_drops;
+	uint64_t fwsync_unicast_egress_packets;
+	uint64_t fwsync_unicast_egress_drops;
+	uint64_t drop_samples;
+	uint64_t balancer_state_insert_failed;
+	uint64_t balancer_state_insert_done;
+};
 }
 
 namespace globalBase ///< @todo: remove
 {
-	enum class static_counter_type : uint32_t
-	{
-		start = YANET_CONFIG_COUNTER_FALLBACK_SIZE - 1,
-		balancer_state,
-		balancer_state_insert_failed = balancer_state,
-		balancer_state_insert_done,
-		balancer_icmp_generated_echo_reply_ipv4,
-		balancer_icmp_generated_echo_reply_ipv6,
-		balancer_icmp_sent_to_real,
-		balancer_icmp_drop_icmpv4_payload_too_short_ip,
-		balancer_icmp_drop_icmpv4_payload_too_short_port,
-		balancer_icmp_drop_icmpv6_payload_too_short_ip,
-		balancer_icmp_drop_icmpv6_payload_too_short_port,
-		balancer_icmp_unmatching_src_from_original_ipv4,
-		balancer_icmp_unmatching_src_from_original_ipv6,
-		balancer_icmp_drop_real_disabled,
-		balancer_icmp_no_balancer_src_ipv4,
-		balancer_icmp_no_balancer_src_ipv6,
-		balancer_icmp_drop_already_cloned,
-		balancer_icmp_out_rate_limit_reached,
-		balancer_icmp_drop_no_unrdup_table_for_balancer_id,
-		balancer_icmp_drop_unrdup_vip_not_found,
-		balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id,
-		balancer_icmp_drop_unexpected_transport_protocol,
-		balancer_icmp_drop_unknown_service,
-		balancer_icmp_failed_to_clone,
-		balancer_icmp_clone_forwarded,
-		balancer_fragment_drops,
-		acl_ingress_v4_broken_packet,
-		acl_ingress_v6_broken_packet,
-		acl_egress_v4_broken_packet,
-		acl_egress_v6_broken_packet,
-		slow_worker_normal_priority_rate_limit_exceeded,
-		size
-	};
+enum class static_counter_type : uint32_t
+{
+	start = YANET_CONFIG_COUNTER_FALLBACK_SIZE - 1,
+	balancer_state,
+	balancer_state_insert_failed = balancer_state,
+	balancer_state_insert_done,
+	balancer_icmp_generated_echo_reply_ipv4,
+	balancer_icmp_generated_echo_reply_ipv6,
+	balancer_icmp_sent_to_real,
+	balancer_icmp_drop_icmpv4_payload_too_short_ip,
+	balancer_icmp_drop_icmpv4_payload_too_short_port,
+	balancer_icmp_drop_icmpv6_payload_too_short_ip,
+	balancer_icmp_drop_icmpv6_payload_too_short_port,
+	balancer_icmp_unmatching_src_from_original_ipv4,
+	balancer_icmp_unmatching_src_from_original_ipv6,
+	balancer_icmp_drop_real_disabled,
+	balancer_icmp_no_balancer_src_ipv4,
+	balancer_icmp_no_balancer_src_ipv6,
+	balancer_icmp_drop_already_cloned,
+	balancer_icmp_out_rate_limit_reached,
+	balancer_icmp_drop_no_unrdup_table_for_balancer_id,
+	balancer_icmp_drop_unrdup_vip_not_found,
+	balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id,
+	balancer_icmp_drop_unexpected_transport_protocol,
+	balancer_icmp_drop_unknown_service,
+	balancer_icmp_failed_to_clone,
+	balancer_icmp_clone_forwarded,
+	balancer_fragment_drops,
+	acl_ingress_v4_broken_packet,
+	acl_ingress_v6_broken_packet,
+	acl_egress_v4_broken_packet,
+	acl_egress_v6_broken_packet,
+	slow_worker_normal_priority_rate_limit_exceeded,
+	size
+};
 
-	enum class eNexthopType : unsigned int
-	{
-		drop,
-		interface,
-		controlPlane,
-		repeat,
-	};
+enum class eNexthopType : unsigned int
+{
+	drop,
+	interface,
+	controlPlane,
+	repeat,
+};
 
-	enum class eFlowType : uint8_t
-	{
-		drop,
-		acl_ingress,
-		tun64_ipv4_checked,
-		tun64_ipv6_checked,
-		decap_checked, ///< @todo: decap
-		nat64stateful_lan,
-		nat64stateful_wan,
-		nat64stateless_ingress_checked, ///< @todo: nat64stateless_ingress
-		nat64stateless_ingress_icmp,
-		nat64stateless_ingress_fragmentation,
-		nat64stateless_egress_checked, ///< @todo: nat64stateless_egress
-		nat64stateless_egress_icmp,
-		nat64stateless_egress_fragmentation,
-		nat64stateless_egress_farm,
-		balancer,
-		balancer_icmp_reply,
-		balancer_icmp_forward,
-		route,
-		route_local,
-		route_tunnel,
-		acl_egress,
-		dregress,
-		controlPlane,
-		logicalPort_egress,
-		slowWorker_nat64stateless_ingress_icmp,
-		slowWorker_nat64stateless_ingress_fragmentation,
-		slowWorker_nat64stateless_egress_icmp,
-		slowWorker_nat64stateless_egress_fragmentation,
-		slowWorker_nat64stateless_egress_farm,
-		slowWorker_dregress,
-		slowWorker_kni,
-		slowWorker_dump,
-		slowWorker_repeat,
-		slowWorker_kni_local,
-		slowWorker_fw_sync,
-		after_early_decap,
-		slowWorker_balancer_icmp_forward,
-		balancer_fragment,
-	};
+enum class eFlowType : uint8_t
+{
+	drop,
+	acl_ingress,
+	tun64_ipv4_checked,
+	tun64_ipv6_checked,
+	decap_checked, ///< @todo: decap
+	nat64stateful_lan,
+	nat64stateful_wan,
+	nat64stateless_ingress_checked, ///< @todo: nat64stateless_ingress
+	nat64stateless_ingress_icmp,
+	nat64stateless_ingress_fragmentation,
+	nat64stateless_egress_checked, ///< @todo: nat64stateless_egress
+	nat64stateless_egress_icmp,
+	nat64stateless_egress_fragmentation,
+	nat64stateless_egress_farm,
+	balancer,
+	balancer_icmp_reply,
+	balancer_icmp_forward,
+	route,
+	route_local,
+	route_tunnel,
+	acl_egress,
+	dregress,
+	controlPlane,
+	logicalPort_egress,
+	slowWorker_nat64stateless_ingress_icmp,
+	slowWorker_nat64stateless_ingress_fragmentation,
+	slowWorker_nat64stateless_egress_icmp,
+	slowWorker_nat64stateless_egress_fragmentation,
+	slowWorker_nat64stateless_egress_farm,
+	slowWorker_dregress,
+	slowWorker_kni,
+	slowWorker_dump,
+	slowWorker_repeat,
+	slowWorker_kni_local,
+	slowWorker_fw_sync,
+	after_early_decap,
+	slowWorker_balancer_icmp_forward,
+	balancer_fragment,
+};
 
-	inline const char* eFlowType_toString(eFlowType t)
+inline const char* eFlowType_toString(eFlowType t)
+{
+	switch (t)
 	{
-		switch (t)
-		{
-		case eFlowType::drop: return "drop";
-		case eFlowType::acl_ingress: return "acl_ingress";
-		case eFlowType::tun64_ipv4_checked: return "tun64_ipv4_checked";
-		case eFlowType::tun64_ipv6_checked: return "tun64_ipv6_checked";
-		case eFlowType::decap_checked: return "decap_checked";
-		case eFlowType::nat64stateful_lan: return "nat64stateful_lan";
-		case eFlowType::nat64stateful_wan: return "nat64stateful_wan";
-		case eFlowType::nat64stateless_ingress_checked: return "nat64stateless_ingress_checked";
-		case eFlowType::nat64stateless_ingress_icmp: return "nat64stateless_ingress_icmp";
-		case eFlowType::nat64stateless_ingress_fragmentation: return "nat64stateless_ingress_fragmentation";
-		case eFlowType::nat64stateless_egress_checked: return "nat64stateless_egress_checked";
-		case eFlowType::nat64stateless_egress_icmp: return "nat64stateless_egress_icmp";
-		case eFlowType::nat64stateless_egress_fragmentation: return "nat64stateless_egress_fragmentation";
-		case eFlowType::nat64stateless_egress_farm: return "nat64stateless_egress_farm";
-		case eFlowType::balancer: return "balancer";
-		case eFlowType::balancer_icmp_reply: return "balancer_icmp_reply";
-		case eFlowType::balancer_icmp_forward: return "balancer_icmp_forward";
-		case eFlowType::route: return "route";
-		case eFlowType::route_local: return "route_local";
-		case eFlowType::route_tunnel: return "route_tunnel";
-		case eFlowType::acl_egress: return "acl_egress";
-		case eFlowType::dregress: return "dregress";
-		case eFlowType::controlPlane: return "controlPlane";
-		case eFlowType::logicalPort_egress: return "logicalPort_egress";
-		case eFlowType::slowWorker_nat64stateless_ingress_icmp: return "slowWorker_nat64stateless_ingress_icmp";
-		case eFlowType::slowWorker_nat64stateless_ingress_fragmentation: return "slowWorker_nat64stateless_ingress_fragmentation";
-		case eFlowType::slowWorker_nat64stateless_egress_icmp: return "slowWorker_nat64stateless_egress_icmp";
-		case eFlowType::slowWorker_nat64stateless_egress_fragmentation: return "slowWorker_nat64stateless_egress_fragmentation";
-		case eFlowType::slowWorker_nat64stateless_egress_farm: return "slowWorker_nat64stateless_egress_farm";
-		case eFlowType::slowWorker_dregress: return "slowWorker_dregress";
-		case eFlowType::slowWorker_kni: return "slowWorker_kni";
-		case eFlowType::slowWorker_dump: return "slowWorker_dump";
-		case eFlowType::slowWorker_repeat: return "slowWorker_repeat";
-		case eFlowType::slowWorker_kni_local: return "slowWorker_kni_local";
-		case eFlowType::slowWorker_fw_sync: return "slowWorker_fw_sync";
-		case eFlowType::after_early_decap: return "after_early_decap";
-		case eFlowType::slowWorker_balancer_icmp_forward: return "slowWorker_balancer_icmp_forward";
-		case eFlowType::balancer_fragment: return "balancer_fragment";
-		}
-
-		return "unknown";
+		case eFlowType::drop:
+			return "drop";
+		case eFlowType::acl_ingress:
+			return "acl_ingress";
+		case eFlowType::tun64_ipv4_checked:
+			return "tun64_ipv4_checked";
+		case eFlowType::tun64_ipv6_checked:
+			return "tun64_ipv6_checked";
+		case eFlowType::decap_checked:
+			return "decap_checked";
+		case eFlowType::nat64stateful_lan:
+			return "nat64stateful_lan";
+		case eFlowType::nat64stateful_wan:
+			return "nat64stateful_wan";
+		case eFlowType::nat64stateless_ingress_checked:
+			return "nat64stateless_ingress_checked";
+		case eFlowType::nat64stateless_ingress_icmp:
+			return "nat64stateless_ingress_icmp";
+		case eFlowType::nat64stateless_ingress_fragmentation:
+			return "nat64stateless_ingress_fragmentation";
+		case eFlowType::nat64stateless_egress_checked:
+			return "nat64stateless_egress_checked";
+		case eFlowType::nat64stateless_egress_icmp:
+			return "nat64stateless_egress_icmp";
+		case eFlowType::nat64stateless_egress_fragmentation:
+			return "nat64stateless_egress_fragmentation";
+		case eFlowType::nat64stateless_egress_farm:
+			return "nat64stateless_egress_farm";
+		case eFlowType::balancer:
+			return "balancer";
+		case eFlowType::balancer_icmp_reply:
+			return "balancer_icmp_reply";
+		case eFlowType::balancer_icmp_forward:
+			return "balancer_icmp_forward";
+		case eFlowType::route:
+			return "route";
+		case eFlowType::route_local:
+			return "route_local";
+		case eFlowType::route_tunnel:
+			return "route_tunnel";
+		case eFlowType::acl_egress:
+			return "acl_egress";
+		case eFlowType::dregress:
+			return "dregress";
+		case eFlowType::controlPlane:
+			return "controlPlane";
+		case eFlowType::logicalPort_egress:
+			return "logicalPort_egress";
+		case eFlowType::slowWorker_nat64stateless_ingress_icmp:
+			return "slowWorker_nat64stateless_ingress_icmp";
+		case eFlowType::slowWorker_nat64stateless_ingress_fragmentation:
+			return "slowWorker_nat64stateless_ingress_fragmentation";
+		case eFlowType::slowWorker_nat64stateless_egress_icmp:
+			return "slowWorker_nat64stateless_egress_icmp";
+		case eFlowType::slowWorker_nat64stateless_egress_fragmentation:
+			return "slowWorker_nat64stateless_egress_fragmentation";
+		case eFlowType::slowWorker_nat64stateless_egress_farm:
+			return "slowWorker_nat64stateless_egress_farm";
+		case eFlowType::slowWorker_dregress:
+			return "slowWorker_dregress";
+		case eFlowType::slowWorker_kni:
+			return "slowWorker_kni";
+		case eFlowType::slowWorker_dump:
+			return "slowWorker_dump";
+		case eFlowType::slowWorker_repeat:
+			return "slowWorker_repeat";
+		case eFlowType::slowWorker_kni_local:
+			return "slowWorker_kni_local";
+		case eFlowType::slowWorker_fw_sync:
+			return "slowWorker_fw_sync";
+		case eFlowType::after_early_decap:
+			return "after_early_decap";
+		case eFlowType::slowWorker_balancer_icmp_forward:
+			return "slowWorker_balancer_icmp_forward";
+		case eFlowType::balancer_fragment:
+			return "balancer_fragment";
 	}
 
-	enum class eFlowFlags : uint8_t
-	{
-		keepstate = 1,
-		log = 2,
-	};
+	return "unknown";
+}
 
-	enum class dump_type_e : uint8_t
-	{
-		physicalPort_ingress,
-		physicalPort_egress,
-		physicalPort_drop,
-		acl,
-	};
+enum class eFlowFlags : uint8_t
+{
+	keepstate = 1,
+	log = 2,
+};
 
-	union tFlowData
-	{
-		tLogicalPortId logicalPortId;
-		tAclId aclId;
-		tDecapId decapId;
-		tRouteId routeId;
-		nat64stateful_id_t nat64stateful_id;
-		dregress_id_t dregressId;
-		tun64_id_t tun64Id;
+enum class dump_type_e : uint8_t
+{
+	physicalPort_ingress,
+	physicalPort_egress,
+	physicalPort_drop,
+	acl,
+};
 
+union tFlowData
+{
+	tLogicalPortId logicalPortId;
+	tAclId aclId;
+	tDecapId decapId;
+	tRouteId routeId;
+	nat64stateful_id_t nat64stateful_id;
+	dregress_id_t dregressId;
+	tun64_id_t tun64Id;
+
+	struct
+	{
+		tNat64statelessId id : 8;
+		tNat64statelessTranslationId translationId : 24;
+	} nat64stateless;
+
+	struct
+	{
+		balancer_id_t id : 8;
+		balancer_service_id_t service_id : 24;
+	} balancer;
+
+	struct
+	{
+		dump_type_e type : 8;
+		uint32_t id : 24;
+	} dump;
+
+	uint32_t atomic;
+};
+
+static_assert(CONFIG_YADECAP_NAT64STATELESSES_SIZE <= 0xFF);
+static_assert(CONFIG_YADECAP_NAT64STATELESS_TRANSLATIONS_SIZE <= 0xFFFFFF);
+
+using flow_data_t = tFlowData;
+
+class tFlow
+{
+public:
+	tFlow() :
+	        type(eFlowType::controlPlane), ///< @todo: drop
+	        flags(0),
+	        counter_id(0)
+	{
+		data.atomic = 0;
+	}
+
+	tFlow(eFlowType t) :
+	        type(t),
+	        flags(0),
+	        counter_id(0)
+	{
+		data.atomic = 0;
+	}
+
+	inline bool operator==(const tFlow& second) const
+	{
+		return std::tie(type_params_atomic, data.atomic) == std::tie(second.type_params_atomic, second.data.atomic);
+	}
+
+	inline bool operator!=(const tFlow& second) const
+	{
+		return !operator==(second);
+	}
+
+	constexpr bool operator<(const tFlow& second) const
+	{
+		return std::tie(type_params_atomic, data.atomic) < std::tie(second.type_params_atomic, second.data.atomic);
+	}
+
+public:
+	uint64_t getId() ///< @todo
+	{
+		if (type == eFlowType::nat64stateless_ingress_checked ||
+		    type == eFlowType::nat64stateless_ingress_icmp ||
+		    type == eFlowType::nat64stateless_ingress_fragmentation ||
+		    type == eFlowType::slowWorker_nat64stateless_ingress_icmp ||
+		    type == eFlowType::slowWorker_nat64stateless_ingress_fragmentation)
+		{
+			return data.nat64stateless.id;
+		}
+
+		if (type == eFlowType::nat64stateless_egress_checked ||
+		    type == eFlowType::nat64stateless_egress_icmp ||
+		    type == eFlowType::nat64stateless_egress_fragmentation ||
+		    type == eFlowType::slowWorker_nat64stateless_egress_icmp ||
+		    type == eFlowType::slowWorker_nat64stateless_egress_fragmentation)
+		{
+			return data.nat64stateless.id;
+		}
+
+		return data.atomic;
+	}
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop((char*)this, sizeof(*this));
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push((char*)this, sizeof(*this));
+	}
+
+public:
+	union
+	{
+		uint32_t type_params_atomic;
 		struct
 		{
-			tNat64statelessId id : 8;
-			tNat64statelessTranslationId translationId : 24;
-		} nat64stateless;
-
-		struct
-		{
-			balancer_id_t id : 8;
-			balancer_service_id_t service_id : 24;
-		} balancer;
-
-		struct
-		{
-			dump_type_e type : 8;
-			uint32_t id : 24;
-		} dump;
-
-		uint32_t atomic;
-	};
-
-	static_assert(CONFIG_YADECAP_NAT64STATELESSES_SIZE <= 0xFF);
-	static_assert(CONFIG_YADECAP_NAT64STATELESS_TRANSLATIONS_SIZE <= 0xFFFFFF);
-
-	using flow_data_t = tFlowData;
-
-	class tFlow
-	{
-	public:
-		tFlow() :
-		        type(eFlowType::controlPlane), ///< @todo: drop
-		        flags(0),
-		        counter_id(0)
-		{
-			data.atomic = 0;
-		}
-
-		tFlow(eFlowType t) :
-			type(t),
-			flags(0),
-			counter_id(0)
-		{
-			data.atomic = 0;
-		}
-
-		inline bool operator==(const tFlow& second) const
-		{
-			return std::tie(type_params_atomic, data.atomic) == std::tie(second.type_params_atomic, second.data.atomic);
-		}
-
-		inline bool operator!=(const tFlow& second) const
-		{
-			return !operator==(second);
-		}
-
-		constexpr bool operator<(const tFlow& second) const
-		{
-			return std::tie(type_params_atomic, data.atomic) < std::tie(second.type_params_atomic, second.data.atomic);
-		}
-
-	public:
-		uint64_t getId() ///< @todo
-		{
-			if (type == eFlowType::nat64stateless_ingress_checked ||
-			    type == eFlowType::nat64stateless_ingress_icmp ||
-			    type == eFlowType::nat64stateless_ingress_fragmentation ||
-			    type == eFlowType::slowWorker_nat64stateless_ingress_icmp ||
-			    type == eFlowType::slowWorker_nat64stateless_ingress_fragmentation)
-			{
-				return data.nat64stateless.id;
-			}
-
-			if (type == eFlowType::nat64stateless_egress_checked ||
-			    type == eFlowType::nat64stateless_egress_icmp ||
-			    type == eFlowType::nat64stateless_egress_fragmentation ||
-			    type == eFlowType::slowWorker_nat64stateless_egress_icmp ||
-			    type == eFlowType::slowWorker_nat64stateless_egress_fragmentation)
-			{
-				return data.nat64stateless.id;
-			}
-
-			return data.atomic;
-		}
-
-		void pop(stream_in_t& stream)
-		{
-			stream.pop((char*)this, sizeof(*this));
-		}
-
-		void push(stream_out_t& stream) const
-		{
-			stream.push((char*)this, sizeof(*this));
-		}
-
-	public:
-		union
-		{
-			uint32_t type_params_atomic;
-			struct
-			{
-				eFlowType type;
-				uint8_t flags : 2;
-				uint32_t counter_id : 22;
-			};
+			eFlowType type;
+			uint8_t flags : 2;
+			uint32_t counter_id : 22;
 		};
-
-		flow_data_t data;
 	};
 
-	static_assert(YANET_CONFIG_ACL_COUNTERS_SIZE < (1 << 22));
+	flow_data_t data;
+};
 
-	using flow_t = tFlow;
+static_assert(YANET_CONFIG_ACL_COUNTERS_SIZE < (1 << 22));
+
+using flow_t = tFlow;
 }
 
 namespace defender
@@ -2355,19 +2382,19 @@ using result = std::tuple<status, std::string>;
 
 namespace getPortStatsEx
 {
-	using portCounters = std::tuple<uint64_t, //< bytes
-	                                uint64_t, //< unicast_pkts
-	                                uint64_t, //< multicast_pkts
-	                                uint64_t, //< broadcast_pkts
-	                                uint64_t, //< drops
-	                                uint64_t>; //< errors
+using portCounters = std::tuple<uint64_t, //< bytes
+                                uint64_t, //< unicast_pkts
+                                uint64_t, //< multicast_pkts
+                                uint64_t, //< broadcast_pkts
+                                uint64_t, //< drops
+                                uint64_t>; //< errors
 
-	using port = std::tuple<std::string, //< name
-	                        uint8_t, //< link_state
-	                        portCounters, ///< in
-	                        portCounters>; ///< out
+using port = std::tuple<std::string, //< name
+                        uint8_t, //< link_state
+                        portCounters, ///< in
+                        portCounters>; ///< out
 
-	using response = std::map<tPortId, port>;
+using response = std::map<tPortId, port>;
 }
 
 namespace fragmentation
@@ -2479,13 +2506,13 @@ struct stats_t
 	uint64_t fwstate6_size;
 };
 
-enum class owner_e: uint8_t
+enum class owner_e : uint8_t
 {
 	internal = 0x01,
 	external = 0x02,
 };
 
-enum class tcp_flags_e: uint8_t
+enum class tcp_flags_e : uint8_t
 {
 	FIN = 0x01,
 	SYN = 0x02,
@@ -2528,11 +2555,11 @@ inline std::string flags_to_string(uint8_t flags)
 
 } // namespace fwstate
 
-template <class T>
-inline void hash_combine(std::size_t &s, const T &v)
+template<class T>
+inline void hash_combine(std::size_t& s, const T& v)
 {
 	std::hash<T> h;
-	s ^= h(v) + 0x9e3779b9 + (s<< 6) + (s>> 2);
+	s ^= h(v) + 0x9e3779b9 + (s << 6) + (s >> 2);
 }
 
 }
@@ -2563,7 +2590,7 @@ struct hash<common::ipv6_address_t>
 		common::hash_combine(res, ipv6_low);
 		common::hash_combine(res, ipv6_high);
 
-        return res;
+		return res;
 	}
 };
 
@@ -2595,10 +2622,9 @@ struct hash<std::tuple<common::ip_address_t, uint16_t, uint8_t>>
 		common::hash_combine(res, vport);
 		common::hash_combine(res, proto);
 
-        return res;
+		return res;
 	}
 };
-
 
 template<>
 struct hash<common::ip_prefix_t>
@@ -2634,8 +2660,8 @@ struct hash<std::tuple<std::string, common::ip_address_t, std::string>>
 		common::hash_combine(res, std::get<1>(protocol_peer_table_name));
 		common::hash_combine(res, std::get<2>(protocol_peer_table_name));
 
-        return res;
-    }
+		return res;
+	}
 };
 
 template<>
@@ -2649,8 +2675,8 @@ struct hash<std::tuple<std::string, common::ip_address_t, std::string, std::stri
 		common::hash_combine(res, std::get<2>(nexthop_key));
 		common::hash_combine(res, std::get<3>(nexthop_key));
 
-        return res;
-    }
+		return res;
+	}
 };
 
 template<>
@@ -2662,8 +2688,8 @@ struct hash<std::tuple<std::string, uint32_t>>
 		common::hash_combine(res, std::get<0>(vrf_priority));
 		common::hash_combine(res, std::get<1>(vrf_priority));
 
-        return res;
-    }
+		return res;
+	}
 };
 
 template<>
@@ -2706,55 +2732,54 @@ namespace common
 
 namespace rib
 {
-	using nexthop_t = std::map<std::tuple<std::string, ///< protocol
-	                                      ip_address_t, ///< peer
-	                                      std::string, ///< table_name
-	                                      std::string>, ///< path_information
-	                           std::tuple<ip_address_t, ///< nexthop
-	                                      std::vector<uint32_t>, ///< labels
-	                                      std::string, ///< origin
-	                                      uint32_t, ///< med
-	                                      std::vector<uint32_t>, ///< aspath
-	                                      std::set<community_t>, ///< communities
-	                                      std::set<large_community_t>, ///< large_communities
-	                                      uint32_t>>; ///< local_preference
+using nexthop_t = std::map<std::tuple<std::string, ///< protocol
+                                      ip_address_t, ///< peer
+                                      std::string, ///< table_name
+                                      std::string>, ///< path_information
+                           std::tuple<ip_address_t, ///< nexthop
+                                      std::vector<uint32_t>, ///< labels
+                                      std::string, ///< origin
+                                      uint32_t, ///< med
+                                      std::vector<uint32_t>, ///< aspath
+                                      std::set<community_t>, ///< communities
+                                      std::set<large_community_t>, ///< large_communities
+                                      uint32_t>>; ///< local_preference
 
-	using vrf_priority_t = std::tuple<std::string, uint32_t>;
+using vrf_priority_t = std::tuple<std::string, uint32_t>;
 
-	using pptn_t = std::tuple<std::string, ///< protocol
-							  ip_address_t, ///< peer
-							  std::string ///< table_name
-							 >;
+using pptn_t = std::tuple<std::string, ///< protocol
+                          ip_address_t, ///< peer
+                          std::string ///< table_name
+                          >;
 
-	using vppptn_t = std::tuple<std::string, ///< vrf
-							  uint32_t, ///< priority
-							  std::string, ///< protocol
-							  ip_address_t, ///< peer
-							  std::string ///< table_name
-							 >;
+using vppptn_t = std::tuple<std::string, ///< vrf
+                            uint32_t, ///< priority
+                            std::string, ///< protocol
+                            ip_address_t, ///< peer
+                            std::string ///< table_name
+                            >;
 
-	using nexthop_stuff_t = std::tuple<ip_address_t, ///< nexthop
-	                                   std::vector<uint32_t>, ///< labels
-	                                   std::string, ///< origin
-	                                   uint32_t, ///< med
-	                                   std::vector<uint32_t>, ///< aspath
-	                                   std::set<common::community_t>, ///< communities
-	                                   std::set<common::large_community_t>, ///< large_communities
-	                                   uint32_t ///< local_preference
-									  >;
+using nexthop_stuff_t = std::tuple<ip_address_t, ///< nexthop
+                                   std::vector<uint32_t>, ///< labels
+                                   std::string, ///< origin
+                                   uint32_t, ///< med
+                                   std::vector<uint32_t>, ///< aspath
+                                   std::set<common::community_t>, ///< communities
+                                   std::set<common::large_community_t>, ///< large_communities
+                                   uint32_t ///< local_preference
+                                   >;
 
-	using nexthop_map_t = std::unordered_map<uint32_t,
-											 std::unordered_map<std::string, ///< path_info
-																const rib::nexthop_stuff_t*>
-											>;
+using nexthop_map_t = std::unordered_map<uint32_t,
+                                         std::unordered_map<std::string, ///< path_info
+                                                            const rib::nexthop_stuff_t*>>;
 
-	using path_info_to_nexthop_stuff_ptr_t = std::unordered_map<std::string, ///< path_info
-										  					 	const nexthop_stuff_t*>;
+using path_info_to_nexthop_stuff_ptr_t = std::unordered_map<std::string, ///< path_info
+                                                            const nexthop_stuff_t*>;
 }
 
 namespace acl
 {
-	typedef std::map<tAclId, std::set<std::tuple<bool, std::string>>> iface_map_t; // true -> ingress
+typedef std::map<tAclId, std::set<std::tuple<bool, std::string>>> iface_map_t; // true -> ingress
 }
 
 }
@@ -2803,8 +2828,8 @@ struct hash<std::vector<uint32_t>>
 			common::hash_combine(res, label);
 		}
 
-        return res;
-    }
+		return res;
+	}
 };
 
 template<>
@@ -2819,8 +2844,8 @@ struct hash<std::set<common::community_t>>
 			common::hash_combine(res, community);
 		}
 
-        return res;
-    }
+		return res;
+	}
 };
 
 template<>
@@ -2835,8 +2860,8 @@ struct hash<std::set<common::large_community_t>>
 			common::hash_combine(res, large_community);
 		}
 
-        return res;
-    }
+		return res;
+	}
 };
 
 template<>

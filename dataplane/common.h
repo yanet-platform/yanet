@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdio.h>
 #include <arpa/inet.h>
+#include <stdio.h>
 
 #include <rte_ether.h>
 #include <rte_hash_crc.h>
@@ -11,7 +11,7 @@
 
 #define YADECAP_UNUSED [[maybe_unused]]
 
-#define YADECAP_LOG_PRINT(msg, args ...) fprintf(stdout, msg, ## args)
+#define YADECAP_LOG_PRINT(msg, args...) fprintf(stdout, msg, ##args)
 
 #define YADECAP_LOG_DEBUG YANET_LOG_DEBUG
 
@@ -23,11 +23,13 @@
 
 #define YADECAP_CACHE_ALIGNED(name) void* name[0] __rte_aligned(RTE_CACHE_LINE_SIZE)
 
-#define YANET_INLINE_ALWAYS __attribute__ ((always_inline))
-#define YANET_INLINE_NEVER __attribute__ ((noinline))
+#define YANET_INLINE_ALWAYS __attribute__((always_inline))
+#define YANET_INLINE_NEVER __attribute__((noinline))
 
-#define YADECAP_MEMORY_BARRIER_COMPILE __asm__ __volatile__ ("" ::: "memory")
-#define YANET_MEMORY_BARRIER_COMPILE __asm__ __volatile__ ("" ::: "memory")
+#define YADECAP_MEMORY_BARRIER_COMPILE __asm__ __volatile__("" :: \
+	                                                            : "memory")
+#define YANET_MEMORY_BARRIER_COMPILE __asm__ __volatile__("" :: \
+	                                                          : "memory")
 
 #define YADECAP_METADATA(mbuf) ((dataplane::metadata*)((char*)(mbuf)->buf_addr))
 

@@ -20,8 +20,7 @@ void cModule::moduleStart()
 {
 	for (auto& func : funcThreads)
 	{
-		threads.emplace_back([func = std::move(func)]()
-		{
+		threads.emplace_back([func = std::move(func)]() {
 			try
 			{
 				func();

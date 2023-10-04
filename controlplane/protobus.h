@@ -10,22 +10,22 @@ namespace controlplane
 namespace module
 {
 
-	class protoBus: public cModule
-	{
-	public:
-		protoBus();
-		~protoBus() override;
+class protoBus : public cModule
+{
+public:
+	protoBus();
+	~protoBus() override;
 
-		eResult init() override;
-		void stop() override;
+	eResult init() override;
+	void stop() override;
 
-	protected:
-		void serverThread();
-		void clientThread(int clientSocket);
+protected:
+	void serverThread();
+	void clientThread(int clientSocket);
 
-	protected:
-		int serverSocket;
-	};
+protected:
+	int serverSocket;
+};
 
 }
 }

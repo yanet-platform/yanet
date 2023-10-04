@@ -3,13 +3,13 @@
 #include <map>
 #include <mutex>
 
-#include "common/idp.h"
 #include "common/icp.h"
 #include "common/idataplane.h"
+#include "common/idp.h"
 
 #include "module.h"
-#include "type.h"
 #include "route.h"
+#include "type.h"
 
 namespace telegraf
 {

@@ -117,16 +117,17 @@ struct transport_key_t
 
 // class action_t is used to store all non-terminating rule data that
 // shouldn't be stored in common::globalBase::tFlow
-class action_t {
+class action_t
+{
 public:
 	action_t() :
-		dump_id(0),
-		dump_tag("")
+	        dump_id(0),
+	        dump_tag("")
 	{}
 
 	action_t(std::string dump_tag) :
-		dump_id(0),
-		dump_tag(dump_tag)
+	        dump_id(0),
+	        dump_tag(dump_tag)
 	{}
 
 	inline bool operator==(const action_t& o) const
