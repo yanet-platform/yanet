@@ -9,7 +9,7 @@ enum class result_e : uint32_t
 {
 	success,
 	errorAllocatingMemory,
-	errorAllocatingKNI,
+	errorAllocatingKernelInterface,
 	errorInitEal,
 	errorInitBarrier,
 	errorInitMempool,
@@ -73,8 +73,8 @@ static constexpr const char* result_to_c_str(common::result_e e)
 			return "success";
 		case result_e::errorAllocatingMemory:
 			return "errorAllocatingMemory";
-		case result_e::errorAllocatingKNI:
-			return "errorAllocatingKNI";
+		case result_e::errorAllocatingKernelInterface:
+			return "errorAllocatingKernelInterface";
 		case result_e::errorInitEal:
 			return "errorInitEal";
 		case result_e::errorInitBarrier:

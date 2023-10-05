@@ -161,6 +161,11 @@ public:
 	{
 	}
 
+	mac_address_t(const uint8_t* address)
+	{
+		memcpy(this->address.data(), address, this->address.size());
+	}
+
 	mac_address_t(const std::string& string)
 	{
 		unsigned int bytes[6];

@@ -1,9 +1,10 @@
+#include <linux/if.h>
+#include <sys/ioctl.h>
 #include <sys/un.h>
 
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 #include <rte_ip.h>
-#include <rte_kni.h>
 #include <rte_lcore.h>
 #include <rte_malloc.h>
 
@@ -24,7 +25,7 @@ cControlPlane::cControlPlane(cDataPlane* dataPlane) :
         fragmentation(this, dataPlane),
         dregress(this, dataPlane),
         mempool(nullptr),
-        useKni(false),
+        use_kernel_interface(false),
         slowWorker(nullptr),
         prevTimePointForSWRateLimiter(std::chrono::high_resolution_clock::now())
 {
@@ -33,24 +34,28 @@ cControlPlane::cControlPlane(cDataPlane* dataPlane) :
 
 cControlPlane::~cControlPlane()
 {
-	for (auto& iter : knis)
+	for (const auto& [port_id, kernel_interface] : kernel_interfaces)
 	{
-		rte_kni_release(std::get<1>(iter.second));
+		const auto& interface_name = std::get<0>(kernel_interface);
+		remove_kernel_interface(port_id, interface_name);
 	}
 
-	for (auto& iter : ingress_dump_knis)
+	for (const auto& [port_id, kernel_interface] : in_dump_kernel_interfaces)
 	{
-		rte_kni_release(std::get<1>(iter.second));
+		const auto& interface_name = std::get<0>(kernel_interface);
+		remove_kernel_interface(port_id, interface_name);
 	}
 
-	for (auto& iter : egress_dump_knis)
+	for (const auto& [port_id, kernel_interface] : out_dump_kernel_interfaces)
 	{
-		rte_kni_release(std::get<1>(iter.second));
+		const auto& interface_name = std::get<0>(kernel_interface);
+		remove_kernel_interface(port_id, interface_name);
 	}
 
-	for (auto& iter : drop_dump_knis)
+	for (const auto& [port_id, kernel_interface] : drop_dump_kernel_interfaces)
 	{
-		rte_kni_release(std::get<1>(iter.second));
+		const auto& interface_name = std::get<0>(kernel_interface);
+		remove_kernel_interface(port_id, interface_name);
 	}
 
 	if (mempool)
@@ -59,33 +64,17 @@ cControlPlane::~cControlPlane()
 	}
 }
 
-/// sad
-std::map<tPortId, std::string> physicalPortNames;
-std::set<dataplane::globalBase::atomic*> globalBaseAtomics;
-
-eResult cControlPlane::init(bool useKni)
+eResult cControlPlane::init(bool use_kernel_interface)
 {
-	this->useKni = useKni;
+	this->use_kernel_interface = use_kernel_interface;
 
 	eResult result = eResult::success;
 
-	/// init mempool for kni
+	/// init mempool for kernel interfaces and slow worker
 	result = initMempool();
 	if (result != eResult::success)
 	{
 		return result;
-	}
-
-	for (const auto& [portId, value] : dataPlane->ports)
-	{
-		physicalPortNames[portId] = std::get<0>(value);
-	}
-
-	for (auto& [socketId, globalBaseAtomic] : dataPlane->globalBaseAtomics)
-	{
-		(void)socketId;
-
-		globalBaseAtomics.emplace(globalBaseAtomic);
 	}
 
 	gc_step = dataPlane->getConfigValue(eConfigType::gc_step);
@@ -126,6 +115,14 @@ void cControlPlane::start()
 		rte_eth_promiscuous_enable(portId);
 	}
 
+	if (use_kernel_interface)
+	{
+		if (init_kernel_interfaces() != eResult::success)
+		{
+			abort();
+		}
+	}
+
 	rc = pthread_barrier_wait(&dataPlane->runBarrier);
 	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
 	{
@@ -138,13 +135,12 @@ void cControlPlane::start()
 		return;
 	}
 
-	if (useKni)
+	for (const auto& [port_id, kernel_interface] : kernel_interfaces)
 	{
-		/// init kernel NIC interfaces
-		if (initKnis() != eResult::success)
-		{
-			abort();
-		}
+		(void)port_id;
+		const auto& interface_name = std::get<0>(kernel_interface);
+
+		set_kernel_interface_up(interface_name);
 	}
 
 	mainThread();
@@ -487,7 +483,7 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 		{
 			/// @todo: check portId
 
-			const auto& port = knis.find(portId)->second;
+			const auto& port = kernel_interfaces.find(portId)->second;
 
 			const auto& stats = std::get<2>(port);
 
@@ -513,7 +509,7 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 	{
 		/// all ports
 
-		for (const auto& [portId, port] : knis)
+		for (const auto& [portId, port] : kernel_interfaces)
 		{
 			const auto& stats = std::get<2>(port);
 
@@ -1232,6 +1228,62 @@ common::idp::get_shm_info::response cControlPlane::get_shm_info()
 	return response;
 }
 
+eResult cControlPlane::dump_physical_port(const common::idp::dump_physical_port::request& request)
+{
+	const auto& [interface_name, direction, state] = request;
+
+	const auto port_id = dataPlane->interface_name_to_port_id(interface_name);
+	if (!port_id)
+	{
+		return eResult::invalidInterfaceName;
+	}
+
+	uint8_t flag = 0;
+	if (direction == "in")
+	{
+		flag = YANET_PHYSICALPORT_FLAG_IN_DUMP;
+	}
+	else if (direction == "out")
+	{
+		flag = YANET_PHYSICALPORT_FLAG_OUT_DUMP;
+	}
+	else if (direction == "drop")
+	{
+		flag = YANET_PHYSICALPORT_FLAG_DROP_DUMP;
+	}
+	else
+	{
+		return eResult::invalidArguments;
+	}
+
+	if (state)
+	{
+		/// start dump traffic to interface
+		for (auto& [socket_id, globalbase_atomic] : dataPlane->globalBaseAtomics)
+		{
+			(void)socket_id;
+
+			__atomic_or_fetch(&globalbase_atomic->physicalPort_flags[*port_id],
+			                  (uint8_t)(flag),
+			                  __ATOMIC_RELAXED);
+		}
+	}
+	else
+	{
+		/// stop dump traffic to interface
+		for (auto& [socket_id, globalbase_atomic] : dataPlane->globalBaseAtomics)
+		{
+			(void)socket_id;
+
+			__atomic_and_fetch(&globalbase_atomic->physicalPort_flags[*port_id],
+			                   (uint8_t)(~flag),
+			                   __ATOMIC_RELAXED);
+		}
+	}
+
+	return eResult::success;
+}
+
 common::idp::nat64stateful_state::response cControlPlane::nat64stateful_state(const common::idp::nat64stateful_state::request& request)
 {
 	common::idp::nat64stateful_state::response response;
@@ -1383,294 +1435,201 @@ eResult cControlPlane::initMempool()
 	return eResult::success;
 }
 
-YADECAP_UNUSED
-static int kniChangeMTU(YADECAP_UNUSED uint16_t portId,
-                        YADECAP_UNUSED unsigned int mtu)
+eResult cControlPlane::init_kernel_interfaces()
 {
-	return 0;
-}
-
-YADECAP_UNUSED
-static int kniConfigNetworkInterface(uint16_t portId,
-                                     uint8_t up)
-{
-	int ret = 0;
-
-	if (!rte_eth_dev_is_valid_port(portId))
+	for (const auto& [port_id, port] : dataPlane->ports)
 	{
-		YADECAP_LOG_ERROR("invalid port id: '%d'\n", portId);
-		return -EINVAL;
-	}
-
-	(void)up;
-
-	/** @todo: fix mempool
-	if (up)
-	{
-		rte_eth_dev_stop(portId);
-		ret = rte_eth_dev_start(portId);
-		if (ret < 0)
-		{
-			YADECAP_LOG_ERROR("rte_eth_dev_start() = %d\n", ret);
-		}
-	}
-	else
-	{
-		rte_eth_dev_stop(portId);
-	}
-	*/
-
-	return ret;
-}
-
-YADECAP_UNUSED
-static int kniConfigMacAddress(YADECAP_UNUSED uint16_t portId,
-                               YADECAP_UNUSED uint8_t macAddress[])
-{
-	return 0;
-}
-
-YADECAP_UNUSED
-static int kniConfigPromiscusity(YADECAP_UNUSED uint16_t portId,
-                                 YADECAP_UNUSED uint8_t on)
-{
-	return 0;
-}
-
-YADECAP_UNUSED
-static int ingressDumpKniConfigPromiscusity(YADECAP_UNUSED uint16_t portId,
-                                            YADECAP_UNUSED uint8_t on)
-{
-	if (portId >= CONFIG_YADECAP_PORTS_SIZE)
-	{
-		YADECAP_LOG_ERROR("invalid port id: '%d'\n", portId);
-		return -EINVAL;
-	}
-
-	if (!rte_eth_dev_is_valid_port(portId))
-	{
-		YADECAP_LOG_ERROR("invalid port id: '%d'\n", portId);
-		return -EINVAL;
-	}
-
-	YADECAP_LOG_INFO("ingress dump to interface 'in.%s' is '%s'\n", physicalPortNames[portId].data(), on ? "enabled" : "disabled");
-
-	for (auto* globalBaseAtomic : globalBaseAtomics)
-	{
-		if (on)
-		{
-			__atomic_or_fetch(&globalBaseAtomic->physicalPort_flags[portId],
-			                  (uint8_t)(YANET_PHYSICALPORT_FLAG_INGRESS_DUMP),
-			                  __ATOMIC_RELAXED);
-		}
-		else
-		{
-			__atomic_and_fetch(&globalBaseAtomic->physicalPort_flags[portId],
-			                   (uint8_t)(~YANET_PHYSICALPORT_FLAG_INGRESS_DUMP),
-			                   __ATOMIC_RELAXED);
-		}
-	}
-
-	return 0;
-}
-
-YADECAP_UNUSED
-static int egressDumpKniConfigPromiscusity(YADECAP_UNUSED uint16_t portId,
-                                           YADECAP_UNUSED uint8_t on)
-{
-	if (portId >= CONFIG_YADECAP_PORTS_SIZE)
-	{
-		YADECAP_LOG_ERROR("invalid port id: '%d'\n", portId);
-		return -EINVAL;
-	}
-
-	if (!rte_eth_dev_is_valid_port(portId))
-	{
-		YADECAP_LOG_ERROR("invalid port id: '%d'\n", portId);
-		return -EINVAL;
-	}
-
-	YADECAP_LOG_INFO("egress dump to interface 'out.%s' is '%s'\n", physicalPortNames[portId].data(), on ? "enabled" : "disabled");
-
-	for (auto* globalBaseAtomic : globalBaseAtomics)
-	{
-		if (on)
-		{
-			__atomic_or_fetch(&globalBaseAtomic->physicalPort_flags[portId],
-			                  (uint8_t)(YANET_PHYSICALPORT_FLAG_EGRESS_DUMP),
-			                  __ATOMIC_RELAXED);
-		}
-		else
-		{
-			__atomic_and_fetch(&globalBaseAtomic->physicalPort_flags[portId],
-			                   (uint8_t)(~YANET_PHYSICALPORT_FLAG_EGRESS_DUMP),
-			                   __ATOMIC_RELAXED);
-		}
-	}
-
-	return 0;
-}
-
-YADECAP_UNUSED
-static int egressDropDumpKniConfigPromiscusity(YADECAP_UNUSED uint16_t portId,
-                                               YADECAP_UNUSED uint8_t on)
-{
-	if (portId >= CONFIG_YADECAP_PORTS_SIZE)
-	{
-		YADECAP_LOG_ERROR("invalid port id: '%d'\n", portId);
-		return -EINVAL;
-	}
-
-	if (!rte_eth_dev_is_valid_port(portId))
-	{
-		YADECAP_LOG_ERROR("invalid port id: '%d'\n", portId);
-		return -EINVAL;
-	}
-
-	YADECAP_LOG_INFO("egress drop dump to interface 'drop.%s' is '%s'\n", physicalPortNames[portId].data(), on ? "enabled" : "disabled");
-
-	for (auto* globalBaseAtomic : globalBaseAtomics)
-	{
-		if (on)
-		{
-			__atomic_or_fetch(&globalBaseAtomic->physicalPort_flags[portId],
-			                  (uint8_t)(YANET_PHYSICALPORT_FLAG_DROP_DUMP),
-			                  __ATOMIC_RELAXED);
-		}
-		else
-		{
-			__atomic_and_fetch(&globalBaseAtomic->physicalPort_flags[portId],
-			                   (uint8_t)(~YANET_PHYSICALPORT_FLAG_DROP_DUMP),
-			                   __ATOMIC_RELAXED);
-		}
-	}
-
-	return 0;
-}
-
-eResult cControlPlane::initKnis()
-{
-	int rc = rte_kni_init(4 * rte_eth_dev_count_avail()); ///< kni + dump ingress kni + dump egress kni +  dump egress drop kni
-	if (rc < 0)
-	{
-		YADECAP_LOG_ERROR("rte_kni_init(): %s [%d]\n",
-		                  rte_strerror(rte_errno),
-		                  rte_errno);
-		return eResult::errorAllocatingKNI;
-	}
-
-	for (const auto& portIter : dataPlane->ports)
-	{
-		const tPortId& portId = portIter.first;
-		const std::string& interfaceName = std::get<0>(portIter.second);
-
-		rte_eth_dev_info devInfo;
-
-		rte_kni_conf config;
-		memset(&config, 0, sizeof(config));
-
-		snprintf(config.name, RTE_KNI_NAMESIZE, "%s", interfaceName.data());
-		config.mbuf_size = CONFIG_YADECAP_MBUF_SIZE - RTE_PKTMBUF_HEADROOM;
-
-		rte_eth_dev_info_get(portId, &devInfo);
-		rte_eth_macaddr_get(portId, (rte_ether_addr*)&config.mac_addr);
-		rte_eth_dev_get_mtu(portId, &config.mtu);
-
-		config.min_mtu = devInfo.min_mtu;
-		config.max_mtu = devInfo.max_mtu;
-
-		rte_kni_ops ops;
-		memset(&ops, 0, sizeof(ops));
-		ops.port_id = portId;
-		ops.change_mtu = kniChangeMTU;
-		ops.config_network_if = kniConfigNetworkInterface;
-		ops.config_mac_address = kniConfigMacAddress;
-		ops.config_promiscusity = kniConfigPromiscusity;
-
-		rte_kni* kni = rte_kni_alloc(mempool, &config, &ops);
-		if (!kni)
-		{
-			YADECAP_LOG_ERROR("rte_kni_alloc()\n");
-			return eResult::errorAllocatingKNI;
-		}
-
-		knis[portId] = {interfaceName,
-		                kni,
-		                {},
-		                {},
-		                0};
-
-		config.core_id = dataPlane->config.dumpKniCoreId;
-		config.force_bind = 1;
+		const auto& interface_name = std::get<0>(port);
 
 		{
-			snprintf(config.name, RTE_KNI_NAMESIZE, "in.%s", interfaceName.data());
-
-			rte_kni_ops ops;
-			memset(&ops, 0, sizeof(ops));
-			ops.port_id = portId;
-			ops.change_mtu = kniChangeMTU;
-			ops.config_network_if = kniConfigNetworkInterface;
-			ops.config_mac_address = kniConfigMacAddress;
-			ops.config_promiscusity = ingressDumpKniConfigPromiscusity;
-
-			rte_kni* kni = rte_kni_alloc(mempool, &config, &ops);
-			if (!kni)
+			auto kernel_port_id = add_kernel_interface(port_id, interface_name);
+			if (!kernel_port_id)
 			{
-				YADECAP_LOG_ERROR("rte_kni_alloc()\n");
-				return eResult::errorAllocatingKNI;
+				return eResult::errorAllocatingKernelInterface;
 			}
 
-			ingress_dump_knis[portId] = {interfaceName, kni, {}, 0};
+			kernel_interfaces[port_id] = {interface_name,
+			                              *kernel_port_id,
+			                              {},
+			                              {},
+			                              0};
 		}
 
 		{
-			snprintf(config.name, RTE_KNI_NAMESIZE, "out.%s", interfaceName.data());
-
-			rte_kni_ops ops;
-			memset(&ops, 0, sizeof(ops));
-			ops.port_id = portId;
-			ops.change_mtu = kniChangeMTU;
-			ops.config_network_if = kniConfigNetworkInterface;
-			ops.config_mac_address = kniConfigMacAddress;
-			ops.config_promiscusity = egressDumpKniConfigPromiscusity;
-
-			rte_kni* kni = rte_kni_alloc(mempool, &config, &ops);
-			if (!kni)
+			auto kernel_port_id = add_kernel_interface(port_id, "in." + interface_name);
+			if (!kernel_port_id)
 			{
-				YADECAP_LOG_ERROR("rte_kni_alloc()\n");
-				return eResult::errorAllocatingKNI;
+				return eResult::errorAllocatingKernelInterface;
 			}
 
-			egress_dump_knis[portId] = {interfaceName, kni, {}, 0};
+			in_dump_kernel_interfaces[port_id] = {"in." + interface_name,
+			                                      *kernel_port_id,
+			                                      {},
+			                                      0};
 		}
 
 		{
-			snprintf(config.name, RTE_KNI_NAMESIZE, "drop.%s", interfaceName.data());
-
-			rte_kni_ops ops;
-			memset(&ops, 0, sizeof(ops));
-			ops.port_id = portId;
-			ops.change_mtu = kniChangeMTU;
-			ops.config_network_if = kniConfigNetworkInterface;
-			ops.config_mac_address = kniConfigMacAddress;
-			ops.config_promiscusity = egressDropDumpKniConfigPromiscusity;
-
-			rte_kni* kni = rte_kni_alloc(mempool, &config, &ops);
-			if (!kni)
+			auto kernel_port_id = add_kernel_interface(port_id, "out." + interface_name);
+			if (!kernel_port_id)
 			{
-				YADECAP_LOG_ERROR("rte_kni_alloc()\n");
-				return eResult::errorAllocatingKNI;
+				return eResult::errorAllocatingKernelInterface;
 			}
 
-			drop_dump_knis[portId] = {interfaceName, kni, {}, 0};
+			out_dump_kernel_interfaces[port_id] = {"out." + interface_name,
+			                                       *kernel_port_id,
+			                                       {},
+			                                       0};
+		}
+
+		{
+			auto kernel_port_id = add_kernel_interface(port_id, "drop." + interface_name);
+			if (!kernel_port_id)
+			{
+				return eResult::errorAllocatingKernelInterface;
+			}
+
+			drop_dump_kernel_interfaces[port_id] = {"drop." + interface_name,
+			                                        *kernel_port_id,
+			                                        {},
+			                                        0};
 		}
 	}
 
 	return eResult::success;
 }
 
-void cControlPlane::flushKni(rte_kni* kni, sKniStats& stats, rte_mbuf** mbufs, uint32_t& count)
+std::optional<tPortId> cControlPlane::add_kernel_interface(const tPortId port_id,
+                                                           const std::string& interface_name)
+{
+	rte_ether_addr ether_addr;
+	rte_eth_macaddr_get(port_id, &ether_addr);
+
+	char vdev_name[RTE_DEV_NAME_MAX_LEN];
+	char vdev_args[256];
+
+	snprintf(vdev_name,
+	         sizeof(vdev_name),
+	         "virtio_user_%s_%u",
+	         interface_name.data(),
+	         port_id);
+
+	snprintf(vdev_args,
+	         sizeof(vdev_args),
+	         "path=/dev/vhost-net,queues=1,queue_size=%u,iface=%s,mac=%s",
+	         YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE,
+	         interface_name.data(),
+	         common::mac_address_t(ether_addr.addr_bytes).toString().data());
+
+	if (rte_eal_hotplug_add("vdev", vdev_name, vdev_args) != 0)
+	{
+		YADECAP_LOG_ERROR("failed to hotplug vdev interface '%s' with '%s'\n",
+		                  vdev_name,
+		                  vdev_args);
+		return std::nullopt;
+	}
+
+	uint16_t kernel_port_id;
+	if (rte_eth_dev_get_port_by_name(vdev_name, &kernel_port_id) != 0)
+	{
+		YADECAP_LOG_ERROR("vdev interface '%s' not found\n", vdev_name);
+		rte_eal_hotplug_remove("vdev", vdev_name);
+		return std::nullopt;
+	}
+
+	rte_eth_conf eth_conf;
+	memset(&eth_conf, 0, sizeof(eth_conf));
+
+	int ret = rte_eth_dev_configure(kernel_port_id,
+	                                1,
+	                                1,
+	                                &eth_conf);
+	if (ret < 0)
+	{
+		YADECAP_LOG_ERROR("rte_eth_dev_configure() = %d\n", ret);
+		rte_eal_hotplug_remove("vdev", vdev_name);
+		return std::nullopt;
+	}
+
+	uint16_t mtu;
+	if (rte_eth_dev_get_mtu(port_id, &mtu) == 0)
+	{
+		rte_eth_dev_set_mtu(kernel_port_id, mtu);
+	}
+
+	int rc = rte_eth_rx_queue_setup(kernel_port_id,
+	                                0,
+	                                4096,
+	                                0, ///< @todo: socket
+	                                nullptr,
+	                                mempool);
+	if (rc < 0)
+	{
+		YADECAP_LOG_ERROR("rte_eth_rx_queue_setup() = %d\n", rc);
+		rte_eal_hotplug_remove("vdev", vdev_name);
+		return std::nullopt;
+	}
+
+	rc = rte_eth_tx_queue_setup(kernel_port_id,
+	                            0,
+	                            4096,
+	                            0, ///< @todo: socket
+	                            nullptr);
+	if (rc < 0)
+	{
+		YADECAP_LOG_ERROR("rte_eth_tx_queue_setup(%u, %u) = %d\n", kernel_port_id, 0, ret);
+		rte_eal_hotplug_remove("vdev", vdev_name);
+		return std::nullopt;
+	}
+
+	rc = rte_eth_dev_start(kernel_port_id);
+	if (rc)
+	{
+		YADECAP_LOG_ERROR("can't start eth dev(%d, %d): %s\n",
+		                  rc,
+		                  rte_errno,
+		                  rte_strerror(rte_errno));
+		rte_eal_hotplug_remove("vdev", vdev_name);
+		return std::nullopt;
+	}
+
+	return kernel_port_id;
+}
+
+void cControlPlane::remove_kernel_interface(const tPortId port_id,
+                                            const std::string& interface_name)
+{
+	char vdev_name[RTE_DEV_NAME_MAX_LEN];
+
+	snprintf(vdev_name,
+	         sizeof(vdev_name),
+	         "virtio_user_%s_%u",
+	         interface_name.data(),
+	         port_id);
+
+	rte_eal_hotplug_remove("vdev", vdev_name);
+}
+
+void cControlPlane::set_kernel_interface_up(const std::string& interface_name)
+{
+	int socket = ::socket(AF_INET, SOCK_DGRAM, 0);
+	if (socket < 0)
+	{
+		return;
+	}
+
+	struct ifreq request;
+	memset(&request, 0, sizeof request);
+
+	strncpy(request.ifr_name, interface_name.data(), IFNAMSIZ);
+
+	request.ifr_flags |= IFF_UP;
+	ioctl(socket, SIOCSIFFLAGS, &request);
+}
+
+void cControlPlane::flush_kernel_interface(tPortId kernel_port_id,
+                                           sKniStats& stats,
+                                           rte_mbuf** mbufs,
+                                           uint32_t& count)
 {
 	uint32_t packetsLength = 0;
 
@@ -1680,7 +1639,7 @@ void cControlPlane::flushKni(rte_kni* kni, sKniStats& stats, rte_mbuf** mbufs, u
 		packetsLength += rte_pktmbuf_pkt_len(mbuf);
 	}
 
-	unsigned txSize = rte_kni_tx_burst(kni, mbufs, count);
+	unsigned txSize = rte_eth_tx_burst(kernel_port_id, 0, mbufs, count);
 	for (uint16_t mbuf_i = txSize; mbuf_i < count; mbuf_i++)
 	{
 		rte_mbuf* mbuf = mbufs[mbuf_i];
@@ -1694,14 +1653,16 @@ void cControlPlane::flushKni(rte_kni* kni, sKniStats& stats, rte_mbuf** mbufs, u
 	count = 0;
 }
 
-void cControlPlane::flushDump(rte_kni* kni, rte_mbuf** mbufs, uint32_t& count)
+void cControlPlane::flush_kernel_interface(tPortId kernel_port_id,
+                                           rte_mbuf** mbufs,
+                                           uint32_t& count)
 {
 	if (!count)
 	{
 		return;
 	}
 
-	unsigned txSize = rte_kni_tx_burst(kni, mbufs, count);
+	unsigned txSize = rte_eth_tx_burst(kernel_port_id, 0, mbufs, count);
 	for (uint16_t mbuf_i = txSize; mbuf_i < count; mbuf_i++)
 	{
 		rte_mbuf* mbuf = mbufs[mbuf_i];
@@ -1773,29 +1734,35 @@ void cControlPlane::mainThread()
 			ring_handle(worker->ring_toFreePackets, worker->ring_lowPriority);
 		}
 
-		for (auto& iter : knis)
+		for (auto& iter : kernel_interfaces)
 		{
-			auto& [name, kni, stats, mbufs, count] = iter.second;
-			(void)name;
-			flushKni(kni, stats, mbufs.data(), count);
+			auto& [interface_name, kernel_port_id, stats, mbufs, count] = iter.second;
+			(void)interface_name;
+			flush_kernel_interface(kernel_port_id, stats, mbufs.data(), count);
 		}
-		for (auto& iter : ingress_dump_knis)
+		for (auto& [port_id, kernel_interface] : in_dump_kernel_interfaces)
 		{
-			auto& [name, kni, mbufs, count] = iter.second;
-			(void)name;
-			flushDump(kni, mbufs.data(), count);
+			auto& [interface_name, kernel_port_id, mbufs, count] = kernel_interface;
+			(void)port_id;
+			(void)interface_name;
+
+			flush_kernel_interface(kernel_port_id, mbufs.data(), count);
 		}
-		for (auto& iter : egress_dump_knis)
+		for (auto& [port_id, kernel_interface] : out_dump_kernel_interfaces)
 		{
-			auto& [name, kni, mbufs, count] = iter.second;
-			(void)name;
-			flushDump(kni, mbufs.data(), count);
+			auto& [interface_name, kernel_port_id, mbufs, count] = kernel_interface;
+			(void)port_id;
+			(void)interface_name;
+
+			flush_kernel_interface(kernel_port_id, mbufs.data(), count);
 		}
-		for (auto& iter : drop_dump_knis)
+		for (auto& [port_id, kernel_interface] : drop_dump_kernel_interfaces)
 		{
-			auto& [name, kni, mbufs, count] = iter.second;
-			(void)name;
-			flushDump(kni, mbufs.data(), count);
+			auto& [interface_name, kernel_port_id, mbufs, count] = kernel_interface;
+			(void)port_id;
+			(void)interface_name;
+
+			flush_kernel_interface(kernel_port_id, mbufs.data(), count);
 		}
 
 		/// dequeue packets from worker_gc's ring to slowworker
@@ -1827,15 +1794,13 @@ void cControlPlane::mainThread()
 		fragmentation.handle();
 		dregress.handle();
 
-		/// recv packets from kni
-		for (auto& iter : knis)
+		/// recv packets from kernel interface and send to physical port
+		for (auto& [port_id, kernel_interface] : kernel_interfaces)
 		{
-			const tPortId& portId = iter.first;
-			rte_kni* kni = std::get<1>(iter.second);
+			auto kernel_port_id = std::get<1>(kernel_interface);
 
-			rte_kni_handle_request(kni);
-
-			unsigned rxSize = rte_kni_rx_burst(kni,
+			unsigned rxSize = rte_eth_rx_burst(kernel_port_id,
+			                                   0,
 			                                   mbufs,
 			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
 			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
@@ -1843,19 +1808,20 @@ void cControlPlane::mainThread()
 				rte_mbuf* mbuf = mbufs[mbuf_i];
 
 				dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-				metadata->fromPortId = portId;
+				metadata->fromPortId = port_id;
 
-				handlePacketFromControlPlane(mbuf);
+				handle_packet_from_kernel(mbuf);
 			}
 		}
 
-		for (auto& iter : ingress_dump_knis)
+		/// recv from in.X/out.X/drop.X interfaces and free packets
+		for (auto& [port_id, kernel_interface] : in_dump_kernel_interfaces)
 		{
-			rte_kni* kni = std::get<1>(iter.second);
+			auto kernel_port_id = std::get<1>(kernel_interface);
+			(void)port_id;
 
-			rte_kni_handle_request(kni);
-
-			unsigned rxSize = rte_kni_rx_burst(kni,
+			unsigned rxSize = rte_eth_rx_burst(kernel_port_id,
+			                                   0,
 			                                   mbufs,
 			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
 			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
@@ -1864,14 +1830,13 @@ void cControlPlane::mainThread()
 				rte_pktmbuf_free(mbuf);
 			}
 		}
-
-		for (auto& iter : egress_dump_knis)
+		for (auto& [port_id, kernel_interface] : out_dump_kernel_interfaces)
 		{
-			rte_kni* kni = std::get<1>(iter.second);
+			auto kernel_port_id = std::get<1>(kernel_interface);
+			(void)port_id;
 
-			rte_kni_handle_request(kni);
-
-			unsigned rxSize = rte_kni_rx_burst(kni,
+			unsigned rxSize = rte_eth_rx_burst(kernel_port_id,
+			                                   0,
 			                                   mbufs,
 			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
 			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
@@ -1880,14 +1845,13 @@ void cControlPlane::mainThread()
 				rte_pktmbuf_free(mbuf);
 			}
 		}
-
-		for (auto& iter : drop_dump_knis)
+		for (auto& [port_id, kernel_interface] : drop_dump_kernel_interfaces)
 		{
-			rte_kni* kni = std::get<1>(iter.second);
+			auto kernel_port_id = std::get<1>(kernel_interface);
+			(void)port_id;
 
-			rte_kni_handle_request(kni);
-
-			unsigned rxSize = rte_kni_rx_burst(kni,
+			unsigned rxSize = rte_eth_rx_burst(kernel_port_id,
+			                                   0,
 			                                   mbufs,
 			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
 			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
@@ -2033,8 +1997,8 @@ void cControlPlane::handlePacketFromForwardingPlane(rte_mbuf* mbuf)
 
 #endif
 
-	auto iter = knis.find(metadata->fromPortId);
-	if (iter == knis.end())
+	auto iter = kernel_interfaces.find(metadata->fromPortId);
+	if (iter == kernel_interfaces.end())
 	{
 		// TODO stats
 		unsigned txSize = rte_eth_tx_burst(metadata->fromPortId, 0, &mbuf, 1);
@@ -2045,20 +2009,20 @@ void cControlPlane::handlePacketFromForwardingPlane(rte_mbuf* mbuf)
 		return;
 	}
 
-	auto& [name, kni, stats, mbufs, count] = iter->second;
+	auto& [name, kernel_port_id, stats, mbufs, count] = iter->second;
 	(void)name;
 	mbufs[count++] = mbuf;
 	if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
 	{
-		flushKni(kni, stats, mbufs.data(), count);
+		flush_kernel_interface(kernel_port_id, stats, mbufs.data(), count);
 	}
 }
 
-void cControlPlane::handlePacketFromControlPlane(rte_mbuf* mbuf)
+void cControlPlane::handle_packet_from_kernel(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-	sKniStats& stats = std::get<2>(knis[metadata->fromPortId]);
+	sKniStats& stats = std::get<2>(kernel_interfaces[metadata->fromPortId]);
 
 	uint32_t packetLength = rte_pktmbuf_pkt_len(mbuf);
 
@@ -3225,16 +3189,16 @@ void cControlPlane::handlePacket_dump(rte_mbuf* mbuf)
 	{
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		auto it = ingress_dump_knis.find(metadata->flow.data.dump.id);
-		if (it != ingress_dump_knis.end())
+		auto it = in_dump_kernel_interfaces.find(metadata->flow.data.dump.id);
+		if (it != in_dump_kernel_interfaces.end())
 		{
-			auto& [name, kni, mbufs, count] = it->second;
-			(void)name;
+			auto& [interface_name, kernel_port_id, mbufs, count] = it->second;
+			(void)interface_name;
 
 			mbufs[count++] = mbuf;
 			if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
 			{
-				flushDump(kni, mbufs.data(), count);
+				flush_kernel_interface(kernel_port_id, mbufs.data(), count);
 			}
 
 			return;
@@ -3244,16 +3208,16 @@ void cControlPlane::handlePacket_dump(rte_mbuf* mbuf)
 	{
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		auto it = egress_dump_knis.find(metadata->flow.data.dump.id);
-		if (it != egress_dump_knis.end())
+		auto it = out_dump_kernel_interfaces.find(metadata->flow.data.dump.id);
+		if (it != out_dump_kernel_interfaces.end())
 		{
-			auto& [name, kni, mbufs, count] = it->second;
-			(void)name;
+			auto& [interface_name, kernel_port_id, mbufs, count] = it->second;
+			(void)interface_name;
 
 			mbufs[count++] = mbuf;
 			if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
 			{
-				flushDump(kni, mbufs.data(), count);
+				flush_kernel_interface(kernel_port_id, mbufs.data(), count);
 			}
 
 			return;
@@ -3263,16 +3227,16 @@ void cControlPlane::handlePacket_dump(rte_mbuf* mbuf)
 	{
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		auto it = drop_dump_knis.find(metadata->flow.data.dump.id);
-		if (it != drop_dump_knis.end())
+		auto it = drop_dump_kernel_interfaces.find(metadata->flow.data.dump.id);
+		if (it != drop_dump_kernel_interfaces.end())
 		{
-			auto& [name, kni, mbufs, count] = it->second;
-			(void)name;
+			auto& [interface_name, kernel_port_id, mbufs, count] = it->second;
+			(void)interface_name;
 
 			mbufs[count++] = mbuf;
 			if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
 			{
-				flushDump(kni, mbufs.data(), count);
+				flush_kernel_interface(kernel_port_id, mbufs.data(), count);
 			}
 
 			return;

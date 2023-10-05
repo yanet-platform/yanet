@@ -49,6 +49,25 @@ void physicalPort()
 	table.print();
 }
 
+void physical_port_dump(const std::string& direction,
+                        const std::string& interface_name,
+                        const std::string& state)
+{
+	interface::dataPlane dataplane;
+
+	bool bool_state = false;
+	if (state == "enable")
+	{
+		bool_state = true;
+	}
+
+	const auto result = dataplane.dump_physical_port({interface_name, direction, bool_state});
+	if (result != eResult::success)
+	{
+		throw std::string(common::result_to_c_str(result));
+	}
+}
+
 void logicalPort()
 {
 	interface::controlPlane controlPlane;

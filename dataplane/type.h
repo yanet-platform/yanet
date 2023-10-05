@@ -18,7 +18,6 @@ class worker_gc_t;
 class cBus;
 struct rte_mbuf;
 struct rte_mempool;
-struct rte_kni;
 
 //
 

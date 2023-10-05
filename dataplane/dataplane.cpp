@@ -260,7 +260,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		return result;
 	}
 
-	result = controlPlane->init(config.useKni);
+	result = controlPlane->init(config.use_kernel_interface);
 	if (result != eResult::success)
 	{
 		return result;
@@ -1211,6 +1211,21 @@ std::map<std::string, common::uint64> cDataPlane::getPortStats(const tPortId& po
 	return result;
 }
 
+std::optional<tPortId> cDataPlane::interface_name_to_port_id(const std::string& interface_name)
+{
+	for (const auto& [port_id, port] : ports)
+	{
+		const auto& port_interface_name = std::get<0>(port);
+		if (port_interface_name == interface_name)
+		{
+			return port_id;
+		}
+	}
+
+	/// unknown interface
+	return std::nullopt;
+}
+
 eResult cDataPlane::parseConfig(const std::string& configFilePath)
 {
 	eResult result = eResult::success;
@@ -1275,21 +1290,11 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 
 	if (rootJson.find("useKni") != rootJson.end())
 	{
-		config.useKni = rootJson.find("useKni").value();
+		config.use_kernel_interface = rootJson.find("useKni").value();
 	}
-
-	if (config.useKni)
+	if (rootJson.find("use_kernel_interface") != rootJson.end())
 	{
-		if (rootJson.find("dumpKniCoreId") == rootJson.end())
-		{
-			YADECAP_LOG_ERROR("not found: 'dumpKniCoreId'\n");
-			return eResult::invalidConfigurationFile;
-		}
-		config.dumpKniCoreId = rootJson.find("dumpKniCoreId").value();
-	}
-	else
-	{
-		config.dumpKniCoreId = 0;
+		config.use_kernel_interface = rootJson.find("use_kernel_interface").value();
 	}
 
 	auto rssDepth = rootJson.find("rssDepth");
@@ -1577,12 +1582,6 @@ eResult cDataPlane::checkConfig()
 		return eResult::invalidConfigurationFile;
 	}
 
-	if (config.dumpKniCoreId >= std::thread::hardware_concurrency())
-	{
-		YADECAP_LOG_ERROR("invalid coreId: '%u'\n", config.dumpKniCoreId);
-		return eResult::invalidConfigurationFile;
-	}
-
 	{
 		std::set<std::string> pcis;
 		for (const auto& portIter : config.ports)
@@ -1605,8 +1604,7 @@ eResult cDataPlane::checkConfig()
 		const tCoreId& coreId = workerIter.first;
 
 		if (coreId >= std::thread::hardware_concurrency() ||
-		    coreId == config.controlPlaneCoreId ||
-		    coreId == config.dumpKniCoreId)
+		    coreId == config.controlPlaneCoreId)
 		{
 			YADECAP_LOG_ERROR("invalid coreId: '%u'\n", coreId);
 			return eResult::invalidConfigurationFile;

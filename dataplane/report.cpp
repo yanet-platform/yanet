@@ -5,7 +5,6 @@
 #include <unistd.h>
 
 #include <rte_ethdev.h>
-#include <rte_kni.h>
 #include <rte_mempool.h>
 
 #include "common.h"
@@ -472,7 +471,7 @@ nlohmann::json cReport::convertControlPlane(const cControlPlane* controlPlane)
 
 	json["mempool"] = convertMempool(controlPlane->mempool);
 
-	for (const auto& iter : controlPlane->knis)
+	for (const auto& iter : controlPlane->kernel_interfaces)
 	{
 		nlohmann::json jsonKni;
 

@@ -70,6 +70,7 @@ enum class requestType : uint32_t
 	version,
 	get_counter_by_name,
 	get_shm_info,
+	dump_physical_port,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -848,6 +849,13 @@ using dump_meta = std::tuple<std::string, ///< ring name
 using response = std::vector<dump_meta>;
 }
 
+namespace dump_physical_port
+{
+using request = std::tuple<std::string, ///< interface_name
+                           std::string, ///< direction (in/out/drop)
+                           bool>; ///< state
+}
+
 namespace limits
 {
 using limit = std::tuple<std::string, ///< name
@@ -904,7 +912,8 @@ using request = std::tuple<requestType,
                                         debug_latch_update::request,
                                         unrdup_vip_to_balancers::request,
                                         update_vip_vport_proto::request,
-                                        get_counter_by_name::request>>;
+                                        get_counter_by_name::request,
+                                        dump_physical_port::request>>;
 
 using response = std::variant<std::tuple<>,
                               updateGlobalBase::response, ///< + others which have eResult as response

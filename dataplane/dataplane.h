@@ -8,7 +8,6 @@
 #include <vector>
 
 #include <rte_ethdev.h>
-#include <rte_kni.h>
 #include <rte_malloc.h>
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
@@ -67,10 +66,9 @@ struct tDataPlaneConfig
 	        ports;
 	std::set<tCoreId> workerGCs;
 	tCoreId controlPlaneCoreId;
-	tCoreId dumpKniCoreId;
 	std::map<tCoreId, std::vector<std::string>> workers;
 	bool useHugeMem = true;
-	bool useKni = true;
+	bool use_kernel_interface = true;
 	uint64_t rssFlags = RTE_ETH_RSS_IP;
 	uint32_t SWNormalPriorityRateLimitPerWorker = 0;
 	uint32_t SWICMPOutRateLimit = 0;
@@ -115,6 +113,7 @@ public:
 
 	uint64_t getConfigValue(const eConfigType& type) const;
 	std::map<std::string, common::uint64> getPortStats(const tPortId& portId) const;
+	std::optional<tPortId> interface_name_to_port_id(const std::string& interface_name);
 
 protected:
 	eResult parseConfig(const std::string& configFilePath);
