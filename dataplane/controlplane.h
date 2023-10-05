@@ -30,7 +30,7 @@ public:
 	cControlPlane(cDataPlane* dataPlane);
 	virtual ~cControlPlane();
 
-	eResult init(bool useKni);
+	eResult init(bool use_kernel_interface);
 	void start();
 	void stop();
 	void join();
@@ -71,6 +71,7 @@ public:
 	common::idp::get_counter_by_name::response get_counter_by_name(const common::idp::get_counter_by_name::request& request);
 	common::idp::nat64stateful_state::response nat64stateful_state(const common::idp::nat64stateful_state::request& request);
 	common::idp::get_shm_info::response get_shm_info();
+	eResult dump_physical_port(const common::idp::dump_physical_port::request& request);
 
 	void switchBase();
 	void switchGlobalBase();
@@ -81,13 +82,16 @@ public:
 
 protected:
 	eResult initMempool();
-	eResult initKnis();
+	eResult init_kernel_interfaces();
+	std::optional<tPortId> add_kernel_interface(const tPortId port_id, const std::string& interface_name);
+	void remove_kernel_interface(const tPortId port_id, const std::string& interface_name);
+	void set_kernel_interface_up(const std::string& interface_name);
 
 	void mainThread();
 	unsigned ring_handle(rte_ring* ring_to_free_mbuf, rte_ring* ring);
 
 	void handlePacketFromForwardingPlane(rte_mbuf* mbuf); ///< @todo: rename
-	void handlePacketFromControlPlane(rte_mbuf* mbuf);
+	void handle_packet_from_kernel(rte_mbuf* mbuf);
 	void handlePacket_icmp_translate_v6_to_v4(rte_mbuf* mbuf);
 	void handlePacket_icmp_translate_v4_to_v6(rte_mbuf* mbuf);
 	void handlePacket_dregress(rte_mbuf* mbuf);
@@ -124,8 +128,8 @@ protected:
 		uint64_t odropped;
 	};
 
-	void flushKni(rte_kni* kni, sKniStats& stats, rte_mbuf** mbufs, uint32_t& count);
-	void flushDump(rte_kni* kni, rte_mbuf** mbufs, uint32_t& count);
+	void flush_kernel_interface(tPortId kernel_port_id, sKniStats& stats, rte_mbuf** mbufs, uint32_t& count);
+	void flush_kernel_interface(tPortId kernel_port_id, rte_mbuf** mbufs, uint32_t& count);
 
 	cDataPlane* dataPlane;
 
@@ -139,14 +143,35 @@ protected:
 	std::mutex vip_vport_proto_mutex;
 
 	rte_mempool* mempool;
-	bool useKni;
-	std::map<tPortId, std::tuple<std::string, rte_kni*, sKniStats, std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>, uint32_t>> knis;
+	bool use_kernel_interface;
+	std::map<tPortId,
+	         std::tuple<std::string, ///< interface_name
+	                    tPortId, ///< kernel_port_id
+	                    sKniStats,
+	                    std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>,
+	                    uint32_t>>
+	        kernel_interfaces;
 
-	std::map<tPortId, std::tuple<std::string, rte_kni*, std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>, uint32_t>> ingress_dump_knis;
+	std::map<tPortId,
+	         std::tuple<std::string, ///< interface_name
+	                    tPortId, ///< kernel_port_id
+	                    std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>,
+	                    uint32_t>>
+	        in_dump_kernel_interfaces;
 
-	std::map<tPortId, std::tuple<std::string, rte_kni*, std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>, uint32_t>> egress_dump_knis;
+	std::map<tPortId,
+	         std::tuple<std::string, ///< interface_name
+	                    tPortId, ///< kernel_port_id
+	                    std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>,
+	                    uint32_t>>
+	        out_dump_kernel_interfaces;
 
-	std::map<tPortId, std::tuple<std::string, rte_kni*, std::array<rte_mbuf*, 64 * CONFIG_YADECAP_MBUFS_BURST_SIZE>, uint32_t>> drop_dump_knis;
+	std::map<tPortId,
+	         std::tuple<std::string, ///< interface_name
+	                    tPortId, ///< kernel_port_id
+	                    std::array<rte_mbuf*, 64 * CONFIG_YADECAP_MBUFS_BURST_SIZE>,
+	                    uint32_t>>
+	        drop_dump_kernel_interfaces;
 
 	common::slowworker::stats_t stats;
 	common::idp::getErrors::response errors; ///< @todo: class errorsManager

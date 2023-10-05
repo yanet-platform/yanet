@@ -619,7 +619,7 @@ inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port
 
 		preparePacket(mbuf);
 
-		if (basePermanently.globalBaseAtomic->physicalPort_flags[metadata->fromPortId] & YANET_PHYSICALPORT_FLAG_INGRESS_DUMP)
+		if (basePermanently.globalBaseAtomic->physicalPort_flags[metadata->fromPortId] & YANET_PHYSICALPORT_FLAG_IN_DUMP)
 		{
 			if (!rte_ring_full(ring_lowPriority))
 			{
@@ -883,7 +883,7 @@ inline void cWorker::logicalPort_egress_handle()
 			}
 		}
 
-		if (basePermanently.globalBaseAtomic->physicalPort_flags[logicalPort.portId] & YANET_PHYSICALPORT_FLAG_EGRESS_DUMP)
+		if (basePermanently.globalBaseAtomic->physicalPort_flags[logicalPort.portId] & YANET_PHYSICALPORT_FLAG_OUT_DUMP)
 		{
 			if (!rte_ring_full(ring_lowPriority))
 			{
