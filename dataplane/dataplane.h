@@ -60,10 +60,16 @@ enum class eConfigType
 
 struct tDataPlaneConfig
 {
+	/*
+	   DPDK ports used by `dataplane`.
+	   Each port has a name with which is exposed into host system
+	   and an identifier (typically pci id) used to lookup the port within
+	   DPDK.
+	*/
 	std::map<std::string, ///< interfaceName
-	         std::tuple<std::string, ///< pci
-	                    bool>> ///< bind driver
+	         std::tuple<std::string>> ///< pci
 	        ports;
+
 	std::set<tCoreId> workerGCs;
 	tCoreId controlPlaneCoreId;
 	std::map<tCoreId, std::vector<std::string>> workers;
