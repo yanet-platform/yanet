@@ -298,8 +298,7 @@ eResult cDataPlane::initPorts()
 	for (const auto& configPortIter : config.ports)
 	{
 		const std::string& interfaceName = configPortIter.first;
-		const auto& [pci, bind] = configPortIter.second;
-		(void)bind;
+		const auto& [pci] = configPortIter.second;
 
 		tPortId portId;
 		if (strncmp(pci.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
@@ -1361,7 +1360,6 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 	{
 		std::string interfaceName = portJson["interfaceName"];
 		std::string pci = portJson["pci"];
-		bool bind = false;
 
 		if (exist(config.ports, interfaceName))
 		{
@@ -1369,15 +1367,7 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 			return eResult::invalidConfigurationFile;
 		}
 
-		if (exist(portJson, "bind"))
-		{
-			if (portJson["bind"] == "true")
-			{
-				bind = true;
-			}
-		}
-
-		config.ports[interfaceName] = {pci, bind};
+		config.ports[interfaceName] = {pci};
 
 		for (tCoreId coreId : portJson["coreIds"])
 		{
@@ -1587,8 +1577,7 @@ eResult cDataPlane::checkConfig()
 		std::set<std::string> pcis;
 		for (const auto& portIter : config.ports)
 		{
-			const auto& [pci, bind] = portIter.second;
-			(void)bind;
+			const auto& [pci] = portIter.second;
 
 			if (exist(pcis, pci))
 			{
@@ -1681,8 +1670,7 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 
 	for (const auto& port : config.ports)
 	{
-		const auto& [pci, bind] = port.second;
-		(void)bind;
+		const auto& [pci] = port.second;
 
 		// Do not whitelist sock dev virtual devices
 		if (strncmp(pci.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
