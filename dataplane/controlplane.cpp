@@ -703,17 +703,17 @@ common::idp::getConfig::response cControlPlane::getConfig() const
 	common::idp::getConfig::response response;
 	auto& [response_ports, response_workers, response_values] = response;
 
-	for (const auto& portIter : dataPlane->ports)
+	for (const auto& [port_id, port] : dataPlane->ports)
 	{
-		const tPortId& portId = portIter.first;
-		const std::string& interfaceName = std::get<0>(portIter.second);
-		const auto& etherAddress = std::get<2>(portIter.second);
-		const std::string pci = std::get<3>(portIter.second);
+		const auto& [interface_name, rx_queues, tx_queues_count, mac_address, pci, symmetric_mode] = port;
+		(void)rx_queues;
+		(void)tx_queues_count;
+		(void)symmetric_mode;
 
-		response_ports[portId] = {interfaceName,
-		                          rte_eth_dev_socket_id(portId),
-		                          etherAddress,
-		                          pci};
+		response_ports[port_id] = {interface_name,
+		                           rte_eth_dev_socket_id(port_id),
+		                           mac_address,
+		                           pci};
 	}
 
 	for (const auto& workerIter : dataPlane->workers)

@@ -89,8 +89,8 @@ eResult cWorker::init(const tCoreId& coreId,
 	this->bases[currentBaseId] = base;
 	this->bases[currentBaseId ^ 1] = base;
 
-	unsigned int elements_count = 2 * CONFIG_YADECAP_WORKER_PORTS_SIZE * dataPlane->getConfigValue(eConfigType::port_rx_queue_size) +
-	                              2 * CONFIG_YADECAP_WORKER_PORTS_SIZE * dataPlane->getConfigValue(eConfigType::port_tx_queue_size) +
+	unsigned int elements_count = 2 * basePermanently.workerPortsCount * dataPlane->getConfigValue(eConfigType::port_rx_queue_size) +
+	                              2 * basePermanently.workerPortsCount * dataPlane->getConfigValue(eConfigType::port_tx_queue_size) +
 	                              2 * dataPlane->getConfigValue(eConfigType::ring_highPriority_size) +
 	                              2 * dataPlane->getConfigValue(eConfigType::ring_normalPriority_size) +
 	                              2 * dataPlane->getConfigValue(eConfigType::ring_lowPriority_size);
@@ -180,8 +180,8 @@ void cWorker::start()
 
 	/// @todo: prepare()
 
-	unsigned int mbufs_count_expect = 2 * CONFIG_YADECAP_WORKER_PORTS_SIZE * dataPlane->getConfigValue(eConfigType::port_rx_queue_size) +
-	                                  2 * CONFIG_YADECAP_WORKER_PORTS_SIZE * dataPlane->getConfigValue(eConfigType::port_tx_queue_size) +
+	unsigned int mbufs_count_expect = 2 * basePermanently.workerPortsCount * dataPlane->getConfigValue(eConfigType::port_rx_queue_size) +
+	                                  2 * basePermanently.workerPortsCount * dataPlane->getConfigValue(eConfigType::port_tx_queue_size) +
 	                                  2 * dataPlane->getConfigValue(eConfigType::ring_highPriority_size) +
 	                                  2 * dataPlane->getConfigValue(eConfigType::ring_normalPriority_size) +
 	                                  2 * dataPlane->getConfigValue(eConfigType::ring_lowPriority_size);

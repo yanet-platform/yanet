@@ -37,6 +37,21 @@ public:
 		transportSizes[IPPROTO_GRE] = sizeof(rte_gre_hdr);
 	}
 
+	bool add_worker_port(const tPortId port_id,
+	                     tQueueId queue_id)
+	{
+		if (workerPortsCount >= CONFIG_YADECAP_WORKER_PORTS_SIZE)
+		{
+			return false;
+		}
+
+		workerPorts[workerPortsCount].inPortId = port_id;
+		workerPorts[workerPortsCount].inQueueId = queue_id;
+		workerPortsCount++;
+
+		return true;
+	}
+
 	dataplane::globalBase::atomic* globalBaseAtomic;
 	/// Pointers to all globalBaseAtomic for each CPU socket.
 	///

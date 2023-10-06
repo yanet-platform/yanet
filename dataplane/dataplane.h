@@ -68,7 +68,9 @@ struct tDataPlaneConfig
 	   DPDK.
 	*/
 	std::map<std::string, ///< interfaceName
-	         std::tuple<std::string>> ///< pci
+	         std::tuple<std::string, ///< pci
+	                    bool ///< symmetric_mode
+	                    >>
 	        ports;
 
 	std::set<tCoreId> workerGCs;
@@ -292,10 +294,12 @@ protected:
 	tDataPlaneConfig config;
 
 	std::map<tPortId,
-	         std::tuple<std::string, ///< interfaceName
-	                    std::map<tCoreId, tQueueId>, ///< rxQueues
-	                    std::array<uint8_t, 6>, ///< address
-	                    std::string ///< pci
+	         std::tuple<std::string, ///< interface_name
+	                    std::map<tCoreId, tQueueId>, ///< rx_queues
+	                    unsigned int, ///< tx_queues_count
+	                    common::mac_address_t, ///< mac_address
+	                    std::string, ///< pci
+	                    bool ///< symmetric_mode
 	                    >>
 	        ports;
 	std::map<tCoreId, cWorker*> workers;

@@ -299,7 +299,7 @@ eResult cDataPlane::initPorts()
 	for (const auto& configPortIter : config.ports)
 	{
 		const std::string& interfaceName = configPortIter.first;
-		const auto& [pci] = configPortIter.second;
+		const auto& [pci, symmetric_mode] = configPortIter.second;
 
 		tPortId portId;
 		if (strncmp(pci.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
@@ -319,12 +319,8 @@ eResult cDataPlane::initPorts()
 		                 interfaceName.data(),
 		                 pci.data());
 
-		std::get<0>(ports[portId]) = interfaceName;
-		std::get<3>(ports[portId]) = pci;
-
 		rte_ether_addr etherAddress;
 		rte_eth_macaddr_get(portId, &etherAddress);
-		memcpy(std::get<2>(ports[portId]).data(), etherAddress.addr_bytes, 6);
 
 		rte_eth_dev_info devInfo;
 		rte_eth_dev_info_get(portId, &devInfo);
@@ -371,6 +367,8 @@ eResult cDataPlane::initPorts()
 		YADECAP_LOG_INFO("max_lro_pkt_size: %u\n", portConf.rxmode.max_lro_pkt_size);
 		YADECAP_LOG_INFO("mtu: %u\n", mtu);
 
+		std::map<tCoreId, tQueueId> rx_queues;
+
 		uint16_t rxQueuesCount = 0;
 		uint16_t txQueuesCount = config.workers.size() + 1; ///< tx queue '0' for control plane
 		for (const auto& configWorkerIter : config.workers)
@@ -381,10 +379,19 @@ eResult cDataPlane::initPorts()
 			{
 				if (interfaceName == workerInterfaceName)
 				{
-					std::get<1>(ports[portId])[coreId] = rxQueuesCount;
+					rx_queues[coreId] = rxQueuesCount;
 					rxQueuesCount++;
 				}
 			}
+		}
+
+		if (symmetric_mode &&
+		    rxQueuesCount < txQueuesCount)
+		{
+			YADECAP_LOG_INFO("symmetric mode is enabled. configure rx queues size from '%u' to '%u'\n",
+			                 rxQueuesCount,
+			                 txQueuesCount);
+			rxQueuesCount = txQueuesCount;
 		}
 
 		YADECAP_LOG_INFO("rxQueuesCount: %u, txQueuesCount: %u\n", rxQueuesCount, txQueuesCount);
@@ -407,6 +414,13 @@ eResult cDataPlane::initPorts()
 		}
 
 		rte_eth_stats_reset(portId);
+
+		ports[portId] = {interfaceName,
+		                 rx_queues,
+		                 txQueuesCount,
+		                 etherAddress.addr_bytes,
+		                 pci,
+		                 symmetric_mode};
 	}
 
 	for (const auto& interface_name : remove_keys)
@@ -743,18 +757,75 @@ eResult cDataPlane::initWorkers()
 			basePermanently.nat64stateful_numa_id = rte_cpu_to_be_16(socket_id);
 		}
 
-		for (const auto& portIter : ports)
+		for (const auto& [port_id, port] : ports)
 		{
-			const auto& portId = portIter.first;
-			const auto& rxQueues = std::get<1>(portIter.second);
+			const auto& [interface_name, rx_queues, tx_queues_count, mac_address, pci, symmetric_mode] = port;
+			(void)mac_address;
+			(void)pci;
 
-			if (exist(rxQueues, coreId))
+			if (exist(rx_queues, coreId))
 			{
-				basePermanently.workerPorts[basePermanently.workerPortsCount].inPortId = portId;
-				basePermanently.workerPorts[basePermanently.workerPortsCount].inQueueId = rxQueues.find(coreId)->second;
-				basePermanently.workerPortsCount++;
+				YANET_LOG_DEBUG("worker[%u]: add_worker_port(port_id: %u, queue_id: %u)\n",
+				                coreId,
+				                port_id,
+				                rx_queues.find(coreId)->second);
+
+				if (!basePermanently.add_worker_port(port_id, rx_queues.find(coreId)->second))
+				{
+					YADECAP_LOG_ERROR("can't add port '%s' to worker '%u'\n",
+					                  interface_name.data(),
+					                  coreId);
+					return eResult::invalidCoresCount;
+				}
+
+				if (symmetric_mode)
+				{
+					/// symmetric mode. add more rx queues
+					///
+					/// before
+					/// rx_queue_id -> core_id
+					/// 0           -> 1
+					/// 1           -> 2
+					/// 2           -> 3
+					/// 3           -> n/s
+					/// 4           -> n/s
+					/// 5           -> n/s
+					/// 6           -> n/s
+					///
+					/// after
+					/// rx_queue_id -> core_id
+					/// 0           -> 1
+					/// 1           -> 2
+					/// 2           -> 3
+					/// 3           -> 1
+					/// 4           -> 2
+					/// 5           -> 3
+					/// 6           -> 1
+
+					uint16_t workers_count = rx_queues.size();
+					uint16_t rx_queue_id = rx_queues.find(coreId)->second + workers_count;
+
+					while (rx_queue_id < tx_queues_count)
+					{
+						YANET_LOG_DEBUG("worker[%u]: add_worker_port(port_id: %u, queue_id: %u)\n",
+						                coreId,
+						                port_id,
+						                rx_queue_id);
+
+						if (!basePermanently.add_worker_port(port_id, rx_queue_id))
+						{
+							YADECAP_LOG_ERROR("can't add port '%s' to worker '%u'\n",
+							                  interface_name.data(),
+							                  coreId);
+							return eResult::invalidCoresCount;
+						}
+
+						rx_queue_id += workers_count;
+					}
+				}
 			}
 		}
+
 		basePermanently.outQueueId = outQueueId;
 		basePermanently.ports_count = ports.size();
 
@@ -1366,6 +1437,7 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 	{
 		std::string interfaceName = portJson["interfaceName"];
 		std::string pci = portJson["pci"];
+		bool symmetric_mode = false;
 
 		if (exist(config.ports, interfaceName))
 		{
@@ -1373,7 +1445,12 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 			return eResult::invalidConfigurationFile;
 		}
 
-		config.ports[interfaceName] = {pci};
+		if (exist(portJson, "symmetric_mode"))
+		{
+			symmetric_mode = portJson["symmetric_mode"];
+		}
+
+		config.ports[interfaceName] = {pci, symmetric_mode};
 
 		for (tCoreId coreId : portJson["coreIds"])
 		{
@@ -1582,7 +1659,8 @@ eResult cDataPlane::checkConfig()
 		std::set<std::string> pcis;
 		for (const auto& portIter : config.ports)
 		{
-			const auto& [pci] = portIter.second;
+			const auto& [pci, symmetric_mode] = portIter.second;
+			(void)symmetric_mode;
 
 			if (exist(pcis, pci))
 			{
@@ -1674,7 +1752,8 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 
 	for (const auto& port : config.ports)
 	{
-		const auto& [pci] = port.second;
+		const auto& [pci, symmetric_mode] = port.second;
+		(void)symmetric_mode;
 
 		// Do not whitelist sock dev virtual devices
 		if (strncmp(pci.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
