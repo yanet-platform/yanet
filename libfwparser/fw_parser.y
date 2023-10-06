@@ -1,6 +1,5 @@
 // require bison version 3.2+
-//%require "3.2"
-%require "3.0"
+%require "3.2"
 
 // generate C++ source code
 %language "C++"
@@ -9,8 +8,7 @@
 %define api.namespace {ipfw}
 
 // define custom parser class name
-//%define api.parser.class {fw_parser_t}    // for bison 3.2+
-%define parser_class_name {fw_parser_t}     // for bison 3.0
+%define api.parser.class {fw_parser_t}
 
 // define type of semantic values
 %define api.value.type variant
@@ -134,13 +132,15 @@
 		SRCPORT DSTPORT SRCIP DSTIP EQUAL COMMA MINUS EOL M4LQ M4RQ DUMP
 
 // QUEUE could be an argument to *MASK
-%nonassoc	QUEUE
-%nonassoc	MASK FLOWMASK SCHEDMASK
+%precedence	QUEUE
+%precedence	MASK FLOWMASK SCHEDMASK
 
 %%
 
-commands: 
-	| commands command
+commands:
+	%empty
+	|
+	commands command
 	;
 command:
 	LABEL EOL
@@ -187,7 +187,7 @@ dnsstate:
 	ACTUAL | STALE
 	;
 dnsusers:
-	/* user may not be specified */
+	%empty // user may not be specified
 	|
 	dnsuser
 	|
@@ -272,6 +272,7 @@ actionmod:
 	log
 	;
 comment:
+	%empty
 	|
 	COMMENT
 	{
@@ -301,6 +302,7 @@ createtable:
 	TABLE newtable CREATE tablespec EOL
 	;
 defaulttableconfig:
+	%empty
 	{
 		cfg.create_skipto_table();
 	}
@@ -321,7 +323,11 @@ newtable:
 		cfg.set_table($1);
 	}
 	;
-endtable: { } ;
+endtable:
+	%empty
+	{
+	}
+	;
 
 tablespec:
 	tablespecopt
@@ -400,7 +406,7 @@ tablevaluetype:
 	}
 	;
 tableopts:
-	/* empty table value */
+	%empty
 	{
 		cfg.fill_table_entry_value("");
 	}
@@ -462,6 +468,7 @@ tablerec:
 	}
 	;
 rulenumber:
+	%empty
 	{
 		cfg.fill_rule_number(0);
 	}
@@ -760,6 +767,7 @@ tag:
 	}
 	;
 tagunique:
+	%empty
 	{
 	}
 	;
@@ -769,6 +777,7 @@ log:
 	LOG set_have_log logopts
 	;
 set_have_log:
+	%empty
 	{
 		cfg.set_rule_log();
 	}
@@ -874,8 +883,8 @@ protoset:
 	;
 statement: statementpre statementbody statementpost;
 
-statementpre: { };
-statementpost: { };
+statementpre: %empty { };
+statementpost: %empty { };
 
 statementbody:
 	statementtoken
@@ -1049,12 +1058,14 @@ statementset:
 	statementset COMMA statementtoken
 	;
 srcports:
+	%empty
 	|
 	portsoption
 	|
 	SRCPORT portsoption
 	;
 dstports:
+	%empty
 	|
 	portsoption
 	;
@@ -1108,7 +1119,7 @@ porttoken:
 	}
 	;
 options:
-	/* no options */
+	%empty
 	|
 	optiontoken options
 	|
@@ -1389,6 +1400,7 @@ optiontoken:
 	}
 	;
 fragspec:
+	%empty
 	{
 		cfg.set_rule_flag(rule_t::ipoff_flags_t::OFFSET);
 	}
@@ -1494,6 +1506,7 @@ statename:
 	{
 	}
 	|
+	%empty
 	{
 	}
 	;
@@ -1795,7 +1808,7 @@ RPORTrangepaddr:
 	RANGE | SOCKADDR4 MINUS NUMBER
 	;
 RPORTrangeraddr:
-	| IP | SOCKADDR4 MINUS NUMBER
+	%empty | IP | SOCKADDR4 MINUS NUMBER
 	;
 RPORTsingleladdr:
 	RPORTladdr | RPORTladdr COMMA RPORTsingleladdr
@@ -1807,7 +1820,7 @@ RPORTsinglepaddr:
 	NUMBER | SOCKADDR4
 	;
 RPORTsingleraddr:
-	| IP | SOCKADDR4
+	%empty | IP | SOCKADDR4
 	;
 RAspec:
 	RAlocaladdr IP
