@@ -74,6 +74,20 @@ RUN make install && \
     ldconfig
 
 
+# bison
+ENV BISON_VERSION 3.3.2
+
+WORKDIR /project
+RUN curl http://ftp.gnu.org/gnu/bison/bison-${BISON_VERSION}.tar.gz -o bison.tar.gz
+RUN mkdir bison && \
+    tar -xf bison.tar.gz -C bison --strip-components=1
+
+WORKDIR /project/bison
+RUN ./configure --prefix=/usr
+RUN make -j
+RUN make install
+
+
 WORKDIR /project
 RUN rm -rf *
 
@@ -82,7 +96,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsystemd-dev \
     libyaml-cpp-dev \
     libgtest-dev \
-    bison \
     flex \
     libfl-dev \
     netbase \
