@@ -1416,7 +1416,7 @@ void cControlPlane::waitAllWorkers()
 eResult cControlPlane::initMempool()
 {
 	mempool = rte_mempool_create("cp",
-	                             CONFIG_YADECAP_MBUFS_COUNT + dataPlane->getConfigValue(eConfigType::fragmentation_size) + dataPlane->getConfigValue(eConfigType::master_mempool_size) + 4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE + 4 * dataPlane->ports.size() * 4096, ///< for KNI (in/out/drop/kni)
+	                             CONFIG_YADECAP_MBUFS_COUNT + dataPlane->getConfigValue(eConfigType::fragmentation_size) + dataPlane->getConfigValue(eConfigType::master_mempool_size) + 4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE + 4 * dataPlane->ports.size() * dataPlane->getConfigValue(eConfigType::kernel_interface_queue_size),
 	                             CONFIG_YADECAP_MBUF_SIZE,
 	                             0,
 	                             sizeof(struct rte_pktmbuf_pool_private),
@@ -1515,8 +1515,8 @@ std::optional<tPortId> cControlPlane::add_kernel_interface(const tPortId port_id
 
 	snprintf(vdev_args,
 	         sizeof(vdev_args),
-	         "path=/dev/vhost-net,queues=1,queue_size=%u,iface=%s,mac=%s",
-	         YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE,
+	         "path=/dev/vhost-net,queues=1,queue_size=%lu,iface=%s,mac=%s",
+	         dataPlane->getConfigValue(eConfigType::kernel_interface_queue_size),
 	         interface_name.data(),
 	         common::mac_address_t(ether_addr.addr_bytes).toString().data());
 
@@ -1558,7 +1558,7 @@ std::optional<tPortId> cControlPlane::add_kernel_interface(const tPortId port_id
 
 	int rc = rte_eth_rx_queue_setup(kernel_port_id,
 	                                0,
-	                                4096,
+	                                dataPlane->getConfigValue(eConfigType::kernel_interface_queue_size),
 	                                0, ///< @todo: socket
 	                                nullptr,
 	                                mempool);
@@ -1571,7 +1571,7 @@ std::optional<tPortId> cControlPlane::add_kernel_interface(const tPortId port_id
 
 	rc = rte_eth_tx_queue_setup(kernel_port_id,
 	                            0,
-	                            4096,
+	                            dataPlane->getConfigValue(eConfigType::kernel_interface_queue_size),
 	                            0, ///< @todo: socket
 	                            nullptr);
 	if (rc < 0)
