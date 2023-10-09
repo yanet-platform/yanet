@@ -1,5 +1,5 @@
-// require bison version 3.2+
-%require "3.2"
+// require bison version 3.3+
+%require "3.3"
 
 // generate C++ source code
 %language "C++"
