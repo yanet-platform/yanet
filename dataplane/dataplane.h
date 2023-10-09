@@ -56,6 +56,7 @@ enum class eConfigType
 	acl_values_size,
 	master_mempool_size,
 	nat64stateful_states_size,
+	kernel_interface_queue_size,
 };
 
 struct tDataPlaneConfig
