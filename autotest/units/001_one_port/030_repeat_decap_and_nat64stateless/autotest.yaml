@@ -1,0 +1,10 @@
+steps:
+- ipv4Update:
+  - "1.1.0.0/16 -> 200.0.0.1"
+  - "10.0.0.0/8 -> 200.0.0.1"
+  - "10.0.0.0/32 -> 200.0.0.1"
+- ipv6Update: "2000::/128 -> fe80::1"
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap

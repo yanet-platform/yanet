@@ -1,0 +1,12 @@
+:BEGIN
+add skipto :IN ip from any to any in
+
+:IN
+add allow udp from any to 2121:bbb8:ff1c:2030::/60 53
+add allow ip from any to { fe80::2 or 200.0.0.2 }
+add allow tcp from any to 2121:bbb8:ff1c:2030::/ffff:ffff:ffff:fff0:: 80
+add allow tcp from any to 2121:bbb8:ff1c:2031::/ffff:ffff:ffff:ffff:: 81
+add allow tcp from any to 2121:bbb8:ff1c:0:0:5678::/ffff:ffff:ffff:0000:ffff:ffff:: 82
+add allow tcp from any to 2121:bbb8:ff1c:0:aaaa:bbbb::/ffff:ffff:ffff:0000:ffff:ffff:: 83
+add allow tcp from any to any established
+add deny ip from any to any

@@ -1,0 +1,10 @@
+:BEGIN
+add skipto :IN ip from any to any in
+
+:IN
+add skipto :SEC_GAP ip from any to 2121:bbb8:1000::/ffff:ffff:ffff:ffff::
+add deny ip from any to any
+
+:SEC_GAP
+add allow ip from any to 2121:bbb8:0:0:5555::/ffff:ffff:0000:0000:ffff::
+add deny ip from any to any
