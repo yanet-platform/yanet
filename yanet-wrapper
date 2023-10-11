@@ -4,6 +4,7 @@ set -Eeuo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
 ARCH=""
+BINARY="dataplane"
 CONFIG=""
 TYPE=""
 
@@ -11,25 +12,34 @@ usage() {
   cat <<EOF
 Usage: $(basename "${BASH_SOURCE[0]}") [OPTIONS]
 
-Yanet wrapper for yanet-dataplane.
+YANET wrapper.
 
 Options:
 -h        Print this help and exit
 -a        Instruction set architecture host (corei7, broadwell, knl)
--c        Config file for dataplane
--t        Type of yanet dataplane binary(release, l3balancer or firewall)
+-b        Set binary (dataplane, controlplane)
+-c        Config file
+-t        Type of yanet binary (release, l3balancer or firewall)
 EOF
   exit
 }
 
-while getopts "h:a:c:t:" opt ; do
+while getopts "h:a:b:c:t:" opt ; do
   case $opt in
     h) usage ;;
     a) ARCH=$OPTARG ;;
+    b) BINARY=$OPTARG ;;
     c) CONFIG=$OPTARG ;;
     t) TYPE=$OPTARG ;;
     *) usage ;;
   esac
 done
 
-/usr/bin/yanet-dataplane-$ARCH-$TYPE -c $CONFIG
+if [ "$BINARY" = "dataplane" ];
+then
+  /usr/bin/yanet-$BINARY-$ARCH-$TYPE -c $CONFIG
+elif [ "$BINARY" = "controlplane" ];
+  /usr/bin/yanet-$BINARY-$ARCH -c $CONFIG
+else
+  false
+fi
