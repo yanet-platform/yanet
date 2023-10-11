@@ -1,0 +1,7 @@
+:BEGIN
+add skipto :IN ip from any to any in
+
+:IN
+add deny udp from any to 2121:bbb8:ff1c:2030::/60 53
+add allow ip from any to 2121:bbb8:ff1c:2030::/60
+add deny ip from any to any
