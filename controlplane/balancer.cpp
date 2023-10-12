@@ -216,7 +216,18 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 
 	for (const auto& [module_name, balancer] : base_prev.balancers)
 	{
-		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
+		for (const auto& [service_id,
+		                  virtual_ip,
+		                  proto,
+		                  virtual_port,
+		                  version,
+		                  scheduler,
+		                  scheduler_params,
+		                  forwarding_method,
+		                  flags,
+		                  ipv4_outer_source_network,
+		                  ipv6_outer_source_network,
+		                  reals] : balancer.services)
 		{
 			(void)service_id;
 			(void)version;
@@ -225,6 +236,8 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 			(void)reals;
 			(void)flags;
 			(void)forwarding_method;
+			(void)ipv4_outer_source_network;
+			(void)ipv6_outer_source_network;
 
 			service_counters.remove({module_name, {virtual_ip, proto, virtual_port}});
 
@@ -248,7 +261,18 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 	{
 		std::unordered_set<std::tuple<common::ip_address_t, uint16_t, uint8_t>> vip_vport_proto;
 
-		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
+		for (const auto& [service_id,
+		                  virtual_ip,
+		                  proto,
+		                  virtual_port,
+		                  version,
+		                  scheduler,
+		                  scheduler_params,
+		                  forwarding_method,
+		                  flags,
+		                  ipv4_outer_source_network,
+		                  ipv6_outer_source_network,
+		                  reals] : balancer.services)
 		{
 			(void)service_id;
 			(void)version;
@@ -256,6 +280,8 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 			(void)scheduler_params;
 			(void)flags;
 			(void)forwarding_method;
+			(void)ipv4_outer_source_network;
+			(void)ipv6_outer_source_network;
 
 			service_counters.insert({module_name, {virtual_ip, proto, virtual_port}});
 
@@ -592,11 +618,24 @@ void balancer_t::update_service(const balancer::generation_config_t& generation_
 		uint64_t services_reals_enabled_count = 0;
 		uint64_t services_reals_count = 0;
 
-		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
+		for (const auto& [service_id,
+		                  virtual_ip,
+		                  proto,
+		                  virtual_port,
+		                  version,
+		                  scheduler,
+		                  scheduler_params,
+		                  forwarding_method,
+		                  flags,
+		                  ipv4_outer_source_network,
+		                  ipv6_outer_source_network,
+		                  reals] : balancer.services)
 		{
 			(void)flags;
 			(void)scheduler_params;
 			(void)forwarding_method;
+			(void)ipv4_outer_source_network;
+			(void)ipv6_outer_source_network;
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
@@ -676,7 +715,18 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 
 	for (const auto& [module_name, balancer] : generation_config.config_balancers)
 	{
-		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
+		for (const auto& [service_id,
+		                  virtual_ip,
+		                  proto,
+		                  virtual_port,
+		                  version,
+		                  scheduler,
+		                  scheduler_params,
+		                  forwarding_method,
+		                  flags,
+		                  ipv4_outer_source_network,
+		                  ipv6_outer_source_network,
+		                  reals] : balancer.services)
 		{
 			(void)scheduler_params;
 			(void)version;
@@ -725,9 +775,12 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 			        counter_ids[0],
 			        scheduler,
 			        forwarding_method,
-			        balancer.default_wlc_power, //todo use scheduler_params.wlc_power when other services will be able to set it
+			        balancer.default_wlc_power, // todo use scheduler_params.wlc_power when other services will be able to set it
 			        (uint32_t)real_start,
-			        (uint32_t)(req_reals.size() - real_start)});
+			        (uint32_t)(req_reals.size() - real_start),
+			        ipv4_outer_source_network,
+			        ipv6_outer_source_network,
+			});
 		}
 	}
 
@@ -745,13 +798,26 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 	for (const auto& [module_name, balancer] : generation_config.config_balancers)
 	{
 
-		for (const auto& [service_id, virtual_ip, proto, virtual_port, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
+		for (const auto& [service_id,
+		                  virtual_ip,
+		                  proto,
+		                  virtual_port,
+		                  version,
+		                  scheduler,
+		                  scheduler_params,
+		                  forwarding_method,
+		                  flags,
+		                  ipv4_outer_source_network,
+		                  ipv6_outer_source_network,
+		                  reals] : balancer.services)
 		{
 			(void)flags;
 			(void)scheduler;
 			(void)scheduler_params;
 			(void)version;
 			(void)forwarding_method;
+			(void)ipv4_outer_source_network;
+			(void)ipv6_outer_source_network;
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
