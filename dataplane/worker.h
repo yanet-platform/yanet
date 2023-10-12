@@ -156,6 +156,8 @@ protected:
 	inline void balancer_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 	inline void balancer_icmp_reply_handle();
 	inline void balancer_icmp_forward_handle();
+	inline void balancer_ipv6_source(rte_ipv6_hdr* header, const ipv6_address_t& balancer, const dataplane::globalBase::balancer_service_t& service, const rte_ipv4_hdr* ipv4HeaderInner, const rte_ipv6_hdr* ipv6HeaderInner);
+	inline void balancer_ipv4_source(rte_ipv4_hdr* header, const ipv4_address_t& balancer, const dataplane::globalBase::balancer_service_t& service);
 
 	/// fw state
 	inline bool acl_try_keepstate(rte_mbuf* mbuf);

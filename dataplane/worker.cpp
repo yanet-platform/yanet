@@ -3881,16 +3881,15 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 
 		rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
 
+		balancer_ipv6_source(ipv6Header, balancer.source_ipv6, service, ipv4HeaderInner, ipv6HeaderInner);
+		rte_memcpy(ipv6Header->dst_addr, real.destination.bytes, 16);
+
 		if (ipv4HeaderInner)
 		{
 			ipv6Header->vtc_flow = rte_cpu_to_be_32((0x6 << 28) | (ipv4HeaderInner->type_of_service << 20)); ///< @todo: flow label
 			ipv6Header->payload_len = ipv4HeaderInner->total_length;
 			ipv6Header->proto = IPPROTO_IPIP;
 			ipv6Header->hop_limits = ipv4HeaderInner->time_to_live;
-
-			rte_memcpy(ipv6Header->src_addr, balancer.source_ipv6.bytes, 16);
-			((uint32_t*)ipv6Header->src_addr)[2] = ipv4HeaderInner->src_addr;
-			rte_memcpy(ipv6Header->dst_addr, real.destination.bytes, 16);
 		}
 		else
 		{
@@ -3898,10 +3897,6 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 			ipv6Header->payload_len = rte_cpu_to_be_16(sizeof(rte_ipv6_hdr) + rte_be_to_cpu_16(ipv6HeaderInner->payload_len));
 			ipv6Header->proto = IPPROTO_IPV6;
 			ipv6Header->hop_limits = ipv6HeaderInner->hop_limits;
-
-			rte_memcpy(ipv6Header->src_addr, balancer.source_ipv6.bytes, 16);
-			((uint32_t*)ipv6Header->src_addr)[2] = ((uint32_t*)ipv6HeaderInner->src_addr)[2] ^ ((uint32_t*)ipv6HeaderInner->src_addr)[3];
-			rte_memcpy(ipv6Header->dst_addr, real.destination.bytes, 16);
 		}
 	}
 	else // IPV4
@@ -3941,7 +3936,7 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 			ipv4Header->next_proto_id = IPPROTO_IPV6;
 		}
 
-		ipv4Header->src_addr = balancer.source_ipv4.address;
+		balancer_ipv4_source(ipv4Header, balancer.source_ipv4, service);
 		ipv4Header->dst_addr = real.destination.mapped_ipv4_address.address;
 
 		yanet_ipv4_checksum(ipv4Header);
@@ -3996,6 +3991,66 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 
 	/// @todo: opt
 	preparePacket(mbuf);
+}
+
+/// Sets the IPv6 source address for the packet, taking into account the address set for the service.
+/// In order to optimize the distribution of packets across the queues of the NIC installed on the servers
+/// to which the packet will be sent, the source address is (if possible) randomized taking into account the mask.
+inline void cWorker::balancer_ipv6_source(rte_ipv6_hdr* header,
+                                          const ipv6_address_t& balancer_src,
+                                          const dataplane::globalBase::balancer_service_t& service,
+                                          const rte_ipv4_hdr* ipv4HeaderInner,
+                                          const rte_ipv6_hdr* ipv6HeaderInner)
+{
+	uint32_t random_src;
+	if (ipv4HeaderInner)
+	{
+		random_src = ipv4HeaderInner->src_addr;
+	}
+	else
+	{
+		random_src = ((uint32_t*)ipv6HeaderInner->src_addr)[2] ^ ((uint32_t*)ipv6HeaderInner->src_addr)[3];
+	}
+
+	if (!(service.outer_source_network_flag & IPv6_OUTER_SOURCE_NETWORK_FLAG))
+	{
+		rte_memcpy(header->src_addr, balancer_src.bytes, 16);
+		((uint32_t*)header->src_addr)[2] = random_src;
+		return;
+	}
+
+	rte_memcpy(header->src_addr, service.ipv6_outer_source_network.address.bytes, 16);
+
+	/// Take the index of the first byte after the mask.
+	uint8_t random_ptr = service.ipv6_outer_source_network.mask / 8;
+	if (service.ipv6_outer_source_network.mask % 8)
+	{
+		random_ptr++;
+	}
+
+	uint8_t n_to_fill = RTE_MIN(sizeof(header->src_addr) - random_ptr, 4);
+
+	/// Fill the first 4 (or less) bytes after the mask with random numbers.
+	rte_memcpy(&header->src_addr[random_ptr], &random_src, n_to_fill);
+
+	/// If the last octet wasn't randomized, then fill it with the last octet of the balancer src address.
+	if (service.ipv6_outer_source_network.mask <= 80)
+	{
+		((uint16_t*)header->src_addr)[7] = ((uint16_t*)balancer_src.bytes)[7];
+	}
+}
+
+/// Sets the IPv4 source address for the packet, taking into account the address set for the service.
+inline void cWorker::balancer_ipv4_source(rte_ipv4_hdr* header,
+                                          const ipv4_address_t& balancer_src,
+                                          const dataplane::globalBase::balancer_service_t& service)
+{
+	if (!(service.outer_source_network_flag & IPv4_OUTER_SOURCE_NETWORK_FLAG))
+	{
+		header->src_addr = balancer_src.address;
+		return;
+	}
+	header->src_addr = service.ipv4_outer_source_network.address.address;
 }
 
 inline void cWorker::balancer_flow(rte_mbuf* mbuf,

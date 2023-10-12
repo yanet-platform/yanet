@@ -265,7 +265,9 @@ using service = std::tuple<balancer_service_id_t, /// service id
                            balancer::forwarding_method, // tunneling method (default ipip)
                            uint32_t, /// default_wlc_power
                            uint32_t, ///< real_start
-                           uint32_t>; ///< real_size
+                           uint32_t, ///< real_size
+                           std::optional<common::ipv4_prefix_t>, ///< ipv4_outer_source_network
+                           std::optional<common::ipv6_prefix_t>>; ///< ipv6_outer_source_network>
 using real = std::tuple<balancer_real_id_t, ///< real id
                         common::ip_address_t,
                         tCounterId>;

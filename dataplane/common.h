@@ -52,6 +52,9 @@
 
 #define YANET_BALANCER_ID_INVALID (0)
 
+#define IPv4_OUTER_SOURCE_NETWORK_FLAG ((uint8_t)(1u << 0))
+#define IPv6_OUTER_SOURCE_NETWORK_FLAG ((uint8_t)(1u << 1))
+
 template<typename TMap,
          typename TValue>
 inline bool existValue(const TMap& map, const TValue& value)

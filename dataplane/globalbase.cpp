@@ -1181,7 +1181,16 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 	}
 	balancer_services_count = 0;
 
-	for (const auto& [balancer_service_id, flags, counter_id, scheduler, forwarding_method, default_wlc_power, real_start, real_size] : services)
+	for (const auto& [balancer_service_id,
+	                  flags,
+	                  counter_id,
+	                  scheduler,
+	                  forwarding_method,
+	                  default_wlc_power,
+	                  real_start,
+	                  real_size,
+	                  ipv4_outer_source_network,
+	                  ipv6_outer_source_network] : services)
 	{
 		if (balancer_service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 		{
@@ -1203,6 +1212,23 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 			return eResult::invalidCount;
 		}
 
+		uint8_t outer_source_network_flag = 0;
+		ipv4_prefix_t ipv4_prefix;
+		if (ipv4_outer_source_network)
+		{
+			outer_source_network_flag |= IPv4_OUTER_SOURCE_NETWORK_FLAG;
+			ipv4_prefix.address = ipv4_prefix.address.convert(ipv4_outer_source_network.value().address());
+			ipv4_prefix.mask = ipv4_outer_source_network.value().mask();
+		}
+
+		ipv6_prefix_t ipv6_prefix;
+		if (ipv6_outer_source_network)
+		{
+			outer_source_network_flag |= IPv6_OUTER_SOURCE_NETWORK_FLAG;
+			ipv6_prefix.address = ipv6_prefix.address.convert(ipv6_outer_source_network.value().address());
+			ipv6_prefix.mask = ipv6_outer_source_network.value().mask();
+		}
+
 		balancer_active_services[balancer_services_count++] = balancer_service_id;
 		auto& balancer_service = balancer_services[balancer_service_id];
 
@@ -1213,6 +1239,9 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		balancer_service.scheduler = scheduler;
 		balancer_service.wlc_power = default_wlc_power;
 		balancer_service.forwarding_method = forwarding_method;
+		balancer_service.outer_source_network_flag = outer_source_network_flag;
+		balancer_service.ipv4_outer_source_network = ipv4_prefix;
+		balancer_service.ipv6_outer_source_network = ipv6_prefix;
 	}
 
 	const auto& reals = std::get<1>(request);

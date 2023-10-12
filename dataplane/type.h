@@ -223,6 +223,18 @@ struct ipv6_address_t
 	};
 };
 
+struct ipv4_prefix_t
+{
+	ipv4_address_t address;
+	uint8_t mask;
+};
+
+struct ipv6_prefix_t
+{
+	ipv6_address_t address;
+	uint8_t mask;
+};
+
 struct tcp_option_t
 {
 	uint8_t kind;
@@ -576,6 +588,15 @@ struct balancer_service_t
 	::balancer::scheduler scheduler;
 	::balancer::forwarding_method forwarding_method;
 	uint32_t wlc_power;
+
+	/*
+		outer_source_network_flag:
+		zero byte stores the state for ipv4_router_source_network
+		first byte stores the state for ipv6_router_source_network
+	*/
+	uint8_t outer_source_network_flag;
+	ipv4_prefix_t ipv4_outer_source_network;
+	ipv6_prefix_t ipv6_outer_source_network;
 };
 
 static_assert(YANET_CONFIG_BALANCER_REALS_SIZE <= 0xFFFFFFFF, "invalid YANET_CONFIG_BALANCER_REALS_SIZE");

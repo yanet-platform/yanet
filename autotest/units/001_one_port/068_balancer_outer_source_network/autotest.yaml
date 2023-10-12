@@ -1,0 +1,62 @@
+steps:
+- ipv4Update: 
+  - "0.0.0.0/0 -> 200.0.0.1"
+  - "100.0.0.0/8 -> 100.0.0.5"
+- ipv6Update: "::/0 -> fe80::1"
+- cli:
+    - balancer real enable balancer0 10.0.0.1 tcp 80 2000::1 80
+    - balancer real enable balancer0 10.0.0.42 tcp 80 100.0.0.42 80
+    - balancer real enable balancer0 2001:dead:beef::1 tcp 80 2000::1 80
+    - balancer real enable balancer0 2001:dead:beef::2 tcp 80 100.0.0.6 80
+    - balancer real enable balancer0 2002:dead:beef::3 tcp 80 2000::2 80
+    - balancer real enable balancer0 2003:dead:beef::3 tcp 80 2000::2 80
+    - balancer real enable balancer0 2004:dead:beef::3 tcp 80 2000::2 80
+    - balancer real enable balancer0 2005:dead:beef::3 tcp 80 2000::2 80
+    - balancer real enable balancer0 2006:dead:beef::3 tcp 80 2000::2 80
+    - balancer real enable balancer0 2007:dead:beef::3 tcp 80 2000::2 80
+    - balancer real enable balancer0 2008:dead:beef::3 tcp 80 2000::2 80
+    - balancer real flush
+- sendPackets:
+    - port: kni0
+      send: 001-send.pcap
+      expect: 001-expect.pcap
+- sendPackets:
+    - port: kni0
+      send: 002-send.pcap
+      expect: 002-expect.pcap
+- sendPackets:
+    - port: kni0
+      send: 003-send.pcap
+      expect: 003-expect.pcap
+- sendPackets:
+    - port: kni0
+      send: 004-send.pcap
+      expect: 004-expect.pcap
+- sendPackets:
+    - port: kni0
+      send: 005-send.pcap
+      expect: 005-expect.pcap
+- sendPackets:
+    - port: kni0
+      send: 006-send.pcap
+      expect: 006-expect.pcap
+- sendPackets:
+    - port: kni0
+      send: 007-send.pcap
+      expect: 007-expect.pcap
+- sendPackets:
+    - port: kni0
+      send: 008-send.pcap
+      expect: 008-expect.pcap
+- sendPackets:
+    - port: kni0
+      send: 009-send.pcap
+      expect: 009-expect.pcap
+- sendPackets:
+    - port: kni0
+      send: 010-send.pcap
+      expect: 010-expect.pcap
+- sendPackets:
+    - port: kni0
+      send: 011-send.pcap
+      expect: 011-expect.pcap

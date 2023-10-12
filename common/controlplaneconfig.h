@@ -310,6 +310,8 @@ using service_t = std::tuple<balancer_service_id_t,
                              ::balancer::scheduler_params,
                              ::balancer::forwarding_method,
                              uint8_t, ///< flags: mss_fix|ops
+                             std::optional<common::ipv4_prefix_t>, ///< ipv4_outer_source_network
+                             std::optional<common::ipv6_prefix_t>, ///< ipv6_outer_source_network
                              std::vector<real_t>>;
 
 class config_t

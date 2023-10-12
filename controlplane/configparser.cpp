@@ -1553,6 +1553,11 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 
 		std::optional<std::string> service_version = exist(service_json, "version") ? std::make_optional(service_json["version"].get<std::string>()) : std::nullopt;
 
+		std::optional<common::ipv4_prefix_t> ipv4_outer_source_network =
+		        exist(service_json, "ipv4_outer_source_network") ? std::make_optional(service_json["ipv4_outer_source_network"].get<std::string>()) : std::nullopt;
+		std::optional<common::ipv6_prefix_t> ipv6_outer_source_network =
+		        exist(service_json, "ipv6_outer_source_network") ? std::make_optional(service_json["ipv6_outer_source_network"].get<std::string>()) : std::nullopt;
+
 		std::string scheduler_string = service_json["scheduler"];
 
 		balancer::scheduler scheduler;
@@ -1653,6 +1658,8 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 		                               scheduler_params,
 		                               forwarding_method,
 		                               flags,
+		                               ipv4_outer_source_network,
+		                               ipv6_outer_source_network,
 		                               reals);
 
 		baseNext.services_count++;

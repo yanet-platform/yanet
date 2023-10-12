@@ -587,7 +587,18 @@ void config_converter_t::processBalancer()
 		                                                                                balancer.source_ipv4,
 		                                                                                balancer.flow});
 
-		for (const auto& [service_id, vip, proto, vport, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
+		for (const auto& [service_id,
+		                  vip,
+		                  proto,
+		                  vport,
+		                  version,
+		                  scheduler,
+		                  scheduler_params,
+		                  forwarding_method,
+		                  flags,
+		                  ipv4_outer_source_network,
+		                  ipv6_outer_source_network,
+		                  reals] : balancer.services)
 		{
 			/// @todo:
 			(void)vip;
@@ -599,6 +610,8 @@ void config_converter_t::processBalancer()
 			(void)reals;
 			(void)version;
 			(void)forwarding_method;
+			(void)ipv4_outer_source_network;
+			(void)ipv6_outer_source_network;
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
@@ -1470,13 +1483,26 @@ void config_converter_t::acl_rules_balancer(controlplane::base::acl_t& acl,
 	auto flow = convertToFlow(nextModule);
 	auto flow_fragment = convertToFlow(nextModule, "fragment"); ///< actually drop
 
-	for (const auto& [service_id, vip, proto, vport, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
+	for (const auto& [service_id,
+	                  vip,
+	                  proto,
+	                  vport,
+	                  version,
+	                  scheduler,
+	                  scheduler_params,
+	                  forwarding_method,
+	                  flags,
+	                  ipv4_outer_source_network,
+	                  ipv6_outer_source_network,
+	                  reals] : balancer.services)
 	{
 		(void)scheduler;
 		(void)scheduler_params;
 		(void)version;
 		(void)flags;
 		(void)forwarding_method;
+		(void)ipv4_outer_source_network;
+		(void)ipv6_outer_source_network;
 
 		if (reals.empty())
 		{
@@ -1551,7 +1577,18 @@ void config_converter_t::acl_rules_balancer_icmp_reply(controlplane::base::acl_t
 
 	auto flow = convertToFlow(nextModule, "icmp_reply");
 
-	for (const auto& [service_id, vip, proto, vport, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
+	for (const auto& [service_id,
+	                  vip,
+	                  proto,
+	                  vport,
+	                  version,
+	                  scheduler,
+	                  scheduler_params,
+	                  forwarding_method,
+	                  flags,
+	                  ipv4_outer_source_network,
+	                  ipv6_outer_source_network,
+	                  reals] : balancer.services)
 	{
 		(void)scheduler;
 		(void)scheduler_params;
@@ -1560,6 +1597,8 @@ void config_converter_t::acl_rules_balancer_icmp_reply(controlplane::base::acl_t
 		(void)vport;
 		(void)version;
 		(void)forwarding_method;
+		(void)ipv4_outer_source_network;
+		(void)ipv6_outer_source_network;
 
 		if (reals.empty())
 		{
@@ -1607,7 +1646,18 @@ void config_converter_t::acl_rules_balancer_icmp_forward(controlplane::base::acl
 	ranges_t icmpv6_forward_types(values_t({ICMP6_DST_UNREACH, ICMP6_TIME_EXCEEDED, ICMP6_PARAM_PROB, ICMP6_PACKET_TOO_BIG}));
 	controlplane::base::acl_rule_transport_icmpv6_t rule_icmpv6_forward(icmpv6_forward_types);
 
-	for (const auto& [service_id, vip, proto, vport, version, scheduler, scheduler_params, forwarding_method, flags, reals] : balancer.services)
+	for (const auto& [service_id,
+	                  vip,
+	                  proto,
+	                  vport,
+	                  version,
+	                  scheduler,
+	                  scheduler_params,
+	                  forwarding_method,
+	                  flags,
+	                  ipv4_outer_source_network,
+	                  ipv6_outer_source_network,
+	                  reals] : balancer.services)
 	{
 		(void)scheduler;
 		(void)scheduler_params;
@@ -1616,6 +1666,8 @@ void config_converter_t::acl_rules_balancer_icmp_forward(controlplane::base::acl
 		(void)vport;
 		(void)version;
 		(void)forwarding_method;
+		(void)ipv4_outer_source_network;
+		(void)ipv6_outer_source_network;
 
 		if (reals.empty())
 		{
