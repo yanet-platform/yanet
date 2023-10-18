@@ -35,10 +35,9 @@ while getopts "h:a:b:c:t:" opt ; do
   esac
 done
 
-if [ "$BINARY" = "dataplane" ];
-then
+if [ "$BINARY" = "dataplane" ]; then
   /usr/bin/yanet-$BINARY-$ARCH-$TYPE -c $CONFIG
-elif [ "$BINARY" = "controlplane" ];
+elif [ "$BINARY" = "controlplane" ]; then
   /usr/bin/yanet-$BINARY-$ARCH -c $CONFIG
 else
   false
