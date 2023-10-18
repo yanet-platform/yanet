@@ -1,15 +1,16 @@
 FROM yanetplatform/builder AS builder
 
-ARG YANET_VERSION_MAJOR
-ARG YANET_VERSION_MINOR
-ARG YANET_VERSION_REVISION
-ARG YANET_VERSION_HASH
-ARG YANET_VERSION_CUSTOM
+ARG YANET_VERSION_MAJOR=0
+ARG YANET_VERSION_MINOR=0
+ARG YANET_VERSION_REVISION=0
+ARG YANET_VERSION_HASH=00000000
+ARG YANET_VERSION_CUSTOM=develop
 
 COPY . /project
 RUN meson setup --prefix=/target \
                 -Dtarget=release \
-                -Dyanet_config=release,firewall,l3balancer \
+                -Dstrip=true \
+                -Dyanet_config=release,firewall,l3balancer,low_memory \
                 -Darch=corei7,broadwell,knl \
                 -Dversion_major=$YANET_VERSION_MAJOR \
                 -Dversion_minor=$YANET_VERSION_MINOR \

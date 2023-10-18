@@ -1,4 +1,5 @@
 .git
+demo
 docker
 build*
 */build*
