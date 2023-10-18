@@ -1377,7 +1377,14 @@ std::map<std::string, common::uint64> cDataPlane::getPortStats(const tPortId& po
 		rte_eth_link link;
 		rte_eth_link_get_nowait(portId, &link);
 
-		result["link_speed"] = link.link_speed;
+		if (link.link_speed == RTE_ETH_SPEED_NUM_UNKNOWN)
+		{
+			result["link_speed"] = RTE_ETH_SPEED_NUM_10G;
+		}
+		else
+		{
+			result["link_speed"] = link.link_speed;
+		}
 		result["link_duplex"] = link.link_duplex;
 		result["link_autoneg"] = link.link_autoneg;
 		result["link_status"] = link.link_status;
