@@ -1,0 +1,17 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    lo:
+      match:
+        name: lo
+      addresses:
+        - 192.168.0.2/32
+        - 2afe::2/128
+    eth0:
+      dhcp4: no
+      addresses:
+        - 10.2.0.2/24
+        - 2000:2::2/64
+      gateway4: 10.2.0.1
+      gateway6: 2000:2::1
