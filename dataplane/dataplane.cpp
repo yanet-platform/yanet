@@ -49,43 +49,6 @@ static void printHugepageMemory(const char* prefix, tSocketId socketId) ///< @to
 	}
 }
 
-YADECAP_UNUSED
-static unsigned int getMaximumSpeed(const rte_eth_dev_info& devInfo)
-{
-	uint32_t speedCapabilities = devInfo.speed_capa;
-
-	if (speedCapabilities & RTE_ETH_LINK_SPEED_100G)
-	{
-		return 100000;
-	}
-	else if (speedCapabilities & RTE_ETH_LINK_SPEED_40G)
-	{
-		return 40000;
-	}
-	else if (speedCapabilities & RTE_ETH_LINK_SPEED_25G)
-	{
-		return 25000;
-	}
-	else if (speedCapabilities & RTE_ETH_LINK_SPEED_10G)
-	{
-		return 10000;
-	}
-	else if (speedCapabilities & RTE_ETH_LINK_SPEED_1G)
-	{
-		return 1000;
-	}
-	else if (speedCapabilities & (RTE_ETH_LINK_SPEED_100M | RTE_ETH_LINK_SPEED_100M_HD))
-	{
-		return 100;
-	}
-	else if (speedCapabilities & (RTE_ETH_LINK_SPEED_10M | RTE_ETH_LINK_SPEED_10M_HD))
-	{
-		return 10;
-	}
-
-	return 0;
-}
-
 cDataPlane::cDataPlane() :
         currentGlobalBaseId(0),
         globalBaseSerial(0),
@@ -508,13 +471,6 @@ eResult cDataPlane::initPorts()
 
 		rte_eth_dev_info devInfo;
 		rte_eth_dev_info_get(portId, &devInfo);
-
-		unsigned int speed = getMaximumSpeed(devInfo);
-		if (!speed)
-		{
-			YADECAP_LOG_ERROR("unsupported device\n");
-			return eResult::unsupportedDevice;
-		}
 
 		rte_eth_conf portConf;
 		memset(&portConf, 0, sizeof(rte_eth_conf));
