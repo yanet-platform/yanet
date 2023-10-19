@@ -343,6 +343,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::dump_physical_port, request);
 		}
+		else if (type == common::idp::requestType::balancer_state_clear)
+		{
+			response = callWithResponse(&cControlPlane::balancer_state_clear, request);
+		}
 		else
 		{
 			stats.errors[(uint32_t)common::idp::errorType::busParse]++;

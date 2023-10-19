@@ -23,6 +23,7 @@ public:
 
 	void run_on_this_thread(const std::function<bool()>& callback);
 	void nat64stateful_state(const common::idp::nat64stateful_state::request& request, common::idp::nat64stateful_state::response& response);
+	void balancer_state_clear();
 
 	void limits(common::idp::limits::response& response) const;
 

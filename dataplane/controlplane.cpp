@@ -1284,6 +1284,17 @@ eResult cControlPlane::dump_physical_port(const common::idp::dump_physical_port:
 	return eResult::success;
 }
 
+eResult cControlPlane::balancer_state_clear()
+{
+	for (auto& [core_id, worker_gc] : dataPlane->worker_gcs)
+	{
+		(void)core_id;
+		worker_gc->balancer_state_clear();
+	}
+
+	return eResult::success;
+}
+
 common::idp::nat64stateful_state::response cControlPlane::nat64stateful_state(const common::idp::nat64stateful_state::request& request)
 {
 	common::idp::nat64stateful_state::response response;
