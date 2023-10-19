@@ -1,0 +1,13 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
+- ipv6Update: "::/0 -> fe80::1"
+- cli:
+  - balancer real enable balancer0 10.0.0.3 tcp 80 2000::1 80
+  - balancer real enable balancer0 10.0.0.3 tcp 80 2000::2 80
+  - balancer real enable balancer0 10.0.0.3 udp 80 2000::3 80
+  - balancer real enable balancer0 10.0.0.3 udp 80 2000::4 80
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap

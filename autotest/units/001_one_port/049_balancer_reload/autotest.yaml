@@ -1,0 +1,147 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
+- ipv6Update: "::/0 -> fe80::1"
+- cli:
+  - latch update dataplane GB_PREUPDATE 1
+- reload_async: controlplane.conf
+- cli:
+  - balancer real enable balancer0 20.1.0.2 tcp 443 2443::1 443
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- cli:
+  - latch update dataplane GB_UPDATE_BALANCER 1
+  - latch update dataplane GB_PREUPDATE 0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  20.1.0.2    tcp    443           wrr        2443::1  443        true     4       4            4        392
+    balancer0  20.1.0.2    tcp    443           wrr        2443::2  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::3  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::4  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::5  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::6  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::7  443        false    4       0            0        0
+- cli:
+  - balancer real enable balancer0 20.1.0.2 tcp 443 2443::2 443
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+- cli:
+  - latch update dataplane GB_SWITCH 1
+  - latch update dataplane GB_UPDATE_BALANCER 0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  20.1.0.2    tcp    443           wrr        2443::1  443        true     4       5            5        490
+    balancer0  20.1.0.2    tcp    443           wrr        2443::2  443        true     4       3            3        294
+    balancer0  20.1.0.2    tcp    443           wrr        2443::3  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::4  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::5  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::6  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::7  443        false    4       0            0        0
+- cli:
+  - balancer real enable balancer0 20.1.0.2 tcp 443 2443::3 443
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+- cli:
+  - latch update dataplane GB_PREUPDATE 1
+  - latch update dataplane GB_SWITCH 0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  20.1.0.2    tcp    443           wrr        2443::1  443        true     4       7            7        686
+    balancer0  20.1.0.2    tcp    443           wrr        2443::2  443        true     4       7            7        686
+    balancer0  20.1.0.2    tcp    443           wrr        2443::3  443        true     4       2            2        196
+    balancer0  20.1.0.2    tcp    443           wrr        2443::4  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::5  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::6  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::7  443        false    4       0            0        0
+- cli:
+  - balancer real enable balancer0 20.1.0.2 tcp 443 2443::4 443
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
+- cli:
+  - latch update dataplane GB_UPDATE_BALANCER 1
+  - latch update dataplane GB_PREUPDATE 0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  20.1.0.2    tcp    443           wrr        2443::1  443        true     4       9            9        882
+    balancer0  20.1.0.2    tcp    443           wrr        2443::2  443        true     4       10           10       980
+    balancer0  20.1.0.2    tcp    443           wrr        2443::3  443        true     4       4            4        392
+    balancer0  20.1.0.2    tcp    443           wrr        2443::4  443        true     4       1            1        98
+    balancer0  20.1.0.2    tcp    443           wrr        2443::5  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::6  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::7  443        false    4       0            0        0
+- cli:
+  - balancer real enable balancer0 20.1.0.2 tcp 443 2443::5 443
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 005-send.pcap
+    expect: 005-expect.pcap
+- cli:
+  - latch update dataplane GB_POSTUPDATE 1
+  - latch update dataplane GB_UPDATE_BALANCER 0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  20.1.0.2    tcp    443           wrr        2443::1  443        true     4       10           10       980
+    balancer0  20.1.0.2    tcp    443           wrr        2443::2  443        true     4       12           12       1176
+    balancer0  20.1.0.2    tcp    443           wrr        2443::3  443        true     4       6            6        588
+    balancer0  20.1.0.2    tcp    443           wrr        2443::4  443        true     4       3            3        294
+    balancer0  20.1.0.2    tcp    443           wrr        2443::5  443        true     4       9            9        882
+    balancer0  20.1.0.2    tcp    443           wrr        2443::6  443        false    4       0            0        0
+    balancer0  20.1.0.2    tcp    443           wrr        2443::7  443        false    4       0            0        0
+- cli:
+  - balancer real enable balancer0 20.1.0.2 tcp 443 2443::6 443
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 006-send.pcap
+    expect: 006-expect.pcap
+- cli:
+  - latch update dataplane GB_POSTUPDATE 0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  20.1.0.2    tcp    443           wrr        2443::1  443        true     4       12           12       1176
+    balancer0  20.1.0.2    tcp    443           wrr        2443::2  443        true     4       16           16       1568
+    balancer0  20.1.0.2    tcp    443           wrr        2443::3  443        true     4       7            7        686
+    balancer0  20.1.0.2    tcp    443           wrr        2443::4  443        true     4       5            5        490
+    balancer0  20.1.0.2    tcp    443           wrr        2443::5  443        true     4       14           14       1372
+    balancer0  20.1.0.2    tcp    443           wrr        2443::6  443        true     4       2            2        196
+    balancer0  20.1.0.2    tcp    443           wrr        2443::7  443        false    4       0            0        0
+- sendPackets:
+  - port: kni0
+    send: 007-send.pcap
+    expect: 007-expect.pcap
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  20.1.0.2    tcp    443           wrr        2443::1  443        true     4       15           15       1470
+    balancer0  20.1.0.2    tcp    443           wrr        2443::2  443        true     4       17           17       1666
+    balancer0  20.1.0.2    tcp    443           wrr        2443::3  443        true     4       12           12       1176
+    balancer0  20.1.0.2    tcp    443           wrr        2443::4  443        true     4       10           10       980
+    balancer0  20.1.0.2    tcp    443           wrr        2443::5  443        true     4       14           14       1372
+    balancer0  20.1.0.2    tcp    443           wrr        2443::6  443        true     4       4            4        392
+    balancer0  20.1.0.2    tcp    443           wrr        2443::7  443        false    4       0            0        0
+

@@ -1,0 +1,46 @@
+steps:
+- ipv4Update:
+  - "100.0.0.0/24 -> 100.0.0.100"
+  - "100.100.20.0/24 -> 100.0.0.100"
+  - "0.0.0.0/0 -> 200.0.0.200"
+- ipv6Update:
+  - "2000::0/16 -> 2000::a"
+  - "2333::0/16 -> 2000::a"
+  - "::/0 -> fe80::1"
+- cli:
+  - balancer real enable balancer0 10.0.0.1 tcp 80 100.0.0.1 80
+  - balancer real enable balancer0 2004:dead:beef::1 tcp 80 2000::2 80
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- reload: controlplane.2.conf
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 005-send.pcap
+    expect: 005-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 006-send.pcap
+    expect: 006-expect.pcap
+- memorize_counter_value:
+    acl_ingress_dropPackets 2
+- sendPackets:
+  - port: kni0
+    send: 007-send.pcap
+    expect: 007-expect.pcap
+- diff_with_kept_counter_value:
+    acl_ingress_dropPackets 2 1

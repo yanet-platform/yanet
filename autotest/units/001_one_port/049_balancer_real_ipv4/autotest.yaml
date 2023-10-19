@@ -1,0 +1,127 @@
+steps:
+- ipv4Update: 
+  - "0.0.0.0/0 -> 200.0.0.1"
+  - "100.0.0.0/8 -> 100.0.0.5"
+- ipv6Update: "::/0 -> fe80::1"
+- cli:
+  - balancer real enable balancer0 10.0.0.16 tcp 80 100.0.0.1 80
+  - balancer real enable balancer0 10.0.0.16 tcp 80 100.0.0.2 80
+  - balancer real enable balancer0 10.0.0.16 udp 80 100.0.0.3 80
+  - balancer real enable balancer0 10.0.0.16 udp 80 100.0.0.4 80
+
+  - balancer real enable balancer0 10.0.0.17 tcp 80 2006::1 80
+  - balancer real enable balancer0 10.0.0.17 tcp 80 2006::2 80
+  - balancer real enable balancer0 10.0.0.17 udp 80 2006::3 80
+  - balancer real enable balancer0 10.0.0.17 udp 80 2006::4 80
+
+  - balancer real enable balancer0 2004:dead:beef::1 tcp 80 100.0.0.6 80
+  - balancer real enable balancer0 2004:dead:beef::1 tcp 80 100.0.0.7 80
+  - balancer real enable balancer0 2004:dead:beef::1 udp 80 100.0.0.8 80
+  - balancer real enable balancer0 2004:dead:beef::1 udp 80 100.0.0.9 80
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sleep: 1
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,dummy_column,virtual_ip,proto,virtual_port,real_ip,real_port,client_ip,client_port balancer state balancer0
+    module     virtual_ip         proto  virtual_port  real_ip    real_port  client_ip  client_port
+    ---------  -----------------  -----  ------------  ---------  ---------  ---------  -----------
+    balancer0  10.0.0.16          tcp    80            100.0.0.1  80         1.1.0.2    12380
+    balancer0  10.0.0.16          tcp    80            100.0.0.1  80         1.1.0.4    12380
+    balancer0  10.0.0.16          tcp    80            100.0.0.2  80         1.1.0.1    12380
+    balancer0  10.0.0.16          tcp    80            100.0.0.2  80         1.1.0.3    12380
+    balancer0  10.0.0.16          udp    80            100.0.0.3  80         1.1.0.1    12380
+    balancer0  10.0.0.16          udp    80            100.0.0.3  80         1.1.0.3    12380
+    balancer0  10.0.0.16          udp    80            100.0.0.4  80         1.1.0.2    12380
+    balancer0  10.0.0.16          udp    80            100.0.0.4  80         1.1.0.4    12380
+    balancer0  10.0.0.17          tcp    80            2006::1    80         1.1.0.2    12380
+    balancer0  10.0.0.17          tcp    80            2006::1    80         1.1.0.4    12380
+    balancer0  10.0.0.17          tcp    80            2006::2    80         1.1.0.1    12380
+    balancer0  10.0.0.17          tcp    80            2006::2    80         1.1.0.3    12380
+    balancer0  10.0.0.17          udp    80            2006::3    80         1.1.0.1    12380
+    balancer0  10.0.0.17          udp    80            2006::3    80         1.1.0.3    12380
+    balancer0  10.0.0.17          udp    80            2006::4    80         1.1.0.2    12380
+    balancer0  10.0.0.17          udp    80            2006::4    80         1.1.0.4    12380
+    balancer0  2004:dead:beef::1  tcp    80            100.0.0.6  80         2002::11   12380
+    balancer0  2004:dead:beef::1  tcp    80            100.0.0.6  80         2002::13   12380
+    balancer0  2004:dead:beef::1  tcp    80            100.0.0.7  80         2002::10   12380
+    balancer0  2004:dead:beef::1  tcp    80            100.0.0.7  80         2002::12   12380
+    balancer0  2004:dead:beef::1  udp    80            100.0.0.8  80         2002::11   12380
+    balancer0  2004:dead:beef::1  udp    80            100.0.0.8  80         2002::13   12380
+    balancer0  2004:dead:beef::1  udp    80            100.0.0.9  80         2002::10   12380
+    balancer0  2004:dead:beef::1  udp    80            100.0.0.9  80         2002::12   12380
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.16
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip    real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  ---------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.16   tcp    80            rr         100.0.0.1  80         true     1       2            2        156
+    balancer0  10.0.0.16   tcp    80            rr         100.0.0.2  80         true     1       2            2        156
+    balancer0  10.0.0.16   tcp    80            rr         100.0.0.3  80         false    1       0            0        0
+    balancer0  10.0.0.16   tcp    80            rr         100.0.0.4  80         false    1       0            0        0
+    balancer0  10.0.0.16   udp    80            rr         100.0.0.1  80         false    1       0            0        0
+    balancer0  10.0.0.16   udp    80            rr         100.0.0.2  80         false    1       0            0        0
+    balancer0  10.0.0.16   udp    80            rr         100.0.0.3  80         true     1       2            2        132
+    balancer0  10.0.0.16   udp    80            rr         100.0.0.4  80         true     1       2            2        132
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.17
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.17   tcp    80            rr         2006::1  80         true     1       2            2        196
+    balancer0  10.0.0.17   tcp    80            rr         2006::2  80         true     1       2            2        196
+    balancer0  10.0.0.17   tcp    80            rr         2006::3  80         false    1       0            0        0
+    balancer0  10.0.0.17   tcp    80            rr         2006::4  80         false    1       0            0        0
+    balancer0  10.0.0.17   udp    80            rr         2006::1  80         false    1       0            0        0
+    balancer0  10.0.0.17   udp    80            rr         2006::2  80         false    1       0            0        0
+    balancer0  10.0.0.17   udp    80            rr         2006::3  80         true     1       2            2        172
+    balancer0  10.0.0.17   udp    80            rr         2006::4  80         true     1       2            2        172
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 2004:dead:beef::1
+    module     virtual_ip         proto  virtual_port  scheduler  real_ip    real_port  enabled  weight  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  ---------  ---------  -------  ------  -----------  -------  -----
+    balancer0  2004:dead:beef::1  tcp    80            rr         100.0.0.6  80         true     1       2            2        196
+    balancer0  2004:dead:beef::1  tcp    80            rr         100.0.0.7  80         true     1       2            2        196
+    balancer0  2004:dead:beef::1  tcp    80            rr         100.0.0.8  80         false    1       0            0        0
+    balancer0  2004:dead:beef::1  tcp    80            rr         100.0.0.9  80         false    1       0            0        0
+    balancer0  2004:dead:beef::1  udp    80            rr         100.0.0.6  80         false    1       0            0        0
+    balancer0  2004:dead:beef::1  udp    80            rr         100.0.0.7  80         false    1       0            0        0
+    balancer0  2004:dead:beef::1  udp    80            rr         100.0.0.8  80         true     1       2            2        172
+    balancer0  2004:dead:beef::1  udp    80            rr         100.0.0.9  80         true     1       2            2        172
+- sleep: 59
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.16
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip    real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  ---------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.16   tcp    80            rr         100.0.0.1  80         true     1       0            2        156
+    balancer0  10.0.0.16   tcp    80            rr         100.0.0.2  80         true     1       0            2        156
+    balancer0  10.0.0.16   tcp    80            rr         100.0.0.3  80         false    1       0            0        0
+    balancer0  10.0.0.16   tcp    80            rr         100.0.0.4  80         false    1       0            0        0
+    balancer0  10.0.0.16   udp    80            rr         100.0.0.1  80         false    1       0            0        0
+    balancer0  10.0.0.16   udp    80            rr         100.0.0.2  80         false    1       0            0        0
+    balancer0  10.0.0.16   udp    80            rr         100.0.0.3  80         true     1       0            2        132
+    balancer0  10.0.0.16   udp    80            rr         100.0.0.4  80         true     1       0            2        132
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.17
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.17   tcp    80            rr         2006::1  80         true     1       0            2        196
+    balancer0  10.0.0.17   tcp    80            rr         2006::2  80         true     1       0            2        196
+    balancer0  10.0.0.17   tcp    80            rr         2006::3  80         false    1       0            0        0
+    balancer0  10.0.0.17   tcp    80            rr         2006::4  80         false    1       0            0        0
+    balancer0  10.0.0.17   udp    80            rr         2006::1  80         false    1       0            0        0
+    balancer0  10.0.0.17   udp    80            rr         2006::2  80         false    1       0            0        0
+    balancer0  10.0.0.17   udp    80            rr         2006::3  80         true     1       0            2        172
+    balancer0  10.0.0.17   udp    80            rr         2006::4  80         true     1       0            2        172
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 2004:dead:beef::1
+    module     virtual_ip         proto  virtual_port  scheduler  real_ip    real_port  enabled  weight  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  ---------  ---------  -------  ------  -----------  -------  -----
+    balancer0  2004:dead:beef::1  tcp    80            rr         100.0.0.6  80         true     1       0            2        196
+    balancer0  2004:dead:beef::1  tcp    80            rr         100.0.0.7  80         true     1       0            2        196
+    balancer0  2004:dead:beef::1  tcp    80            rr         100.0.0.8  80         false    1       0            0        0
+    balancer0  2004:dead:beef::1  tcp    80            rr         100.0.0.9  80         false    1       0            0        0
+    balancer0  2004:dead:beef::1  udp    80            rr         100.0.0.6  80         false    1       0            0        0
+    balancer0  2004:dead:beef::1  udp    80            rr         100.0.0.7  80         false    1       0            0        0
+    balancer0  2004:dead:beef::1  udp    80            rr         100.0.0.8  80         true     1       0            2        172
+    balancer0  2004:dead:beef::1  udp    80            rr         100.0.0.9  80         true     1       0            2        172

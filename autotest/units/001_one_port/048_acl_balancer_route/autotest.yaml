@@ -1,0 +1,296 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
+- ipv6Update: "::/0 -> fe80::1"
+- cli:
+  - balancer real enable balancer0 10.0.0.1 tcp 80 2000::1 80
+  - balancer real enable balancer0 2001:dead:beef::1 tcp 80 2000::2 80
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- cli:
+  - balancer real enable balancer0 10.0.0.1 tcp 80 2000::2 80
+  - balancer real enable balancer0 2001:dead:beef::1 tcp 80 2000::1 80
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+- cli:
+  - balancer real enable balancer0 10.0.0.2 tcp 80 2000::1 80
+  - balancer real enable balancer0 10.0.0.2 tcp 80 2000::2 80
+  - balancer real enable balancer0 10.0.0.2 tcp 80 2000::3 80
+  - balancer real enable balancer0 10.0.0.2 tcp 80 2000::4 80
+  - balancer real enable balancer0 10.0.0.2 tcp 443 2443::1 443
+  - balancer real enable balancer0 10.0.0.2 tcp 443 2443::2 443
+  - balancer real enable balancer0 10.0.0.2 tcp 443 2443::3 443
+  - balancer real enable balancer0 10.0.0.2 tcp 443 2443::4 443
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 005-send.pcap
+    expect: 005-expect.pcap
+- sleep: 4
+- cli_check: |
+    balancer
+    module     services  reals_enabled  reals  connections  next_module
+    ---------  --------  -------------  -----  -----------  -----------
+    balancer0  4         12             12     32           route0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,connections,packets,bytes balancer service any
+    module     virtual_ip         proto  virtual_port  scheduler  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  -----------  -------  -----
+    balancer0  10.0.0.1           tcp    80            rr         8            12       1176
+    balancer0  10.0.0.2           tcp    80            rr         8            8        784
+    balancer0  10.0.0.2           tcp    443           rr         8            8        784
+    balancer0  2001:dead:beef::1  tcp    80            rr         8            12       1416
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,connections,packets,bytes balancer service balancer0 10.0.0.2
+    module     virtual_ip  proto  virtual_port  scheduler  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -----------  -------  -----
+    balancer0  10.0.0.2    tcp    80            rr         8            8        784
+    balancer0  10.0.0.2    tcp    443           rr         8            8        784
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,connections,packets,bytes balancer service balancer0 10.0.0.2 tcp 80
+    module     virtual_ip  proto  virtual_port  scheduler  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -----------  -------  -----
+    balancer0  10.0.0.2    tcp    80            rr         8            8        784
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip         proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.1           tcp    80            rr         2000::1  80         true     1       7            11       1078
+    balancer0  10.0.0.1           tcp    80            rr         2000::2  80         true     1       1            1        98
+    balancer0  10.0.0.2           tcp    80            rr         2000::1  80         true     1       2            2        196
+    balancer0  10.0.0.2           tcp    80            rr         2000::2  80         true     1       2            2        196
+    balancer0  10.0.0.2           tcp    80            rr         2000::3  80         true     1       1            1        98
+    balancer0  10.0.0.2           tcp    80            rr         2000::4  80         true     1       3            3        294
+    balancer0  10.0.0.2           tcp    443           rr         2443::1  443        true     1       1            1        98
+    balancer0  10.0.0.2           tcp    443           rr         2443::2  443        true     1       3            3        294
+    balancer0  10.0.0.2           tcp    443           rr         2443::3  443        true     1       2            2        196
+    balancer0  10.0.0.2           tcp    443           rr         2443::4  443        true     1       2            2        196
+    balancer0  2001:dead:beef::1  tcp    80            rr         2000::1  80         true     1       1            2        236
+    balancer0  2001:dead:beef::1  tcp    80            rr         2000::2  80         true     1       7            10       1180
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.1 tcp 80
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.1    tcp    80            rr         2000::1  80         true     1       7            11       1078
+    balancer0  10.0.0.1    tcp    80            rr         2000::2  80         true     1       1            1        98
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.1 tcp 80 2000::1
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.1    tcp    80            rr         2000::1  80         true     1       7            11       1078
+- cli:
+  - balancer real disable balancer0 10.0.0.1 tcp 80 2000::1 80
+  - balancer real disable balancer0 2001:dead:beef::1 tcp 80 2000::2 80
+  - balancer real disable balancer0 10.0.0.1 tcp 80 2000::2 80
+  - balancer real disable balancer0 2001:dead:beef::1 tcp 80 2000::1 80
+  - balancer real disable balancer0 10.0.0.2 tcp 80 2000::1 80
+  - balancer real disable balancer0 10.0.0.2 tcp 80 2000::2 80
+  - balancer real disable balancer0 10.0.0.2 tcp 80 2000::3 80
+  - balancer real disable balancer0 10.0.0.2 tcp 80 2000::4 80
+  - balancer real disable balancer0 10.0.0.2 tcp 443 2443::1 443
+  - balancer real disable balancer0 10.0.0.2 tcp 443 2443::2 443
+  - balancer real disable balancer0 10.0.0.2 tcp 443 2443::3 443
+  - balancer real disable balancer0 10.0.0.2 tcp 443 2443::4 443
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 006-send.pcap
+    expect: 006-expect.pcap
+- cli:
+  - balancer real enable balancer0 10.0.0.1 tcp 80 2000::1 80
+  - balancer real enable balancer0 2001:dead:beef::1 tcp 80 2000::2 80
+  - balancer real enable balancer0 10.0.0.1 tcp 80 2000::2 80
+  - balancer real enable balancer0 2001:dead:beef::1 tcp 80 2000::1 80
+  - balancer real enable balancer0 10.0.0.2 tcp 80 2000::1 80
+  - balancer real enable balancer0 10.0.0.2 tcp 80 2000::2 80
+  - balancer real enable balancer0 10.0.0.2 tcp 80 2000::3 80
+  - balancer real enable balancer0 10.0.0.2 tcp 80 2000::4 80
+  - balancer real enable balancer0 10.0.0.2 tcp 443 2443::1 443
+  - balancer real enable balancer0 10.0.0.2 tcp 443 2443::2 443
+  - balancer real enable balancer0 10.0.0.2 tcp 443 2443::3 443
+  - balancer real enable balancer0 10.0.0.2 tcp 443 2443::4 443
+  - balancer real flush
+- sendPackets:
+  - port: kni0
+    send: 007-send.pcap
+    expect: 007-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 008-send.pcap
+    expect: 008-expect.pcap
+- values:
+  - controlplane balancer.reals_unordered.size 12
+  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.real_counters.size 12
+- cli:
+  - balancer real disable balancer0 10.0.0.1 tcp 80 2000::1 80
+  - balancer real disable balancer0 2001:dead:beef::1 tcp 80 2000::2 80
+  - balancer real disable balancer0 10.0.0.1 tcp 80 2000::2 80
+  - balancer real disable balancer0 2001:dead:beef::1 tcp 80 2000::1 80
+  - balancer real disable balancer0 10.0.0.2 tcp 80 2000::1 80
+  - balancer real disable balancer0 10.0.0.2 tcp 80 2000::2 80
+  - balancer real disable balancer0 10.0.0.2 tcp 80 2000::3 80
+  - balancer real disable balancer0 10.0.0.2 tcp 80 2000::4 80
+  - balancer real disable balancer0 10.0.0.2 tcp 443 2443::1 443
+  - balancer real disable balancer0 10.0.0.2 tcp 443 2443::2 443
+  - balancer real disable balancer0 10.0.0.2 tcp 443 2443::3 443
+  - balancer real disable balancer0 10.0.0.2 tcp 443 2443::4 443
+  - balancer real flush
+- sleep: 4
+- cli_check: |
+    balancer
+    module     services  reals_enabled  reals  connections  next_module
+    ---------  --------  -------------  -----  -----------  -----------
+    balancer0  4         0              12     32           route0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,connections,packets,bytes balancer service any
+    module     virtual_ip         proto  virtual_port  scheduler  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  -----------  -------  -----
+    balancer0  10.0.0.1           tcp    80            rr         8            16       1568
+    balancer0  10.0.0.2           tcp    80            rr         8            8        784
+    balancer0  10.0.0.2           tcp    443           rr         8            8        784
+    balancer0  2001:dead:beef::1  tcp    80            rr         8            16       1888
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,connections,packets,bytes balancer service balancer0 10.0.0.2
+    module     virtual_ip  proto  virtual_port  scheduler  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -----------  -------  -----
+    balancer0  10.0.0.2    tcp    80            rr         8            8        784
+    balancer0  10.0.0.2    tcp    443           rr         8            8        784
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,connections,packets,bytes balancer service balancer0 10.0.0.2 tcp 80
+    module     virtual_ip  proto  virtual_port  scheduler  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -----------  -------  -----
+    balancer0  10.0.0.2    tcp    80            rr         8            8        784
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip         proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.1           tcp    80            rr         2000::1  80         false    1       7            15       1470
+    balancer0  10.0.0.1           tcp    80            rr         2000::2  80         false    1       1            1        98
+    balancer0  10.0.0.2           tcp    80            rr         2000::1  80         false    1       2            2        196
+    balancer0  10.0.0.2           tcp    80            rr         2000::2  80         false    1       2            2        196
+    balancer0  10.0.0.2           tcp    80            rr         2000::3  80         false    1       1            1        98
+    balancer0  10.0.0.2           tcp    80            rr         2000::4  80         false    1       3            3        294
+    balancer0  10.0.0.2           tcp    443           rr         2443::1  443        false    1       1            1        98
+    balancer0  10.0.0.2           tcp    443           rr         2443::2  443        false    1       3            3        294
+    balancer0  10.0.0.2           tcp    443           rr         2443::3  443        false    1       2            2        196
+    balancer0  10.0.0.2           tcp    443           rr         2443::4  443        false    1       2            2        196
+    balancer0  2001:dead:beef::1  tcp    80            rr         2000::1  80         false    1       1            3        354
+    balancer0  2001:dead:beef::1  tcp    80            rr         2000::2  80         false    1       7            13       1534
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.1 tcp 80
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.1    tcp    80            rr         2000::1  80         false    1       7            15       1470
+    balancer0  10.0.0.1    tcp    80            rr         2000::2  80         false    1       1            1        98
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.1 tcp 80 2000::1
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.1    tcp    80            rr         2000::1  80         false    1       7            15       1470
+- values:
+  - controlplane balancer.reals_unordered.size 12
+  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.real_counters.size 12
+- reload: controlplane.2.conf
+- values:
+  - controlplane balancer.reals_unordered.size 12
+  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.real_counters.size 12
+- sleep: 10
+- values:
+  - controlplane balancer.reals_unordered.size 12
+  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.real_counters.size 12
+- sleep: 90
+- values:
+  - controlplane balancer.reals_unordered.size 12
+  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.real_counters.size 12
+- reload: controlplane.2.conf
+- values:
+  - controlplane balancer.reals_unordered.size 0
+  - controlplane balancer.reals_unordered_ids_unused.size 1023
+  - controlplane balancer.real_counters.size 0
+- reload: controlplane.2.conf
+- values:
+  - controlplane balancer.reals_unordered.size 0
+  - controlplane balancer.reals_unordered_ids_unused.size 1023
+  - controlplane balancer.real_counters.size 0
+- reload: controlplane.conf
+- values:
+  - controlplane balancer.reals_unordered.size 12
+  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.real_counters.size 12
+- reload: controlplane.2.conf
+- sleep: 30
+- reload: controlplane.conf
+- values:
+  - controlplane balancer.reals_unordered.size 12
+  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.real_counters.size 12
+- sleep: 4
+- cli_check: |
+    balancer
+    module     services  reals_enabled  reals  connections  next_module
+    ---------  --------  -------------  -----  -----------  -----------
+    balancer0  4         0              12     0            route0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,connections,packets,bytes balancer service any
+    module     virtual_ip         proto  virtual_port  scheduler  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  -----------  -------  -----
+    balancer0  10.0.0.1           tcp    80            rr         0            0        0
+    balancer0  10.0.0.2           tcp    80            rr         0            0        0
+    balancer0  10.0.0.2           tcp    443           rr         0            0        0
+    balancer0  2001:dead:beef::1  tcp    80            rr         0            0        0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,connections,packets,bytes balancer service balancer0 10.0.0.2
+    module     virtual_ip  proto  virtual_port  scheduler  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -----------  -------  -----
+    balancer0  10.0.0.2    tcp    80            rr         0            0        0
+    balancer0  10.0.0.2    tcp    443           rr         0            0        0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,connections,packets,bytes balancer service balancer0 10.0.0.2 tcp 80
+    module     virtual_ip  proto  virtual_port  scheduler  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -----------  -------  -----
+    balancer0  10.0.0.2    tcp    80            rr         0            0        0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip         proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.1           tcp    80            rr         2000::1  80         false    1       0            0        0
+    balancer0  10.0.0.1           tcp    80            rr         2000::2  80         false    1       0            0        0
+    balancer0  10.0.0.2           tcp    80            rr         2000::1  80         false    1       0            0        0
+    balancer0  10.0.0.2           tcp    80            rr         2000::2  80         false    1       0            0        0
+    balancer0  10.0.0.2           tcp    80            rr         2000::3  80         false    1       0            0        0
+    balancer0  10.0.0.2           tcp    80            rr         2000::4  80         false    1       0            0        0
+    balancer0  10.0.0.2           tcp    443           rr         2443::1  443        false    1       0            0        0
+    balancer0  10.0.0.2           tcp    443           rr         2443::2  443        false    1       0            0        0
+    balancer0  10.0.0.2           tcp    443           rr         2443::3  443        false    1       0            0        0
+    balancer0  10.0.0.2           tcp    443           rr         2443::4  443        false    1       0            0        0
+    balancer0  2001:dead:beef::1  tcp    80            rr         2000::1  80         false    1       0            0        0
+    balancer0  2001:dead:beef::1  tcp    80            rr         2000::2  80         false    1       0            0        0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.1 tcp 80
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.1    tcp    80            rr         2000::1  80         false    1       0            0        0
+    balancer0  10.0.0.1    tcp    80            rr         2000::2  80         false    1       0            0        0
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.1 tcp 80 2000::1
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.1    tcp    80            rr         2000::1  80         false    1       0            0        0

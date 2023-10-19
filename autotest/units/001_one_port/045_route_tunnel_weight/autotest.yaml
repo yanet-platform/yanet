@@ -1,0 +1,291 @@
+steps:
+- rib_insert:
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 88.88.88.1
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1001
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:10
+      prefixes:
+      - nexthop: 88.88.88.1
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.1:10002
+        labels:
+        - 1010
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:100
+      prefixes:
+      - nexthop: 88.88.88.1
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.1:10003
+        labels:
+        - 1100
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:5
+      prefixes:
+      - nexthop: 88.88.88.2
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.2:10001
+        labels:
+        - 2005
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:50
+      prefixes:
+      - nexthop: 88.88.88.2
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.2:10002
+        labels:
+        - 2050
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:100
+      prefixes:
+      - nexthop: 88.88.88.2
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.2:10003
+        labels:
+        - 2100
+    - table_name: ipv6 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 8888::1
+        prefix: 7e57::/64
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1001
+    - table_name: ipv6 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:10
+      prefixes:
+      - nexthop: 8888::1
+        prefix: 7e57::/64
+        path_information: 88.88.88.1:10002
+        labels:
+        - 1010
+    - table_name: ipv6 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:100
+      prefixes:
+      - nexthop: 8888::1
+        prefix: 7e57::/64
+        path_information: 88.88.88.1:10003
+        labels:
+        - 1100
+    - table_name: ipv6 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:5
+      prefixes:
+      - nexthop: 8888::2
+        prefix: 7e57::/64
+        path_information: 88.88.88.2:10001
+        labels:
+        - 2005
+    - table_name: ipv6 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:50
+      prefixes:
+      - nexthop: 8888::2
+        prefix: 7e57::/64
+        path_information: 88.88.88.2:10002
+        labels:
+        - 2050
+    - table_name: ipv6 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:100
+      prefixes:
+      - nexthop: 8888::2
+        prefix: 7e57::/64
+        path_information: 88.88.88.2:10003
+        labels:
+        - 2100
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:100
+      prefixes:
+      - nexthop: 88.88.88.1
+        prefix: 1.0.0.251/32
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1100
+      - nexthop: 88.88.88.2
+        prefix: 1.0.0.251/32
+        path_information: 88.88.88.2:10001
+        labels:
+        - 2100
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:4000000
+      prefixes:
+      - nexthop: 88.88.88.1
+        prefix: 1.0.0.251/32
+        path_information: 88.88.88.1:10002
+        labels:
+        - 1400
+      - nexthop: 88.88.88.2
+        prefix: 1.0.0.251/32
+        path_information: 88.88.88.2:10002
+        labels:
+        - 2400
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:4000000
+      prefixes:
+      - nexthop: 88.88.88.1
+        prefix: 1.0.0.250/32
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1400
+      - nexthop: 88.88.88.2
+        prefix: 1.0.0.250/32
+        path_information: 88.88.88.2:10001
+        labels:
+        - 2400
+    - table_name: ipv6 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:100
+      prefixes:
+      - nexthop: 8888::1
+        prefix: 7e57::fffb/128
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1100
+      - nexthop: 8888::2
+        prefix: 7e57::fffb/128
+        path_information: 88.88.88.2:10001
+        labels:
+        - 2100
+    - table_name: ipv6 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:4000000
+      prefixes:
+      - nexthop: 8888::1
+        prefix: 7e57::fffb/128
+        path_information: 88.88.88.1:10002
+        labels:
+        - 1400
+      - nexthop: 8888::2
+        prefix: 7e57::fffb/128
+        path_information: 88.88.88.2:10002
+        labels:
+        - 2400
+    - table_name: ipv6 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:4000000
+      prefixes:
+      - nexthop: 8888::1
+        prefix: 7e57::fffa/128
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1400
+      - nexthop: 8888::2
+        prefix: 7e57::fffa/128
+        path_information: 88.88.88.2:10001
+        labels:
+        - 2400
+- ipv4Update:
+  - "0.0.0.0/0 -> 100.0.0.1 200.0.0.1"
+- ipv6Update:
+  - "::/0 -> c0de::100:1 c0de::200:1"
+- cli_check: |
+    route tunnel lookup route0 1.0.0.1
+    ingress_physical_ports  prefix      nexthop     label  egress_interface  peer  weight (%)
+    ----------------------  ----------  ----------  -----  ----------------  ----  ----------
+    kni0                    1.0.0.0/24  88.88.88.1  1001   kni0.100          A     0.19
+    kni0                    1.0.0.0/24  88.88.88.1  1001   kni0.200          A     0.19
+    kni0                    1.0.0.0/24  88.88.88.1  1010   kni0.100          B     1.88
+    kni0                    1.0.0.0/24  88.88.88.1  1010   kni0.200          B     1.88
+    kni0                    1.0.0.0/24  88.88.88.1  1100   kni0.100          C     18.80
+    kni0                    1.0.0.0/24  88.88.88.1  1100   kni0.200          C     18.80
+    kni0                    1.0.0.0/24  88.88.88.2  2005   kni0.100          A     0.94
+    kni0                    1.0.0.0/24  88.88.88.2  2005   kni0.200          A     0.94
+    kni0                    1.0.0.0/24  88.88.88.2  2050   kni0.100          B     9.40
+    kni0                    1.0.0.0/24  88.88.88.2  2050   kni0.200          B     9.40
+    kni0                    1.0.0.0/24  88.88.88.2  2100   kni0.100          C     18.80
+    kni0                    1.0.0.0/24  88.88.88.2  2100   kni0.200          C     18.80
+- cli_check: |
+    route tunnel lookup route0 7e57::1
+    ingress_physical_ports  prefix     nexthop  label  egress_interface  peer  weight (%)
+    ----------------------  ---------  -------  -----  ----------------  ----  ----------
+    kni0                    7e57::/64  8888::1  1001   kni0.100          A     0.19
+    kni0                    7e57::/64  8888::1  1001   kni0.200          A     0.19
+    kni0                    7e57::/64  8888::1  1010   kni0.100          B     1.88
+    kni0                    7e57::/64  8888::1  1010   kni0.200          B     1.88
+    kni0                    7e57::/64  8888::1  1100   kni0.100          C     18.80
+    kni0                    7e57::/64  8888::1  1100   kni0.200          C     18.80
+    kni0                    7e57::/64  8888::2  2005   kni0.100          A     0.94
+    kni0                    7e57::/64  8888::2  2005   kni0.200          A     0.94
+    kni0                    7e57::/64  8888::2  2050   kni0.100          B     9.40
+    kni0                    7e57::/64  8888::2  2050   kni0.200          B     9.40
+    kni0                    7e57::/64  8888::2  2100   kni0.100          C     18.80
+    kni0                    7e57::/64  8888::2  2100   kni0.200          C     18.80
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 005-send.pcap
+    expect: 005-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 006-send.pcap
+    expect: 006-expect.pcap

@@ -1,0 +1,3 @@
+:BEGIN
+add deny ip from any to any
+
