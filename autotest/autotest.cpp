@@ -1441,6 +1441,11 @@ void tAutotest::mainThread()
 			std::abort();
 		}
 
+		/// clear dataplane states
+		{
+			dataPlane.balancer_state_clear();
+		}
+
 		YANET_LOG_PRINT(ANSI_COLOR_GREEN "done '%s'\n\n" ANSI_COLOR_RESET, configFilePath.data());
 		fflush(stdout);
 		fflush(stderr);
