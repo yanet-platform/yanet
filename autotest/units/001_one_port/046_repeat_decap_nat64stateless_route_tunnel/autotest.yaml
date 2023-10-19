@@ -1,0 +1,47 @@
+steps:
+- rib_insert:
+    tables:
+    - table_name: ipv4 unicast
+      prefixes:
+      - nexthop: 200.0.0.1
+        prefix: 0.0.0.0/0
+    - table_name: ipv4 mpls-vpn
+      large_communities:
+      - 13238:1:10
+      prefixes:
+      - nexthop: 88.88.88.1
+        prefix: 1.1.0.0/16
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1010
+      - nexthop: 88.88.88.1
+        prefix: 10.0.0.0/8
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1020
+      - nexthop: 88.88.88.1
+        prefix: 10.0.0.0/32
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1030
+    - table_name: ipv6 unicast
+      prefixes:
+      - nexthop: fe80::1
+        prefix: ::/0
+    - table_name: ipv6 unicast
+      large_communities:
+      - 13238:1:10
+      prefixes:
+      - nexthop: 8888::1
+        prefix: 2000::/128
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1040
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap

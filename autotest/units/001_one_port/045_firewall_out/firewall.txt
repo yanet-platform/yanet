@@ -1,0 +1,54 @@
+:BEGIN
+add allow ip from any to any via lp0.100
+
+add skipto :SKP1_IN ip from any to any via lp0.200 in
+add skipto :SKP1 ip from any to any via lp0.200
+
+add allow { udp or tcp } from { 1.1.1.2 or 2222:898::/32 } to { 2.2.2.2 or 2222:898:0:1429::ad2 } domain in
+add allow { udp or tcp } from { 2.2.2.2 or 2222:898:0:1429::ad2 } domain to { 1.1.1.2 or 2222:898::/32 } out
+
+add allow ip from any to any icmp6types 133,134,135,136 in
+
+add skipto :SKP1_IN ip from 2222:898:c00::/40 to any in
+add skipto :SKP1 ip from any to 2222:898:c00::/40 out
+
+add skipto :SKP2_IN ip from any to any via lp0.300 in
+add skipto :SKP2 ip from any to any via lp0.300
+
+add deny ip from any to any
+
+:SKP1
+add allow tcp from any to { 1.1.1.2 or 2222:898::3f4 } 80,443
+add allow { udp or tcp } from { 1.1.1.2 or 2222:898::/32 } to { 2.2.2.2 or 2222:898:0:1429::ad2 } domain
+add allow ip from any to 2222:898::/32 icmp6types 1,2,3,4,128,129,133,134,135,136 out
+
+add allow ip from any to any frag
+add deny tcp from any to any tcpflags rst
+add allow tcp from any to any established
+add deny ip from any to any
+
+:SKP1_IN
+add allow ip from { 1.1.1.2 or 2222:898::/32 } to any
+
+add allow ip from any to any frag
+add deny tcp from any to any tcpflags rst
+add allow tcp from any to any established
+add deny ip from any to any
+
+:SKP2
+add allow tcp from f805@2222:898:c00::/40 to { 2222:898:bf00:400::1 } 443
+
+add allow tcp from f805@2222:898:c00::/40 to { 2222:898:bf00:400::2 } 443 keep-state
+
+add allow ip from any to any frag
+add deny tcp from any to any tcpflags rst
+add allow tcp from any to any established
+add deny ip from any to any
+
+:SKP2_IN
+add allow ip from { 1.1.1.3 or 2222:898:bf00:400::/56 } to { 1.1.1.2 or 2222:898::/32 }
+
+add allow ip from any to any frag
+add deny tcp from any to any tcpflags rst
+add allow tcp from any to any established
+add deny ip from any to any

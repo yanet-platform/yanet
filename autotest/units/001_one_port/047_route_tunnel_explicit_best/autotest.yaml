@@ -1,0 +1,173 @@
+steps:
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 0.0.0.0
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 88.88.88.1
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1100
+      - nexthop: 88.88.88.2
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.2:10001
+        labels:
+        - 1200
+    - table_name: ipv4 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 88.88.88.1
+        prefix: 1.0.0.254/32
+        path_information: 88.88.88.1:11000
+        labels:
+        - 1100
+      - nexthop: 88.88.88.2
+        prefix: 1.0.0.254/32
+        path_information: 88.88.88.2:11001
+        labels:
+        - 1200
+    - table_name: ipv6 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 8888::1
+        prefix: 7e57::/64
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1100
+      - nexthop: 8888::2
+        prefix: 7e57::/64
+        path_information: 88.88.88.2:10001
+        labels:
+        - 1200
+      - nexthop: 8888::1
+        prefix: 7e57::fffe/128
+        path_information: 88.88.88.1:9999
+        labels:
+        - 1100
+      - nexthop: 8888::2
+        prefix: 7e57::fffe/128
+        path_information: 88.88.88.2:15000
+        labels:
+        - 1200
+- rib_insert:
+    tables:
+    - table_name: ipv4 mpls-vpn
+      med: 100
+      large_communities:
+      - 13238:1:1
+      - 13238:1000:1
+      prefixes:
+      - nexthop: 88.88.88.111
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.111:10001
+        labels:
+        - 11100
+    - table_name: ipv4 mpls-vpn
+      med: 200
+      large_communities:
+      - 13238:1:1
+      - 13238:1000:1
+      prefixes:
+      - nexthop: 88.88.88.222
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.222:10001
+        labels:
+        - 11200
+    - table_name: ipv4 mpls-vpn
+      med: 1
+      large_communities:
+      - 13238:1:1
+      - 13238:1000:2
+      prefixes:
+      - nexthop: 88.88.88.166
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.166:10001
+        labels:
+        - 11166
+      - nexthop: 88.88.88.66
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.66:10001
+        labels:
+        - 11266
+    - table_name: ipv6 mpls-vpn
+      med: 100
+      large_communities:
+      - 13238:1:1
+      - 13238:1000:1
+      prefixes:
+      - nexthop: 8888::111
+        prefix: 7e57::/64
+        path_information: 88.88.88.111:10001
+        labels:
+        - 11100
+    - table_name: ipv6 mpls-vpn
+      med: 200
+      large_communities:
+      - 13238:1:1
+      - 13238:1000:1
+      prefixes:
+      - nexthop: 8888::222
+        prefix: 7e57::/64
+        path_information: 88.88.88.222:10001
+        labels:
+        - 11200
+    - table_name: ipv6 mpls-vpn
+      med: 1
+      large_communities:
+      - 13238:1:1
+      - 13238:1000:2
+      prefixes:
+      - nexthop: 8888::166
+        prefix: 7e57::/64
+        path_information: 88.88.88.166:10001
+        labels:
+        - 11166
+      - nexthop: 8888::66
+        prefix: 7e57::/64
+        path_information: 88.88.88.66:10001
+        labels:
+        - 11266
+- ipv4Update:
+  - "0.0.0.0/0 -> 100.0.0.1 200.0.0.1"
+- ipv6Update:
+  - "::/0 -> c0de::100:1 c0de::200:1"
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 005-send.pcap
+    expect: 005-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 006-send.pcap
+    expect: 006-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 007-send.pcap
+    expect: 007-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 008-send.pcap
+    expect: 008-expect.pcap
