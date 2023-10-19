@@ -38,6 +38,10 @@ foreach arch : archs
 
     cpp_args_append = ['-march=' + arch]
 
+    if yanet_configs.length() == 1
+        cpp_args_append += '-DYANET_CONFIG_SUFFIX=' + yanet_config
+    endif
+
     executable(bin,
                sources,
                include_directories: yanet_rootdir,
