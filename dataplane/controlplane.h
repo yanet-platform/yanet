@@ -72,6 +72,7 @@ public:
 	common::idp::nat64stateful_state::response nat64stateful_state(const common::idp::nat64stateful_state::request& request);
 	common::idp::get_shm_info::response get_shm_info();
 	eResult dump_physical_port(const common::idp::dump_physical_port::request& request);
+	eResult balancer_state_clear();
 
 	void switchBase();
 	void switchGlobalBase();

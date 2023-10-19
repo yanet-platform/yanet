@@ -71,6 +71,7 @@ enum class requestType : uint32_t
 	get_counter_by_name,
 	get_shm_info,
 	dump_physical_port,
+	balancer_state_clear,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 

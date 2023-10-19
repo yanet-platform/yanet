@@ -214,6 +214,11 @@ public:
 		return get<common::idp::requestType::dump_physical_port, eResult>(request);
 	}
 
+	auto balancer_state_clear() const
+	{
+		return get<common::idp::requestType::balancer_state_clear, eResult>();
+	}
+
 protected:
 	void connectToDataPlane() const
 	{

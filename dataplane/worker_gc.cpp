@@ -1194,3 +1194,28 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 		return true;
 	});
 }
+
+void worker_gc_t::balancer_state_clear()
+{
+	uint32_t offset = 0;
+	run_on_this_thread([&]() {
+		auto& globalbase_atomic = base_permanently.globalBaseAtomic;
+
+		for (auto iter : globalbase_atomic->balancer_state.range(offset, 64))
+		{
+			iter.lock();
+			if (iter.is_valid())
+			{
+				iter.unset_valid();
+			}
+			iter.unlock();
+		}
+
+		if (offset != 0)
+		{
+			return false;
+		}
+
+		return true;
+	});
+}
