@@ -25,18 +25,40 @@ You can build YANET in [docker](https://www.docker.com/) container and run it wi
 
 Or build on bare metal. See [documentation](docs/build.md).
 ## Running Autotests
+Pull docker image:
 ```
-$ cd yanet
-$ docker run --rm -it -v $PWD:/project yanetplatform/builder
-
-# meson setup --prefix=/usr -Dtarget=autotest build_autotest
-# meson compile -C build_autotest
-# meson install -C build_autotest
-# yanet-autotest-run.py autotest/units/001_one_port
-or
-# yanet-autotest-run.py autotest/units/001_one_port autotest/units/001_one_port/019_acl_decap_route
+docker pull yanetplatform/builder
 ```
 
+Add alias for run commands on docker:
+```
+alias yanet-builder="docker run --rm -it -v /run/yanet:/run/yanet -v $PWD:/project yanetplatform/builder"
+```
+
+Once setup `build_autotest` directory:
+```
+yanet-builder meson setup -Dtarget=autotest build_autotest
+```
+
+Compile:
+```
+yanet-builder meson compile -C build_autotest
+```
+
+Run autotest with all units in `autotest/units/001_one_port`:
+```
+yanet-builder ./autotest/yanet-autotest-run.py --prefix=build_autotest autotest/units/001_one_port
+```
+
+Or run one unit:
+```
+yanet-builder ./autotest/yanet-autotest-run.py --prefix=build_autotest autotest/units/001_one_port autotest/units/001_one_port/019_acl_decap_route
+```
+
+For more information about the autotests run:
+```
+yanet-builder ./autotest/yanet-autotest-run.py -h
+```
 ## Dependencies
 - [DPDK](https://github.com/DPDK/dpdk)
 - [JSON](https://github.com/nlohmann/json)
