@@ -32,7 +32,7 @@ docker pull yanetplatform/builder
 
 Add alias for run commands on docker:
 ```
-alias yanet-builder="docker run --rm -it -v /run/yanet:/run/yanet -v $PWD:/project yanetplatform/builder"
+alias yanet-builder="docker run --rm -it -v /run/yanet:/run/yanet -v \$PWD:/project yanetplatform/builder"
 ```
 
 Once setup `build_autotest` directory:
