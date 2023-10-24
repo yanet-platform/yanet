@@ -5,14 +5,10 @@
 *.includes
 *.cflags
 *.cxxflags
-build*/
+build
+build_*
 *.gcno
 *.orig*
-.idea
 __pycache__
-.cproject
-.project
-.settings/
-.pydevproject
 report/
 .*

@@ -64,7 +64,7 @@ docker pull yanetplatform/yanet
 > [!NOTE]
 > Or build it yourself:
 > ```
-> docker build -f yanet.Dockerfile -t yanetplatform/yanet .
+> docker build -f image/yanet/Dockerfile -t yanetplatform/yanet .
 > ```
 
 Build virtual machine image `build_vm/yanet.qcow2`:

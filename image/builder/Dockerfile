@@ -1,5 +1,4 @@
-FROM ubuntu:22.04
-
+FROM ubuntu:22.04 AS base
 
 RUN apt-get update && apt-get upgrade -y
 
@@ -42,7 +41,7 @@ RUN cd dpdk && \
 
 WORKDIR /project/dpdk
 RUN mkdir build
-RUN meson setup --prefix=/usr -D platform=generic -D cpu_instruction_set=corei7 -D disable_libs=flow_classify -D enable_driver_sdk=true -D disable_drivers=net/mlx4 -D tests=false build
+RUN meson setup --prefix=/target -D platform=generic -D cpu_instruction_set=corei7 -D disable_libs=flow_classify -D enable_driver_sdk=true -D disable_drivers=net/mlx4 -D tests=false build
 RUN meson compile -C build
 RUN meson install -C build
 
@@ -52,8 +51,8 @@ ENV NLOHMANN_JSON_VERSION 3.11.2
 
 WORKDIR /project
 RUN curl -L https://github.com/nlohmann/json/releases/download/v${NLOHMANN_JSON_VERSION}/json.hpp -o json.hpp
-RUN mkdir -p /usr/include/nlohmann && \
-    cp -v json.hpp /usr/include/nlohmann/
+RUN mkdir -p /target/include/nlohmann && \
+    cp -v json.hpp /target/include/nlohmann/
 
 
 # protobuf
@@ -65,17 +64,23 @@ RUN git clone -b v${PROTOBUF_VERSION} https://github.com/protocolbuffers/protobu
 WORKDIR /project/protobuf
 RUN git submodule update --init --recursive
 RUN ./autogen.sh && \
-    ./configure --prefix=/usr
-RUN make
+    ./configure --prefix=/target
+RUN make -j
 RUN make install && \
     ldconfig
 
 
-WORKDIR /project
-RUN rm -rf *
-
+FROM ubuntu:22.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    meson \
+    ninja-build \
+    pkg-config \
+    git \
+    libnuma-dev \
+    libibverbs-dev \
+    libpcap-dev \
     libsystemd-dev \
     libyaml-cpp-dev \
     libgtest-dev \
@@ -89,3 +94,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     devscripts \
     debhelper \
     dupload
+
+COPY --from=base /target/ /usr/
+
+WORKDIR /project
