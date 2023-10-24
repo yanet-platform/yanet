@@ -1,5 +1,5 @@
 .git
 demo
-docker
-build*
-*/build*
+image
+build
+build_*
