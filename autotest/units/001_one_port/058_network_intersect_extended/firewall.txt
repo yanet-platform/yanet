@@ -1,0 +1,27 @@
+:BEGIN
+add skipto :IN ip from any to any in
+
+:IN
+add skipto :SEC_GAP1 ip from any to 2020:ddd:1000::/ffff:ffff:ffff:ffff::
+add skipto :SEC_GAP2 ip from any to 2020:ddd:2000::/ffff:ffff:ffff::
+add skipto :SEC_GAP3 ip from any to 2020:ddd::/ffff:ffff::
+add skipto :SEC_SIM ip from any to 2020:cccc:0:0:1111::/ffff:ffff:0000:0000:ffff::
+add deny ip from any to any
+
+:SEC_GAP1
+add allow ip from any to 2020:ddd:0:0:5555::/ffff:ffff:0000:0000:ffff::
+add deny ip from any to any
+
+:SEC_GAP2
+add allow ip from any to 2020:ddd:0:0:6666::/ffff:ffff:0000:0000:ffff::
+add deny ip from any to any
+
+:SEC_GAP3
+add allow ip from any to 2020:ddd:0:0:7777::/ffff:ffff:0000:0000:ffff::
+add deny ip from any to any
+
+:SEC_SIM
+add allow ip from any to 2020:cccc:4000::/ffff:ffff:ffff:ffff::
+add allow ip from any to 2020:cccc:5000::/ffff:ffff:ffff::
+add allow tcp from any to 2020:cccc::/ffff:ffff:: dst-port 22
+add deny ip from any to any

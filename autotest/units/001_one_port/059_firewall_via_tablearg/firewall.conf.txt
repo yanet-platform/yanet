@@ -1,0 +1,24 @@
+:BEGIN
+table _SKIPTO_EARLY_IN_ create type iface
+table _SKIPTO_EARLY_IN_ add lp.100 :VLAN100
+table _SKIPTO_EARLY_IN_ add lp.200 :VLAN200
+table _SKIPTO_EARLY_IN_ add lp.300 :VLAN300
+table _SKIPTO_EARLY_IN_ add lp.400 :VLAN400
+add skipto tablearg ip from any to any via table(_SKIPTO_EARLY_IN_) in
+add deny ip from any to any
+
+:VLAN100
+add allow udp from any to any 53
+add allow tcp from any to any 443
+add deny ip from any to any
+
+:VLAN200
+add allow icmp from any to any icmptypes 0,8
+add deny ip from any to any
+
+:VLAN300
+add allow ip from any to any
+
+:VLAN400
+add deny tcp from any to any setup
+add allow ip from any to any 

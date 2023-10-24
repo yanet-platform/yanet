@@ -1,0 +1,57 @@
+steps:
+- ipv4Update: 
+  - "0.0.0.0/0 -> 201.0.0.1"
+  - "101.0.0.0/8 -> 101.0.0.3"
+- ipv6Update:
+  - "2000:51b::/32 -> 2202::1"
+  - "::/0 -> fe80::1"
+- cli:
+  - balancer real enable balancer0 10.0.0.20 tcp 80 101.0.0.1 80
+  - balancer real enable balancer0 10.0.0.20 udp 80 101.0.0.1 80
+
+  - balancer real enable balancer0 10.0.0.21 tcp 80 2010::1 80
+
+  - balancer real enable balancer0 2005:dead:beef::1 tcp 80 2010::2 80
+  - balancer real enable balancer0 2005:dead:beef::1 udp 80 2010::2 80
+  - balancer real flush
+
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.20
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip    real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  ---------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.20   tcp    80            rr         101.0.0.1  80         true     1       0            0        0
+    balancer0  10.0.0.20   udp    80            rr         101.0.0.1  80         true     1       0            0        0
+
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.21
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.21   tcp    80            rr         2010::1  80         true     1       0            0        0
+
+# ipv4 and icmpv4
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+# ipv6 and icmpv6
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+
+# reply even if all reals of a service are disabled
+- cli:
+  - balancer real disable balancer0 10.0.0.21 tcp 80 2010::1 80
+  - balancer real flush
+
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 10.0.0.21
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.21   tcp    80            rr         2010::1  80         false    1       0            0        0
+
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap

@@ -1,0 +1,50 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
+- ipv6Update: "::/0 -> fe80::1"
+- cli:
+    - balancer real enable balancer0 10.1.0.55 tcp 443 2443::1 443
+    - balancer real enable balancer0 10.1.0.55 tcp 443 2443::2 443
+    - balancer real enable balancer0 10.1.0.55 tcp 443 2443::3 443
+    - balancer real flush
+- sendPackets:
+    - port: kni0
+      send: 001-send.pcap
+      expect: 001-expect.pcap
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.1.0.55   tcp    443           wlc        2443::1  443        true     2       16           16       1568
+    balancer0  10.1.0.55   tcp    443           wlc        2443::2  443        true     1       8            8        784
+    balancer0  10.1.0.55   tcp    443           wlc        2443::3  443        true     1       8            8        784
+    balancer0  10.1.0.55   tcp    443           wlc        2443::4  443        false    4       0            0        0
+
+- cli:
+    - balancer real enable balancer0 10.1.0.55 tcp 443 2443::4 443
+    - balancer real flush
+- sendPackets:
+    - port: kni0
+      send: 002-send.pcap
+      expect: 002-expect.pcap
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.1.0.55   tcp    443           wlc        2443::1  443        true     2       17           17       1666
+    balancer0  10.1.0.55   tcp    443           wlc        2443::2  443        true     1       10           10       980
+    balancer0  10.1.0.55   tcp    443           wlc        2443::3  443        true     1       9            9        882
+    balancer0  10.1.0.55   tcp    443           wlc        2443::4  443        true     4       28           28       2744
+
+- sleep: 2
+- sendPackets:
+    - port: kni0
+      send: 003-send.pcap
+      expect: 003-expect.pcap
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
+    module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.1.0.55   tcp    443           wlc        2443::1  443        true     2       24           24       2352
+    balancer0  10.1.0.55   tcp    443           wlc        2443::2  443        true     1       11           11       1078
+    balancer0  10.1.0.55   tcp    443           wlc        2443::3  443        true     1       12           12       1176
+    balancer0  10.1.0.55   tcp    443           wlc        2443::4  443        true     4       49           49       4802

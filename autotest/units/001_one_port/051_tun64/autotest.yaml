@@ -1,0 +1,15 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
+- ipv6Update: "::/0 -> fe80::1"
+- sendPackets:
+  - port: kni0
+    send: decap.pcap
+    expect: decap_expect.pcap
+- sendPackets:
+  - port: kni0
+    send: encap.pcap
+    expect: encap_expect.pcap
+- sendPackets:
+  - port: kni0
+    send: encap_rnd.pcap
+    expect: encap_rnd_expect.pcap

@@ -1,0 +1,2 @@
+:BEGIN
+add allow udp from any to 2020:ddd:ff1c:2030::/60 53

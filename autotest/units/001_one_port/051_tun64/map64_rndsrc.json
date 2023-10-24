@@ -1,0 +1,14 @@
+{
+   "1.23.123.134": {
+      "net_loc": "LOC3",
+      "scheme": "tun64",
+      "fqdn": "fqdn2.net",
+      "addr6": "2020:ddd:ccc:bbb:0:4444:cccc:3737"
+   },
+   "123.0.250.66": {
+      "net_loc": "LOC4",
+      "scheme": "tun64",
+      "fqdn": "fqdn3.net",
+      "addr6": "2020:ddd:ccc:111:0:567:5555:8888"
+   }
+}
