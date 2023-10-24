@@ -1,0 +1,10 @@
+steps:
+- ipv4Update: "200.0.10.0/24 -> 200.0.10.1"
+- ipv4Update: "200.0.20.0/24 -> 200.0.20.1"
+- ipv4Update: "200.0.30.0/24 -> 200.0.30.1"
+- ipv4Update: "200.0.40.0/24 -> 200.0.40.1"
+- clearFWState:
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap

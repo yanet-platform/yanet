@@ -1,0 +1,2265 @@
+steps:
+
+# default (see neighbor in controlplane.conf)
+- cli: |
+    rib static insert default 0.0.0.0/0 200.0.0.1
+
+#################################################################################################################
+# 1 rib_insert new nexthop_stuff, new prefix, new peer-proto-table_name
+#################################################################################################################
+- echo: "1 rib_insert() test: new nexthop_stuff, new prefix, new \"peer-proto-table_name\" - START"
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 1.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+# checking whether prefix was indeed flushed
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "1 rib_insert() test: new nexthop_stuff, new prefix, new \"peer-proto-table_name\" - DONE"
+
+#################################################################################################################
+# 2 rib_insert new nexthop_stuff, existing prefix, existing peer-proto-table_name
+#################################################################################################################
+- echo: "2 rib_insert() test: new nexthop_stuff, existing prefix, existing \"peer-proto-table_name\" - START"
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 1.0.0.0/24
+        path_information: 192.168.0.2:10001 # in old nexthop_t table path_info is in the key, while nexthop ip is not! there can't be two different nexthop ips for the same path_info 
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  1         2      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- echo: "2 rib_insert() test: new nexthop_stuff, existing prefix, existing \"peer-proto-table_name\" - DONE"
+
+#################################################################################################################
+# 3 rib_insert new nexthop_stuff, existing prefix, new peer-proto-table_name
+#################################################################################################################
+- echo: "3 rib_insert() test: new nexthop_stuff, existing prefix, new \"peer-proto-table_name\" - START"
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.2
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 1.0.0.0/24
+        path_information: 192.168.0.3:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  1         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- echo: "3 rib_insert() test: new nexthop_stuff, existing prefix, new \"peer-proto-table_name\" - DONE"
+
+#################################################################################################################
+# 4 rib_insert new nexthop_stuff, new prefix, existing peer-proto-table_name
+#################################################################################################################
+- echo: "4 rib_insert() test: new nexthop_stuff, new prefix, existing \"peer-proto-table_name\" - START"
+
+- cli_check: |
+    route tunnel get route0 2.0.0.0/24
+    ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
+    ----------------------  -------  -----  ----------------  ----  ----------
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 2.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         3      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 2.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "4 rib_insert() test: new nexthop_stuff, new prefix, existing \"peer-proto-table_name\" - DONE"
+
+#################################################################################################################
+# 5 rib_insert existing nexthop_stuff, new prefix, new peer-proto-table_name
+#################################################################################################################
+- echo: "5 rib_insert() test: existing nexthop_stuff, new prefix, new \"peer-proto-table_name\" - START"
+
+- cli_check: |
+    route tunnel get route0 3.0.0.0/24
+    ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
+    ----------------------  -------  -----  ----------------  ----  ----------
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.3
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 3.0.0.0/24
+        path_information: 192.168.0.3:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         3      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 3.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "5 rib_insert() test: existing nexthop_stuff, new prefix, new \"peer-proto-table_name\" - DONE"
+
+#################################################################################################################
+# 6 rib_insert existing nexthop_stuff, existing prefix, new peer-proto-table_name
+#################################################################################################################
+- echo: "6 rib_insert() test: existing nexthop_stuff, existing prefix, new \"peer-proto-table_name\" - START"
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.4
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 3.0.0.0/24
+        path_information: 192.168.0.3:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         3      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.4  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.4  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- echo: "6 rib_insert() test: existing nexthop_stuff, existing prefix, new \"peer-proto-table_name\" - DONE"
+
+#################################################################################################################
+# 7 rib_insert existing nexthop_stuff, new prefix, existing peer-proto-table_name
+#################################################################################################################
+- echo: "7 rib_insert() test: existing nexthop_stuff, new prefix, existing \"peer-proto-table_name\" - START"
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
+    ----------------------  -------  -----  ----------------  ----  ----------
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 4.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  3         4      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.4  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.4  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "7 rib_insert() test: existing nexthop_stuff, new prefix, existing \"peer-proto-table_name\" - DONE"
+
+#################################################################################################################
+# 8 rib_insert existing nexthop_stuff, existing prefix, existing peer-proto-table_name
+#################################################################################################################
+- echo: "8 rib_insert() test: existing nexthop_stuff, existing prefix, existing \"peer-proto-table_name\" - START"
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 1.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  3         4      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.4  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.4  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- echo: "8 rib_insert() test: existing nexthop_stuff, existing prefix, existing \"peer-proto-table_name\" - DONE"
+
+#################################################################################################################
+# 9 rib_insert existing nexthop_stuff, existing prefix, existing peer-proto-table_name - new vrf-priority
+#################################################################################################################
+- echo: "9 rib_insert() test: existing nexthop_stuff, existing prefix, existing \"peer-proto-table_name\" - new vrf_priority - START"
+
+- rib_insert:
+    attribute:
+      vrf: tluafed
+      priority: 5000
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 1.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  3         4      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.4  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.4  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- echo: "9 rib_insert() test: existing nexthop_stuff, existing prefix, existing \"peer-proto-table_name\" - new vrf_priority - DONE"
+
+#################################################################################################################
+# 10 rib_remove prefix for unexisting vrf-priority
+#################################################################################################################
+- echo: "10 rib_remove() test: trying to remove prefix for unexisting vrf-priority - START"
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- rib_remove:
+    attribute:
+      vrf: unknown
+      priority: 10000
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      prefixes:
+      - prefix: 1.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+
+# expected result: nothing changed since previous step 
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  3         4      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.4  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.4  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "10 rib_remove() test: trying to remove prefix for unexisting vrf-priority - DONE"
+
+#################################################################################################################
+# 11 rib_remove prefix for existing vrf-priority but unexisting protocol-peer-table_name
+#################################################################################################################
+- echo: "11 rib_remove() test: trying to remove prefix for existing vrf-priority but unexisting protocol-peer-table_name - START"
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- rib_remove:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 100.100.100.10
+      prefixes:
+      - prefix: 1.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+
+# expected result: nothing changed since previous step 
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  3         4      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.4  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.4  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "11 rib_remove() test: trying to remove prefix for existing vrf-priority but unexisting protocol-peer-table_name - DONE"
+
+#################################################################################################################
+# 12 rib_remove unexisting prefix
+#################################################################################################################
+- echo: "12 rib_remove() test: trying to remove unexisting prefix - START"
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/32
+    ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
+    ----------------------  -------  -----  ----------------  ----  ----------
+
+- rib_remove:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      prefixes:
+      - prefix: 1.0.0.0/32
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+
+# expected result: nothing changed since previous step 
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  3         4      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.4  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.4  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/32
+    ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
+    ----------------------  -------  -----  ----------------  ----  ----------
+
+- echo: "12 rib_remove() test: trying to remove unexisting prefix - DONE"
+
+#################################################################################################################
+# 13 rib_remove prefix which has multiple path_info related to it 
+#################################################################################################################
+- echo: "13 rib_remove() test: trying to remove prefix which has multiple path_info related to it - START"
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- rib_remove:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      prefixes:
+      - prefix: 1.0.0.0/24
+        path_information: 192.168.0.2:10001
+        labels:
+        - 1100
+
+# expected result:
+# one less path for peer 10.10.10.1 in rib summary, amount of prefixes remains the same
+# line for path_info 192.168.0.2:10001
+# 'default 10000 1.0.0.0/24 autotest 10.10.10.1 ipv4 mpls-vpn 192.168.0.2:10001 192.168.0.1 1100 0 incomplete 0 n/s 13238:1:1'
+# is removed from rib prefixes
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  3         3      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.4  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.4  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "13 rib_remove() test: trying to remove prefix which has multiple path_info related to it - DONE"
+
+#################################################################################################################
+# 14 rib_remove prefix of peer, which has other prefixes
+#################################################################################################################
+- echo: "14 rib_remove() test: trying to remove prefix for peer, which has some other prefixes - START"
+
+- cli_check: |
+    route tunnel get route0 2.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- rib_remove:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      prefixes:
+      - prefix: 2.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+
+# expected result:
+# one less path and one less prefix for peer 10.10.10.1 in rib summary - prefixes record remains
+# line for prefix 2.0.0.0/24
+# 'default 10000 2.0.0.0/24 autotest 10.10.10.1 ipv4 mpls-vpn 192.168.0.1:10001 192.168.0. 1100 0 incomplete 0 n/s 13238:1:1'
+# is removed from rib prefixes
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.4  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.4  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 2.0.0.0/24
+    ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
+    ----------------------  -------  -----  ----------------  ----  ----------
+
+- echo: "14 rib_remove() test: trying to remove prefix for peer, which has some other prefixes - DONE"
+
+#################################################################################################################
+# 15 rib_remove the last (for this peer) prefix which has the last path_info related to it 
+#################################################################################################################
+- echo: "15 rib_remove() test: trying to remove the last (for this peer) prefix which has the last path_info related to it - START"
+
+- cli_check: |
+    route tunnel get route0 3.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- rib_remove:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.4
+      prefixes:
+      - prefix: 3.0.0.0/24
+        path_information: 192.168.0.3:10001
+        labels:
+        - 1100
+
+# expected result:
+# there was only one path and one prefix for peer 10.10.10.4 - its record in rib summary
+# 'default 10000 autotest 10.10.10.4 ipv4 mpls-vpn 1 1 false'
+# should disappear,
+# line for peer 10.10.10.4
+# 'default 10000 3.0.0.0/24 autotest 10.10.10.4 ipv4 mpls-vpn 192.168.0.3:10001 192.168.0.1 1100 0 incomplete 0 n/s 13238:1:1'
+# is removed from rib prefixes
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+# this prefix is still known because of other peer
+- cli_check: |
+    route tunnel get route0 3.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "15 rib_remove() test: trying to remove the last (for this peer) prefix which has the last path_info related to it - DONE"
+
+#################################################################################################################
+# 16 rib_insert multiple prefixes insertion
+#################################################################################################################
+- echo: "16 rib_insert() test: multiple prefixes insertion - START"
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 5.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+      - nexthop: 192.168.0.2
+        prefix: 5.0.0.0/24
+        path_information: 192.168.0.2:10001
+        labels:
+        - 1100
+      - nexthop: 192.168.0.2
+        prefix: 6.0.0.0/24
+        path_information: 192.168.0.2:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  4         5      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     5.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     5.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.2  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     6.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.2:10001  192.168.0.2  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 5.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                50.00
+    kni0                    192.168.0.2  1100   kni0.200                50.00
+
+- cli_check: |
+    route tunnel get route0 6.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.2  1100   kni0.200                100.00
+
+- echo: "16 rib_insert() test: multiple prefixes insertion - DONE"
+
+#################################################################################################################
+# 17 rib_remove multiple prefixes removal
+#################################################################################################################
+- echo: "17 rib_remove() test: multiple prefixes removal - START"
+
+- rib_remove:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      prefixes:
+      - prefix: 5.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+      - prefix: 5.0.0.0/24
+        path_information: 192.168.0.2:10001
+        labels:
+        - 1100
+      - prefix: 6.0.0.0/24
+        path_information: 192.168.0.2:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 5.0.0.0/24
+    ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
+    ----------------------  -------  -----  ----------------  ----  ----------
+
+- cli_check: |
+    route tunnel get route0 6.0.0.0/24
+    ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
+    ----------------------  -------  -----  ----------------  ----  ----------
+
+- echo: "17 rib_remove() test: multiple prefixes removal - DONE"
+
+#################################################################################################################
+# 18 rib_remove all parts of request exist separately, however the whole combination does not - no remove
+#################################################################################################################
+- echo: "18 rib_remove() test: all parts of request exist separately, however the whole combination does not - START"
+
+- cli_check: |
+    route tunnel get route0 3.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- rib_remove:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.2
+      prefixes:
+      - prefix: 4.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      prefixes:
+      - prefix: 3.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      prefixes:
+      - prefix: 4.0.0.0/24
+        path_information: 192.168.0.3:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 3.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "18 rib_remove() test: all parts of request exist separately, however the whole combination does not - DONE"
+
+#################################################################################################################
+# 19 rib_clear request contains only protocol
+#################################################################################################################
+- echo: "19 rib_clear() test: request contains only protocol - START"
+
+## add some prefixes for new protocol
+- rib_insert:
+    attribute:
+      protocol: 2_b_rmvd
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 1.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+      - nexthop: 192.168.0.1
+        prefix: 5.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.3
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 3.0.0.0/24
+        path_information: 192.168.0.1:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     2_b_rmvd  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     2_b_rmvd  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  2_b_rmvd  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  2_b_rmvd  10.10.10.3  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     5.0.0.0/24  2_b_rmvd  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 3.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 5.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+## remove prefixes for new protocol
+- rib_clear:
+    attribute:
+      protocol: 2_b_rmvd
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.3  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.3  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 3.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 5.0.0.0/24
+    ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
+    ----------------------  -------  -----  ----------------  ----  ----------
+
+- echo: "19 rib_clear() test: request contains only protocol - DONE"
+
+#################################################################################################################
+# 20 rib_clear request contains protocol, peer, vrf, priority
+#################################################################################################################
+- echo: "20 rib_clear() test: request contains protocol, peer, vrf, priority - START"
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- rib_clear:
+    attribute:
+      protocol: autotest
+      peer: 10.10.10.3
+      vrf: default
+      priority: 10000
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+    tluafed  5000      autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+    tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- rib_clear:
+    attribute:
+      protocol: autotest
+      peer: 10.10.10.1
+      vrf: tluafed
+      priority: 5000
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "20 rib_clear() test: request contains protocol, peer, vrf, priority - DONE"
+
+#################################################################################################################
+# 21 rib_clear combination of protocol, peer, vrf, priority from request does not exist - nothing to clear
+#################################################################################################################
+- echo: "21 rib_clear() test: combination of protocol, peer, vrf, priority from request does not exist (though they exist separately) - nothing to clear - START"
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- rib_clear:
+    attribute:
+      protocol: static
+      peer: 10.10.10.1
+      vrf: default
+      priority: 10000
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "21 rib_clear() test: combination of protocol, peer, vrf, priority from request does not exist (though they exist separately) - nothing to clear - DONE"
+
+#################################################################################################################
+# 22 rib_clear - nothing to clear
+#################################################################################################################
+- echo: "22 rib_clear() test: protocol/peer/vrf/priority from request do not exist - nothing to clear - START"
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+# unexisting peer
+- rib_clear:
+    attribute:
+      protocol: autotest
+      peer: 10.10.10.3
+      vrf: default
+      priority: 10000
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+# unexisting protocol
+- rib_clear:
+    attribute:
+      protocol: 2_b_rmvd
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+# unexisting vrf
+- rib_clear:
+    attribute:
+      protocol: autotest
+      peer: 10.10.10.1
+      vrf: tluafed
+      priority: 10000
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+# unexisting priority
+- rib_clear:
+    attribute:
+      protocol: autotest
+      peer: 10.10.10.1
+      vrf: default
+      priority: 99999
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.0.1          200.0.0.1            0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- cli_check: |
+    route tunnel get route0 4.0.0.0/24
+    ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+    ----------------------  -----------  -----  ----------------  ----  ----------
+    kni0                    192.168.0.1  1100   kni0.200                100.00
+
+- echo: "22 rib_clear() test: protocol/peer/vrf/priority from request do not exist - nothing to clear - DONE"
+
+#################################################################################################################
+# won't need it anymore, no more 'route tunnel' checks
+- cli: |
+    rib static remove default 0.0.0.0/0 200.0.0.1
+
+#################################################################################################################
+# 23 rib_lookup existing prefix for existing vrf
+#################################################################################################################
+- echo: "23 rib_lookup() test: existing prefix for existing vrf - START"
+
+- cli_check: |
+    rib lookup default 4.0.0.0
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    rib lookup default 4.0.0.255
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     4.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    rib lookup default 1.0.0.1
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    rib lookup default 1.0.0.255
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+# this is treated as update, not another insert! path_info for this prefix, this vrf-priority and protocol-peer-table_name has alreadu been existing, only labels have changed
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.2
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 1.0.0.0/24
+        path_information: 192.168.0.3:10001
+        labels:
+        - 1200
+
+- cli_check: |
+    rib lookup default 1.0.0.255
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1200    0                         incomplete  0    n/s          13238:1:1
+
+# rollback previous update
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.2
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 192.168.0.1
+        prefix: 1.0.0.0/24
+        path_information: 192.168.0.3:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib lookup default 1.0.0.255
+    vrf      priority  prefix      protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+
+- echo: "23 rib_lookup() test: existing prefix for existing vrf - DONE"
+
+#################################################################################################################
+# 24 rib_lookup unexisting prefix for existing vrf
+#################################################################################################################
+- echo: "24 rib_lookup() test: unexisting prefix for existing vrf - START"
+
+- cli_check: |
+    rib lookup default 4.0.1.0
+    vrf  priority  prefix  protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    ---  --------  ------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+
+- cli_check: |
+    rib lookup default 1.0.1.255
+    vrf  priority  prefix  protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    ---  --------  ------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+
+- echo: "24 rib_lookup() test: unexisting prefix for existing vrf - DONE"
+
+#################################################################################################################
+# 25 rib_lookup unexisting vrf
+#################################################################################################################
+- echo: "25 rib_lookup() test: unexisting vrf - START"
+
+- cli_check: |
+    rib lookup tluafed 4.0.0.0
+    vrf  priority  prefix  protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    ---  --------  ------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+
+- cli_check: |
+    rib lookup tluafed 1.0.0.1
+    vrf  priority  prefix  protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    ---  --------  ------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+
+- echo: "25 rib_lookup() test: unexisting vrf - DONE"
+
+#################################################################################################################
+# 26 rib_get unexisting prefix for existing vrf
+#################################################################################################################
+- echo: "26 rib_get() test: unexisting prefix for existing vrf - START"
+
+- cli_check: |
+    rib get default 4.0.0.0/32
+    vrf  priority  protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    ---  --------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+
+- cli_check: |
+    rib get default 1.0.0.0/8
+    vrf  priority  protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    ---  --------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+
+- echo: "26 rib_get() test: unexisting prefix for existing vrf - DONE"
+
+#################################################################################################################
+# 27 rib_get unexisting vrf
+#################################################################################################################
+- echo: "27 rib_get() test: unexisting vrf - START"
+
+- cli_check: |
+    rib get tluafed 4.0.0.0/24
+    vrf  priority  protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    ---  --------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+
+- cli_check: |
+    rib get tluafed 1.0.0.0/24
+    vrf  priority  protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    ---  --------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+
+- echo: "27 rib_get() test: unexisting vrf - DONE"
+
+#################################################################################################################
+# 28 rib_get existing prefix for existing vrf
+#################################################################################################################
+- echo: "28 rib_get() test: existing prefix for existing vrf - START"
+
+- cli_check: |
+    rib get default 4.0.0.0/24
+    vrf      priority  protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- cli_check: |
+    rib get default 1.0.0.0/24
+    vrf      priority  protocol  peer        table_name     path_information   nexthop      labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  --------  ----------  -------------  -----------------  -----------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  192.168.0.3:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
+
+- echo: "28 rib_get() test: existing prefix for existing vrf - DONE"
+
+#################################################################################################################
+# 29 rib_save/rib_load test
+#################################################################################################################
+- echo: "29 rib_save()/rib_load() test: rib tables are restored after they were saved to file, cleared and loaded from file - START"
+
+## remove ALL prefixes, we will fill tables from scratch
+- rib_clear:
+    attribute:
+      protocol: autotest
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer  table_name  prefixes  paths  eor
+    -------  --------  --------  ----  ----------  --------  -----  ----
+    default  10000     static    ::                1         1      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix     protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ---------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     fe80::/64  static    ::                                  ::               0                                 0    n/s          n/s
+
+# trying to have as many combinations with the same nexthop_stuff_t as possible (different prefixes, different peers, different vrfs, different path_infos, ...)
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 11.11.11.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5.5.5.5
+        prefix: 1.0.0.0/24
+        path_information: 5.5.5.5:5555
+        labels:
+        - 1100
+
+# same nexthop_stuff_t, different peer 
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 22.22.22.2
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5.5.5.5
+        prefix: 1.0.0.0/24
+        path_information: 5.5.5.5:5555
+        labels:
+        - 1100
+
+# same nexthop_stuff_t, different path_info
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 11.11.11.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5.5.5.5
+        prefix: 1.0.0.0/24
+        path_information: 5.5.5.5:9999
+        labels:
+        - 1100
+
+# same nexthop_stuff_t, different prefix
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 11.11.11.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5.5.5.5
+        prefix: 2.0.0.0/24
+        path_information: 5.5.5.5:5555
+        labels:
+        - 1100
+
+# same nexthop_stuff_t, different prefix, different path_info
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 11.11.11.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5.5.5.5
+        prefix: 2.0.0.0/24
+        path_information: 5.5.5.5:9999
+        labels:
+        - 1100
+
+# same nexthop_stuff_t, different vrf
+- rib_insert:
+    attribute:
+      vrf: tluafed
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 11.11.11.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5.5.5.5
+        prefix: 1.0.0.0/24
+        path_information: 5.5.5.5:5555
+        labels:
+        - 1100
+
+# different nexthop_stuff_t (labels)
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 11.11.11.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5.5.5.5
+        prefix: 1.0.0.0/24
+        path_information: 5.5.5.5:5555
+        labels:
+        - 2200
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  11.11.11.1  ipv4 mpls-vpn  2         4      false
+    default  10000     autotest  22.22.22.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         1         1      true
+    tluafed  10000     autotest  11.11.11.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information  nexthop  labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  ----------------  -------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     1.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  2200    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:9999      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  22.22.22.2  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:9999      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                           ::               0                                     0    n/s          n/s
+    tluafed  10000     1.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+
+# rib_save()
+- cli:
+  dontdoit podumoi controlplane rib save > rib_saved.dmp
+
+## remove ALL prefixes, we will load rib tables from rib_saved.dmp
+- rib_clear:
+    attribute:
+      protocol: autotest
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer  table_name  prefixes  paths  eor
+    -------  --------  --------  ----  ----------  --------  -----  ----
+    default  10000     static    ::                1         1      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix     protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ---------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     fe80::/64  static    ::                                  ::               0                                 0    n/s          n/s
+    
+# rib_load()
+- cli:
+  dontdoit podumoi controlplane rib load < rib_saved.dmp
+
+# loaded tables are the same as those we had saved
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  11.11.11.1  ipv4 mpls-vpn  2         4      false
+    default  10000     autotest  22.22.22.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         1         1      true
+    tluafed  10000     autotest  11.11.11.1  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information  nexthop  labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  ----------------  -------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     1.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  2200    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:9999      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  22.22.22.2  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:9999      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                           ::               0                                     0    n/s          n/s
+    tluafed  10000     1.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+
+- echo: "29 rib_save()/rib_load() test: rib tables are restored after they were saved to file, cleared and loaded from file - DONE"
+
+#################################################################################################################
+# 30 rib_insert() -> rib_save() -> rib_clear() -> rib_insert() SOME OTHER_PREFIXES!! -> rib_load() - only loaded prefixes are present
+#################################################################################################################
+- echo: "30 rib_insert() -> rib_save() -> rib_clear() -> rib_insert() SOME OTHER_PREFIXES!! -> rib_load() - only loaded prefixes are present - START"
+
+## remove ALL prefixes, we will fill tables from scratch
+- rib_clear:
+    attribute:
+      protocol: autotest
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer  table_name  prefixes  paths  eor
+    -------  --------  --------  ----  ----------  --------  -----  ----
+    default  10000     static    ::                1         1      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix     protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ---------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     fe80::/64  static    ::                                  ::               0                                 0    n/s          n/s
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 11.11.11.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5.5.5.5
+        prefix: 1.0.0.0/24
+        path_information: 5.5.5.5:5555
+        labels:
+        - 1100
+
+# same nexthop_stuff_t, different peer 
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 22.22.22.2
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5.5.5.5
+        prefix: 1.0.0.0/24
+        path_information: 5.5.5.5:5555
+        labels:
+        - 1100
+
+# same nexthop_stuff_t, different prefix
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 11.11.11.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5.5.5.5
+        prefix: 2.0.0.0/24
+        path_information: 5.5.5.5:5555
+        labels:
+        - 1100
+
+# different path_info and nexthop_stuff_t
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 11.11.11.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 6.6.6.6
+        prefix: 1.0.0.0/24
+        path_information: 6.6.6.6:6666
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  11.11.11.1  ipv4 mpls-vpn  2         3      false
+    default  10000     autotest  22.22.22.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         1         1      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information  nexthop  labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  ----------------  -------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     1.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  6.6.6.6:6666      6.6.6.6  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  22.22.22.2  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                           ::               0                                     0    n/s          n/s
+
+# rib_save()
+- cli:
+  dontdoit podumoi controlplane rib save > rib_saved.dmp
+
+## remove ALL prefixes
+- rib_clear:
+    attribute:
+      protocol: autotest
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer  table_name  prefixes  paths  eor
+    -------  --------  --------  ----  ----------  --------  -----  ----
+    default  10000     static    ::                1         1      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix     protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ---------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     fe80::/64  static    ::                                  ::               0                                 0    n/s          n/s
+
+# insert different prefixes for different peers and vrfs - all will be rewritten after rib_load()
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 33.33.33.33
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 8.8.8.8
+        prefix: 7.7.7.7/24
+        path_information: 8.8.8.8:8888
+        labels:
+        - 1100
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 33.33.33.33
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 8.8.8.8
+        prefix: 9.9.9.9/24
+        path_information: 8.8.8.8:8888
+        labels:
+        - 1100
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 44.44.44.44
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 8.8.8.8
+        prefix: 7.7.7.7/24
+        path_information: 8.8.8.8:8888
+        labels:
+        - 1100
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+      vrf: tluafed
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 33.33.33.33
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 8.8.8.8
+        prefix: 7.7.7.7/24
+        path_information: 8.8.8.8:8888
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer         table_name     prefixes  paths  eor
+    -------  --------  --------  -----------  -------------  --------  -----  -----
+    default  10000     autotest  33.33.33.33  ipv4 mpls-vpn  2         2      false
+    default  10000     autotest  44.44.44.44  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                          1         1      true
+    tluafed  10000     autotest  33.33.33.33  ipv4 mpls-vpn  1         1      false
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer         table_name     path_information  nexthop  labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  -----------  -------------  ----------------  -------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     7.7.7.7/24  autotest  33.33.33.33  ipv4 mpls-vpn  8.8.8.8:8888      8.8.8.8  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     7.7.7.7/24  autotest  44.44.44.44  ipv4 mpls-vpn  8.8.8.8:8888      8.8.8.8  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     9.9.9.9/24  autotest  33.33.33.33  ipv4 mpls-vpn  8.8.8.8:8888      8.8.8.8  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                            ::               0                                     0    n/s          n/s
+    tluafed  10000     7.7.7.7/24  autotest  33.33.33.33  ipv4 mpls-vpn  8.8.8.8:8888      8.8.8.8  1100    0                         incomplete  0    n/s          13238:1:1
+
+# rib_load()
+- cli:
+  dontdoit podumoi controlplane rib load < rib_saved.dmp
+
+# loaded tables are the same as those we had saved
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  11.11.11.1  ipv4 mpls-vpn  2         3      false
+    default  10000     autotest  22.22.22.2  ipv4 mpls-vpn  1         1      false
+    default  10000     static    ::                         1         1      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information  nexthop  labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  ----------------  -------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     1.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  6.6.6.6:6666      6.6.6.6  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  22.22.22.2  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  11.11.11.1  ipv4 mpls-vpn  5.5.5.5:5555      5.5.5.5  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                           ::               0                                     0    n/s          n/s
+
+#TODO: would be interesting to check what was in prefixes_rebuild table on every step of tests with rib_save()/rib_load()
+
+- echo: "30 rib_insert() -> rib_save() -> rib_clear() -> rib_insert() SOME OTHER_PREFIXES!! -> rib_load() - only loaded prefixes are present - DONE"
+
+#################################################################################################################
+# 31 fib rebuild
+#################################################################################################################
+- echo: "31 fib rebuild - START"
+
+## remove ALL prefixes, we will fill tables from scratch
+- rib_clear:
+    attribute:
+      protocol: autotest
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer  table_name  prefixes  paths  eor
+    -------  --------  --------  ----  ----------  --------  -----  ----
+    default  10000     static    ::                1         1      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix     protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ---------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     fe80::/64  static    ::                                  ::               0                                 0    n/s          n/s
+
+# default (see neighbor in controlplane.conf)
+- cli: |
+    rib static insert default 0.0.0.0/0 200.0.0.1
+
+# original prefix with local_pref = 100
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      local_pref: 100
+      prefixes:
+      - nexthop: 200.0.0.1
+        prefix: 1.0.0.0/24
+        path_information: 200.0.0.1:10001
+        labels:
+        - 1100
+
+- echo: "insert prefix 1.0.0.0/24 from peer 10.10.10.1 with local_pref 100"
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name  prefixes  paths  eor
+    -------  --------  --------  ----------  ----------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls   1         1      false
+    default  10000     static    ::                      2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name  path_information  nexthop    labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  ----------  ----------------  ---------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                      200.0.0.1         200.0.0.1          0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls   200.0.0.1:10001   200.0.0.1  1100    100                       incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                        ::                 0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop    label  egress_interface  peer  weight (%)
+    ----------------------  ---------  -----  ----------------  ----  ----------
+    kni0                    200.0.0.1  1100   kni0.200                100.00
+
+# same prefix, different peer, different label but same med
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls
+      peer: 20.20.20.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      local_pref: 100
+      prefixes:
+      - nexthop: 200.0.0.1
+        prefix: 1.0.0.0/24
+        path_information: 200.0.0.1:10001
+        labels:
+        - 1200
+
+- echo: "insert same prefix 1.0.0.0/24 from another peer 20.20.20.1 with local_pref 100"
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name  prefixes  paths  eor
+    -------  --------  --------  ----------  ----------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls   1         1      false
+    default  10000     autotest  20.20.20.1  ipv4 mpls   1         1      false
+    default  10000     static    ::                      2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name  path_information  nexthop    labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  ----------  ----------------  ---------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                      200.0.0.1         200.0.0.1          0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls   200.0.0.1:10001   200.0.0.1  1100    100                       incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  20.20.20.1  ipv4 mpls   200.0.0.1:10001   200.0.0.1  1200    100                       incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                        ::                 0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop    label  egress_interface  peer  weight (%)
+    ----------------------  ---------  -----  ----------------  ----  ----------
+    kni0                    200.0.0.1  1100   kni0.200                50.00
+    kni0                    200.0.0.1  1200   kni0.200                50.00
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+# original prefix, but local_pref was changed
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      local_pref: 10
+      prefixes:
+      - nexthop: 200.0.0.1
+        prefix: 1.0.0.0/24
+        path_information: 200.0.0.1:10001
+        labels:
+        - 1100
+
+- echo: "update prefix 1.0.0.0/24 from peer 10.10.10.1 with new local_pref 10 (this route (with label 1100)) must be gone from fib)"
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name  prefixes  paths  eor
+    -------  --------  --------  ----------  ----------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls   1         1      false
+    default  10000     autotest  20.20.20.1  ipv4 mpls   1         1      false
+    default  10000     static    ::                      2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name  path_information  nexthop    labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  ----------  ----------------  ---------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                      200.0.0.1         200.0.0.1          0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls   200.0.0.1:10001   200.0.0.1  1100    10                        incomplete  0    n/s          13238:1:1
+    default  10000     1.0.0.0/24  autotest  20.20.20.1  ipv4 mpls   200.0.0.1:10001   200.0.0.1  1200    100                       incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                        ::                 0                                     0    n/s          n/s
+
+# only one route should survive in fib
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop    label  egress_interface  peer  weight (%)
+    ----------------------  ---------  -----  ----------------  ----  ----------
+    kni0                    200.0.0.1  1200   kni0.200                100.00
+
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+
+# without manual interference, this one messes with the next autottest
+- cli: |
+    rib static remove default 0.0.0.0/0 200.0.0.1
+
+- echo: "31 fib rebuild - DONE"

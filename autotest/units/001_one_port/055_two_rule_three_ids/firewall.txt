@@ -1,0 +1,7 @@
+:BEGIN
+add skipto :IN ip from any to any in
+
+:IN
+add allow tcp from 2020:ddd:c00:0:abcd::/ffff:ffff:ff00:0:ffff:: to any 80
+add allow tcp from 2020:ddd:c00::/48 to any 22
+add deny ip from any to any

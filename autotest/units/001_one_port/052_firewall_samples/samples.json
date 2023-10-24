@@ -1,0 +1,7 @@
+[
+{"in_iface":"lp0.100","out_iface":"lp0.200","proto":6,"src_addr":"1.1.1.1","src_port":53,"dst_addr":"11.0.0.1","dst_port":1024},
+{"in_iface":"lp0.100","out_iface":"lp0.200","proto":6,"src_addr":"11.0.0.1","src_port":1024,"dst_addr":"1.1.1.1","dst_port":53},
+{"in_iface":"lp0.100","out_iface":"lp0.200","proto":6,"src_addr":"11.0.0.1","src_port":1025,"dst_addr":"1.1.1.1","dst_port":53},
+{"in_iface":"lp0.200","out_iface":"lp0.100","proto":6,"src_addr":"2111:aaa:ff1c:2030::1","src_port":53,"dst_addr":"1111:2222::1","dst_port":1024},
+{"in_iface":"lp0.200","out_iface":"lp0.100","proto":6,"src_addr":"1111:2222::1","src_port":1024,"dst_addr":"2111:aaa:ff1c:2030::1","dst_port":53},
+{"in_iface":"lp0.200","out_iface":"lp0.100","proto":6,"src_addr":"1111:2222::1","src_port":1025,"dst_addr":"2111:aaa:ff1c:2030::1","dst_port":53}]

@@ -1,0 +1,24 @@
+## uncomment to try Slow Worker Normal Priority Ring rate limiter with ICMPs which should be processed by slow worker (no real state existing on this balancer)
+## most probably ring will be full prior to rate limiter actually being triggered 
+
+# steps:
+# - ipv4Update: 
+#   - "0.0.0.0/0 -> 202.0.0.1"
+#   - "102.0.0.0/8 -> 102.0.0.5"
+# - ipv6Update:
+#   - "2020:ddd:3333::/64 -> 2202::1"
+#   - "::/0 -> fe80::1"
+# - cli:
+#   - balancer real enable balancer0 10.0.0.34 tcp 80 2013::1 80
+#   - balancer real flush
+
+# - cli_check: |
+#     balancer real balancer0 10.0.0.34
+#     module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+#     ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+#     balancer0  10.0.0.34   tcp    80            rr         2013::1  80         true     1       0            0        0
+
+# - sendPackets:
+#   - port: kni0
+#     send: 001-send.pcap
+#     expect: 001-expect.pcap

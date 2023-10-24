@@ -1,0 +1,39 @@
+:BEGIN
+table _SKIPTO_DST_PREFIX_ add 213.180.192.0/19 :TUN64_SKP1
+table _SKIPTO_DST_PREFIX_ add 213.180.200.0/25 :TUN64_SKP2
+table _SKIPTO_DST_PREFIX_ add 213.180.207.112/28 :TUN64_SKP3
+table _SKIPTO_DST_PREFIX_ add 213.180.207.64/27 :TUN64_SKP4
+table _SKIPTO_DST_PREFIX_ add 77.88.56.64/26 :TUN64_SKP5
+table _SKIPTO_DST_PREFIX_ add 77.88.46.0/25 :TUN64_SKP2
+
+add skipto tablearg ip from any to table(_SKIPTO_DST_PREFIX_)
+add deny ip from any to any
+
+:TUN64_SKP1
+add deny tcp from any to any setup
+add allow tcp from any to any
+add deny log logamount 500 all from any to any
+
+:TUN64_SKP2
+add allow tcp from any to any http,https
+add deny tcp from any to any setup
+add allow tcp from any to any
+add deny log logamount 500 all from any to any
+
+:TUN64_SKP3
+add allow tcp from any to any dst-port 1024-65535
+add allow udp from any to any dst-port 1024-65535
+add deny log logamount 500 all from any to any
+
+:TUN64_SKP4
+add allow udp from any 500,4500 to any
+add allow esp from any to any
+add deny tcp from any to any setup
+add allow tcp from any to any
+add deny log logamount 500 all from any to any
+
+:TUN64_SKP5
+add deny tcp from any to any setup
+add allow udp from any src-port 53 to any dst-port 1025-65535
+add allow ip from any to any keep-state in
+add deny log logamount 500 all from any to any
