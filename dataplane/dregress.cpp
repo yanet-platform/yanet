@@ -144,8 +144,19 @@ void dregress_t::insert(rte_mbuf* mbuf)
 			if (tcp_parse(mbuf, rtt, loss_count, ack_count))
 			{
 				stats.tcp_insert_sessions++;
+				uint8_t flags = 0;
 
-				connections->insert(key, {loss_count, ack_count, labelled_nexthop, label, community, prefix_address, peer_as, origin_as, (uint16_t)controlplane->currentTime, (is_best ? YANET_DREGRESS_FLAG_IS_BEST : (uint8_t)0), prefix_mask});
+				if (is_best)
+				{
+					flags |= YANET_DREGRESS_FLAG_IS_BEST;
+				}
+
+				if (nexthop.is_ipv4())
+				{
+					flags |= YANET_DREGRESS_FLAG_NH_IS_IPV4;
+				}
+
+				connections->insert(key, {loss_count, ack_count, labelled_nexthop, label, community, prefix_address, peer_as, origin_as, (uint16_t)controlplane->currentTime, flags, prefix_mask});
 
 				if (tcpHeader->tcp_flags & TCP_FIN_FLAG)
 				{
@@ -161,6 +172,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 				if (prefix.is_ipv4())
 				{
 					counters_v4.append(community,
+					                   nexthop,
 					                   is_best,
 					                   label,
 					                   peer_as,
@@ -171,6 +183,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 				else
 				{
 					counters_v6.append(community,
+					                   nexthop,
 					                   is_best,
 					                   label,
 					                   peer_as,
@@ -232,10 +245,21 @@ void dregress_t::insert(rte_mbuf* mbuf)
 					rtt_count = 0;
 				}
 
+				common::ip_address_t nexthop;
+				if (value->flags & YANET_DREGRESS_FLAG_NH_IS_IPV4)
+				{
+					nexthop = common::ip_address_t(4, value->nexthop.bytes);
+				}
+				else
+				{
+					nexthop = common::ip_address_t(6, value->nexthop.bytes);
+				}
+
 				std::lock_guard<std::mutex> guard(counters_mutex);
 				if (prefix.is_ipv4())
 				{
 					counters_v4.append(value->community,
+					                   nexthop,
 					                   value->flags & YANET_DREGRESS_FLAG_IS_BEST,
 					                   value->label,
 					                   value->peer_as,
@@ -246,6 +270,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 				else
 				{
 					counters_v6.append(value->community,
+					                   nexthop,
 					                   value->flags & YANET_DREGRESS_FLAG_IS_BEST,
 					                   value->label,
 					                   value->peer_as,

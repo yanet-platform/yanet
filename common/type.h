@@ -2477,6 +2477,7 @@ using value_t = std::tuple<common::ip_address_t, ///< nexthop
 
 using counters_t = common::ctree<4, ///< ack, loss, rtt_sum, rtt_count
                                  common::community_t,
+                                 common::ip_address_t, ///< nexthop
                                  bool, ///< is_best
                                  uint32_t, ///< label
                                  uint32_t, ///< peer_as

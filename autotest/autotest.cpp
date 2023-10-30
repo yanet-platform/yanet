@@ -991,6 +991,24 @@ bool tAutotest::step_rib_insert(const YAML::Node& yaml)
 				med = yaml_table["med"].as<uint32_t>();
 			}
 
+			std::vector<uint32_t> aspath;
+			if (yaml_table["aspath"].IsDefined())
+			{
+				for (const auto& yaml_aspath : yaml_table["aspath"])
+				{
+					aspath.emplace_back(yaml_aspath.as<uint32_t>());
+				}
+			}
+
+			std::set<community_t> communities;
+			if (yaml_table["communities"].IsDefined())
+			{
+				for (const auto& yaml_community : yaml_table["communities"])
+				{
+					communities.emplace(yaml_community.as<std::string>());
+				}
+			}
+
 			std::set<large_community_t> large_communities;
 			if (yaml_table["large_communities"].IsDefined())
 			{
@@ -1006,7 +1024,7 @@ bool tAutotest::step_rib_insert(const YAML::Node& yaml)
 				local_pref = yaml_table["local_pref"].as<uint32_t>();
 			}
 
-			auto& prefixes = attribute_tables[{peer, "incomplete", med, {}, {}, large_communities, local_pref}][table_name];
+			auto& prefixes = attribute_tables[{peer, "incomplete", med, aspath, communities, large_communities, local_pref}][table_name];
 
 			if (yaml_table["prefixes"].IsDefined())
 			{
