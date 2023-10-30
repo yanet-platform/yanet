@@ -365,8 +365,7 @@ void dregress()
 	std::map<common::community_t, std::string> communities;
 	for (const auto& [community, peer_link_orig] : communities_orig)
 	{
-		std::string peer_link = peer_link_orig;
-		replaceAll(peer_link, " ", "\\ ");
+		(void)peer_link_orig;
 
 		uint32_t link_id = 0;
 
@@ -375,10 +374,11 @@ void dregress()
 			link_id = static_cast<uint32_t>(community) & 0xFFFF;
 		}
 
-		communities[community] = std::to_string(link_id) + ",peer_link=" + peer_link;
+		communities[community] = std::to_string(link_id);
 	}
 
 	counters_v4.convert_update(communities,
+	                           {},
 	                           {{true, "best"},
 	                            {false, "alternative"}},
 	                           {},
@@ -386,6 +386,7 @@ void dregress()
 	                           {},
 	                           {});
 	counters_v6.convert_update(communities,
+	                           {},
 	                           {{true, "best"},
 	                            {false, "alternative"}},
 	                           {},
@@ -393,7 +394,8 @@ void dregress()
 	                           {},
 	                           {});
 
-	counters_v4.print({"link_id", // along with peer_name
+	counters_v4.print({"link_id",
+	                   "nexthop",
 	                   "route",
 	                   "label",
 	                   "peer_as",
@@ -417,7 +419,8 @@ void dregress()
 		                  }
 	                  });
 
-	counters_v6.print({"link_id", // along with peer_name
+	counters_v6.print({"link_id",
+	                   "nexthop",
 	                   "route",
 	                   "label",
 	                   "peer_as",
@@ -447,45 +450,45 @@ void dregress_traffic()
 	interface::controlPlane controlPlane;
 	const auto& [peer, peer_as] = controlPlane.telegraf_dregress_traffic();
 
-	for (const auto& [is_ipv4, peer_name_orig, packets, bytes] : peer)
+	for (const auto& [is_ipv4, link_id, nexthop, packets, bytes] : peer)
 	{
-		std::string peer_name = peer_name_orig;
-		replaceAll(peer_name, " ", "\\ ");
 
 		influxdb_format::print(is_ipv4 ? "dregress_traffic_v4" : "dregress_traffic_v6",
-		                       {{"peer_link", peer_name, {.optional_null = "n/s", .string_empty = "empty"}}},
+		                       {{"link_id", link_id},
+		                        {"nexthop", nexthop}},
 		                       {{"packets", packets},
 		                        {"bytes", bytes}});
 	}
 
 	std::map<std::tuple<bool, ///< is_ipv4
-	                    std::string>, ///< link_name
+	                    uint32_t, ///< link_id
+	                    std::string>, ///< nexthop
 	         std::tuple<common::uint64, ///< packets
 	                    common::uint64>>
 	        peer_only;
-	for (const auto& [is_ipv4, peer_name_orig, origin_as, packets, bytes] : peer_as)
+	for (const auto& [is_ipv4, link_id, nexthop, origin_as, packets, bytes] : peer_as)
 	{
-		std::string peer_name = peer_name_orig;
-		replaceAll(peer_name, " ", "\\ ");
 
 		influxdb_format::print(is_ipv4 ? "dregress_traffic_as_v4" : "dregress_traffic_as_v6",
-		                       {{"peer_link", peer_name, {.optional_null = "n/s", .string_empty = "empty"}},
+		                       {{"link_id", link_id},
+		                        {"nexthop", nexthop},
 		                        {"origin_as", origin_as}},
 		                       {{"packets", packets},
 		                        {"bytes", bytes}});
 
-		auto& [peer_only_packets, peer_only_bytes] = peer_only[{is_ipv4, peer_name}];
+		auto& [peer_only_packets, peer_only_bytes] = peer_only[{is_ipv4, link_id, nexthop}];
 		peer_only_packets += packets;
 		peer_only_bytes += bytes;
 	}
 
 	for (const auto& [key, value] : peer_only)
 	{
-		const auto& [is_ipv4, peer_name] = key;
+		const auto& [is_ipv4, link_id, nexthop] = key;
 		const auto& [packets, bytes] = value;
 
 		influxdb_format::print(is_ipv4 ? "dregress_traffic_as_v4" : "dregress_traffic_as_v6",
-		                       {{"peer_link", peer_name, {.optional_null = "n/s", .string_empty = "empty"}}},
+		                       {{"link_id", link_id},
+		                        {"nexthop", nexthop}},
 		                       {{"packets", packets},
 		                        {"bytes", bytes}});
 	}

@@ -46,6 +46,7 @@
 
 #define YANET_DREGRESS_FLAG_FIN ((uint8_t)(1u << 0))
 #define YANET_DREGRESS_FLAG_IS_BEST ((uint8_t)(1u << 1))
+#define YANET_DREGRESS_FLAG_NH_IS_IPV4 ((uint8_t)(1u << 2))
 
 #define YANET_BALANCER_FLAG_ENABLED ((uint8_t)(1u << 0))
 #define YANET_BALANCER_FLAG_DST_IPV6 ((uint8_t)(1u << 1))

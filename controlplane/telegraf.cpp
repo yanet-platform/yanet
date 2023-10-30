@@ -223,7 +223,7 @@ common::icp::telegraf_dregress_traffic::response telegraf_t::telegraf_dregress_t
 		const auto counters = controlPlane->route.tunnel_counter.get_counters();
 		for (const auto& [key, value] : counters)
 		{
-			const auto& [is_ipv4, peer_id, origin_as] = key;
+			const auto& [is_ipv4, peer_id, nexthop, origin_as] = key;
 			const auto& [packets, bytes] = value;
 			(void)origin_as;
 
@@ -234,7 +234,7 @@ common::icp::telegraf_dregress_traffic::response telegraf_t::telegraf_dregress_t
 
 				if (packets > packets_prev)
 				{
-					auto& [peer_packets, peer_bytes] = route_tunnel_peer_counters[{is_ipv4, peer_id}];
+					auto& [peer_packets, peer_bytes] = route_tunnel_peer_counters[{is_ipv4, peer_id, nexthop}];
 					peer_packets += packets - packets_prev;
 					peer_bytes += bytes - bytes_prev;
 
@@ -244,7 +244,8 @@ common::icp::telegraf_dregress_traffic::response telegraf_t::telegraf_dregress_t
 						/// not fallback
 
 						response_peer_as.emplace_back(is_ipv4,
-						                              peers[peer_id],
+						                              peer_id,
+						                              nexthop.toString(),
 						                              origin_as,
 						                              packets - packets_prev,
 						                              bytes - bytes_prev);
@@ -255,10 +256,10 @@ common::icp::telegraf_dregress_traffic::response telegraf_t::telegraf_dregress_t
 
 		for (const auto& [key, value] : route_tunnel_peer_counters)
 		{
-			const auto& [is_ipv4, peer_id] = key;
+			const auto& [is_ipv4, peer_id, nexthop] = key;
 			const auto& [packets, bytes] = value;
 
-			response_peer.emplace_back(is_ipv4, peers[peer_id], packets, bytes);
+			response_peer.emplace_back(is_ipv4, peer_id, nexthop.toString(), packets, bytes);
 		}
 
 		dregress_traffic_counters_prev = counters;

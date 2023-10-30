@@ -74,6 +74,7 @@ using tunnel_lookup_t = std::tuple<ip_address_t, ///< nexthop
 /// @todo: vrf
 using tunnel_counter_key_t = std::tuple<bool, ///< is_ipv4
                                         uint32_t, ///< peer_id
+                                        ip_address_t, ///< nexthop
                                         uint32_t>; ///< origin_as
 
 class generation_t

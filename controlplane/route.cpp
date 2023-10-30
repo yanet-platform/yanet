@@ -11,8 +11,8 @@ eResult route_t::init()
 	}
 
 	tunnel_counter.init(&controlPlane->counter_manager);
-	tunnel_counter.insert({true, 0, 0}); ///< fallback v4
-	tunnel_counter.insert({false, 0, 0}); ///< fallback v6
+	tunnel_counter.insert({true, 0, ip_address_t(), 0}); ///< fallback v4
+	tunnel_counter.insert({false, 0, ip_address_t(), 0}); ///< fallback v6
 
 	controlPlane->register_command(common::icp::requestType::route_config, [this]() {
 		return route_config();
@@ -1374,11 +1374,10 @@ std::optional<uint32_t> route_t::tunnel_value_insert(const route::tunnel_value_k
 	{
 		for (const auto& [nexthop, label, peer_id, origin_as, weight] : *nexthops)
 		{
-			(void)nexthop;
 			(void)label;
 			(void)weight;
 
-			tunnel_counter.insert({fallback.is_ipv4(), peer_id, origin_as});
+			tunnel_counter.insert({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 		}
 	}
 
@@ -1398,11 +1397,10 @@ void route_t::tunnel_value_remove(const uint32_t& value_id)
 		{
 			for (const auto& [nexthop, label, peer_id, origin_as, weight] : *nexthops)
 			{
-				(void)nexthop;
 				(void)label;
 				(void)weight;
 
-				tunnel_counter.remove({fallback.is_ipv4(), peer_id, origin_as}, 20);
+				tunnel_counter.remove({fallback.is_ipv4(), peer_id, nexthop, origin_as}, 20);
 			}
 		}
 	}
@@ -1626,7 +1624,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 
 			if (exist(interfaces, egress_interface_id))
 			{
-				const auto counter_ids = tunnel_counter.get_ids({fallback.is_ipv4(), peer_id, origin_as});
+				const auto counter_ids = tunnel_counter.get_ids({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 
 				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop);
 				weights.emplace_back(weight);
@@ -1650,7 +1648,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 				const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight] = item;
 				(void)egress_interface_name;
 
-				const auto counter_ids = tunnel_counter.get_ids({fallback.is_ipv4(), peer_id, origin_as});
+				const auto counter_ids = tunnel_counter.get_ids({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 
 				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop);
 				weights.emplace_back(weight);

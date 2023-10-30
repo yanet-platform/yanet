@@ -265,12 +265,14 @@ using response = std::tuple<std::vector<uint8_t>, ///< dregress_counters_v4 + dr
 namespace telegraf_dregress_traffic
 {
 using peer = std::tuple<bool, ///< is_ipv4
-                        std::string, ///< link_name
+                        uint32_t, ///< link_id
+                        std::string, ///< nexthop
                         uint64_t, ///< packets
                         uint64_t>;
 
 using peer_as = std::tuple<bool, ///< is_ipv4
-                           std::string, ///< link_name
+                           uint32_t, ///< link_id
+                           std::string, ///< nexthop
                            uint32_t, ///< origin_as
                            uint64_t, ///< packets
                            uint64_t>; ///< bytes
