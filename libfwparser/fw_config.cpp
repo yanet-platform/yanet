@@ -777,6 +777,19 @@ void fw_config_t::set_dump_action_arg(const rule_t::action_arg_t& a)
     }
 }
 
+void fw_config_t::set_state_tag(const rule_t::state_tag& a) {
+    FW_CONF_DEBUG("index() = " << a.index());
+
+    if (std::holds_alternative<int64_t>(a))
+    {
+        m_curr_rule->tag = std::to_string(std::get<int64_t>(a));
+    }
+    else
+    {
+        m_curr_rule->tag = a;
+    }
+}
+
 void fw_config_t::add_rule_ports(const rule_t::ports_arg_t& ports)
 {
     FW_CONF_DEBUG("index() = " << ports.index());
@@ -830,6 +843,9 @@ void fw_config_t::add_rule_opcode(const rule_t::opcode_arg_t& value)
             break;
         case rule_t::opcode_t::KEEPSTATE:
             m_curr_rule->keepstate = true;
+            break;
+        case rule_t::opcode_t::CHECKSTATE:
+            m_curr_rule->checkstate = true;
             break;
         case rule_t::opcode_t::IPID:
             break;

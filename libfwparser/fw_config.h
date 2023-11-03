@@ -197,6 +197,7 @@ namespace ipfw {
         enum class opcode_t {
             DIRECTION,
             KEEPSTATE,
+            CHECKSTATE,
             IPID,
             IPLEN,
             IPTTL,
@@ -274,10 +275,13 @@ namespace ipfw {
                                           int64_t>;
         using opcode_arg_t = std::variant<common::range_t,
                                           uint32_t>;
+        using state_tag = std::variant<int64_t, std::string>;
 
         location_history_t location; // file:lineno
         rule_state_t state = rule_state_t::UNKNOWN;
         bool keepstate = false;
+        bool checkstate = false;
+
         bool log = false;           // has log option
         unsigned int logamount = 0; // log limit
         unsigned int setno = 0;     // set number
@@ -288,6 +292,7 @@ namespace ipfw {
 
         rule_action_t action{rule_action_t::DENY}; // rule action
         action_arg_t action_arg;                   // action argument
+        state_tag tag;                             // tag for check-state/keep-state
         proto_t proto;                             // list of IP protocols
         address_t src, dst;                        // sourc/destination
         bool src_targ, dst_targ;                   // skipto tablearg src/dst
@@ -415,6 +420,7 @@ namespace ipfw {
         void set_rule_action(rule_action_t);
         void set_rule_action_arg(const rule_t::action_arg_t&);
         void set_dump_action_arg(const rule_t::action_arg_t&);
+        void set_state_tag(const rule_t::state_tag&);
         void set_rule_log()
         {
             m_curr_rule->log = true;

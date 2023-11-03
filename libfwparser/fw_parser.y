@@ -254,7 +254,7 @@ add:
 		cfg.fill_rule_text();
 	}
 	|
-	ADDRULE rulenumber checkstate EOL
+	ADDRULE rulenumber checkstate_action EOL
 	{
 		cfg.fill_rule_text();
 	}
@@ -277,7 +277,7 @@ comment:
 	{
 	}
 	;
-checkstate:
+checkstate_action:
 	CHECKSTATE
 	{
 		cfg.set_rule_action(rule_action_t::CHECKSTATE);
@@ -1248,9 +1248,15 @@ optiontoken:
 	}
 	icmptypes
 	|
-	keepstate
+	keepstate 
 	{
 		cfg.set_rule_opcode(rule_t::opcode_t::KEEPSTATE);
+		cfg.add_rule_opcode(1);
+	}
+	|
+	checkstate 
+	{
+		cfg.set_rule_opcode(rule_t::opcode_t::CHECKSTATE);
 		cfg.add_rule_opcode(1);
 	}
 	|
@@ -1441,7 +1447,12 @@ fragtoken:
 keepstate:
 	KEEPSTATE
 	|
-	KEEPSTATE LABEL
+	KEEPSTATE state_tag
+	;
+checkstate:
+	CHECKSTATE
+	|
+	CHECKSTATE state_tag
 	;
 dscpspec:
 	dscpspectoken
@@ -2019,12 +2030,23 @@ nptv6config:
 dump_tag:
 	TOKEN
 	{
-	cfg.set_dump_action_arg($1);
+		cfg.set_dump_action_arg($1);
 	}
 	|
 	NUMBER
 	{
-	cfg.set_dump_action_arg($1);
+		cfg.set_dump_action_arg($1);
+	}
+	;
+state_tag:
+	TOKEN
+	{
+		сfg.set_state_tag($1);
+	}
+	|
+	NUMBER
+	{
+		сfg.set_state_tag($1);
 	}
 	;
 nptv6token:
