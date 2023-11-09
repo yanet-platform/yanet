@@ -30,3 +30,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iproute2
 
 COPY --from=builder /target/bin/* /usr/bin/
+COPY --from=builder /target/share /usr/share

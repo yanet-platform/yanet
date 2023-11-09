@@ -31,3 +31,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libibverbs-dev
 
 COPY --from=builder /target/bin/* /usr/bin/
+COPY --from=builder /target/share /usr/share
