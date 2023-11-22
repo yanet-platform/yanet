@@ -659,6 +659,11 @@ void tAutotest::recvThread(std::string interfaceName,
 				}
 			}
 			success = false;
+
+			if (expect_pcaps.size() == 1)
+			{
+				expect_pcaps[0].advance();
+			}
 		}
 
 		packetsCount++;
