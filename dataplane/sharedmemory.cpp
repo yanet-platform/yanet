@@ -25,10 +25,11 @@ void cSharedMemory::write(rte_mbuf* mbuf)
 
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-	item->header.tag = metadata->hash;
-	item->header.size = mbuf->data_len;
+	uint64_t memory_size = buffer.unit_size - sizeof(cSharedMemory::ring_header_t);
+	uint64_t copy_size = RTE_MIN(memory_size, mbuf->data_len);
 
-	uint64_t copy_size = RTE_MIN(buffer.unit_size, mbuf->data_len);
+	item->header.size = copy_size;
+	item->header.tag = metadata->hash;
 
 	memcpy(item->memory,
 	       rte_pktmbuf_mtod(mbuf, void*),
