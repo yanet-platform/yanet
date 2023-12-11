@@ -55,6 +55,7 @@ eResult cControlPlane::init(const std::string& jsonFilePath)
 	modules.emplace_back(&fqdn);
 	modules.emplace_back(&durations);
 	modules.emplace_back(&nat64stateful);
+	modules.emplace_back(&nat46clat);
 
 	for (auto* module : modules)
 	{

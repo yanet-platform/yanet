@@ -30,6 +30,7 @@ using tRouteId = uint32_t;
 using nat64stateful_id_t = uint32_t;
 using tNat64statelessId = uint32_t;
 using tNat64statelessTranslationId = uint32_t;
+using nat46clat_id_t = uint32_t;
 using tAclId = uint32_t;
 using tAclRuleId = uint32_t;
 using tAclGroupId = uint32_t;
@@ -2147,6 +2148,8 @@ enum class eFlowType : uint8_t
 	after_early_decap,
 	slowWorker_balancer_icmp_forward,
 	balancer_fragment,
+	nat46clat_lan,
+	nat46clat_wan,
 };
 
 inline const char* eFlowType_toString(eFlowType t)
@@ -2229,6 +2232,10 @@ inline const char* eFlowType_toString(eFlowType t)
 			return "slowWorker_balancer_icmp_forward";
 		case eFlowType::balancer_fragment:
 			return "balancer_fragment";
+		case eFlowType::nat46clat_lan:
+			return "nat46clat_lan";
+		case eFlowType::nat46clat_wan:
+			return "nat46clat_wan";
 	}
 
 	return "unknown";
@@ -2255,6 +2262,7 @@ union tFlowData
 	tDecapId decapId;
 	tRouteId routeId;
 	nat64stateful_id_t nat64stateful_id;
+	nat46clat_id_t nat46clat_id;
 	dregress_id_t dregressId;
 	tun64_id_t tun64Id;
 
