@@ -13,6 +13,7 @@
 
 #include "controlplaneconfig.h"
 #include "counters.h"
+#include "nat46clat.h"
 #include "result.h"
 #include "type.h"
 
@@ -84,6 +85,9 @@ enum class requestType : uint32_t
 	controlplane_durations,
 	version,
 	getFwLabels,
+	nat46clat_config,
+	nat46clat_announce,
+	nat46clat_stats,
 	size
 };
 
@@ -209,6 +213,12 @@ inline const char* requestType_toString(requestType t)
 			return "version";
 		case requestType::getFwLabels:
 			return "getFwLabels";
+		case requestType::nat46clat_config:
+			return "nat46clat_config";
+		case requestType::nat46clat_announce:
+			return "nat46clat_announce";
+		case requestType::nat46clat_stats:
+			return "nat46clat_stats";
 		case requestType::size:
 			return "unknown";
 	}
@@ -576,6 +586,25 @@ using announce = std::tuple<std::string, ///< module
 using response = std::set<announce>;
 }
 
+namespace nat46clat_announce
+{
+using announce = std::tuple<std::string, ///< module_name
+                            common::ip_prefix_t>;
+
+using response = std::vector<announce>;
+}
+
+namespace nat46clat_config
+{
+using response = std::map<std::string, nat46clat::config>;
+}
+
+namespace nat46clat_stats
+{
+using response = std::map<std::string, ///< module_name
+                          std::array<uint64_t, (size_t)nat46clat::module_counter::enum_size>>;
+}
+
 namespace getNat64statelessTranslations
 {
 using response = std::map<std::tuple<std::string, ///< moduleName
@@ -931,7 +960,10 @@ using response = std::variant<std::tuple<>,
                               resolve_fqdn_to_ip::response,
                               controlplane_durations::response,
                               version::response,
-                              loadConfig::response>;
+                              loadConfig::response,
+                              nat46clat_config::response,
+                              nat46clat_announce::response,
+                              nat46clat_stats::response>;
 }
 
 }
