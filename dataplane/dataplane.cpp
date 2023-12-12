@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <cstdint>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -30,6 +31,7 @@
 #include "dataplane.h"
 #include "report.h"
 #include "sock_dev.h"
+#include "tsc_deltas.h"
 #include "worker.h"
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_INFO;
@@ -1248,6 +1250,17 @@ eResult cDataPlane::allocateSharedMemory()
 		}
 	}
 
+	for (const auto& [socket_id, num] : number_of_workers_per_socket)
+	{
+		auto it = shm_size_per_socket.find(socket_id);
+		if (it == shm_size_per_socket.end())
+		{
+			it = shm_size_per_socket.emplace_hint(it, socket_id, 0);
+		}
+		it->second += sizeof(dataplane::perf::num_of_workers);
+		it->second += sizeof(dataplane::perf::tsc_deltas) * (num + ((int)socket_id == numa_node_of_cpu(config.controlPlaneCoreId)));
+	}
+
 	/// allocating IPC shared memory
 	key_t key = YANET_DEFAULT_IPC_SHMKEY;
 	for (const auto& [socket_id, size] : shm_size_per_socket)
@@ -1279,8 +1292,7 @@ eResult cDataPlane::allocateSharedMemory()
 			YADECAP_LOG_ERROR("shmat(%d, NULL, %d) = %d\n", shmid, 0, errno);
 			return eResult::errorInitSharedMemory;
 		}
-
-		shm_by_socket_id[socket_id] = std::make_tuple(key, shmaddr);
+		shm_by_socket_id[socket_id] = std::make_tuple(key, shmaddr, number_of_workers_per_socket[socket_id]);
 
 		key++;
 	}
@@ -1312,7 +1324,8 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 			continue;
 		}
 
-		const auto& [key, shm] = it->second;
+		const auto& key = std::get<0>(it->second);
+		const auto& shm = std::get<1>(it->second);
 
 		int ring_id = 0;
 		for (const auto& [tag, ring_cfg] : config.shared_memory)
@@ -1352,6 +1365,33 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 
 			ring_id++;
 		}
+	}
+
+	for (const auto& [socket_id, shm_info] : shm_by_socket_id)
+	{
+		const auto& shm = std::get<1>(shm_info);
+		const auto& number_of_workers = std::get<2>(shm_info);
+
+		auto num_of_workers = (dataplane::perf::num_of_workers*)((intptr_t)shm + offsets[shm]);
+		num_of_workers->number = number_of_workers + ((int)socket_id == numa_node_of_cpu(config.controlPlaneCoreId));
+		offsets[shm] += sizeof(dataplane::perf::num_of_workers);
+	}
+
+	for (auto& core_id_to_worker : workers)
+	{
+		auto worker = std::get<1>(core_id_to_worker);
+
+		const auto& socket_id = worker->socketId;
+		const auto& it = shm_by_socket_id.find(socket_id);
+		if (it == shm_by_socket_id.end())
+		{
+			continue;
+		}
+		const auto& shm = std::get<1>(it->second);
+
+		worker->tsc_deltas = (dataplane::perf::tsc_deltas*)((intptr_t)shm + offsets[shm]);
+		memset(worker->tsc_deltas, 0, sizeof(dataplane::perf::tsc_deltas));
+		offsets[shm] += sizeof(dataplane::perf::tsc_deltas);
 	}
 
 	return eResult::success;

@@ -1,6 +1,8 @@
+#include <cstdint>
 #include <string>
 #include <thread>
 
+#include <rte_cycles.h>
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 #include <rte_ether.h>
@@ -509,10 +511,24 @@ inline void cWorker::handlePackets()
 	const auto& base = bases[localBaseId & 1];
 	const auto& globalbase = *base.globalBase;
 
+	auto tsc_start = rte_get_tsc_cycles();
+	uint64_t tsc_end;
+	tsc_deltas->iter_num++;
+
 	logicalPort_ingress_handle();
+	tsc_end = rte_get_tsc_cycles();
+	tsc_deltas->logicalPort_ingress_handle += tsc_end - tsc_start;
+	tsc_start = tsc_end;
 
 	acl_ingress_handle4();
+	tsc_end = rte_get_tsc_cycles();
+	tsc_deltas->acl_ingress_handle4 += tsc_end - tsc_start;
+	tsc_start = tsc_end;
+
 	acl_ingress_handle6();
+	tsc_end = rte_get_tsc_cycles();
+	tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+	tsc_start = tsc_end;
 
 	if (globalbase.early_decap_enabled)
 	{
@@ -521,6 +537,9 @@ inline void cWorker::handlePackets()
 			acl_ingress_stack4 = after_early_decap_stack4;
 			after_early_decap_stack4.clear();
 			acl_ingress_handle4();
+			tsc_end = rte_get_tsc_cycles();
+			tsc_deltas->acl_ingress_handle4 += tsc_end - tsc_start;
+			tsc_start = tsc_end;
 		}
 
 		if (after_early_decap_stack6.mbufsCount > 0)
@@ -528,53 +547,119 @@ inline void cWorker::handlePackets()
 			acl_ingress_stack6 = after_early_decap_stack6;
 			after_early_decap_stack6.clear();
 			acl_ingress_handle6();
+			tsc_end = rte_get_tsc_cycles();
+			tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+			tsc_start = tsc_end;
 		}
 	}
 
 	if (globalbase.tun64_enabled)
 	{
 		tun64_ipv4_handle();
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->tun64_ipv4_handle += tsc_end - tsc_start;
+		tsc_start = tsc_end;
+
 		tun64_ipv6_handle();
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->tun64_ipv6_handle += tsc_end - tsc_start;
+		tsc_start = tsc_end;
 	}
 
 	if (globalbase.decap_enabled)
 	{
 		decap_handle();
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->decap_handle += tsc_end - tsc_start;
+		tsc_start = tsc_end;
 	}
 
 	if (globalbase.nat64stateful_enabled)
 	{
 		nat64stateful_lan_handle();
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+		tsc_start = tsc_end;
+
 		nat64stateful_wan_handle();
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+		tsc_start = tsc_end;
 	}
 
 	if (globalbase.nat64stateless_enabled)
 	{
 		nat64stateless_ingress_handle();
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+		tsc_start = tsc_end;
+
 		nat64stateless_egress_handle();
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+		tsc_start = tsc_end;
 	}
 
 	if (globalbase.balancer_enabled)
 	{
 		balancer_handle();
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+		tsc_start = tsc_end;
 
 		balancer_icmp_reply_handle(); // balancer replies instead of real (when client pings VS)
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+		tsc_start = tsc_end;
+
 		balancer_icmp_forward_handle(); // forward icmp message to other balancers (if not sent to one of this balancer's reals)
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+		tsc_start = tsc_end;
 	}
 
 	route_handle4();
+	tsc_end = rte_get_tsc_cycles();
+	tsc_deltas->route_handle4 += tsc_end - tsc_start;
+	tsc_start = tsc_end;
+
 	route_handle6();
+	tsc_end = rte_get_tsc_cycles();
+	tsc_deltas->route_handle6 += tsc_end - tsc_start;
+	tsc_start = tsc_end;
+
 	route_tunnel_handle4();
+	tsc_end = rte_get_tsc_cycles();
+	tsc_deltas->route_tunnel_handle4 += tsc_end - tsc_start;
+	tsc_start = tsc_end;
+
 	route_tunnel_handle6();
+	tsc_end = rte_get_tsc_cycles();
+	tsc_deltas->route_tunnel_handle6 += tsc_end - tsc_start;
+	tsc_start = tsc_end;
 
 	if (globalbase.acl_egress_enabled)
 	{
 		acl_egress_handle4();
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->acl_egress_handle4 += tsc_end - tsc_start;
+		tsc_start = tsc_end;
+
 		acl_egress_handle6();
+		tsc_end = rte_get_tsc_cycles();
+		tsc_deltas->acl_egress_handle6 += tsc_end - tsc_start;
+		tsc_start = tsc_end;
 	}
 
 	logicalPort_egress_handle();
+	tsc_end = rte_get_tsc_cycles();
+	tsc_deltas->logicalPort_egress_handle += tsc_end - tsc_start;
+	tsc_start = tsc_end;
+
 	controlPlane_handle();
+	tsc_end = rte_get_tsc_cycles();
+	tsc_deltas->controlPlane_handle += tsc_end - tsc_start;
+
 	physicalPort_egress_handle();
 }
 
@@ -2199,6 +2284,8 @@ inline void cWorker::route_tunnel_handle6()
 		return;
 	}
 
+	auto tsc_start = rte_get_tsc_cycles();
+
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_tunnel_stack6.mbufsCount;
 	     mbuf_i++)
@@ -2292,6 +2379,9 @@ inline void cWorker::route_tunnel_handle6()
 	}
 
 	route_tunnel_stack6.clear();
+
+	auto tsc_end = rte_get_tsc_cycles();
+	tsc_deltas->route_tunnel_handle6 += tsc_end - tsc_start;
 }
 
 inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,

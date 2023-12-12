@@ -337,7 +337,7 @@ protected:
 	// array instead of the table - how many coreIds can be there?
 	std::unordered_map<uint32_t, std::unordered_map<std::string, uint64_t*>> coreId_to_stats_tables;
 
-	std::map<tSocketId, std::tuple<key_t, void*>> shm_by_socket_id;
+	std::map<tSocketId, std::tuple<key_t, void*, uint64_t>> shm_by_socket_id;
 
 	std::mutex hugepage_pointers_mutex;
 	std::map<void*, hugepage_pointer> hugepage_pointers;
