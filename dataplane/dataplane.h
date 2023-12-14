@@ -145,6 +145,7 @@ protected:
 
 	std::optional<uint64_t> getCounterValueByName(const std::string& counter_name, uint32_t coreId);
 	common::idp::get_shm_info::response getShmInfo();
+	common::idp::get_shm_tsc_info::response getShmTscInfo();
 
 	template<typename type,
 	         typename... args_t>
@@ -327,6 +328,7 @@ protected:
 	rte_mempool* mempool_log;
 
 	common::idp::get_shm_info::response dumps_meta;
+	common::idp::get_shm_tsc_info::response tscs_meta;
 	std::map<std::string, uint64_t> tag_to_id;
 
 	/// modules
@@ -337,7 +339,7 @@ protected:
 	// array instead of the table - how many coreIds can be there?
 	std::unordered_map<uint32_t, std::unordered_map<std::string, uint64_t*>> coreId_to_stats_tables;
 
-	std::map<tSocketId, std::tuple<key_t, void*, uint64_t>> shm_by_socket_id;
+	std::map<tSocketId, std::tuple<key_t, void*>> shm_by_socket_id;
 
 	std::mutex hugepage_pointers_mutex;
 	std::map<void*, hugepage_pointer> hugepage_pointers;

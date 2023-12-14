@@ -71,6 +71,7 @@ public:
 	common::idp::get_counter_by_name::response get_counter_by_name(const common::idp::get_counter_by_name::request& request);
 	common::idp::nat64stateful_state::response nat64stateful_state(const common::idp::nat64stateful_state::request& request);
 	common::idp::get_shm_info::response get_shm_info();
+	common::idp::get_shm_tsc_info::response get_shm_tsc_info();
 	eResult dump_physical_port(const common::idp::dump_physical_port::request& request);
 	eResult balancer_state_clear();
 

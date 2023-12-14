@@ -12,11 +12,6 @@ namespace dataplane
 namespace perf
 {
 
-struct num_of_workers
-{
-	uint64_t number;
-} __attribute__((__aligned__(64)));
-
 struct tsc_deltas
 {
 	uint64_t iter_num;

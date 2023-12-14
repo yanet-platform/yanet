@@ -850,4 +850,23 @@ void shm_info()
 	table.print();
 }
 
+void shm_tsc_info()
+{
+	interface::dataPlane dataplane;
+	const auto response = dataplane.get_shm_tsc_info();
+
+	table_t table;
+	table.insert("core id",
+	             "socket id",
+	             "ipc key",
+	             "offset");
+
+	for (const auto& [core, socket, ipc_key, offset] : response)
+	{
+		table.insert(core, socket, ipc_key, offset);
+	}
+
+	table.print();
+}
+
 }

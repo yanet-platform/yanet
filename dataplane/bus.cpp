@@ -339,6 +339,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::get_shm_info, request);
 		}
+		else if (type == common::idp::requestType::get_shm_tsc_info)
+		{
+			response = callWithResponse(&cControlPlane::get_shm_tsc_info, request);
+		}
 		else if (type == common::idp::requestType::dump_physical_port)
 		{
 			response = callWithResponse(&cControlPlane::dump_physical_port, request);
