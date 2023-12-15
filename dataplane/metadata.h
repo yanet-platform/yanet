@@ -6,7 +6,7 @@
 
 #include "common/type.h"
 
-#include "type.h"
+#include "common.h"
 
 namespace dataplane
 {

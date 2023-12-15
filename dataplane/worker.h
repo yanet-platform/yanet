@@ -127,7 +127,7 @@ protected:
 	/// nat64stateful lan (ipv6)
 	inline void nat64stateful_lan_entry(rte_mbuf* mbuf);
 	inline void nat64stateful_lan_handle();
-	inline void nat64stateful_lan_translation(rte_mbuf* mbuf, const dataplane::globalBase::nat64stateful_lan_value& value);
+	inline void nat64stateful_lan_translation(rte_mbuf* mbuf, const dataplane::globalBase::nat64stateful_t& nat64stateful, const dataplane::globalBase::nat64stateful_lan_value& value);
 	inline void nat64stateful_lan_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 
 	/// nat64stateful wan (ipv4)
@@ -241,8 +241,6 @@ protected:
 
 	dataplane::base::permanently basePermanently;
 
-	uint32_t nat64stateful_packet_id;
-	uint32_t nat64statelessPacketId;
 	uint32_t translation_packet_id;
 
 	uint32_t hashes[CONFIG_YADECAP_MBUFS_BURST_SIZE];
