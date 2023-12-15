@@ -6,8 +6,6 @@
 
 #include "base.h"
 #include "common.h"
-#include "globalbase.h"
-#include "samples.h"
 
 #include "common/generation.h"
 #include "common/idp.h"

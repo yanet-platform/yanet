@@ -1,7 +1,7 @@
 #pragma once
 
-#include "common.h"
 #include "metadata.h"
+#include "type.h"
 
 inline bool prepareL3(rte_mbuf* mbuf, dataplane::metadata* metadata)
 {
