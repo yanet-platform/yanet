@@ -12,6 +12,8 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
+#include "common/counters.h"
+
 #include "checksum.h"
 #include "common.h"
 #include "dataplane.h"
@@ -32,6 +34,7 @@ cWorker::cWorker(cDataPlane* dataPlane) :
         localBaseId(0),
         nat64stateful_packet_id(0),
         nat64statelessPacketId(0),
+        translation_packet_id(0),
         ring_highPriority(nullptr),
         ring_normalPriority(nullptr),
         ring_lowPriority(nullptr),
@@ -504,6 +507,350 @@ void cWorker::preparePacket(rte_mbuf* mbuf)
 	}
 }
 
+inline void cWorker::translation_ipv4_to_ipv6(rte_mbuf* mbuf,
+                                              const ipv6_address_t& ipv6_source,
+                                              const ipv6_address_t& ipv6_destination,
+                                              const uint32_t port_source,
+                                              const uint32_t port_destination,
+                                              const uint32_t identifier)
+{
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+
+	uint16_t checksum_before = 0;
+	uint16_t checksum_after = 0;
+	uint16_t payload_length = 0;
+
+	/// L3 layer translation
+	{
+		rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+		checksum_before = yanet_checksum(&ipv4_header->src_addr, 8);
+
+		uint16_t ipv6_header_size = sizeof(rte_ipv6_hdr) + ((metadata->network_flags & YANET_NETWORK_FLAG_FRAGMENT) ? sizeof(ipv6_extension_fragment_t) : 0);
+		uint16_t ipv4_header_size = (metadata->transport_headerOffset - metadata->network_headerOffset);
+
+		uint16_t packet_id = ipv4_header->packet_id;
+		uint16_t fragment_offset = ipv4_header->fragment_offset;
+
+		ipv6_header_without_addresses_t ipv6_header_short;
+		ipv6_header_short.vtc_flow = rte_cpu_to_be_32((0x6 << 28) | (ipv4_header->type_of_service << 20)); ///< @todo: flow label
+		ipv6_header_short.payload_len = rte_cpu_to_be_16(rte_be_to_cpu_16(ipv4_header->total_length) - 4 * (ipv4_header->version_ihl & 0x0F) + (ipv6_header_size - sizeof(rte_ipv6_hdr)));
+		ipv6_header_short.proto = metadata->transport_headerType;
+		ipv6_header_short.hop_limits = ipv4_header->time_to_live;
+
+		if (ipv6_header_size >= ipv4_header_size)
+		{
+			rte_pktmbuf_prepend(mbuf, ipv6_header_size - ipv4_header_size);
+			memmove(rte_pktmbuf_mtod(mbuf, char*),
+			        rte_pktmbuf_mtod_offset(mbuf, char*, ipv6_header_size - ipv4_header_size),
+			        metadata->network_headerOffset);
+		}
+		else
+		{
+			memmove(rte_pktmbuf_mtod_offset(mbuf, char*, ipv4_header_size - ipv6_header_size),
+			        rte_pktmbuf_mtod(mbuf, char*),
+			        metadata->network_headerOffset);
+			rte_pktmbuf_adj(mbuf, ipv4_header_size - ipv6_header_size);
+		}
+
+		metadata->network_fragmentHeaderOffset = metadata->network_headerOffset + sizeof(rte_ipv6_hdr);
+		metadata->transport_headerOffset = metadata->network_headerOffset + ipv6_header_size;
+
+		/// @todo: check for ethernetHeader or vlanHeader
+		uint16_t* next_header_type = rte_pktmbuf_mtod_offset(mbuf, uint16_t*, metadata->network_headerOffset - 2);
+		*next_header_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
+
+		rte_ipv6_hdr* ipv6_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		rte_memcpy(ipv6_header, &ipv6_header_short, sizeof(ipv6_header_without_addresses_t));
+
+		if (metadata->transport_headerType == IPPROTO_ICMP)
+		{
+			ipv6_header->proto = IPPROTO_ICMPV6;
+		}
+
+		if (metadata->network_flags & YANET_NETWORK_FLAG_FRAGMENT)
+		{
+			ipv6_extension_fragment_t* extension = rte_pktmbuf_mtod_offset(mbuf, ipv6_extension_fragment_t*, metadata->network_fragmentHeaderOffset);
+
+			extension->nextHeader = ipv6_header->proto;
+			extension->reserved = 0;
+			extension->offsetFlagM = rte_cpu_to_be_16(rte_be_to_cpu_16(fragment_offset) << 3);
+			extension->offsetFlagM |= (fragment_offset & 0x0020) << 3;
+			extension->identification = packet_id;
+
+			ipv6_header->proto = IPPROTO_FRAGMENT;
+
+			metadata->network_flags |= YANET_NETWORK_FLAG_HAS_EXTENSION;
+		}
+
+		rte_memcpy(ipv6_header->src_addr, ipv6_source.bytes, 16);
+		rte_memcpy(ipv6_header->dst_addr, ipv6_destination.bytes, 16);
+
+		payload_length = rte_be_to_cpu_16(ipv6_header->payload_len);
+
+		checksum_after = yanet_checksum(&ipv6_header->src_addr[0], 32);
+	}
+
+	/// L4 layer translation
+	if (!(metadata->network_flags & YANET_NETWORK_FLAG_NOT_FIRST_FRAGMENT))
+	{
+		if (metadata->transport_headerType == IPPROTO_TCP)
+		{
+			rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+
+			if (port_source != translation_ignore)
+			{
+				checksum_before = csum_plus(checksum_before, tcp_header->src_port);
+				tcp_header->src_port = rte_cpu_to_be_16(port_source);
+				checksum_after = csum_plus(checksum_after, tcp_header->src_port);
+			}
+			if (port_destination != translation_ignore)
+			{
+				checksum_before = csum_plus(checksum_before, tcp_header->dst_port);
+				tcp_header->dst_port = rte_cpu_to_be_16(port_destination);
+				checksum_after = csum_plus(checksum_after, tcp_header->dst_port);
+			}
+
+			yanet_tcp_checksum_v4_to_v6(tcp_header, checksum_before, checksum_after);
+		}
+		else if (metadata->transport_headerType == IPPROTO_UDP)
+		{
+			rte_udp_hdr* udp_header = rte_pktmbuf_mtod_offset(mbuf, rte_udp_hdr*, metadata->transport_headerOffset);
+
+			if (port_source != translation_ignore)
+			{
+				checksum_before = csum_plus(checksum_before, udp_header->src_port);
+				udp_header->src_port = rte_cpu_to_be_16(port_source);
+				checksum_after = csum_plus(checksum_after, udp_header->src_port);
+			}
+			if (port_destination != translation_ignore)
+			{
+				checksum_before = csum_plus(checksum_before, udp_header->dst_port);
+				udp_header->dst_port = rte_cpu_to_be_16(port_destination);
+				checksum_after = csum_plus(checksum_after, udp_header->dst_port);
+			}
+
+			yanet_udp_checksum_v4_to_v6(udp_header, checksum_before, checksum_after);
+		}
+		else if (metadata->transport_headerType == IPPROTO_ICMP)
+		{
+			icmpv4_header_t* icmp_header = rte_pktmbuf_mtod_offset(mbuf, icmpv4_header_t*, metadata->transport_headerOffset);
+
+			checksum_before = csum_plus(0, icmp_header->typeCode);
+			if (icmp_header->type == ICMP_ECHO)
+			{
+				icmp_header->type = ICMP6_ECHO_REQUEST;
+			}
+			else if (icmp_header->type == ICMP_ECHOREPLY)
+			{
+				icmp_header->type = ICMP6_ECHO_REPLY;
+			}
+
+			checksum_after = csum_plus(checksum_after, rte_cpu_to_be_16(IPPROTO_ICMPV6));
+			if (metadata->network_flags & YANET_NETWORK_FLAG_FRAGMENT)
+			{
+				checksum_after = csum_plus(checksum_after, rte_cpu_to_be_16(metadata->payload_length));
+			}
+			else
+			{
+				checksum_after = csum_plus(checksum_after, rte_cpu_to_be_16(payload_length));
+			}
+			checksum_after = csum_plus(checksum_after, icmp_header->typeCode);
+
+			if (identifier != translation_ignore)
+			{
+				checksum_before = csum_plus(checksum_before, icmp_header->identifier);
+				icmp_header->identifier = rte_cpu_to_be_16(identifier);
+				checksum_after = csum_plus(checksum_after, icmp_header->identifier);
+			}
+
+			yanet_icmp_checksum_v4_to_v6(icmp_header, checksum_before, checksum_after);
+		}
+	}
+
+	preparePacket(mbuf);
+}
+
+inline void cWorker::translation_ipv6_to_ipv4(rte_mbuf* mbuf,
+                                              const ipv4_address_t& ipv4_source,
+                                              const ipv4_address_t& ipv4_destination,
+                                              const uint32_t port_source,
+                                              const uint32_t port_destination,
+                                              const uint32_t identifier)
+{
+#ifdef CONFIG_YADECAP_AUTOTEST
+#else // CONFIG_YADECAP_AUTOTEST
+	translation_packet_id++;
+#endif // CONFIG_YADECAP_AUTOTEST
+
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+
+	uint16_t checksum_before = 0;
+	uint16_t checksum_after = 0;
+	uint16_t payload_length = 0;
+
+	/// L3 layer translation
+	{
+		rte_ipv6_hdr* ipv6_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		checksum_before = yanet_checksum(&ipv6_header->src_addr[0], 32);
+
+		uint16_t packet_id = translation_packet_id;
+		uint16_t fragment_offset = 0; ///< @todo: rte_cpu_to_be_16(RTE_IPV4_HDR_DF_FLAG)
+		payload_length = rte_be_to_cpu_16(ipv6_header->payload_len);
+
+		if (metadata->network_flags & YANET_NETWORK_FLAG_FRAGMENT)
+		{
+			ipv6_extension_fragment_t* extension = rte_pktmbuf_mtod_offset(mbuf, ipv6_extension_fragment_t*, metadata->network_fragmentHeaderOffset);
+
+			packet_id = rte_hash_crc(&extension->identification, sizeof(extension->identification), 0) & 0xFFFF;
+			fragment_offset = rte_cpu_to_be_16(rte_be_to_cpu_16(extension->offsetFlagM) >> 3);
+			fragment_offset |= (extension->offsetFlagM & 0x0100) >> 3;
+		}
+
+		rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->transport_headerOffset - sizeof(rte_ipv4_hdr));
+		ipv4_header->version_ihl = 0x45;
+		ipv4_header->type_of_service = (rte_be_to_cpu_32(ipv6_header->vtc_flow) >> 20) & 0xFF;
+		ipv4_header->total_length = rte_cpu_to_be_16(payload_length + 20 - (metadata->transport_headerOffset - metadata->network_headerOffset - 40));
+		ipv4_header->packet_id = packet_id;
+		ipv4_header->fragment_offset = fragment_offset;
+		ipv4_header->time_to_live = ipv6_header->hop_limits;
+		ipv4_header->next_proto_id = metadata->transport_headerType;
+		ipv4_header->src_addr = ipv4_source.address;
+		ipv4_header->dst_addr = ipv4_destination.address;
+
+		if (metadata->transport_headerType == IPPROTO_ICMPV6)
+		{
+			ipv4_header->next_proto_id = IPPROTO_ICMP;
+		}
+
+		yanet_ipv4_checksum(ipv4_header);
+
+		checksum_after = yanet_checksum(&ipv4_header->src_addr, 8);
+
+		{
+			rte_memcpy(rte_pktmbuf_mtod_offset(mbuf, char*, metadata->transport_headerOffset - metadata->network_headerOffset - sizeof(rte_ipv4_hdr)),
+			           rte_pktmbuf_mtod(mbuf, char*),
+			           metadata->network_headerOffset);
+			rte_pktmbuf_adj(mbuf, metadata->transport_headerOffset - metadata->network_headerOffset - sizeof(rte_ipv4_hdr));
+
+			/// @todo: check for ethernetHeader or vlanHeader
+			uint16_t* next_header_type = rte_pktmbuf_mtod_offset(mbuf, uint16_t*, metadata->network_headerOffset - 2);
+			*next_header_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
+		}
+
+		metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv4_hdr);
+	}
+
+	/// L4 layer translation
+	if (!(metadata->network_flags & YANET_NETWORK_FLAG_NOT_FIRST_FRAGMENT))
+	{
+		if (metadata->transport_headerType == IPPROTO_TCP)
+		{
+			rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+
+			if (port_source != translation_ignore)
+			{
+				checksum_before = csum_plus(checksum_before, tcp_header->src_port);
+				tcp_header->src_port = rte_cpu_to_be_16(port_source);
+				checksum_after = csum_plus(checksum_after, tcp_header->src_port);
+			}
+			if (port_destination != translation_ignore)
+			{
+				checksum_before = csum_plus(checksum_before, tcp_header->dst_port);
+				tcp_header->dst_port = rte_cpu_to_be_16(port_destination);
+				checksum_after = csum_plus(checksum_after, tcp_header->dst_port);
+			}
+
+			yanet_tcp_checksum_v6_to_v4(tcp_header, checksum_before, checksum_after);
+		}
+		else if (metadata->transport_headerType == IPPROTO_UDP)
+		{
+			rte_udp_hdr* udp_header = rte_pktmbuf_mtod_offset(mbuf, rte_udp_hdr*, metadata->transport_headerOffset);
+
+			if (port_source != translation_ignore)
+			{
+				checksum_before = csum_plus(checksum_before, udp_header->src_port);
+				udp_header->src_port = rte_cpu_to_be_16(port_source);
+				checksum_after = csum_plus(checksum_after, udp_header->src_port);
+			}
+			if (port_destination != translation_ignore)
+			{
+				checksum_before = csum_plus(checksum_before, udp_header->dst_port);
+				udp_header->dst_port = rte_cpu_to_be_16(port_destination);
+				checksum_after = csum_plus(checksum_after, udp_header->dst_port);
+			}
+
+			yanet_udp_checksum_v6_to_v4(udp_header, checksum_before, checksum_after);
+		}
+		else if (metadata->transport_headerType == IPPROTO_ICMPV6)
+		{
+			icmpv6_header_t* icmp_header = rte_pktmbuf_mtod_offset(mbuf, icmpv6_header_t*, metadata->transport_headerOffset);
+
+			checksum_before = csum_plus(checksum_before, rte_cpu_to_be_16(IPPROTO_ICMPV6));
+			if (metadata->network_flags & YANET_NETWORK_FLAG_FRAGMENT)
+			{
+				checksum_before = csum_plus(checksum_before, rte_cpu_to_be_16(metadata->payload_length));
+			}
+			else
+			{
+				checksum_before = csum_plus(checksum_before, rte_cpu_to_be_16(payload_length));
+			}
+
+			checksum_before = csum_plus(checksum_before, icmp_header->typeCode);
+			if (icmp_header->type == ICMP6_ECHO_REQUEST)
+			{
+				icmp_header->type = ICMP_ECHO;
+			}
+			else if (icmp_header->type == ICMP6_ECHO_REPLY)
+			{
+				icmp_header->type = ICMP_ECHOREPLY;
+			}
+			checksum_after = csum_plus(0, icmp_header->typeCode);
+
+			if (identifier != translation_ignore)
+			{
+				checksum_before = csum_plus(checksum_before, icmp_header->identifier);
+				icmp_header->identifier = rte_cpu_to_be_16(identifier);
+				checksum_after = csum_plus(checksum_after, icmp_header->identifier);
+			}
+
+			yanet_icmp_checksum_v6_to_v4(icmp_header, checksum_before, checksum_after);
+		}
+	}
+
+	preparePacket(mbuf);
+}
+
+inline void cWorker::mark_ipv4_dscp(rte_mbuf* mbuf,
+                                    const uint8_t dscp_flags)
+{
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+	rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+
+	if (dscp_flags & YADECAP_GB_DSCP_FLAG_ALWAYS_MARK)
+	{
+		uint16_t checksum = ~rte_be_to_cpu_16(ipv4_header->hdr_checksum);
+		// removing previous value of dscp from checksum to replace its with value from config
+		checksum = csum_minus(checksum, ipv4_header->type_of_service & 0xFC);
+		checksum = csum_plus(checksum, dscp_flags & 0xFC);
+
+		ipv4_header->hdr_checksum = ~rte_cpu_to_be_16(checksum);
+		ipv4_header->type_of_service &= 0x3; ///< ECN
+		ipv4_header->type_of_service |= dscp_flags & 0xFC;
+	}
+	else if (dscp_flags & YADECAP_GB_DSCP_FLAG_MARK)
+	{
+		if (!(ipv4_header->type_of_service & 0xFC)) ///< DSCP == 0
+		{
+			uint16_t checksum = ~rte_be_to_cpu_16(ipv4_header->hdr_checksum);
+			// DSCP is equal to 0 anyway (condition above), nothing to remove from checksum
+			checksum = csum_plus(checksum, dscp_flags & 0xFC);
+
+			ipv4_header->hdr_checksum = ~rte_cpu_to_be_16(checksum);
+			ipv4_header->type_of_service |= dscp_flags & 0xFC;
+		}
+	}
+}
+
 inline void cWorker::handlePackets()
 {
 	const auto& base = bases[localBaseId & 1];
@@ -552,6 +899,12 @@ inline void cWorker::handlePackets()
 	{
 		nat64stateless_ingress_handle();
 		nat64stateless_egress_handle();
+	}
+
+	if (globalbase.nat46clat_enabled)
+	{
+		nat46clat_lan_handle();
+		nat46clat_wan_handle();
 	}
 
 	if (globalbase.balancer_enabled)
@@ -1386,6 +1739,14 @@ inline void cWorker::acl_ingress_flow(rte_mbuf* mbuf,
 	else if (flow.type == common::globalBase::eFlowType::nat64stateless_egress_farm)
 	{
 		nat64stateless_egress_entry_farm(mbuf);
+	}
+	else if (flow.type == common::globalBase::eFlowType::nat46clat_lan)
+	{
+		nat46clat_lan_entry(mbuf);
+	}
+	else if (flow.type == common::globalBase::eFlowType::nat46clat_wan)
+	{
+		nat46clat_wan_entry(mbuf);
 	}
 	else if (flow.type == common::globalBase::eFlowType::balancer)
 	{
@@ -3492,6 +3853,158 @@ inline void cWorker::nat64stateless_egress_translation(rte_mbuf* mbuf,
 
 	/// @todo: opt
 	preparePacket(mbuf);
+}
+
+inline void cWorker::nat46clat_lan_entry(rte_mbuf* mbuf)
+{
+	nat46clat_lan_stack.insert(mbuf);
+}
+
+inline void cWorker::nat46clat_lan_handle()
+{
+	const auto& base = bases[localBaseId & 1];
+
+	if (unlikely(nat46clat_lan_stack.mbufsCount == 0))
+	{
+		return;
+	}
+
+	for (unsigned int mbuf_i = 0;
+	     mbuf_i < nat46clat_lan_stack.mbufsCount;
+	     mbuf_i++)
+	{
+		rte_mbuf* mbuf = nat46clat_lan_stack.mbufs[mbuf_i];
+		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+
+		const auto& nat46clat = base.globalBase->nat46clats[metadata->flow.data.nat46clat_id];
+
+		nat46clat_lan_translation(mbuf, nat46clat);
+		nat46clat_lan_flow(mbuf, nat46clat.flow);
+	}
+
+	nat46clat_lan_stack.clear();
+}
+
+inline void cWorker::nat46clat_lan_translation(rte_mbuf* mbuf,
+                                               const dataplane::globalBase::nat46clat_t& nat46clat)
+{
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+	rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+
+	ipv6_address_t ipv6_source;
+	rte_memcpy(&ipv6_source.bytes[0], nat46clat.ipv6_source.bytes, 12);
+	rte_memcpy(&ipv6_source.bytes[12], &ipv4_header->src_addr, 4);
+
+	ipv6_address_t ipv6_destination;
+	rte_memcpy(&ipv6_destination.bytes[0], nat46clat.ipv6_destination.bytes, 12);
+	rte_memcpy(&ipv6_destination.bytes[12], &ipv4_header->dst_addr, 4);
+
+	translation_ipv4_to_ipv6(mbuf,
+	                         ipv6_source,
+	                         ipv6_destination,
+	                         translation_ignore,
+	                         translation_ignore,
+	                         translation_ignore);
+}
+
+inline void cWorker::nat46clat_lan_flow(rte_mbuf* mbuf,
+                                        const common::globalBase::tFlow& flow)
+{
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+	metadata->flow = flow;
+
+	if (flow.type == common::globalBase::eFlowType::route)
+	{
+		route_entry(mbuf);
+	}
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	{
+		route_tunnel_entry(mbuf);
+	}
+	else if (flow.type == common::globalBase::eFlowType::controlPlane)
+	{
+		controlPlane(mbuf);
+	}
+	else
+	{
+		drop(mbuf);
+	}
+}
+
+inline void cWorker::nat46clat_wan_entry(rte_mbuf* mbuf)
+{
+	nat46clat_wan_stack.insert(mbuf);
+}
+
+inline void cWorker::nat46clat_wan_handle()
+{
+	const auto& base = bases[localBaseId & 1];
+
+	if (unlikely(nat46clat_wan_stack.mbufsCount == 0))
+	{
+		return;
+	}
+
+	for (unsigned int mbuf_i = 0;
+	     mbuf_i < nat46clat_wan_stack.mbufsCount;
+	     mbuf_i++)
+	{
+		rte_mbuf* mbuf = nat46clat_wan_stack.mbufs[mbuf_i];
+		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+
+		const auto& nat46clat = base.globalBase->nat46clats[metadata->flow.data.nat46clat_id];
+
+		nat46clat_wan_translation(mbuf, nat46clat);
+		nat46clat_wan_flow(mbuf, nat46clat.flow);
+	}
+
+	nat46clat_wan_stack.clear();
+}
+
+inline void cWorker::nat46clat_wan_translation(rte_mbuf* mbuf,
+                                               const dataplane::globalBase::nat46clat_t& nat46clat)
+{
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+	rte_ipv6_hdr* ipv6_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+
+	ipv4_address_t ipv4_source;
+	rte_memcpy(&ipv4_source.address, &ipv6_header->src_addr[12], 4);
+
+	ipv4_address_t ipv4_destination;
+	rte_memcpy(&ipv4_destination.address, &ipv6_header->dst_addr[12], 4);
+
+	translation_ipv6_to_ipv4(mbuf,
+	                         ipv4_source,
+	                         ipv4_destination,
+	                         translation_ignore,
+	                         translation_ignore,
+	                         translation_ignore);
+
+	mark_ipv4_dscp(mbuf, nat46clat.ipv4_dscp_flags);
+}
+
+inline void cWorker::nat46clat_wan_flow(rte_mbuf* mbuf,
+                                        const common::globalBase::tFlow& flow)
+{
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+	metadata->flow = flow;
+
+	if (flow.type == common::globalBase::eFlowType::route)
+	{
+		route_entry(mbuf);
+	}
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	{
+		route_tunnel_entry(mbuf);
+	}
+	else if (flow.type == common::globalBase::eFlowType::controlPlane)
+	{
+		controlPlane(mbuf);
+	}
+	else
+	{
+		drop(mbuf);
+	}
 }
 
 inline void cWorker::balancer_entry(rte_mbuf* mbuf)

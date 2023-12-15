@@ -350,6 +350,15 @@ struct tNat64stateless
 	/// @todo: egressFlow;
 };
 
+struct nat46clat_t
+{
+	ipv6_address_t ipv6_source;
+	ipv6_address_t ipv6_destination;
+	tCounterId counter_id;
+	uint8_t ipv4_dscp_flags;
+	common::globalBase::tFlow flow;
+};
+
 static_assert(CONFIG_YADECAP_INTERFACES_SIZE <= 0xFFFF, "invalid size");
 
 struct balancer_t

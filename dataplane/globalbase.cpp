@@ -9,6 +9,7 @@
 #include "globalbase.h"
 #include "worker.h"
 
+#include "common/counters.h"
 #include "common/define.h"
 
 #include "debug_latch.h"
@@ -102,6 +103,10 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		else if (type == common::idp::updateGlobalBase::requestType::updateNat64statelessTranslation)
 		{
 			result = updateNat64statelessTranslation(std::get<common::idp::updateGlobalBase::updateNat64statelessTranslation::request>(data));
+		}
+		else if (type == common::idp::updateGlobalBase::requestType::nat46clat_update)
+		{
+			result = nat46clat_update(std::get<common::idp::updateGlobalBase::nat46clat_update::request>(data));
 		}
 		else if (type == common::idp::updateGlobalBase::requestType::update_balancer)
 		{
@@ -399,6 +404,7 @@ eResult generation::clear()
 	decap_enabled = 0;
 	nat64stateful_enabled = 0;
 	nat64stateless_enabled = 0;
+	nat46clat_enabled = 0;
 	balancer_enabled = 0;
 	acl_egress_enabled = 0;
 	sampler_enabled = 0;
@@ -1130,6 +1136,72 @@ eResult generation::updateNat64statelessTranslation(const common::idp::updateGlo
 		nat64statelessTranslation.flags |= YANET_TRANSLATION_FLAG_RANGE;
 		nat64statelessTranslation.diffPort = egressPort - ingressPort;
 	}
+
+	return eResult::success;
+}
+
+eResult generation::nat46clat_update(const common::idp::updateGlobalBase::nat46clat_update::request& request)
+{
+	const auto& [nat46clat_id, ipv6_source, ipv6_destination, dscp_mark_type, dscp, counter_id, flow] = request;
+
+	if (nat46clat_id >= YANET_CONFIG_NAT46CLATS_SIZE)
+	{
+		YADECAP_LOG_ERROR("invalid nat46clat_id: '%u'\n", nat46clat_id);
+		return eResult::invalidId;
+	}
+
+	if (flow.type != common::globalBase::eFlowType::route &&
+	    flow.type != common::globalBase::eFlowType::route_tunnel &&
+	    flow.type != common::globalBase::eFlowType::controlPlane &&
+	    flow.type != common::globalBase::eFlowType::drop)
+	{
+		YADECAP_LOG_ERROR("invalid flow\n");
+		return eResult::invalidFlow;
+	}
+
+	if (!checkFlow(flow))
+	{
+		YADECAP_LOG_ERROR("invalid flow\n");
+		return eResult::invalidFlow;
+	}
+
+	auto& nat46clat = nat46clats[nat46clat_id];
+	nat46clat.ipv6_source = ipv6_address_t::convert(ipv6_source);
+	nat46clat.ipv6_destination = ipv6_address_t::convert(ipv6_destination);
+	nat46clat.counter_id = counter_id;
+	nat46clat.flow = flow;
+
+	if (dscp_mark_type == common::eDscpMarkType::never)
+	{
+		nat46clat.ipv4_dscp_flags = 0;
+	}
+	else if (dscp_mark_type == common::eDscpMarkType::onlyDefault)
+	{
+		if (dscp > 0x3F)
+		{
+			YADECAP_LOG_ERROR("invalid dscp\n");
+			return eResult::invalidArguments;
+		}
+
+		nat46clat.ipv4_dscp_flags = (dscp << 2) | YADECAP_GB_DSCP_FLAG_MARK;
+	}
+	else if (dscp_mark_type == common::eDscpMarkType::always)
+	{
+		if (dscp > 0x3F)
+		{
+			YADECAP_LOG_ERROR("invalid dscp\n");
+			return eResult::invalidArguments;
+		}
+
+		nat46clat.ipv4_dscp_flags = (dscp << 2) | YADECAP_GB_DSCP_FLAG_ALWAYS_MARK;
+	}
+	else
+	{
+		YADECAP_LOG_ERROR("invalid dscp_mark_type\n");
+		return eResult::invalidArguments;
+	}
+
+	nat46clat_enabled = 1;
 
 	return eResult::success;
 }
