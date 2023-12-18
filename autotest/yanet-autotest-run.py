@@ -86,14 +86,16 @@ class Autotest:
         self.p_autotest.wait()
         if self.p_autotest.returncode != 0:
             self.kill_processes()
-            with open("/tmp/yanet-dp.report", "r") as fin:
-                print(fin.read())
+            if self.debug:
+                with open("/tmp/yanet-dp.report", "r") as fin:
+                    print(fin.read())
             sys.exit(3)
 
         if (self.p_dataplane.poll() != None) or (self.p_controlplane.poll() != None):
             self.kill_processes()
-            with open("/tmp/yanet-dp.report", "r") as fin:
-                print(fin.read())
+            if self.debug:
+                with open("/tmp/yanet-dp.report", "r") as fin:
+                    print(fin.read())
             sys.exit(4)
 
         self.kill_processes()
