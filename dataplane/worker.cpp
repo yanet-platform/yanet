@@ -1,3 +1,6 @@
+#include <netinet/icmp6.h>
+#include <netinet/ip_icmp.h>
+
 #include <string>
 #include <thread>
 
@@ -13,11 +16,11 @@
 #include <rte_udp.h>
 
 #include "common/counters.h"
+#include "common/fallback.h"
 
 #include "checksum.h"
 #include "common.h"
 #include "dataplane.h"
-#include "icmp.h"
 #include "metadata.h"
 #include "prepare.h"
 #include "worker.h"

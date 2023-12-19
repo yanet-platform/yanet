@@ -8,8 +8,6 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
-#include "common/result.h"
-
 #include "type.h"
 
 namespace dataplane::base

@@ -8,6 +8,7 @@
 #include <rte_lcore.h>
 #include <rte_malloc.h>
 
+#include "common/fallback.h"
 #include "common/version.h"
 
 #include "checksum.h"

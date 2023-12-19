@@ -4,7 +4,6 @@
 
 #include <sys/un.h>
 
-#include "define.h"
 #include "idp.h"
 #include "result.h"
 #include "sendrecv.h"
