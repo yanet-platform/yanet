@@ -9,11 +9,11 @@
 #include <rte_ip.h>
 
 #include "common/acl.h"
-#include "common/idp.h"
 #include "common/result.h"
 
 #include "common.h"
 #include "metadata.h"
+#include "type.h"
 
 namespace dataplane
 {
