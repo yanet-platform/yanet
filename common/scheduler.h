@@ -1,6 +1,6 @@
 #pragma once
 
-#include "type.h"
+#include <inttypes.h>
 
 namespace balancer
 {
@@ -19,8 +19,7 @@ public:
 	uint32_t wlc_power;
 };
 
-YANET_UNUSED
-constexpr const char* to_string(const scheduler& scheduler)
+[[maybe_unused]] constexpr const char* to_string(const scheduler& scheduler)
 {
 	switch (scheduler)
 	{

@@ -1,8 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <cstdio>
+#include <optional>
 
-#include "type.h"
+#include "define.h"
 
 namespace common
 {

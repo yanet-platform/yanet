@@ -4,6 +4,7 @@
 #include <rte_ethdev.h>
 
 #include "common/counters.h"
+#include "common/fallback.h"
 
 #include "controlplane.h"
 #include "dataplane.h"
