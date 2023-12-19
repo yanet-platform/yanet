@@ -4,7 +4,6 @@
 
 #include "define.h"
 #include "stream.h"
-#include "type.h"
 
 namespace common
 {

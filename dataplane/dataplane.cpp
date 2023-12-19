@@ -16,6 +16,7 @@
 #include <rte_lcore.h>
 #include <rte_malloc.h>
 #include <rte_ring.h>
+#include <rte_version.h>
 
 #include <numa.h>
 #include <numaif.h>
