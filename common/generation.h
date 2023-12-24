@@ -112,7 +112,7 @@ public:
 
 	[[nodiscard]] std::shared_lock<std::shared_mutex> current_lock_guard() const
 	{
-		return std::move(std::shared_lock(current_mutex));
+		return std::shared_lock(current_mutex);
 	}
 
 	const Type& current() const
