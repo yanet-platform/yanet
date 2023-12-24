@@ -103,7 +103,7 @@ eResult tAutotest::initSockets()
 		}
 		struct sockaddr_un sockaddr;
 		sockaddr.sun_family = AF_UNIX;
-		strncpy(sockaddr.sun_path, pci.data() + strlen(SOCK_DEV_PREFIX), sizeof(sockaddr.sun_path));
+		strncpy(sockaddr.sun_path, pci.data() + strlen(SOCK_DEV_PREFIX), sizeof(sockaddr.sun_path) - 1);
 		if (connect(fd, (struct sockaddr*)&sockaddr, sizeof(sockaddr)) < 0)
 		{
 			YANET_LOG_ERROR("error: could not connect: %s\n", strerror(errno));

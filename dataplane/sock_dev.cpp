@@ -446,7 +446,7 @@ int sock_dev_create(const char* name, uint8_t numa_node)
 	unlink(path);
 	internals->fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	internals->sockaddr.sun_family = AF_UNIX;
-	strncpy(internals->sockaddr.sun_path, path, sizeof(internals->sockaddr.sun_path));
+	strncpy(internals->sockaddr.sun_path, path, sizeof(internals->sockaddr.sun_path) - 1);
 	bind(internals->fd, (struct sockaddr*)&internals->sockaddr, sizeof(internals->sockaddr));
 	listen(internals->fd, 1);
 	internals->conFd = -1;
