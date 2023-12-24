@@ -8,18 +8,12 @@
 
 namespace interface
 {
-class protoControlPlane : protected common::icp_proto::BalancerService::Stub
+class protoControlPlane
 {
 public:
 	protoControlPlane(common::proto::UnixProtobufRpcChannel* channel = new common::proto::UnixProtobufRpcChannel(common::icp_proto::socketPath)) :
-	        common::icp_proto::BalancerService::Stub(channel),
-	        channel(channel)
+	        stub(channel)
 	{
-	}
-
-	~protoControlPlane() override
-	{
-		delete channel;
 	}
 
 	auto balancer_real_flush()
@@ -27,7 +21,7 @@ public:
 		common::icp_proto::Empty request;
 		common::proto::RpcController ctl;
 		common::icp_proto::Empty response;
-		RealFlush(&ctl, &request, &response, nullptr);
+		stub.RealFlush(&ctl, &request, &response, nullptr);
 		if (ctl.Failed())
 		{
 			throw std::string("rpc error: " + ctl.ErrorText());
@@ -38,7 +32,7 @@ public:
 	{
 		common::proto::RpcController ctl;
 		common::icp_proto::BalancerRealFindResponse response;
-		RealFind(&ctl, &request, &response, nullptr);
+		stub.RealFind(&ctl, &request, &response, nullptr);
 		if (ctl.Failed())
 		{
 			throw std::string("rpc error: " + ctl.ErrorText());
@@ -50,7 +44,7 @@ public:
 	{
 		common::proto::RpcController ctl;
 		common::icp_proto::Empty response;
-		Real(&ctl, &request, &response, nullptr);
+		stub.Real(&ctl, &request, &response, nullptr);
 		if (ctl.Failed())
 		{
 			throw std::string("rpc error: " + ctl.ErrorText());
@@ -58,6 +52,6 @@ public:
 	}
 
 protected:
-	common::proto::UnixProtobufRpcChannel* channel;
+	common::icp_proto::BalancerService::Stub stub;
 };
 }
