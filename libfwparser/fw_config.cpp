@@ -19,7 +19,7 @@ using namespace ipfw;
 fw_config_t::fw_config_t(int step)
 {
 	// use limits like in FreeBSD kernel
-	const auto& value = std::clamp(step, 1, 1000);
+	const auto value = std::clamp(step, 1, 1000);
 
 	m_debug = 0;
 	m_ruleid_last = 0;
