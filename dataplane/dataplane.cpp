@@ -1211,6 +1211,28 @@ eResult cDataPlane::allocateSharedMemory()
 		auto socket_id = numa_node_of_cpu(coreId);
 		if (socket_id == -1)
 		{
+			YADECAP_LOG_ERROR("numa_node_of_cpu err: %s\n", strerror(errno));
+			socket_id = 0;
+		}
+
+		if (number_of_workers_per_socket.find(socket_id) == number_of_workers_per_socket.end())
+		{
+			number_of_workers_per_socket[socket_id] = 1;
+		}
+		else
+		{
+			number_of_workers_per_socket[socket_id]++;
+		}
+	}
+
+	/// slow worker
+	{
+		const int coreId = config.controlPlaneCoreId;
+
+		auto socket_id = numa_node_of_cpu(coreId);
+		if (socket_id == -1)
+		{
+			YADECAP_LOG_ERROR("numa_node_of_cpu err: %s\n", strerror(errno));
 			socket_id = 0;
 		}
 
@@ -1252,12 +1274,20 @@ eResult cDataPlane::allocateSharedMemory()
 	key_t key = YANET_DEFAULT_IPC_SHMKEY;
 	for (const auto& [socket_id, size] : shm_size_per_socket)
 	{
-		numa_run_on_node(socket_id);
+		if (numa_run_on_node(socket_id) < 0)
+		{
+			YADECAP_LOG_ERROR("numa_run_on_node(%d): %s\n", socket_id, strerror(errno));
+		}
 
 		// deleting old shared memory if exists
-		if (int shmid = shmget(key, 0, 0) != -1)
+		int shmid = shmget(key, 0, 0);
+		if (shmid != -1)
 		{
-			shmctl(shmid, IPC_RMID, NULL);
+			if (shmctl(shmid, IPC_RMID, NULL) < 0)
+			{
+				YADECAP_LOG_ERROR("shmctl(%d, IPC_RMID, NULL): %s\n", shmid, strerror(errno));
+				return eResult::errorInitSharedMemory;
+			}
 		}
 
 		int flags = IPC_CREAT | 0666;
@@ -1266,17 +1296,17 @@ eResult cDataPlane::allocateSharedMemory()
 			flags |= SHM_HUGETLB;
 		}
 
-		int shmid = shmget(key, size, flags);
+		shmid = shmget(key, size, flags);
 		if (shmid == -1)
 		{
-			YADECAP_LOG_ERROR("shmget(%d, %lu, %d) = %d\n", key, size, flags, errno);
+			YADECAP_LOG_ERROR("shmget(%d, %lu, %d): %s\n", key, size, flags, strerror(errno));
 			return eResult::errorInitSharedMemory;
 		}
 
 		void* shmaddr = shmat(shmid, NULL, 0);
 		if (shmaddr == (void*)-1)
 		{
-			YADECAP_LOG_ERROR("shmat(%d, NULL, %d) = %d\n", shmid, 0, errno);
+			YADECAP_LOG_ERROR("shmat(%d, NULL, %d): %s\n", shmid, 0, strerror(errno));
 			return eResult::errorInitSharedMemory;
 		}
 
@@ -1300,11 +1330,6 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 	/// split memory per worker
 	for (auto& [core_id, worker] : workers)
 	{
-		if (core_id == 0)
-		{
-			continue;
-		}
-
 		const auto& socket_id = worker->socketId;
 		const auto& it = shm_by_socket_id.find(socket_id);
 		if (it == shm_by_socket_id.end())
