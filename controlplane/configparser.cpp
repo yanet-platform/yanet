@@ -102,6 +102,10 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 				{
 					loadConfig_balancer(baseNext, id, moduleJson, rootFilePath, jsons);
 				}
+				else if (type == "nat46clat")
+				{
+					loadConfig_nat46clat(baseNext, id, moduleJson, rootFilePath, jsons);
+				}
 				else
 				{
 					throw error_result_t(eResult::invalidType, "unknown module type: " + type);
@@ -994,6 +998,87 @@ void config_parser_t::loadConfig_nat64stateless_translations(controlplane::base_
 		                                                   baseNext.nat64statelessTranslationsCount};
 		baseNext.nat64statelessTranslationsCount++;
 	}
+}
+
+void config_parser_t::loadConfig_nat46clat(controlplane::base_t& baseNext,
+                                           const std::string& moduleId,
+                                           const nlohmann::json& moduleJson,
+                                           const std::string& rootFilePath,
+                                           const std::map<std::string, nlohmann::json>& jsons)
+{
+	(void)rootFilePath;
+	(void)jsons;
+
+	auto& nat46clat = baseNext.nat46clats[moduleId];
+	nat46clat_id_t nat46clat_id = baseNext.nat46clats.size();
+
+	nat46clat.ipv6_source = moduleJson["ipv6_source"].get<std::string>();
+	nat46clat.ipv6_destination = moduleJson["ipv6_destination"].get<std::string>();
+
+	for (const auto& prefix_json : moduleJson["ipv6_prefixes"])
+	{
+		common::ipv6_prefix_t ipv6_prefix(prefix_json.get<std::string>());
+		nat46clat.ipv6_prefixes.emplace(ipv6_prefix);
+	}
+
+	for (const auto& prefix_json : moduleJson["ipv4_prefixes"])
+	{
+		common::ipv4_prefix_t ipv4_prefix(prefix_json.get<std::string>());
+		nat46clat.ipv4_prefixes.emplace(ipv4_prefix);
+	}
+
+	if (exist(moduleJson, "announces"))
+	{
+		for (const auto& prefix_json : moduleJson["announces"])
+		{
+			nat46clat.announces.emplace(prefix_json.get<std::string>());
+		}
+	}
+
+	if (exist(moduleJson, "dscpMarkType"))
+	{
+		using common::eDscpMarkType;
+
+		std::string dscpMarkTypeString = moduleJson["dscpMarkType"];
+
+		if (dscpMarkTypeString == "never")
+		{
+			nat46clat.dscp_mark_type = eDscpMarkType::never;
+		}
+		else if (dscpMarkTypeString == "onlyDefault")
+		{
+			nat46clat.dscp_mark_type = eDscpMarkType::onlyDefault;
+
+			if (exist(moduleJson, "dscp"))
+			{
+				nat46clat.dscp = moduleJson["dscp"];
+			}
+			else
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "dscp not set");
+			}
+		}
+		else if (dscpMarkTypeString == "always")
+		{
+			nat46clat.dscp_mark_type = eDscpMarkType::always;
+
+			if (exist(moduleJson, "dscp"))
+			{
+				nat46clat.dscp = moduleJson["dscp"];
+			}
+			else
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "dscp not set");
+			}
+		}
+		else
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "invalid dscpMarkType: " + dscpMarkTypeString);
+		}
+	}
+
+	nat46clat.next_module = moduleJson.value("nextModule", "");
+	nat46clat.nat46clat_id = nat46clat_id;
 }
 
 void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,

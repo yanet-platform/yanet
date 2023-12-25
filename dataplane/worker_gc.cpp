@@ -3,6 +3,8 @@
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 
+#include "common/counters.h"
+
 #include "controlplane.h"
 #include "dataplane.h"
 #include "worker.h"

@@ -76,6 +76,12 @@ protected:
 	inline void calcHash(rte_mbuf* mbuf);
 	void preparePacket(rte_mbuf* mbuf); ///< @todo: inline
 
+	constexpr static uint32_t translation_ignore = 0xFFFFFFFFu;
+	inline void translation_ipv4_to_ipv6(rte_mbuf* mbuf, const ipv6_address_t& ipv6_source, const ipv6_address_t& ipv6_destination, const uint32_t port_source, const uint32_t port_destination, const uint32_t identifier);
+	inline void translation_ipv6_to_ipv4(rte_mbuf* mbuf, const ipv4_address_t& ipv4_source, const ipv4_address_t& ipv4_destination, const uint32_t port_source, const uint32_t port_destination, const uint32_t identifier);
+
+	inline void mark_ipv4_dscp(rte_mbuf* mbuf, const uint8_t dscp_flags);
+
 	inline void handlePackets();
 
 	inline void physicalPort_ingress_handle(const unsigned int& worker_port_i);
@@ -146,6 +152,18 @@ protected:
 	inline void nat64stateless_egress_handle();
 	inline void nat64stateless_egress_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 	inline void nat64stateless_egress_translation(rte_mbuf* mbuf, const dataplane::globalBase::nat64stateless_translation_t& translation);
+
+	/// nat46clat lan (ipv4)
+	inline void nat46clat_lan_entry(rte_mbuf* mbuf);
+	inline void nat46clat_lan_handle();
+	inline void nat46clat_lan_translation(rte_mbuf* mbuf, const dataplane::globalBase::nat46clat_t& nat46clat);
+	inline void nat46clat_lan_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
+
+	/// nat46clat wan (ipv6)
+	inline void nat46clat_wan_entry(rte_mbuf* mbuf);
+	inline void nat46clat_wan_handle();
+	inline void nat46clat_wan_translation(rte_mbuf* mbuf, const dataplane::globalBase::nat46clat_t& nat46clat);
+	inline void nat46clat_wan_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 
 	inline void balancer_entry(rte_mbuf* mbuf);
 	inline void balancer_icmp_reply_entry(rte_mbuf* mbuf);
@@ -225,6 +243,7 @@ protected:
 
 	uint32_t nat64stateful_packet_id;
 	uint32_t nat64statelessPacketId;
+	uint32_t translation_packet_id;
 
 	uint32_t hashes[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 
@@ -283,6 +302,8 @@ protected:
 	worker::tStack<> nat64stateful_wan_stack;
 	worker::tStack<> nat64stateless_ingress_stack;
 	worker::tStack<> nat64stateless_egress_stack;
+	worker::tStack<> nat46clat_lan_stack;
+	worker::tStack<> nat46clat_wan_stack;
 	worker::tStack<> balancer_stack;
 	worker::tStack<> balancer_icmp_reply_stack;
 	worker::tStack<> balancer_icmp_forward_stack;
