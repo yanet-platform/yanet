@@ -1,7 +1,7 @@
+#include <rte_mbuf.h>
+
 #include "common/bufferring.h"
 #include "common/result.h"
-#include "rte_mbuf.h"
-#include "type.h"
 
 class cSharedMemory
 {

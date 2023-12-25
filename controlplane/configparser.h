@@ -24,6 +24,7 @@ protected:
 	void loadConfig_nat64stateful(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_nat64stateless(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_nat64stateless_translations(controlplane::base_t& baseNext, controlplane::base::nat64stateless_t& nat64stateless, const nlohmann::json& translationsJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
+	void loadConfig_nat46clat(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_acl(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath);
 	void loadConfig_dregress(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_dregress_communities(controlplane::base_t& baseNext, controlplane::dregress::config_t& dregress, const nlohmann::json& json, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);

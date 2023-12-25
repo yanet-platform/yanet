@@ -153,6 +153,7 @@ enum class requestType : uint32_t
 	tun64_update,
 	tun64mappings_update,
 	serial_update,
+	nat46clat_update,
 	dump_tags_ids
 };
 
@@ -247,6 +248,17 @@ using request = std::tuple<tNat64statelessTranslationId,
                            ipv6_address_t, ///< ipv6DestinationAddress
                            ipv4_address_t, ///< ipv4Address
                            std::optional<std::tuple<uint16_t, uint16_t>>>; ///< ingressPort, egressPort
+}
+
+namespace nat46clat_update
+{
+using request = std::tuple<nat46clat_id_t,
+                           ipv6_address_t, ///< ipv6_source
+                           ipv6_address_t, ///< ipv6_destination
+                           eDscpMarkType, ///< dscp_type
+                           uint8_t, ///< dscp
+                           tCounterId,
+                           common::globalBase::flow_t>;
 }
 
 namespace update_balancer
@@ -499,7 +511,8 @@ using requestVariant = std::variant<std::tuple<>,
                                     dregress_value_update::request,
                                     fwstate_synchronization_update::request,
                                     sampler_update::request, /// + update_early_decap_flags::request
-                                    serial_update::request>;
+                                    serial_update::request,
+                                    nat46clat_update::request>;
 
 using request = std::vector<std::tuple<requestType,
                                        requestVariant>>;

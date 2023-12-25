@@ -4,7 +4,6 @@
 
 #include <vector>
 
-#include "common/config.h"
 #include "common/define.h"
 #include "common/result.h"
 #include "common/type.h"

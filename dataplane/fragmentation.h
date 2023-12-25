@@ -9,7 +9,6 @@
 
 #include <rte_mbuf.h>
 
-#include "common/result.h"
 #include "common/type.h"
 
 #include "type.h"

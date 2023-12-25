@@ -14,6 +14,7 @@
 #include "helper.h"
 #include "latch.h"
 #include "limit.h"
+#include "nat46clat.h"
 #include "nat64stateful.h"
 #include "rib.h"
 #include "route.h"
@@ -60,6 +61,8 @@ std::vector<std::tuple<std::string,
                     {"nat64stateless prefix allow6", "[module] [ipv6_prefix] [ipv6_prefix]", [](const auto& args) { call(config::nat64stateless::allow6, args); }},
                     {"nat64stateless prefix disallow6", "[module] [ipv6_prefix] [ipv6_prefix]", [](const auto& args) { call(config::nat64stateless::disallow6, args); }},
                     {"nat64stateless prefix remove6", "[module] [ipv6_prefix]", [](const auto& args) { call(config::nat64stateless::remove6, args); }},
+                    {"nat46clat", "", [](const auto& args) { call(nat46clat::summary, args); }},
+                    {"nat46clat announce", "", [](const auto& args) { call(nat46clat::announce, args); }},
                     {"balancer", "", [](const auto& args) { call(balancer::summary, args); }},
                     {"balancer service", "[module] <virtual_ip> <proto> <virtual_port>", [](const auto& args) { call(balancer::service, args); }},
                     {"balancer real", "[module] <virtual_ip> <proto> <virtual_port> <real_ip> <real_port>", [](const auto& args) { call(balancer::real_find, args); }},

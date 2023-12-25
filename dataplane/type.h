@@ -5,11 +5,8 @@
 
 #include "common/balancer.h"
 #include "common/config.h"
-#include "common/fallback.h"
 #include "common/scheduler.h"
 #include "common/type.h"
-
-#include "common.h"
 
 class cDataPlane;
 class cControlPlane;
@@ -348,6 +345,15 @@ struct tNat64stateless
 
 	/// @todo: ingressFlow;
 	/// @todo: egressFlow;
+};
+
+struct nat46clat_t
+{
+	ipv6_address_t ipv6_source;
+	ipv6_address_t ipv6_destination;
+	tCounterId counter_id;
+	uint8_t ipv4_dscp_flags;
+	common::globalBase::tFlow flow;
 };
 
 static_assert(CONFIG_YADECAP_INTERFACES_SIZE <= 0xFFFF, "invalid size");

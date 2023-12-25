@@ -348,6 +348,19 @@ void unsafe()
 		                       {{"name", name}},
 		                       {{"value", counter}});
 	}
+
+	const auto nat46clat_stats = controlplane.nat46clat_stats();
+	for (const auto& [module_name, stats] : nat46clat_stats)
+	{
+		using nat46clat::module_counter; ///< C++20: using enum
+
+		influxdb_format::print("nat46clat",
+		                       {{"name", module_name}},
+		                       {{"lan_packets", stats[(size_t)module_counter::lan_packets]},
+		                        {"lan_bytes", stats[(size_t)module_counter::lan_bytes]},
+		                        {"wan_packets", stats[(size_t)module_counter::wan_packets]},
+		                        {"wan_bytes", stats[(size_t)module_counter::wan_bytes]}});
+	}
 }
 
 void dregress()

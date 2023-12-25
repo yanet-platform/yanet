@@ -3,7 +3,6 @@
 #include <atomic>
 
 #include "refarray.h"
-#include "type.h"
 
 namespace common
 {
