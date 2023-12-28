@@ -8,6 +8,7 @@
 #include <rte_lcore.h>
 #include <rte_malloc.h>
 
+#include "common/idp.h"
 #include "common/version.h"
 
 #include "checksum.h"
@@ -1236,6 +1237,12 @@ common::idp::get_shm_tsc_info::response cControlPlane::get_shm_tsc_info()
 		response.emplace_back(key);
 	}
 
+	return response;
+}
+
+eResult cControlPlane::set_shm_tsc_state(const common::idp::get_shm_tsc_info::request& request)
+{
+	auto response = dataPlane->setShmTscState(request);
 	return response;
 }
 

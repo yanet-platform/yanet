@@ -869,4 +869,11 @@ void shm_tsc_info()
 	table.print();
 }
 
+void shm_tsc_set_state(std::string state)
+{
+	interface::dataPlane dataplane;
+	bool new_state = state == "true";
+	dataplane.set_shm_tsc_state(new_state);
+}
+
 }

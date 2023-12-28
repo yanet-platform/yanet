@@ -28,6 +28,8 @@
 #include <sys/mman.h>
 
 #include "common.h"
+#include "common/idp.h"
+#include "common/result.h"
 #include "dataplane.h"
 #include "report.h"
 #include "sock_dev.h"
@@ -1406,6 +1408,12 @@ common::idp::get_shm_tsc_info::response cDataPlane::getShmTscInfo()
 	std::copy(tscs_meta.begin(), tscs_meta.end(), std::back_inserter(result));
 
 	return result;
+}
+
+eResult cDataPlane::setShmTscState(common::idp::get_shm_tsc_info::state state)
+{
+	tscs_active = state;
+	return eResult::success;
 }
 
 std::map<std::string, common::uint64> cDataPlane::getPortStats(const tPortId& portId) const

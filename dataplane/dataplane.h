@@ -146,6 +146,7 @@ protected:
 	std::optional<uint64_t> getCounterValueByName(const std::string& counter_name, uint32_t coreId);
 	common::idp::get_shm_info::response getShmInfo();
 	common::idp::get_shm_tsc_info::response getShmTscInfo();
+	eResult setShmTscState(common::idp::get_shm_tsc_info::state new_state);
 
 	template<typename type,
 	         typename... args_t>
@@ -328,8 +329,10 @@ protected:
 	rte_mempool* mempool_log;
 
 	common::idp::get_shm_info::response dumps_meta;
-	common::idp::get_shm_tsc_info::response tscs_meta;
 	std::map<std::string, uint64_t> tag_to_id;
+
+	common::idp::get_shm_tsc_info::response tscs_meta;
+	common::idp::get_shm_tsc_info::state tscs_active;
 
 	/// modules
 	cReport report;
