@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <cstdint>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -27,9 +28,12 @@
 #include <sys/mman.h>
 
 #include "common.h"
+#include "common/idp.h"
+#include "common/result.h"
 #include "dataplane.h"
 #include "report.h"
 #include "sock_dev.h"
+#include "tsc_deltas.h"
 #include "worker.h"
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_INFO;
@@ -1270,6 +1274,17 @@ eResult cDataPlane::allocateSharedMemory()
 		}
 	}
 
+	for (const auto& [socket_id, num] : number_of_workers_per_socket)
+	{
+		auto it = shm_size_per_socket.find(socket_id);
+		if (it == shm_size_per_socket.end())
+		{
+			it = shm_size_per_socket.emplace_hint(it, socket_id, 0);
+		}
+
+		it->second += sizeof(dataplane::perf::tsc_deltas) * (num + ((int)socket_id == numa_node_of_cpu(config.controlPlaneCoreId)));
+	}
+
 	/// allocating IPC shared memory
 	key_t key = YANET_DEFAULT_IPC_SHMKEY;
 	for (const auto& [socket_id, size] : shm_size_per_socket)
@@ -1309,7 +1324,6 @@ eResult cDataPlane::allocateSharedMemory()
 			YADECAP_LOG_ERROR("shmat(%d, NULL, %d): %s\n", shmid, 0, strerror(errno));
 			return eResult::errorInitSharedMemory;
 		}
-
 		shm_by_socket_id[socket_id] = std::make_tuple(key, shmaddr);
 
 		key++;
@@ -1379,6 +1393,25 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 		}
 	}
 
+	for (auto& [core_id, worker] : workers)
+	{
+		const auto& socket_id = worker->socketId;
+		const auto& it = shm_by_socket_id.find(socket_id);
+		if (it == shm_by_socket_id.end())
+		{
+			continue;
+		}
+		const auto& [key, shm] = it->second;
+
+		auto offset = offsets[shm];
+		worker->tsc_deltas = (dataplane::perf::tsc_deltas*)((intptr_t)shm + offset);
+		memset(worker->tsc_deltas, 0, sizeof(dataplane::perf::tsc_deltas));
+		offsets[shm] += sizeof(dataplane::perf::tsc_deltas);
+
+		auto meta = common::idp::get_shm_tsc_info::tsc_meta(core_id, socket_id, key, offset);
+		tscs_meta.emplace_back(meta);
+	}
+
 	return eResult::success;
 }
 
@@ -1390,6 +1423,22 @@ common::idp::get_shm_info::response cDataPlane::getShmInfo()
 	std::copy(dumps_meta.begin(), dumps_meta.end(), std::back_inserter(result));
 
 	return result;
+}
+
+common::idp::get_shm_tsc_info::response cDataPlane::getShmTscInfo()
+{
+	common::idp::get_shm_tsc_info::response result;
+	result.reserve(tscs_meta.size());
+
+	std::copy(tscs_meta.begin(), tscs_meta.end(), std::back_inserter(result));
+
+	return result;
+}
+
+eResult cDataPlane::setShmTscState(common::idp::get_shm_tsc_info::state state)
+{
+	tscs_active = state;
+	return eResult::success;
 }
 
 std::map<std::string, common::uint64> cDataPlane::getPortStats(const tPortId& portId) const

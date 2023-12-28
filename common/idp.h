@@ -70,6 +70,8 @@ enum class requestType : uint32_t
 	version,
 	get_counter_by_name,
 	get_shm_info,
+	get_shm_tsc_info,
+	set_shm_tsc_state,
 	dump_physical_port,
 	balancer_state_clear,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
@@ -852,6 +854,18 @@ using dump_meta = std::tuple<std::string, ///< ring name
 using response = std::vector<dump_meta>;
 }
 
+namespace get_shm_tsc_info
+{
+using tsc_meta = std::tuple<tCoreId, ///< core id
+                            tSocketId, ///< socket id
+                            key_t, /// ipc shm key
+                            uint64_t>; /// offset
+
+using response = std::vector<tsc_meta>;
+using state = bool;
+using request = bool;
+}
+
 namespace dump_physical_port
 {
 using request = std::tuple<std::string, ///< interface_name
@@ -916,7 +930,8 @@ using request = std::tuple<requestType,
                                         unrdup_vip_to_balancers::request,
                                         update_vip_vport_proto::request,
                                         get_counter_by_name::request,
-                                        dump_physical_port::request>>;
+                                        dump_physical_port::request,
+                                        get_shm_tsc_info::request>>;
 
 using response = std::variant<std::tuple<>,
                               updateGlobalBase::response, ///< + others which have eResult as response
@@ -947,6 +962,7 @@ using response = std::variant<std::tuple<>,
                               limits::response,
                               samples::response,
                               get_counter_by_name::response,
-                              get_shm_info::response>;
+                              get_shm_info::response,
+                              get_shm_tsc_info::response>;
 
 }

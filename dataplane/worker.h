@@ -16,6 +16,7 @@
 #include "globalbase.h"
 #include "samples.h"
 #include "sharedmemory.h"
+#include "tsc_deltas.h"
 
 class cDataPlane;
 class mControlPlane;
@@ -296,7 +297,7 @@ protected:
 	rte_ring* ring_highPriority;
 	rte_ring* ring_normalPriority;
 	rte_ring* ring_lowPriority;
-
+	dataplane::perf::tsc_deltas* tsc_deltas;
 	rte_ring* ring_toFreePackets;
 
 	rte_ring* ring_log;
