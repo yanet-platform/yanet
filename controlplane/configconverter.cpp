@@ -758,15 +758,15 @@ void config_converter_t::processAcl()
 			{
 				if (entry == "local")
 				{
-					acl_rules_route_local(acl, nextModule);
+					acl_rules_route_local(acl, nextModuleName);
 				}
 				else if (entry == "forward")
 				{
-					acl_rules_route_forward(acl, nextModule);
+					acl_rules_route_forward(acl, nextModuleName);
 				}
 				else if (entry == "tunnel")
 				{
-					acl_rules_route_forward(acl, nextModule);
+					acl_rules_route_forward(acl, nextModuleName);
 				}
 				else
 				{
