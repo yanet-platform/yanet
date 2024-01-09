@@ -131,6 +131,11 @@ public:
 
 	void switch_worker_base();
 
+	inline uint32_t get_current_time() const
+	{
+		return current_time;
+	}
+
 	template<typename type,
 	         typename... args_t>
 	type* hugepage_create_static(int socket_id,
@@ -290,6 +295,7 @@ protected:
 	common::idp::get_shm_info::response getShmInfo();
 
 	static int lcoreThread(void* args);
+	void timestamp_thread();
 
 protected:
 	friend class cWorker;
@@ -355,4 +361,7 @@ protected:
 	std::vector<cWorker*> workers_vector;
 
 	std::mutex switch_worker_base_mutex;
+	uint32_t current_time;
+
+	std::vector<std::thread> threads;
 };
