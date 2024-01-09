@@ -1358,29 +1358,7 @@ void cControlPlane::switchGlobalBase()
 {
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
-	for (auto& iter : dataPlane->workers)
-	{
-		const auto& coreId = iter.first;
-		auto* worker = iter.second;
-		auto& baseNext = worker->bases[worker->currentBaseId ^ 1];
-		auto* globalBaseNext = dataPlane->globalBases[rte_lcore_to_socket_id(coreId)][dataPlane->currentGlobalBaseId ^ 1];
-
-		baseNext.globalBase = globalBaseNext;
-	}
-
-	for (auto& iter : dataPlane->worker_gcs)
-	{
-		const auto& coreId = iter.first;
-		auto* worker = iter.second;
-		auto& baseNext = worker->bases[worker->current_base_id ^ 1];
-		auto* globalBaseNext = dataPlane->globalBases[rte_lcore_to_socket_id(coreId)][dataPlane->currentGlobalBaseId ^ 1];
-
-		baseNext.globalBase = globalBaseNext;
-	}
-
-	YADECAP_MEMORY_BARRIER_COMPILE;
-
-	switchBase();
+	dataPlane->switch_worker_base();
 
 	YADECAP_MEMORY_BARRIER_COMPILE;
 

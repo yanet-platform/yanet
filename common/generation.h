@@ -2,10 +2,13 @@
 
 #include <array>
 #include <atomic>
+#include <functional>
 #include <mutex>
 #include <shared_mutex>
+#include <vector>
 
-template<typename Type>
+template<typename Type,
+         typename Type_Update_Result = bool>
 class generation_manager
 {
 public:
@@ -156,11 +159,62 @@ public:
 		generations[id ^ 1] = {}; ///< @todo: gc
 	}
 
+	void switch_generation_without_gc()
+	{
+		std::unique_lock current_lock(current_mutex);
+		id ^= 1;
+	}
+
 	/** @todo
 	void gc()
 	{
 	}
 	*/
+
+	/// apply function for both generation
+	template<typename function_t>
+	void fill(const function_t& function)
+	{
+		next_lock();
+		function(next());
+		switch_generation_without_gc();
+		function(next());
+		next_unlock();
+	}
+
+	/// apply function for next generation and insert in requests queue
+	template<typename function_t>
+	Type_Update_Result update(const function_t& function)
+	{
+		next_lock();
+		auto result = function(next());
+		requests.emplace_back(function);
+		next_unlock();
+		return result;
+	}
+
+	/// switch generation and apply all previous requests for next generation
+	template<typename wait_function_t>
+	void switch_generation_with_update(const wait_function_t& wait_function)
+	{
+		next_lock();
+		if (requests.size())
+		{
+			/// update current pointer
+			switch_generation_without_gc();
+
+			/// wait all thread who used previous generation
+			wait_function();
+
+			/// apply all previous requests for next generation
+			for (const auto& function : requests)
+			{
+				function(next());
+			}
+			requests.clear();
+		}
+		next_unlock();
+	}
 
 protected:
 	mutable std::shared_mutex current_mutex;
@@ -168,4 +222,6 @@ protected:
 
 	std::atomic<uint32_t> id;
 	std::array<Type, 2> generations;
+
+	std::vector<std::function<Type_Update_Result(Type&)>> requests;
 };

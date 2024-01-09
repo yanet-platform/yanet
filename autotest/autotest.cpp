@@ -1301,6 +1301,8 @@ void tAutotest::mainThread()
 				this->request.swap(request);
 			}
 
+			dataPlane.neighbor_flush();
+
 			YAML::Node yamlRoot = YAML::LoadFile(configFilePath + "/autotest.yaml");
 
 			for (const YAML::Node& yamlStep : yamlRoot["steps"])
@@ -1467,6 +1469,7 @@ void tAutotest::mainThread()
 		/// clear dataplane states
 		{
 			dataPlane.balancer_state_clear();
+			dataPlane.neighbor_clear();
 		}
 
 		YANET_LOG_PRINT(ANSI_COLOR_GREEN "done '%s'\n\n" ANSI_COLOR_RESET, configFilePath.data());

@@ -867,7 +867,7 @@ eResult generation::update_route(const common::idp::updateGlobalBase::update_rou
 
 eResult generation::updateInterface(const common::idp::updateGlobalBase::updateInterface::request& request)
 {
-	const auto& [interfaceId, neighbor_ether_address_v4, neighbor_ether_address_v6, aclId, flow] = request;
+	const auto& [interfaceId, aclId, flow] = request;
 
 	if (interfaceId >= CONFIG_YADECAP_INTERFACES_SIZE)
 	{
@@ -894,24 +894,6 @@ eResult generation::updateInterface(const common::idp::updateGlobalBase::updateI
 	{
 		YADECAP_LOG_ERROR("invalid aclId\n");
 		return eResult::invalidAclId;
-	}
-
-	if (neighbor_ether_address_v4)
-	{
-		memcpy(interface.neighbor_ether_address_v4.addr_bytes, (*neighbor_ether_address_v4).data(), 6); ///< @todo: convert
-	}
-	else
-	{
-		interface.neighbor_ether_address_v4.addr_bytes[0] = 1;
-	}
-
-	if (neighbor_ether_address_v6)
-	{
-		memcpy(interface.neighbor_ether_address_v6.addr_bytes, (*neighbor_ether_address_v6).data(), 6); ///< @todo: convert
-	}
-	else
-	{
-		interface.neighbor_ether_address_v6.addr_bytes[0] = 1;
 	}
 
 	interface.flow = flow;
@@ -1618,7 +1600,7 @@ eResult generation::route_value_update(const common::idp::updateGlobalBase::rout
 		     ecmp_i < request_interface.size();
 		     ecmp_i++)
 		{
-			const auto& [interface_id, labels] = request_interface[ecmp_i];
+			const auto& [interface_id, labels, neighbor_address] = request_interface[ecmp_i];
 
 			if (interface_id >= CONFIG_YADECAP_INTERFACES_SIZE)
 			{
@@ -1627,6 +1609,7 @@ eResult generation::route_value_update(const common::idp::updateGlobalBase::rout
 			}
 
 			route_value.interface.nexthops[ecmp_i].interfaceId = interface_id;
+			route_value.interface.nexthops[ecmp_i].neighbor_address = ipv6_address_t::convert(neighbor_address);
 
 			if (labels.size() == 0)
 			{
@@ -1803,7 +1786,7 @@ eResult generation::route_tunnel_value_update(const common::idp::updateGlobalBas
 		     ecmp_i < nexthops.size();
 		     ecmp_i++)
 		{
-			const auto& [interface_id, counter_id, label, nexthop_address] = nexthops[ecmp_i];
+			const auto& [interface_id, counter_id, label, nexthop_address, neighbor_address] = nexthops[ecmp_i];
 
 			if (interface_id >= CONFIG_YADECAP_INTERFACES_SIZE)
 			{
@@ -1815,6 +1798,7 @@ eResult generation::route_tunnel_value_update(const common::idp::updateGlobalBas
 			route_tunnel_value.interface.nexthops[ecmp_i].counter_id = counter_id;
 			route_tunnel_value.interface.nexthops[ecmp_i].label = label;
 			route_tunnel_value.interface.nexthops[ecmp_i].nexthop_address = ipv6_address_t::convert(nexthop_address);
+			route_tunnel_value.interface.nexthops[ecmp_i].neighbor_address = ipv6_address_t::convert(neighbor_address);
 		}
 
 		route_tunnel_value.interface.weight_start = weight_start;

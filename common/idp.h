@@ -15,6 +15,7 @@
 #include "acl.h"
 #include "balancer.h"
 #include "config.h"
+#include "neighbor.h"
 #include "result.h"
 #include "scheduler.h"
 #include "type.h"
@@ -72,6 +73,13 @@ enum class requestType : uint32_t
 	get_shm_info,
 	dump_physical_port,
 	balancer_state_clear,
+	neighbor_show,
+	neighbor_insert,
+	neighbor_remove,
+	neighbor_clear,
+	neighbor_flush,
+	neighbor_update_interfaces,
+	neighbor_stats,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -199,8 +207,6 @@ using request = std::tuple<tRouteId,
 namespace updateInterface
 {
 using request = std::tuple<tInterfaceId,
-                           std::optional<mac_address_t>, ///< neighbor_ether_address_v4
-                           std::optional<mac_address_t>, ///< neighbor_ether_address_v6
                            tAclId,
                            common::globalBase::tFlow>;
 }
@@ -372,7 +378,8 @@ using request = lpm::request;
 namespace route_value_update
 {
 using interface = std::vector<std::tuple<tInterfaceId,
-                                         std::vector<uint32_t>>>;
+                                         std::vector<uint32_t>,
+                                         ip_address_t>>; ///< neighbor_address
 
 using request = std::tuple<uint32_t, ///< route_value_id
                            tSocketId,
@@ -397,7 +404,8 @@ using interface = std::tuple<uint32_t, ///< weight_start
                              std::vector<std::tuple<tInterfaceId,
                                                     tCounterId,
                                                     uint32_t, ///< label
-                                                    ip_address_t>>>; ///< nexthop_address
+                                                    ip_address_t, ///< nexthop_address
+                                                    ip_address_t>>>; ///< neighbor_address
 
 using request = std::tuple<uint32_t, ///< route_tunnel_value_id
                            tSocketId,
@@ -913,6 +921,44 @@ using request = std::tuple<id, ///< latch id
 using response = eResult;
 }
 
+namespace neighbor_show
+{
+using response = std::vector<std::tuple<std::string, ///< route_name
+                                        std::string, ///< interface_name
+                                        ip_address_t, ///< ip_address
+                                        mac_address_t, ///< mac_address
+                                        uint16_t>>; ///< last_update_timestamp
+}
+
+namespace neighbor_insert
+{
+using request = std::tuple<std::string, ///< route_name
+                           std::string, ///< interface_name
+                           ip_address_t, ///< ip_address
+                           mac_address_t>; ///< mac_address
+}
+
+namespace neighbor_remove
+{
+using request = std::tuple<std::string, ///< route_name
+                           std::string, ///< interface_name
+                           ip_address_t>; ///< ip_address
+}
+
+namespace neighbor_update_interfaces
+{
+using request = std::vector<std::tuple<tInterfaceId, ///< interface_id
+                                       std::string, ///< route_name
+                                       std::string>>; ///< interface_name
+}
+
+namespace neighbor_stats
+{
+using response = common::neighbor::stats;
+}
+
+//
+
 using request = std::tuple<requestType,
                            std::variant<std::tuple<>,
                                         updateGlobalBase::request,
@@ -929,7 +975,10 @@ using request = std::tuple<requestType,
                                         unrdup_vip_to_balancers::request,
                                         update_vip_vport_proto::request,
                                         get_counter_by_name::request,
-                                        dump_physical_port::request>>;
+                                        dump_physical_port::request,
+                                        neighbor_insert::request,
+                                        neighbor_remove::request,
+                                        neighbor_update_interfaces::request>>;
 
 using response = std::variant<std::tuple<>,
                               updateGlobalBase::response, ///< + others which have eResult as response
@@ -960,6 +1009,7 @@ using response = std::variant<std::tuple<>,
                               limits::response,
                               samples::response,
                               get_counter_by_name::response,
-                              get_shm_info::response>;
-
+                              get_shm_info::response,
+                              neighbor_show::response,
+                              neighbor_stats::response>;
 }

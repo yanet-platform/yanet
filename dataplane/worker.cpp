@@ -2165,15 +2165,28 @@ inline void cWorker::route_handle4()
 				continue;
 			}
 
-			if (targetInterface.neighbor_ether_address_v4.addr_bytes[0] == 1)
+			dataplane::neighbor::key key;
+			memset(&key, 0, sizeof(key));
+			key.interface_id = nexthop.interfaceId;
+			key.flags = 0;
+			key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
+
+			dataplane::neighbor::value const* value;
+			base.neighbor_hashtable->lookup(key, value);
+			if (value)
+			{
+				generic_rte_ether_hdr* ethernet_header = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
+				rte_ether_addr_copy(&value->ether_address, &ethernet_header->dst_addr);
+			}
+			else
 			{
 				stats.interface_neighbor_invalid++;
 				drop(mbuf);
+
+				neighbor_resolve.insert_or_update(key, 0);
+
 				continue;
 			}
-
-			generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
-			rte_ether_addr_copy(&targetInterface.neighbor_ether_address_v4, &ethernetHeader->dst_addr);
 
 			route_nexthop(mbuf, nexthop);
 
@@ -2264,15 +2277,29 @@ inline void cWorker::route_handle6()
 				continue;
 			}
 
-			if (targetInterface.neighbor_ether_address_v6.addr_bytes[0] == 1)
+			dataplane::neighbor::key key;
+			memset(&key, 0, sizeof(key));
+			key.interface_id = nexthop.interfaceId;
+			key.flags = 0;
+			key.flags |= dataplane::neighbor::flag_is_ipv6;
+			memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
+
+			dataplane::neighbor::value const* value;
+			base.neighbor_hashtable->lookup(key, value);
+			if (value)
+			{
+				generic_rte_ether_hdr* ethernet_header = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
+				rte_ether_addr_copy(&value->ether_address, &ethernet_header->dst_addr);
+			}
+			else
 			{
 				stats.interface_neighbor_invalid++;
 				drop(mbuf);
+
+				neighbor_resolve.insert_or_update(key, 0);
+
 				continue;
 			}
-
-			generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
-			rte_ether_addr_copy(&targetInterface.neighbor_ether_address_v6, &ethernetHeader->dst_addr);
 
 			route_nexthop(mbuf, nexthop);
 
@@ -2450,19 +2477,31 @@ inline void cWorker::route_tunnel_handle4()
 				continue;
 			}
 
-			if (targetInterface.neighbor_ether_address_v4.addr_bytes[0] == 1)
+			dataplane::neighbor::key key;
+			memset(&key, 0, sizeof(key));
+			key.interface_id = nexthop.interface_id;
+			key.flags = 0;
+			key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
+
+			dataplane::neighbor::value const* value;
+			base.neighbor_hashtable->lookup(key, value);
+			if (value)
+			{
+				generic_rte_ether_hdr* ethernet_header = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
+				rte_ether_addr_copy(&value->ether_address, &ethernet_header->dst_addr);
+			}
+			else
 			{
 				stats.interface_neighbor_invalid++;
 				drop(mbuf);
+
+				neighbor_resolve.insert_or_update(key, 0);
+
 				continue;
 			}
 
-			/// counters[nexthop.counter_id]++;
-			counters[nexthop.atomic1 >> 8]++;
-			counters[(nexthop.atomic1 >> 8) + 1] += mbuf->pkt_len;
-
-			generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
-			rte_ether_addr_copy(&targetInterface.neighbor_ether_address_v4, &ethernetHeader->dst_addr);
+			counters[nexthop.counter_id]++;
+			counters[nexthop.counter_id + 1] += mbuf->pkt_len;
 
 			route_tunnel_nexthop(mbuf, nexthop);
 
@@ -2556,19 +2595,32 @@ inline void cWorker::route_tunnel_handle6()
 				continue;
 			}
 
-			if (targetInterface.neighbor_ether_address_v6.addr_bytes[0] == 1)
+			dataplane::neighbor::key key;
+			memset(&key, 0, sizeof(key));
+			key.interface_id = nexthop.interface_id;
+			key.flags = 0;
+			key.flags |= dataplane::neighbor::flag_is_ipv6;
+			memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
+
+			dataplane::neighbor::value const* value;
+			base.neighbor_hashtable->lookup(key, value);
+			if (value)
+			{
+				generic_rte_ether_hdr* ethernet_header = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
+				rte_ether_addr_copy(&value->ether_address, &ethernet_header->dst_addr);
+			}
+			else
 			{
 				stats.interface_neighbor_invalid++;
 				drop(mbuf);
+
+				neighbor_resolve.insert_or_update(key, 0);
+
 				continue;
 			}
 
-			/// counters[nexthop.counter_id]++;
-			counters[nexthop.atomic1 >> 8]++;
-			counters[(nexthop.atomic1 >> 8) + 1] += mbuf->pkt_len;
-
-			generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
-			rte_ether_addr_copy(&targetInterface.neighbor_ether_address_v6, &ethernetHeader->dst_addr);
+			counters[nexthop.counter_id]++;
+			counters[nexthop.counter_id + 1] += mbuf->pkt_len;
 
 			route_tunnel_nexthop(mbuf, nexthop);
 

@@ -16,6 +16,7 @@
 #include "limit.h"
 #include "nat46clat.h"
 #include "nat64stateful.h"
+#include "neighbor.h"
 #include "rib.h"
 #include "route.h"
 #include "show.h"
@@ -77,6 +78,9 @@ std::vector<std::tuple<std::string,
                     {"route get", "[module] [ip_prefix]", [](const auto& args) { call(route::get, args); }},
                     {"route tunnel lookup", "[module] [ip_address]", [](const auto& args) { call(route::tunnel::lookup, args); }},
                     {"route tunnel get", "[module] [ip_prefix]", [](const auto& args) { call(route::tunnel::get, args); }},
+                    {"neighbor show", "", [](const auto& args) { call(neighbor::show, args); }},
+                    {"neighbor insert", "[route_name] [interface_name] [ip_address] [mac_address]", [](const auto& args) { call(neighbor::insert, args); }},
+                    {"neighbor remove", "[route_name] [interface_name] [ip_address]", [](const auto& args) { call(neighbor::remove, args); }},
                     {"rib", "", [](const auto& args) { call(rib::summary, args); }},
                     {"rib prefixes", "", [](const auto& args) { call(rib::prefixes, args); }},
                     {"rib lookup", "[vrf] [ip_address]", [](const auto& args) { call(rib::lookup, args); }},

@@ -746,6 +746,20 @@ void route_t::compile_interface(common::idp::updateGlobalBase::request& globalba
                                 const route::generation_t& generation,
                                 route::generation_neighbors_t& generation_neighbors)
 {
+	{
+		common::idp::neighbor_update_interfaces::request request;
+		for (const auto& [route_name, route] : generation.routes)
+		{
+			for (auto& [interface_name, interface] : route.interfaces)
+			{
+				request.emplace_back(interface.interfaceId,
+				                     route_name,
+				                     interface_name);
+			}
+		}
+		dataplane.neighbor_update_interfaces(request);
+	}
+
 	for (const auto& [route_name, route] : generation.routes)
 	{
 		for (auto& [interface_name, interface] : route.interfaces)
@@ -780,17 +794,23 @@ void route_t::compile_interface(common::idp::updateGlobalBase::request& globalba
 			if (neighbor_mac_address_v4)
 			{
 				generation_neighbors.mac_addresses[{route_name, interface_name, *interface.neighborIPv4Address}] = *neighbor_mac_address_v4;
+				dataplane.neighbor_insert({route_name,
+				                           interface_name,
+				                           *interface.neighborIPv4Address,
+				                           *neighbor_mac_address_v4});
 			}
 
 			if (neighbor_mac_address_v6)
 			{
 				generation_neighbors.mac_addresses[{route_name, interface_name, *interface.neighborIPv6Address}] = *neighbor_mac_address_v6;
+				dataplane.neighbor_insert({route_name,
+				                           interface_name,
+				                           *interface.neighborIPv6Address,
+				                           *neighbor_mac_address_v6});
 			}
 
 			globalbase.emplace_back(common::idp::updateGlobalBase::requestType::updateInterface,
 			                        common::idp::updateGlobalBase::updateInterface::request{interface.interfaceId,
-			                                                                                neighbor_mac_address_v4,
-			                                                                                neighbor_mac_address_v6,
 			                                                                                interface.aclId,
 			                                                                                interface.flow});
 		}
@@ -897,22 +917,6 @@ void route_t::reload_after()
 	tunnel_counter.release();
 	generations_neighbors.switch_generation();
 	generations.switch_generation();
-	generations_neighbors.next_unlock();
-	generations.next_unlock();
-}
-
-void route_t::mac_addresses_changed()
-{
-	common::idp::updateGlobalBase::request globalbase;
-
-	generations.next_lock();
-	generations_neighbors.next_lock();
-
-	compile_interface(globalbase, generations.current(), generations_neighbors.next());
-	dataplane.updateGlobalBase(globalbase); ///< может вызвать исключение, которое никто не поймает, и это приведёт к abort()
-
-	generations_neighbors.switch_generation();
-
 	generations_neighbors.next_unlock();
 	generations.next_unlock();
 }
@@ -1129,7 +1133,8 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 			request_interface.emplace_back(nexthop,
 			                               interface_id,
 			                               interface_name,
-			                               labels);
+			                               labels,
+			                               nexthop);
 
 			continue;
 		}
@@ -1224,11 +1229,11 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 		/// same numa
 		for (const auto& item : request_interface)
 		{
-			const auto& [nexthop, egress_interface_id, egress_interface_name, labels] = item;
+			const auto& [nexthop, egress_interface_id, egress_interface_name, labels, neighbor_address] = item;
 
 			if (exist(interfaces, egress_interface_id))
 			{
-				update_interface.emplace_back(egress_interface_id, labels);
+				update_interface.emplace_back(egress_interface_id, labels, neighbor_address);
 
 				value_lookup[value_id][socket_id].emplace_back(nexthop,
 				                                               egress_interface_name,
@@ -1241,9 +1246,9 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 		{
 			for (const auto& item : request_interface)
 			{
-				const auto& [nexthop, egress_interface_id, egress_interface_name, labels] = item;
+				const auto& [nexthop, egress_interface_id, egress_interface_name, labels, neighbor_address] = item;
 
-				update_interface.emplace_back(egress_interface_id, labels);
+				update_interface.emplace_back(egress_interface_id, labels, neighbor_address);
 
 				value_lookup[value_id][socket_id].emplace_back(nexthop,
 				                                               egress_interface_name,
@@ -1301,7 +1306,8 @@ void route_t::value_compile_label(common::idp::updateGlobalBase::request& global
 			request_interface.emplace_back(first_nexthop,
 			                               interface_id,
 			                               interface_name,
-			                               labels);
+			                               labels,
+			                               nexthop);
 		}
 		else
 		{
@@ -1347,7 +1353,8 @@ void route_t::value_compile_fallback(common::idp::updateGlobalBase::request& glo
 			request_interface.emplace_back(nexthop,
 			                               interface_id,
 			                               interface_name,
-			                               labels);
+			                               labels,
+			                               nexthop);
 		}
 	}
 }
@@ -1457,7 +1464,8 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 						                               interface_name,
 						                               peer_id,
 						                               origin_as,
-						                               weight);
+						                               weight,
+						                               default_nexthop);
 					}
 				}
 			}
@@ -1476,7 +1484,8 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 						                               interface_name,
 						                               peer_id,
 						                               origin_as,
-						                               weight);
+						                               weight,
+						                               default_nexthop);
 					}
 				}
 			}
@@ -1517,7 +1526,8 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 				                               interface_name,
 				                               0,
 				                               0,
-				                               1);
+				                               1,
+				                               nexthop);
 			}
 		}
 	}
@@ -1557,7 +1567,8 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 					                               interface_name,
 					                               0,
 					                               0,
-					                               1);
+					                               1,
+					                               default_nexthop);
 				}
 			}
 		}
@@ -1576,7 +1587,8 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 					                               interface_name,
 					                               0,
 					                               0,
-					                               1);
+					                               1,
+					                               default_nexthop);
 				}
 			}
 		}
@@ -1619,14 +1631,14 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		/// same numa
 		for (const auto& item : request_interface)
 		{
-			const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight] = item;
+			const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
 			(void)egress_interface_name;
 
 			if (exist(interfaces, egress_interface_id))
 			{
 				const auto counter_ids = tunnel_counter.get_ids({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 
-				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop);
+				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop, neighbor_address);
 				weights.emplace_back(weight);
 
 				tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
@@ -1645,12 +1657,12 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		{
 			for (const auto& item : request_interface)
 			{
-				const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight] = item;
+				const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
 				(void)egress_interface_name;
 
 				const auto counter_ids = tunnel_counter.get_ids({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 
-				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop);
+				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop, neighbor_address);
 				weights.emplace_back(weight);
 
 				tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
