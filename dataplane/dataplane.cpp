@@ -104,6 +104,8 @@ eResult cDataPlane::init(const std::string& binaryPath,
 {
 	eResult result = eResult::success;
 
+	current_time = time(nullptr);
+
 	result = parseConfig(configFilePath);
 	if (result != eResult::success)
 	{
@@ -1222,8 +1224,35 @@ int cDataPlane::lcoreThread(void* args)
 	return 0;
 }
 
+void cDataPlane::timestamp_thread()
+{
+	uint32_t prev_time = 0;
+
+	for (;;)
+	{
+		current_time = time(nullptr);
+
+		if (current_time != prev_time)
+		{
+			for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
+			{
+				(void)socket_id;
+				globalbase_atomic->currentTime = current_time;
+			}
+
+			prev_time = current_time;
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	}
+}
+
 void cDataPlane::start()
 {
+	threads.emplace_back([this]() {
+		timestamp_thread();
+	});
+
 	report.run();
 	bus.run();
 

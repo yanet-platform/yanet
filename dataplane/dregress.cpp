@@ -5,6 +5,7 @@
 
 #include "checksum.h"
 #include "controlplane.h"
+#include "dataplane.h"
 #include "dregress.h"
 #include "metadata.h"
 #include "worker.h"
@@ -158,7 +159,18 @@ void dregress_t::insert(rte_mbuf* mbuf)
 					flags |= YANET_DREGRESS_FLAG_NH_IS_IPV4;
 				}
 
-				connections->insert(key, {loss_count, ack_count, labelled_nexthop, label, community, prefix_address, peer_as, origin_as, (uint16_t)controlplane->currentTime, flags, prefix_mask});
+				connections->insert(key,
+				                    {loss_count,
+				                     ack_count,
+				                     labelled_nexthop,
+				                     label,
+				                     community,
+				                     prefix_address,
+				                     peer_as,
+				                     origin_as,
+				                     (uint16_t)dataplane->get_current_time(),
+				                     flags,
+				                     prefix_mask});
 
 				if (tcpHeader->tcp_flags & TCP_FIN_FLAG)
 				{
@@ -285,7 +297,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 			labelled_nexthop = value->nexthop;
 			labelled_label = value->label;
 
-			value->timestamp = (uint16_t)controlplane->currentTime;
+			value->timestamp = (uint16_t)dataplane->get_current_time();
 
 			if (tcpHeader->tcp_flags & (TCP_FIN_FLAG | TCP_RST_FLAG))
 			{
@@ -391,7 +403,7 @@ void dregress_t::handle()
 		{
 			if (iter.value()->flags & YANET_DREGRESS_FLAG_FIN)
 			{
-				if ((uint16_t)(controlplane->currentTime - iter.value()->timestamp) > 8) ///< @todo: tag:DREGRESS_CONFIG
+				if ((uint16_t)(dataplane->get_current_time() - iter.value()->timestamp) > 8) ///< @todo: tag:DREGRESS_CONFIG
 				{
 					iter.unsetValid();
 
@@ -400,7 +412,7 @@ void dregress_t::handle()
 			}
 			else
 			{
-				if ((uint16_t)(controlplane->currentTime - iter.value()->timestamp) > 60) ///< @todo: tag:DREGRESS_CONFIG
+				if ((uint16_t)(dataplane->get_current_time() - iter.value()->timestamp) > 60) ///< @todo: tag:DREGRESS_CONFIG
 				{
 					iter.unsetValid();
 

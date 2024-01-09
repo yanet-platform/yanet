@@ -1665,30 +1665,14 @@ void cControlPlane::mainThread()
 {
 	rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 
-	uint32_t prevTime = 0;
-
 	for (;;)
 	{
-		currentTime = time(nullptr);
-
 		if (dataPlane->config.SWNormalPriorityRateLimitPerWorker || dataPlane->config.SWICMPOutRateLimit)
 		{
 			SWRateLimiterTimeTracker();
 		}
 
 		slowWorker->slowWorkerBeforeHandlePackets();
-
-		if (currentTime != prevTime)
-		{
-			for (const auto& iter : dataPlane->globalBaseAtomics)
-			{
-				auto* globalBaseAtomic = iter.second;
-
-				globalBaseAtomic->currentTime = currentTime;
-			}
-
-			prevTime = currentTime;
-		};
 
 		/// dequeue packets from worker's rings
 		for (unsigned nIter = 0; nIter < YANET_CONFIG_RING_PRIORITY_RATIO; nIter++)

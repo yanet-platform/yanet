@@ -189,7 +189,5 @@ protected:
 	std::chrono::high_resolution_clock::time_point prevTimePointForSWRateLimiter;
 
 	uint32_t icmpOutRemainder;
-
-	uint32_t currentTime;
 	uint32_t gc_step;
 };
