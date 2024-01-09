@@ -5,6 +5,7 @@
 
 #include "base.h"
 #include "common.h"
+#include "hashtable.h"
 
 #include "common/generation.h"
 #include "common/idp.h"

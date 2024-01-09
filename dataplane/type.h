@@ -295,8 +295,6 @@ struct tInterface
 {
 	/// @todo: uint8_t enabled;
 
-	rte_ether_addr neighbor_ether_address_v4;
-	rte_ether_addr neighbor_ether_address_v6;
 	tAclId aclId;
 	common::globalBase::tFlow flow;
 };
@@ -384,25 +382,19 @@ struct dregress_t
 struct nexthop ///< @todo
 {
 	tInterfaceId interfaceId : 16;
+	ipv6_address_t neighbor_address;
 	uint32_t labelExpTransport; ///< @todo: rename first
 	uint32_t labelExpService; ///< @todo: rename second
 };
 
 struct nexthop_tunnel_t
 {
-	union
-	{
-		struct
-		{
-			tInterfaceId interface_id : 8;
-			tCounterId counter_id : 24;
-		};
-
-		uint32_t atomic1;
-	};
-
+	tInterfaceId interface_id : 16;
+	uint16_t flags;
+	tCounterId counter_id;
 	uint32_t label;
 	ipv6_address_t nexthop_address;
+	ipv6_address_t neighbor_address;
 };
 
 static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid YANET_CONFIG_COUNTERS_SIZE");
@@ -426,8 +418,6 @@ struct route_value_t
 		} interface;
 	};
 };
-
-static_assert(sizeof(route_value_t) == 192, "invalid size of route_value_t");
 
 struct route_tunnel_value_t
 {

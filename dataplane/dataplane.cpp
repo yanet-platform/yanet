@@ -239,6 +239,14 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		return result;
 	}
 
+	result = neighbor.init(this);
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
+	init_worker_base();
+
 	/// init sync barrier
 	int rc = pthread_barrier_init(&initPortBarrier, nullptr, workers.size());
 	if (rc != 0)
@@ -789,6 +797,8 @@ eResult cDataPlane::initGlobalBases()
 		{
 			return result;
 		}
+
+		socket_ids.emplace(socketId);
 	}
 
 	for (const auto& configWorkerIter : config.workers)
@@ -807,6 +817,8 @@ eResult cDataPlane::initGlobalBases()
 		{
 			return result;
 		}
+
+		socket_ids.emplace(socketId);
 	}
 
 	return result;
@@ -851,6 +863,7 @@ eResult cDataPlane::initWorkers()
 
 		workers[coreId] = worker;
 		controlPlane->slowWorker = worker;
+		workers_vector.emplace_back(worker);
 
 		outQueueId++;
 	}
@@ -1001,6 +1014,7 @@ eResult cDataPlane::initWorkers()
 
 		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[coreId]);
 		workers[coreId] = worker;
+		workers_vector.emplace_back(worker);
 
 		outQueueId++;
 	}
@@ -1080,6 +1094,7 @@ eResult cDataPlane::initWorkers()
 
 		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[core_id]);
 		worker_gcs[core_id] = worker;
+		socket_worker_gcs[socket_id] = worker;
 	}
 
 	return eResult::success;
@@ -1127,6 +1142,31 @@ eResult cDataPlane::initQueues()
 	}
 
 	return eResult::success;
+}
+
+void cDataPlane::init_worker_base()
+{
+	std::vector<std::tuple<tSocketId, dataplane::base::generation*>> base_nexts;
+	for (auto& [core_id, worker] : workers)
+	{
+		(void)core_id;
+
+		auto* base = &worker->bases[worker->currentBaseId];
+		auto* base_next = &worker->bases[worker->currentBaseId ^ 1];
+		base_nexts.emplace_back(worker->socketId, base);
+		base_nexts.emplace_back(worker->socketId, base_next);
+	}
+	for (auto& [core_id, worker] : worker_gcs)
+	{
+		(void)core_id;
+
+		auto* base = &worker->bases[worker->current_base_id];
+		auto* base_next = &worker->bases[worker->current_base_id ^ 1];
+		base_nexts.emplace_back(worker->socket_id, base);
+		base_nexts.emplace_back(worker->socket_id, base_next);
+	}
+
+	neighbor.update_worker_base(base_nexts);
 }
 
 void cDataPlane::hugepage_destroy(void* pointer)
@@ -1197,6 +1237,22 @@ void cDataPlane::join()
 
 	report.join();
 	bus.join();
+}
+
+const std::set<tSocketId>& cDataPlane::get_socket_ids() const
+{
+	return socket_ids;
+}
+
+const std::vector<cWorker*>& cDataPlane::get_workers() const
+{
+	return workers_vector;
+}
+
+void cDataPlane::run_on_worker_gc(const tSocketId socket_id,
+                                  const std::function<bool()>& callback)
+{
+	socket_worker_gcs.find(socket_id)->second->run_on_this_thread(callback);
 }
 
 uint64_t cDataPlane::getConfigValue(const eConfigType& type) const
@@ -1478,6 +1534,41 @@ std::optional<tPortId> cDataPlane::interface_name_to_port_id(const std::string& 
 
 	/// unknown interface
 	return std::nullopt;
+}
+
+void cDataPlane::switch_worker_base()
+{
+	std::lock_guard<std::mutex> guard(switch_worker_base_mutex);
+
+	/// collect all base_next
+	std::vector<std::tuple<tSocketId, dataplane::base::generation*>> base_nexts;
+	for (auto& [core_id, worker] : workers)
+	{
+		(void)core_id;
+
+		auto* base_next = &worker->bases[worker->currentBaseId ^ 1];
+		base_nexts.emplace_back(worker->socketId, base_next);
+	}
+	for (auto& [core_id, worker] : worker_gcs)
+	{
+		(void)core_id;
+
+		auto* base_next = &worker->bases[worker->current_base_id ^ 1];
+		base_nexts.emplace_back(worker->socket_id, base_next);
+	}
+
+	/// update base_next
+	{
+		std::lock_guard<std::mutex> guard(currentGlobalBaseId_mutex);
+		for (const auto& [socket_id, base_next] : base_nexts)
+		{
+			base_next->globalBase = globalBases[socket_id][currentGlobalBaseId ^ 1];
+		}
+	}
+	neighbor.update_worker_base(base_nexts);
+
+	/// switch
+	controlPlane->switchBase();
 }
 
 eResult cDataPlane::parseConfig(const std::string& configFilePath)

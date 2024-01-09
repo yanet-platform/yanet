@@ -214,7 +214,7 @@ protected:
 	YANET_NEVER_INLINE void slowWorkerFlow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 	YANET_NEVER_INLINE void slowWorkerTranslation(rte_mbuf* mbuf, const dataplane::globalBase::tNat64stateless& nat64stateless, const dataplane::globalBase::nat64stateless_translation_t& translation, bool direction); /** true: ingress, false: egress */
 
-protected:
+public:
 	friend class cDataPlane;
 	friend class cReport;
 	friend class cControlPlane;
@@ -229,6 +229,7 @@ protected:
 
 	rte_mempool* mempool;
 
+protected:
 	/// variables above are not needed for mainThread()
 	YADECAP_CACHE_ALIGNED(align1);
 
@@ -333,6 +334,15 @@ protected:
 
 	samples::Sampler sampler;
 
+public:
+	/// use this table for pass resolve neighbor MAC
+	dataplane::hashtable_mod_spinlock<dataplane::neighbor::key,
+	                                  uint32_t, ///< stub
+	                                  32,
+	                                  8>
+	        neighbor_resolve;
+
+protected:
 	YADECAP_CACHE_ALIGNED(align3);
 
 	dataplane::base::generation bases[2];

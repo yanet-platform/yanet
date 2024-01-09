@@ -27,7 +27,8 @@ using value_key_t = std::tuple<std::tuple<std::string, ///< vrf
 using value_interface_t = std::tuple<ip_address_t,
                                      tInterfaceId,
                                      std::string,
-                                     std::vector<uint32_t>>;
+                                     std::vector<uint32_t>,
+                                     ip_address_t>; ///< neighbor_address
 
 using lookup_t = std::tuple<ip_address_t, ///< nexthop
                             std::string,
@@ -62,7 +63,8 @@ using tunnel_value_interface_t = std::tuple<ip_address_t, ///< nexthop
                                             std::string, ///< interface_name
                                             uint32_t, ///< peer_id
                                             uint32_t, ///< origin_as
-                                            uint32_t>; ///< weight
+                                            uint32_t, ///< weight
+                                            ip_address_t>; ///< neighbor_address
 
 using tunnel_lookup_t = std::tuple<ip_address_t, ///< nexthop
                                    std::string, ///< interface_name
@@ -179,7 +181,6 @@ public:
 	void reload_before() override;
 	void reload(const controlplane::base_t& base_prev, const controlplane::base_t& base_next, common::idp::updateGlobalBase::request& globalbase) override;
 	void reload_after() override;
-	void mac_addresses_changed() override;
 
 	void prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix, const std::vector<rib::pptn_t>& pptns, const std::variant<std::monostate, rib::nexthop_map_t, uint32_t>& value);
 	void tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority_orig, const ip_prefix_t& prefix, const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value);
