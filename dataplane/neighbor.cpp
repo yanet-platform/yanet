@@ -208,11 +208,17 @@ common::idp::neighbor_show::response module::neighbor_show() const
 
 				const auto& [route_name, interface_name] = it->second;
 
+				std::optional<uint32_t> last_update_timestamp;
+				if (!(value.flags & flag_is_static))
+				{
+					last_update_timestamp = dataplane->get_current_time() - value.last_update_timestamp;
+				}
+
 				response.emplace_back(route_name,
 				                      interface_name,
 				                      common::ip_address_t(key.flags & flag_is_ipv6 ? 6 : 4, key.address.bytes),
 				                      common::mac_address_t(value.ether_address.addr_bytes),
-				                      value.last_update_timestamp);
+				                      last_update_timestamp);
 			}
 		}
 	}
@@ -256,6 +262,9 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 
 	dataplane::neighbor::value value;
 	memcpy(value.ether_address.addr_bytes, mac_address.data(), 6);
+	value.flags = 0;
+	value.flags |= flag_is_static;
+	value.last_update_timestamp = dataplane->get_current_time();
 
 	auto response = generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 		eResult result = eResult::success;
@@ -481,6 +490,8 @@ void module::netlink_thread()
 
 			value value;
 			memcpy(value.ether_address.addr_bytes, mac_address.data(), 6);
+			value.flags = 0;
+			value.last_update_timestamp = dataplane->get_current_time();
 
 			generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 				for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
@@ -542,6 +553,8 @@ void module::resolve(const dataplane::neighbor::key& key)
 		value.ether_address.addr_bytes[1] = 66;
 	}
 	*((uint32_t*)&value.ether_address.addr_bytes[2]) = rte_hash_crc(key.address.bytes, 16, 0);
+	value.flags = 0;
+	value.last_update_timestamp = dataplane->get_current_time();
 
 	generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 		for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)

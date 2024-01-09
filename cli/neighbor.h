@@ -1,6 +1,5 @@
 #pragma once
 
-#include "common/icontrolplane.h"
 #include "common/idataplane.h"
 
 #include "helper.h"
@@ -13,7 +12,7 @@ void show()
 	interface::dataPlane dataplane;
 	const auto response = dataplane.neighbor_show();
 
-	table_t table;
+	table_t table({.optional_null = "static"});
 	table.insert("route_name",
 	             "interface_name",
 	             "ip_address",

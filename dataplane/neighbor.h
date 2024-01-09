@@ -17,7 +17,8 @@
 namespace dataplane::neighbor
 {
 
-constexpr static uint16_t flag_is_ipv6 = 1;
+constexpr static uint16_t flag_is_ipv6 = 1 << 0;
+constexpr static uint16_t flag_is_static = 1 << 1;
 
 struct key
 {
@@ -31,7 +32,8 @@ static_assert(CONFIG_YADECAP_INTERFACES_SIZE <= 0xFFFF, "invalid size");
 struct value
 {
 	rte_ether_addr ether_address;
-	uint16_t last_update_timestamp;
+	uint16_t flags;
+	uint32_t last_update_timestamp;
 };
 
 //
