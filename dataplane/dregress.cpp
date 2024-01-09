@@ -377,48 +377,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 
 	/// @todo: opt
 	controlplane->slowWorker->preparePacket(mbuf);
-
-	common::globalBase::tFlow flow = dregress.flow;
-	{
-		/// try send to logical port
-
-		common::mac_address_t neighbor;
-
-		{
-			std::lock_guard<std::mutex> guard(neighbor_mutex);
-
-			if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
-			{
-				if (neighbor_v4.size())
-				{
-					const auto& [dregress_neighbor, dregress_flow] = *std::next(neighbor_v4.begin(), metadata->hash % neighbor_v4.size());
-
-					neighbor = dregress_neighbor;
-					flow = dregress_flow;
-				}
-			}
-			else
-			{
-				if (neighbor_v6.size())
-				{
-					const auto& [dregress_neighbor, dregress_flow] = *std::next(neighbor_v6.begin(), metadata->hash % neighbor_v6.size());
-
-					neighbor = dregress_neighbor;
-					flow = dregress_flow;
-				}
-			}
-		}
-
-		if (!neighbor.is_default())
-		{
-			generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
-			memcpy(ethernetHeader->dst_addr.addr_bytes,
-			       neighbor.data(),
-			       6);
-		}
-	}
-
-	controlplane->sendPacketToSlowWorker(mbuf, flow);
+	controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
 }
 
 void dregress_t::handle()

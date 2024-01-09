@@ -84,9 +84,5 @@ public:
 	common::dregress::counters_t counters_v4;
 	common::dregress::counters_t counters_v6;
 
-	std::mutex neighbor_mutex;
-	std::set<std::tuple<common::mac_address_t, common::globalBase::tFlow>> neighbor_v4;
-	std::set<std::tuple<common::mac_address_t, common::globalBase::tFlow>> neighbor_v6;
-
 	uint32_t gc_step;
 };

@@ -429,7 +429,7 @@ namespace dregress_local_prefix_update
 using request = std::set<ip_prefix_t>;
 }
 
-namespace dregress_neighbor_update
+namespace dregress_neighbor_update ///< @deprecated
 {
 using request = std::tuple<std::set<std::tuple<common::mac_address_t, common::globalBase::tFlow>>,
                            std::set<std::tuple<common::mac_address_t, common::globalBase::tFlow>>>;

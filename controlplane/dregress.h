@@ -85,7 +85,6 @@ public:
 	void reload_before() override;
 	void reload(const controlplane::base_t& base_prev, const controlplane::base_t& base_next, common::idp::updateGlobalBase::request& globalbase) override;
 	void reload_after() override;
-	void mac_addresses_changed() override;
 
 	void prefix_insert(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix, const rib::nexthop_map_t& nexthops);
 	void prefix_remove(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix);
@@ -95,7 +94,6 @@ public:
 	common::icp::dregress_config::response dregress_config() const;
 
 	void compile(common::idp::updateGlobalBase::request& globalbase, const dregress::generation_t& generation);
-	void compile_neighbors(common::idp::updateGlobalBase::request& globalbase, const dregress::generation_t& generation);
 
 protected:
 	std::optional<uint32_t> value_insert(const dregress::value_key_t& value_key);

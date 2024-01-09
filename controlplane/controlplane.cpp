@@ -193,11 +193,6 @@ void cControlPlane::start()
 	}
 
 	threads.emplace_back([this] { main_thread(); });
-
-#ifdef CONFIG_YADECAP_AUTOTEST
-#else // CONFIG_YADECAP_AUTOTEST
-	threads.emplace_back([this] { mac_address_resolve_thread(); });
-#endif // CONFIG_YADECAP_AUTOTEST
 }
 
 void cControlPlane::stop()
@@ -972,44 +967,6 @@ void cControlPlane::main_thread()
 	}
 }
 
-void cControlPlane::mac_address_resolve_thread()
-{
-	while (!flagStop)
-	{
-		bool mac_addresses_changed = false;
-
-		{
-			std::unique_lock mac_addresses_lock(mac_addresses_mutex);
-
-			for (auto& [key, mac_address] : this->mac_addresses)
-			{
-				const auto& [vrf, interface_name, address] = key;
-				(void)vrf;
-
-				const auto mac_address_next = system.getMacAddress(interface_name, address);
-				if (mac_address_next)
-				{
-					if ((!mac_address) ||
-					    *mac_address != *mac_address_next)
-					{
-						mac_address = mac_address_next;
-						mac_addresses_changed = true;
-					}
-				}
-			}
-		}
-
-		if (mac_addresses_changed)
-		{
-			for (auto* module : modules)
-			{
-				module->mac_addresses_changed();
-			}
-		}
-
-		std::this_thread::sleep_for(std::chrono::seconds{8});
-	}
-}
 void cControlPlane::register_service(google::protobuf::Service* service)
 {
 	services[service->GetDescriptor()->name()] = service;

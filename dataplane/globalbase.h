@@ -172,7 +172,6 @@ protected:
 	eResult dregress_prefix_remove(const common::idp::updateGlobalBase::dregress_prefix_remove::request& request);
 	eResult dregress_prefix_clear();
 	eResult dregress_local_prefix_update(const common::idp::updateGlobalBase::dregress_local_prefix_update::request& request);
-	eResult dregress_neighbor_update(const common::idp::updateGlobalBase::dregress_neighbor_update::request& request);
 	eResult dregress_value_update(const common::idp::updateGlobalBase::dregress_value_update::request& request);
 	eResult fwstate_synchronization_update(const common::idp::updateGlobalBase::fwstate_synchronization_update::request& request);
 	eResult tun64_update(const common::idp::updateGlobalBase::tun64_update::request& request);
