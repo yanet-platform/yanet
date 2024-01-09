@@ -145,7 +145,6 @@ protected:
 	void addConfig(uint32_t serial, const controlplane::base_t& config);
 
 	void main_thread();
-	void mac_address_resolve_thread();
 
 protected:
 	friend class telegraf_t;

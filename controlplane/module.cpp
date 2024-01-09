@@ -93,10 +93,6 @@ void cModule::reload_after()
 {
 }
 
-void cModule::mac_addresses_changed()
-{
-}
-
 eResult cModule::init()
 {
 	return eResult::success;

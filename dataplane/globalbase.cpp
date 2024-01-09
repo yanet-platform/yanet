@@ -204,7 +204,7 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		}
 		else if (type == common::idp::updateGlobalBase::requestType::dregress_neighbor_update)
 		{
-			result = dregress_neighbor_update(std::get<common::idp::updateGlobalBase::dregress_neighbor_update::request>(data));
+			/// @deprecated
 		}
 		else if (type == common::idp::updateGlobalBase::requestType::dregress_value_update)
 		{
@@ -2138,20 +2138,6 @@ eResult generation::dregress_local_prefix_update(const common::idp::updateGlobal
 			dataPlane->controlPlane->dregress.local_prefixes_v6.emplace(prefix.get_ipv6());
 		}
 	}
-
-	return result;
-}
-
-eResult generation::dregress_neighbor_update(const common::idp::updateGlobalBase::dregress_neighbor_update::request& request)
-{
-	eResult result = eResult::success;
-
-	const auto& [neighbor_v4, neighbor_v6] = request;
-
-	std::lock_guard<std::mutex> guard(dataPlane->controlPlane->dregress.neighbor_mutex);
-
-	dataPlane->controlPlane->dregress.neighbor_v4 = neighbor_v4;
-	dataPlane->controlPlane->dregress.neighbor_v6 = neighbor_v6;
 
 	return result;
 }

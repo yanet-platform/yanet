@@ -8,7 +8,6 @@
 #include "common/idp.h"
 #include "common/result.h"
 
-#include "common.h"
 #include "type.h"
 
 //
@@ -33,7 +32,6 @@ public:
 	virtual void reload_before();
 	virtual void reload(const controlplane::base_t& base_prev, const controlplane::base_t& base_next, common::idp::updateGlobalBase::request& globalbase);
 	virtual void reload_after();
-	virtual void mac_addresses_changed();
 
 protected:
 	virtual eResult init();
