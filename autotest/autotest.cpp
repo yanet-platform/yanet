@@ -1281,6 +1281,12 @@ void tAutotest::mainThread()
 
 		fflushSharedMemory();
 
+		/// clear dataplane states
+		{
+			dataPlane.balancer_state_clear();
+			dataPlane.neighbor_clear();
+		}
+
 		try
 		{
 			{
@@ -1464,12 +1470,6 @@ void tAutotest::mainThread()
 			out << dataPlane.getReport();
 
 			std::abort();
-		}
-
-		/// clear dataplane states
-		{
-			dataPlane.balancer_state_clear();
-			dataPlane.neighbor_clear();
 		}
 
 		YANET_LOG_PRINT(ANSI_COLOR_GREEN "done '%s'\n\n" ANSI_COLOR_RESET, configFilePath.data());
