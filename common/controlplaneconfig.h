@@ -102,7 +102,7 @@ public:
 	void pop(common::stream_in_t& stream)
 	{
 		stream.pop(interfaceId);
-		stream.pop(ipAddresses);
+		stream.pop(ip_prefixes);
 		stream.pop(neighborIPv4Address);
 		stream.pop(neighborIPv6Address);
 		stream.pop(static_neighbor_mac_address_v4);
@@ -116,7 +116,7 @@ public:
 	void push(common::stream_out_t& stream) const
 	{
 		stream.push(interfaceId);
-		stream.push(ipAddresses);
+		stream.push(ip_prefixes);
 		stream.push(neighborIPv4Address);
 		stream.push(neighborIPv6Address);
 		stream.push(static_neighbor_mac_address_v4);
@@ -130,7 +130,7 @@ public:
 public:
 	tInterfaceId interfaceId;
 
-	std::set<common::ip_address_t> ipAddresses;
+	std::set<common::ip_prefix_t> ip_prefixes;
 	std::optional<common::ipv4_address_t> neighborIPv4Address;
 	std::optional<common::ipv6_address_t> neighborIPv6Address;
 	std::optional<common::mac_address_t> static_neighbor_mac_address_v4; ///< @todo: no directly connected (only v4 and v6 neighbor)

@@ -396,7 +396,7 @@ namespace route_interface
 {
 using response = std::map<std::tuple<std::string, ///< route_name
                                      std::string>, ///< interface_name
-                          std::tuple<std::set<ip_address_t>,
+                          std::tuple<std::set<ip_prefix_t>,
                                      std::optional<ipv4_address_t>, ///< neighbor
                                      std::optional<ipv6_address_t>, ///< neighbor
                                      std::optional<mac_address_t>, ///< neighbor_mac_address_v4
