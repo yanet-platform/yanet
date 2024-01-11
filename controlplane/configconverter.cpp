@@ -874,15 +874,15 @@ void config_converter_t::acl_rules_route_local(controlplane::base::acl_t& acl,
 	{
 		(void)interfaceName;
 
-		for (const auto& ipAddress : interface.ipAddresses)
+		for (const auto& ipAddress : interface.ip_prefixes)
 		{
 			if (ipAddress.is_ipv4())
 			{
-				rule_network_ipv4.destinationPrefixes.emplace(ipAddress.get_ipv4());
+				rule_network_ipv4.destinationPrefixes.emplace(ipAddress.address());
 			}
 			else
 			{
-				rule_network_ipv6.destinationPrefixes.emplace(ipAddress.get_ipv6());
+				rule_network_ipv6.destinationPrefixes.emplace(ipAddress.address());
 			}
 		}
 	}

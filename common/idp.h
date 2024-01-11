@@ -377,9 +377,10 @@ using request = lpm::request;
 
 namespace route_value_update
 {
-using interface = std::vector<std::tuple<tInterfaceId,
-                                         std::vector<uint32_t>,
-                                         ip_address_t>>; ///< neighbor_address
+using interface = std::vector<std::tuple<tInterfaceId, ///< interface_id
+                                         std::vector<uint32_t>, ///< labels
+                                         ip_address_t, ///< neighbor_address
+                                         uint16_t>>; ///< nexthop_flags
 
 using request = std::tuple<uint32_t, ///< route_value_id
                            tSocketId,
@@ -405,7 +406,8 @@ using interface = std::tuple<uint32_t, ///< weight_start
                                                     tCounterId,
                                                     uint32_t, ///< label
                                                     ip_address_t, ///< nexthop_address
-                                                    ip_address_t>>>; ///< neighbor_address
+                                                    ip_address_t, ///< neighbor_address
+                                                    uint16_t>>>; ///< nexthop_flags
 
 using request = std::tuple<uint32_t, ///< route_tunnel_value_id
                            tSocketId,

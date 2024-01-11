@@ -49,7 +49,7 @@ eResult route_t::init()
 	return eResult::success;
 }
 
-void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix, const std::vector<rib::pptn_t>& pptns, const std::variant<std::monostate, rib::nexthop_map_t, uint32_t>& value)
+void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix, const std::vector<rib::pptn_t>& pptns, const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value)
 {
 	const auto& [vrf, priority] = vrf_priority;
 
@@ -107,6 +107,10 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 		{
 			destination_next = interface_destination_next.begin()->second;
 		}
+	}
+	else if (const auto directly_connected = std::get_if<route::directly_connected_destination_t>(&value))
+	{
+		destination_next = *directly_connected;
 	}
 	else if (const auto virtual_port_id = std::get_if<uint32_t>(&value))
 	{
@@ -546,9 +550,9 @@ common::icp::route_interface::response route_t::route_interface() const
 		{
 			for (const auto& [interface_name, interface] : route.interfaces)
 			{
-				auto& [addresses, neighbor_v4, neighbor_v6, neighbor_mac_address_v4, neighbor_mac_address_v6, next_module] = response[{route_name, interface_name}];
+				auto& [prefixes, neighbor_v4, neighbor_v6, neighbor_mac_address_v4, neighbor_mac_address_v6, next_module] = response[{route_name, interface_name}];
 
-				addresses = interface.ipAddresses;
+				prefixes = interface.ip_prefixes;
 				neighbor_v4 = interface.neighborIPv4Address;
 				neighbor_v6 = interface.neighborIPv6Address;
 
@@ -896,6 +900,49 @@ void route_t::reload(const controlplane::base_t& base_prev,
 				                     std::tuple<>());
 			}
 		}
+
+		for (const auto& [config_module_name, config_module] : base_prev.routes)
+		{
+			(void)config_module_name;
+
+			for (const auto& [interface_name, interface] : config_module.interfaces)
+			{
+				(void)interface_name;
+
+				for (const auto& ip_prefix : interface.ip_prefixes)
+				{
+					if (!ip_prefix.is_host())
+					{
+						prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+						              ip_prefix.applyMask(ip_prefix.mask()),
+						              {},
+						              std::monostate());
+					}
+				}
+			}
+		}
+
+		for (const auto& [config_module_name, config_module] : base_next.routes)
+		{
+			(void)config_module_name;
+
+			for (const auto& [interface_name, interface] : config_module.interfaces)
+			{
+				for (const auto& ip_prefix : interface.ip_prefixes)
+				{
+					if (!ip_prefix.is_host())
+					{
+						route::directly_connected_destination_t directly_connected = {interface.interfaceId,
+						                                                              interface_name};
+
+						prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+						              ip_prefix.applyMask(ip_prefix.mask()),
+						              {},
+						              directly_connected);
+					}
+				}
+			}
+		}
 	}
 
 #ifdef CONFIG_YADECAP_AUTOTEST
@@ -1096,83 +1143,95 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 
 		return;
 	}
-
-	for (const auto& destination_iter : std::get<0>(destination)) ///< interface
+	else if (const auto directly_connected = std::get_if<route::directly_connected_destination_t>(&destination))
 	{
-		const auto& [nexthop, labels] = destination_iter;
+		const auto& [interface_id, interface_name] = *directly_connected;
 
-		if (nexthop.is_default())
+		request_interface.emplace_back(ipv4_address_t(), ///< default
+		                               interface_id,
+		                               interface_name,
+		                               std::vector<uint32_t>(),
+		                               ipv4_address_t()); ///< default
+	}
+	else
+	{
+		for (const auto& destination_iter : std::get<0>(destination)) ///< interface
 		{
-			controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
-				globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_value_update,
-				                        common::idp::updateGlobalBase::route_value_update::request(value_id,
-				                                                                                   socket_id,
-				                                                                                   common::globalBase::eNexthopType::controlPlane,
-				                                                                                   {}));
+			const auto& [nexthop, labels] = destination_iter;
 
-				value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
-				                                               "linux",
-				                                               std::vector<uint32_t>());
-			});
+			if (nexthop.is_default())
+			{
+				controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
+					globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_value_update,
+					                        common::idp::updateGlobalBase::route_value_update::request(value_id,
+					                                                                                   socket_id,
+					                                                                                   common::globalBase::eNexthopType::controlPlane,
+					                                                                                   {}));
 
-			return;
-		}
+					value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
+					                                               "linux",
+					                                               std::vector<uint32_t>());
+				});
 
-		auto interface = generation.get_interface_by_neighbor(nexthop);
-		if (interface)
-		{
-			const auto& [interface_id, interface_name] = **interface;
+				return;
+			}
 
-			if (labels.size() > 2)
+			auto interface = generation.get_interface_by_neighbor(nexthop);
+			if (interface)
+			{
+				const auto& [interface_id, interface_name] = **interface;
+
+				if (labels.size() > 2)
+				{
+					YANET_LOG_WARNING("wrong labels count '%lu'\n",
+					                  labels.size());
+					continue;
+				}
+
+				request_interface.emplace_back(nexthop,
+				                               interface_id,
+				                               interface_name,
+				                               labels,
+				                               nexthop);
+
+				continue;
+			}
+
+			if (labels.size() > 1)
 			{
 				YANET_LOG_WARNING("wrong labels count '%lu'\n",
 				                  labels.size());
 				continue;
 			}
 
-			request_interface.emplace_back(nexthop,
-			                               interface_id,
-			                               interface_name,
-			                               labels,
-			                               nexthop);
+			ip_prefix_t prefix_next;
+			if (nexthop.is_ipv4())
+			{
+				prefix_next = {nexthop, 32};
+			}
+			else
+			{
+				prefix_next = {nexthop, 128};
+			}
 
-			continue;
-		}
+			auto& [priority_current, update] = prefixes[vrf];
+			auto& current = priority_current[priority];
+			(void)update;
 
-		if (labels.size() > 1)
-		{
-			YANET_LOG_WARNING("wrong labels count '%lu'\n",
-			                  labels.size());
-			continue;
-		}
-
-		ip_prefix_t prefix_next;
-		if (nexthop.is_ipv4())
-		{
-			prefix_next = {nexthop, 32};
-		}
-		else
-		{
-			prefix_next = {nexthop, 128};
-		}
-
-		auto& [priority_current, update] = prefixes[vrf];
-		auto& current = priority_current[priority];
-		(void)update;
-
-		const auto value_id_label = current.get(prefix_next);
-		if (value_id_label)
-		{
-			value_compile_label(globalbase,
-			                    generation,
-			                    *value_id_label,
-			                    labels,
-			                    request_interface,
-			                    nexthop);
-		}
-		else
-		{
-			/// @todo: stats
+			const auto value_id_label = current.get(prefix_next);
+			if (value_id_label)
+			{
+				value_compile_label(globalbase,
+				                    generation,
+				                    *value_id_label,
+				                    labels,
+				                    request_interface,
+				                    nexthop);
+			}
+			else
+			{
+				/// @todo: stats
+			}
 		}
 	}
 
@@ -1223,7 +1282,7 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 		request_interface.resize(CONFIG_YADECAP_GB_ECMP_SIZE);
 	}
 
-	controlPlane->forEachSocket([this, &value_id, &request_interface, &globalbase](const tSocketId& socket_id, const std::set<tInterfaceId>& interfaces) {
+	generation.for_each_socket([this, &value_id, &request_interface, &globalbase](const tSocketId& socket_id, const std::set<tInterfaceId>& interfaces) {
 		common::idp::updateGlobalBase::route_value_update::interface update_interface;
 
 		/// same numa
@@ -1233,7 +1292,13 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 
 			if (exist(interfaces, egress_interface_id))
 			{
-				update_interface.emplace_back(egress_interface_id, labels, neighbor_address);
+				uint16_t flags = 0;
+				if (neighbor_address.is_default())
+				{
+					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
+				}
+
+				update_interface.emplace_back(egress_interface_id, labels, neighbor_address, flags);
 
 				value_lookup[value_id][socket_id].emplace_back(nexthop,
 				                                               egress_interface_name,
@@ -1248,7 +1313,13 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 			{
 				const auto& [nexthop, egress_interface_id, egress_interface_name, labels, neighbor_address] = item;
 
-				update_interface.emplace_back(egress_interface_id, labels, neighbor_address);
+				uint16_t flags = 0;
+				if (neighbor_address.is_default())
+				{
+					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
+				}
+
+				update_interface.emplace_back(egress_interface_id, labels, neighbor_address, flags);
 
 				value_lookup[value_id][socket_id].emplace_back(nexthop,
 				                                               egress_interface_name,
@@ -1621,7 +1692,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		return;
 	}
 
-	controlPlane->forEachSocket([this, &value_id, &request_interface, &fallback = fallback, &globalbase](const tSocketId& socket_id, const std::set<tInterfaceId>& interfaces) {
+	generation.for_each_socket([this, &value_id, &request_interface, &fallback = fallback, &globalbase](const tSocketId& socket_id, const std::set<tInterfaceId>& interfaces) {
 		common::idp::updateGlobalBase::route_tunnel_value_update::interface update_interface;
 		auto& [update_weight_start, update_weight_size, update_nexthops] = update_interface;
 
@@ -1638,7 +1709,13 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 			{
 				const auto counter_ids = tunnel_counter.get_ids({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 
-				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop, neighbor_address);
+				uint16_t flags = 0;
+				if (neighbor_address.is_default())
+				{
+					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
+				}
+
+				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop, neighbor_address, flags);
 				weights.emplace_back(weight);
 
 				tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
@@ -1662,7 +1739,13 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 
 				const auto counter_ids = tunnel_counter.get_ids({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 
-				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop, neighbor_address);
+				uint16_t flags = 0;
+				if (neighbor_address.is_default())
+				{
+					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
+				}
+
+				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop, neighbor_address, flags);
 				weights.emplace_back(weight);
 
 				tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
