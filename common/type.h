@@ -1357,6 +1357,18 @@ public:
 		}
 	}
 
+	bool is_host() const
+	{
+		if (is_ipv4())
+		{
+			return std::get<ipv4_prefix_t>(prefix).mask() == 32;
+		}
+		else
+		{
+			return std::get<ipv6_prefix_t>(prefix).mask() == 128;
+		}
+	}
+
 	ip_prefix_t get_default() const
 	{
 		if (is_ipv4())

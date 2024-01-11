@@ -100,18 +100,6 @@ public:
 		}
 	}
 
-	void inline forEachSocket(const std::function<void(const tSocketId& socketId, const std::set<tInterfaceId>& interfaces)>& function) const
-	{
-		generations.current_lock();
-		std::map<tSocketId, std::set<tInterfaceId>> socket_interfaces = generations.current().socket_interfaces;
-		generations.current_unlock();
-
-		for (const auto& [socket_id, interfaces] : socket_interfaces)
-		{
-			function(socket_id, interfaces);
-		}
-	}
-
 protected: /** commands */
 	common::icp::getPhysicalPorts::response getPhysicalPorts() const;
 	common::icp::getLogicalPorts::response getLogicalPorts() const;

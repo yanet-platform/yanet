@@ -2169,7 +2169,15 @@ inline void cWorker::route_handle4()
 			memset(&key, 0, sizeof(key));
 			key.interface_id = nexthop.interfaceId;
 			key.flags = 0;
-			key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
+
+			if (nexthop.flags & YANET_NEXTHOP_FLAG_DIRECTLY)
+			{
+				key.address.mapped_ipv4_address.address = ipv4Header->dst_addr;
+			}
+			else
+			{
+				key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
+			}
 
 			dataplane::neighbor::value const* value;
 			base.neighbor_hashtable->lookup(key, value);
@@ -2282,7 +2290,15 @@ inline void cWorker::route_handle6()
 			key.interface_id = nexthop.interfaceId;
 			key.flags = 0;
 			key.flags |= dataplane::neighbor::flag_is_ipv6;
-			memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
+
+			if (nexthop.flags & YANET_NEXTHOP_FLAG_DIRECTLY)
+			{
+				memcpy(key.address.bytes, ipv6Header->dst_addr, 16);
+			}
+			else
+			{
+				memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
+			}
 
 			dataplane::neighbor::value const* value;
 			base.neighbor_hashtable->lookup(key, value);
@@ -2481,7 +2497,15 @@ inline void cWorker::route_tunnel_handle4()
 			memset(&key, 0, sizeof(key));
 			key.interface_id = nexthop.interface_id;
 			key.flags = 0;
-			key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
+
+			if (nexthop.flags & YANET_NEXTHOP_FLAG_DIRECTLY)
+			{
+				key.address.mapped_ipv4_address.address = ipv4Header->dst_addr;
+			}
+			else
+			{
+				key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
+			}
 
 			dataplane::neighbor::value const* value;
 			base.neighbor_hashtable->lookup(key, value);
@@ -2600,7 +2624,15 @@ inline void cWorker::route_tunnel_handle6()
 			key.interface_id = nexthop.interface_id;
 			key.flags = 0;
 			key.flags |= dataplane::neighbor::flag_is_ipv6;
-			memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
+
+			if (nexthop.flags & YANET_NEXTHOP_FLAG_DIRECTLY)
+			{
+				memcpy(key.address.bytes, ipv6Header->dst_addr, 16);
+			}
+			else
+			{
+				memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
+			}
 
 			dataplane::neighbor::value const* value;
 			base.neighbor_hashtable->lookup(key, value);

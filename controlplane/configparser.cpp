@@ -250,7 +250,7 @@ void config_parser_t::loadConfig_route(controlplane::base_t& baseNext,
 			{
 				for (const auto& ipAddressJson : interfaceJson["ipAddresses"])
 				{
-					interface.ipAddresses.emplace(ipAddressJson.get<std::string>());
+					interface.ip_prefixes.emplace(ipAddressJson.get<std::string>());
 				}
 			}
 
