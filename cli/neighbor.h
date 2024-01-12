@@ -57,4 +57,10 @@ void remove(const std::string& route_name,
 	                           ip_address});
 }
 
+void flush()
+{
+	interface::dataPlane dataplane;
+	dataplane.neighbor_flush();
+}
+
 }
