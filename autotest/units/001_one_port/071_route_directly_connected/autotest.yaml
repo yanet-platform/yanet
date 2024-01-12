@@ -1,0 +1,27 @@
+steps:
+- cli:
+  - neighbor insert route0 kni0.100 10.10.0.2 00:00:ee:10:44:02
+  - neighbor insert route0 kni0.100 10.10.0.250 00:00:ee:10:44:fa
+  - neighbor insert route0 kni0.100 2000:100::2 00:00:ee:10:66:02
+  - neighbor insert route0 kni0.100 2000:100::fa 00:00:ee:10:66:fa
+  - neighbor insert route0 kni0.200 10.20.0.2 00:00:ee:20:44:02
+  - neighbor insert route0 kni0.200 10.20.0.250 00:00:ee:20:44:fa
+  - neighbor insert route0 kni0.200 2000:200::2 00:00:ee:20:66:02
+  - neighbor insert route0 kni0.200 2000:200::fa 00:00:ee:20:66:fa
+  - neighbor flush
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
