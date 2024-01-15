@@ -30,6 +30,31 @@ jobs:
           # todo
 
 
+  build-debian-packet:
+    needs: build-image-builder
+    runs-on: ubuntu-latest
+    container:
+      image: yanetplatform/builder
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          meson setup --prefix=/target -Dstrip=true build
+          meson compile -C build
+      - run: meson install -C build
+      - uses: jiro4989/build-deb-action@v3
+        with:
+          package: yanet
+          package_root: /target
+          maintainer: taitov
+          version: 61.0
+          arch: amd64
+          desc: YANET is an open-source extensible framework for software forwarding traffic based on DPDK
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-debian-packet
+          path: |
+            ./*.deb
+
   build-unittest:
     needs: build-image-builder
     runs-on: ubuntu-latest
