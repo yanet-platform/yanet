@@ -1303,6 +1303,7 @@ void tAutotest::mainThread()
 					YANET_LOG_ERROR("invalid config: eResult %d\n", static_cast<std::uint32_t>(result));
 					throw "";
 				}
+				controlPlane.rib_flush();
 
 				this->request.swap(request);
 			}
@@ -1621,6 +1622,7 @@ bool nAutotest::tAutotest::step_reload(const YAML::Node& yamlStep)
 		YANET_LOG_ERROR("invalid config: eResult %d\n", static_cast<std::uint32_t>(result));
 		return false;
 	}
+	controlPlane.rib_flush();
 
 	this->request.swap(request);
 

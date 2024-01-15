@@ -1,0 +1,9 @@
+steps:
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap

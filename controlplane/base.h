@@ -418,6 +418,15 @@ public:
 
 //
 
+class base_rib
+{
+public:
+	ip_prefix_t prefix;
+	ip_address_t nexthop;
+};
+
+//
+
 class base_t
 {
 public:
@@ -471,6 +480,10 @@ public:
 	        vrf_fqdns;
 
 	uint32_t nat64stateful_pool_size;
+
+	std::map<std::string, ///< vrf_name
+	         std::vector<base_rib>>
+	        rib;
 };
 
 //

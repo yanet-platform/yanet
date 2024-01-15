@@ -42,6 +42,7 @@ public:
 	~rib_t() override;
 
 	eResult init() override;
+	void reload(const controlplane::base_t& base_prev, const controlplane::base_t& base_next, common::idp::updateGlobalBase::request& globalbase) override;
 
 	void rib_update(const common::icp::rib_update::request& request);
 	void rib_flush(bool force_flush = false);
