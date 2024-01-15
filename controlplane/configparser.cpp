@@ -125,6 +125,11 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 				loadConfig_fqdns(baseNext, path_json, rootFilePath, jsons);
 			}
 		}
+
+		if (exist(rootJson, "rib"))
+		{
+			loadConfig_rib(baseNext, rootJson["rib"]);
+		}
 	}
 	catch (const error_result_t& err)
 	{
@@ -1873,6 +1878,26 @@ void config_parser_t::loadConfig_fqdns(controlplane::base_t& baseNext,
 			{
 				map_ip.emplace_back(json_fqdn);
 			}
+		}
+	}
+}
+
+void config_parser_t::loadConfig_rib(controlplane::base_t& baseNext,
+                                     const nlohmann::json& json)
+{
+	for (const auto& json_iter : json.items())
+	{
+		const auto& name = json_iter.key();
+		const auto& rib_items = json_iter.value();
+
+		auto& vrf = baseNext.rib[name];
+		for (const auto& json_rib_item : rib_items)
+		{
+			controlplane::base_rib base_rib;
+			base_rib.prefix = json_rib_item["prefix"].get<std::string>();
+			base_rib.nexthop = json_rib_item["nexthop"].get<std::string>();
+
+			vrf.emplace_back(std::move(base_rib));
 		}
 	}
 }

@@ -1295,7 +1295,6 @@ void tAutotest::mainThread()
 				common::icp::loadConfig::request request = prepareLoadConfig(configFilePath, "controlplane.conf");
 
 				controlPlane.rib_update({common::icp::rib_update::clear("autotest", std::nullopt)});
-				controlPlane.rib_flush();
 
 				const auto result = controlPlane.loadConfig(request);
 				if (result != eResult::success)
@@ -1303,6 +1302,8 @@ void tAutotest::mainThread()
 					YANET_LOG_ERROR("invalid config: eResult %d\n", static_cast<std::uint32_t>(result));
 					throw "";
 				}
+
+				controlPlane.rib_flush();
 
 				this->request.swap(request);
 			}
