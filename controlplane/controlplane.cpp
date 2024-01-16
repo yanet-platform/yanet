@@ -2,12 +2,10 @@
 #include <netdb.h>
 
 #include "common/idp.h"
-#include "common/stream.h"
 #include "common/version.h"
 
 #include "acl.h"
 #include "bus.h"
-#include "common.h"
 #include "configconverter.h"
 #include "configparser.h"
 #include "controlplane.h"
@@ -144,6 +142,10 @@ eResult cControlPlane::init(const std::string& jsonFilePath)
 
 	register_command(common::icp::requestType::version, [this]() {
 		return command_version();
+	});
+
+	register_command(common::icp::requestType::convert, [this](const common::icp::request& request) {
+		return command_convert(std::get<common::icp::convert::request>(std::get<1>(request)));
 	});
 
 	if (!jsonFilePath.empty())
@@ -829,6 +831,33 @@ common::icp::version::response cControlPlane::command_version()
 	        version_revision(),
 	        version_hash(),
 	        version_custom()};
+}
+
+common::icp::convert::response cControlPlane::command_convert(const common::icp::convert::request& request)
+{
+	common::icp::convert::response response;
+	if (request == "logical_module")
+	{
+		return convert_logical_module();
+	}
+
+	return response;
+}
+
+common::icp::convert::response cControlPlane::convert_logical_module()
+{
+	common::icp::convert::response response;
+
+	generations.current_lock();
+	auto logicalport_id_to_name = generations.current().logicalport_id_to_name;
+	generations.current_unlock();
+
+	for (auto [id, name] : logicalport_id_to_name)
+	{
+		response.push_back({id, name});
+	}
+
+	return response;
 }
 
 eResult cControlPlane::loadConfig(const std::string& rootFilePath,

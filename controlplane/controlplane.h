@@ -134,6 +134,9 @@ protected: /** commands */
 	common::icp::getAclConfig::response command_getAclConfig(common::icp::getAclConfig::request);
 	common::icp::loadConfig::response command_loadConfig(const common::icp::loadConfig::request& request);
 	common::icp::version::response command_version();
+	common::icp::convert::response command_convert(const common::icp::convert::request& request);
+
+	common::icp::convert::response convert_logical_module();
 
 protected:
 	/// @todo: config_t::load()
