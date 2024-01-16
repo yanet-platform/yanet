@@ -1486,7 +1486,7 @@ inline void cWorker::acl_ingress_handle4()
 				continue;
 			}
 			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf);
+			ring.write(mbuf, value.flow.type);
 		}
 
 		acl_ingress_flow(mbuf, value.flow);
@@ -1677,7 +1677,7 @@ inline void cWorker::acl_ingress_handle6()
 				continue;
 			}
 			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf);
+			ring.write(mbuf, value.flow.type);
 		}
 
 		acl_ingress_flow(mbuf, value.flow);
@@ -5107,7 +5107,7 @@ inline void cWorker::acl_egress_handle4()
 				continue;
 			}
 			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf);
+			ring.write(mbuf, value.flow.type);
 		}
 
 		acl_egress_flow(mbuf, value.flow);
@@ -5291,7 +5291,7 @@ inline void cWorker::acl_egress_handle6()
 				continue;
 			}
 			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf);
+			ring.write(mbuf, value.flow.type);
 		}
 
 		acl_egress_flow(mbuf, value.flow);

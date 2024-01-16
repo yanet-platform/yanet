@@ -1,7 +1,5 @@
 #pragma once
 
-#include <inttypes.h>
-
 #include <array>
 #include <map>
 #include <optional>
@@ -88,7 +86,8 @@ enum class requestType : uint32_t
 	nat46clat_config,
 	nat46clat_announce,
 	nat46clat_stats,
-	size
+	convert,
+	size // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
 inline const char* requestType_toString(requestType t)
@@ -219,6 +218,8 @@ inline const char* requestType_toString(requestType t)
 			return "nat46clat_announce";
 		case requestType::nat46clat_stats:
 			return "nat46clat_stats";
+		case requestType::convert:
+			return "convert";
 		case requestType::size:
 			return "unknown";
 	}
@@ -898,6 +899,14 @@ using response = std::tuple<unsigned int, ///< major
                             std::string>; ///< custom
 }
 
+namespace convert
+{
+using request = std::string; // module
+
+using response = std::vector<std::tuple<unsigned int, ///< id
+                                        std::string>>; ///< name
+}
+
 using request = std::tuple<requestType,
                            std::variant<std::tuple<>,
                                         acl_unwind::request,
@@ -912,7 +921,8 @@ using request = std::tuple<requestType,
                                         resolve_fqdn_to_ip::request,
                                         getAclConfig::request,
                                         getFwList::request,
-                                        loadConfig::request>>;
+                                        loadConfig::request,
+                                        convert::request>>;
 
 using response = std::variant<std::tuple<>,
                               telegraf_unsafe::response,
@@ -963,7 +973,8 @@ using response = std::variant<std::tuple<>,
                               loadConfig::response,
                               nat46clat_config::response,
                               nat46clat_announce::response,
-                              nat46clat_stats::response>;
+                              nat46clat_stats::response,
+                              convert::response>;
 }
 
 }

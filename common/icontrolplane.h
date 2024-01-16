@@ -332,6 +332,11 @@ public:
 		return get<common::icp::requestType::nat46clat_stats, common::icp::nat46clat_stats::response>();
 	}
 
+	auto convert(const common::icp::convert::request& request) const
+	{
+		return get<common::icp::requestType::convert, common::icp::convert::response>(request);
+	}
+
 protected:
 	void connectToControlPlane() const
 	{

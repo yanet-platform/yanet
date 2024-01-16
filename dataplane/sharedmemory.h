@@ -2,6 +2,7 @@
 
 #include "common/bufferring.h"
 #include "common/result.h"
+#include "common/type.h"
 
 class cSharedMemory
 {
@@ -12,7 +13,7 @@ public:
 	using item_t = common::bufferring::item_t;
 
 	eResult init(void* memory, int unit_size, int units_number);
-	void write(rte_mbuf* mbuf);
+	void write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type);
 
 	common::bufferring buffer;
 };
