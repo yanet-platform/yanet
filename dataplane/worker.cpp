@@ -4028,7 +4028,7 @@ inline void cWorker::balancer_ipv6_source(rte_ipv6_hdr* header,
 		random_ptr++;
 	}
 
-	uint8_t n_to_fill = RTE_MIN(sizeof(header->src_addr) - random_ptr, 4);
+	uint8_t n_to_fill = RTE_MIN(sizeof(header->src_addr) - random_ptr, (long unsigned int)4);
 
 	/// Fill the first 4 (or less) bytes after the mask with random numbers.
 	rte_memcpy(&header->src_addr[random_ptr], &random_src, n_to_fill);

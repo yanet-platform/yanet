@@ -13,6 +13,7 @@ foreach proto_source : proto_sources
                              command: [find_program('protoc'),
                                        '--proto_path=@CURRENT_SOURCE_DIR@',
                                        '--cpp_out=@OUTDIR@',
+                                       '--experimental_allow_proto3_optional',
                                        '@INPUT@'])
 endforeach
 

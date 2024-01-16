@@ -1,5 +1,12 @@
 dependencies = []
-dependencies += dependency('libdpdk', static: true)
+dependencies += libdpdk.get_variable('static_rte_eal')
+dependencies += libdpdk.get_variable('static_rte_net')
+dependencies += libdpdk.get_variable('static_rte_hash')
+dependencies += libdpdk.get_variable('static_rte_ethdev')
+
+dependencies += libdpdk.get_variable('static_rte_mempool_ring')
+dependencies += libdpdk.get_variable('static_rte_bus_pci')
+
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
 

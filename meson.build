@@ -3,8 +3,8 @@ project('yanet', 'cpp',
         default_options: ['cpp_std=c++17',
                           'buildtype=release',
                           'warning_level=2',
-                          'werror=true',
-                          'b_lto=true'])
+                          'werror=true'])
+
 
 
 yanet_rootdir = include_directories('.')
@@ -19,6 +19,13 @@ add_global_arguments('-DYANET_VERSION_REVISION=' + get_option('version_revision'
 add_global_arguments('-DYANET_VERSION_HASH=' + get_option('version_hash'), language: 'cpp')
 add_global_arguments('-DYANET_VERSION_CUSTOM=' + get_option('version_custom'), language: 'cpp')
 
+libdpdk = subproject('dpdk', default_options: [
+	'platform=generic',
+	'cpu_instruction_set=corei7',
+	'disable_apps=dumpcap,graph,pdump,proc-info,test-acl,test-bbdev,test-cmdline,test-compress-perf,test-crypto-perf,test-dma-perf,test-eventdev,test-fib,test-flow-perf,test-gpudev,test-mldev,test-pipeline,test-pmd,test-regex,test-sad,test-security-perf',
+	'disable_libs=gro,gpudev,acl,bbdev,bitratestats,bpf,cfgfile,compressdev,cryptodev,distributor,lpm,member,pcapng,power,rawdev,regexdev,mldev,rib,latencystats,lpm,rib,reorder,sched,stack,fibacl,bbdev,bitratestats,dmadev',
+	'enable_driver_sdk=true', 'disable_drivers=net/mlx4',
+	'enable_drivers=net/virtio,net/ring', 'tests=false' ] )
 
 if get_option('target').contains('buildenv')
     subdir('libprotobuf')
@@ -48,7 +55,6 @@ endif
 if get_option('yanet_config').length() > 0
     yanet_configs = get_option('yanet_config')
 endif
-
 
 subdir('libprotobuf')
 subdir('libfwparser')
