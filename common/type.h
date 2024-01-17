@@ -563,7 +563,7 @@ public:
 	{
 	}
 
-	constexpr ip_address_t(const uint8_t ip_version, const uint8_t* bytes)
+	ip_address_t(const uint8_t ip_version, const uint8_t* bytes)
 	{
 		if (ip_version == 4)
 		{
@@ -1223,7 +1223,7 @@ public:
 	{
 	}
 
-	constexpr ip_prefix_t(const ip_address_t& address, const uint8_t& mask)
+	ip_prefix_t(const ip_address_t& address, const uint8_t& mask)
 	{
 		if (address.is_ipv4())
 		{
