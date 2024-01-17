@@ -12,3 +12,4 @@ build_*
 __pycache__
 report/
 .*
+compile_commands.json

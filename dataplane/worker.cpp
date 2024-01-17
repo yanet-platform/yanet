@@ -2,7 +2,6 @@
 #include <netinet/ip_icmp.h>
 
 #include <string>
-#include <thread>
 
 #include <rte_errno.h>
 #include <rte_ethdev.h>
@@ -3924,7 +3923,7 @@ inline void cWorker::balancer_handle()
 
 		dataplane::globalBase::balancer_state_value_t* value;
 		dataplane::spinlock_nonrecursive_t* locker;
-		const uint32_t hash = basePermanently.globalBaseAtomic->balancer_state.lookup(key, value, locker);
+		const uint32_t hash = basePermanently.globalBaseAtomic->balancer_state->lookup(key, value, locker);
 		bool rescheduleReal = false;
 		if (value)
 		{
@@ -3999,7 +3998,7 @@ inline void cWorker::balancer_handle()
 					/// counter_id:
 					///   0 - insert failed
 					///   1 - insert done
-					uint32_t counter_id = basePermanently.globalBaseAtomic->balancer_state.insert(hash, key, value);
+					uint32_t counter_id = basePermanently.globalBaseAtomic->balancer_state->insert(hash, key, value);
 					counters[(uint32_t)common::globalBase::static_counter_type::balancer_state + counter_id]++;
 					if (counter_id)
 					{
@@ -4522,7 +4521,7 @@ inline void cWorker::balancer_icmp_forward_handle()
 
 		dataplane::globalBase::balancer_state_value_t* value;
 		dataplane::spinlock_nonrecursive_t* locker;
-		basePermanently.globalBaseAtomic->balancer_state.lookup(key, value, locker);
+		basePermanently.globalBaseAtomic->balancer_state->lookup(key, value, locker);
 
 		if (value)
 		{

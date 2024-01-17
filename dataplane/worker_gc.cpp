@@ -6,7 +6,6 @@
 #include "common/counters.h"
 #include "common/fallback.h"
 
-#include "controlplane.h"
 #include "dataplane.h"
 #include "worker.h"
 #include "worker_gc.h"
@@ -57,6 +56,8 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 	this->bases[local_base_id ^ 1] = base;
 
 	this->controlplane = dataplane->controlPlane.get();
+
+	this->balancer_state_ttl = (uint16_t)dataplane->getConfigValue(eConfigType::balancer_state_ttl);
 
 	for (const auto& [port_id, port] : dataplane->ports)
 	{
@@ -153,15 +154,7 @@ void worker_gc_t::limits(common::idp::limits::response& response) const
 {
 	auto* globalbase_atomic = base_permanently.globalBaseAtomic;
 
-	{
-		auto current_guard = balancer_state_stats.current_lock_guard();
-		limit_insert(response,
-		             "balancer.ht.keys",
-		             socket_id,
-		             balancer_state_stats.current().valid_keys,
-		             globalbase_atomic->balancer_state.pairs_size);
-	}
-
+	globalbase_atomic->updater.balancer_state.limits(response, "balancer.ht");
 	globalbase_atomic->updater.nat64stateful_lan_state.limits(response, "nat64stateful.lan.state.ht");
 	globalbase_atomic->updater.nat64stateful_wan_state.limits(response, "nat64stateful.wan.state.ht");
 	globalbase_atomic->updater.fw4_state.limits(response, "acl.state.v4.ht");
@@ -364,10 +357,8 @@ void worker_gc_t::handle_balancer_gc()
 
 	/// @todo: skip if balancer disabled
 
-	for (auto iter : globalbase_atomic->balancer_state.range(globalbase_atomic->balancer_state_gc.offset, gc_step))
+	for (auto iter : globalbase_atomic->updater.balancer_state.gc(globalbase_atomic->balancer_state_gc.offset, gc_step))
 	{
-		iter.calculate_stats(balancer_state_stats.next());
-
 		if (iter.is_valid())
 		{
 			/// sync
@@ -452,7 +443,7 @@ void worker_gc_t::handle_balancer_gc()
 					dataplane::spinlock_nonrecursive_t* locker;
 					uint32_t old_real_id;
 
-					uint32_t hash = globalbase_atomic_other->balancer_state.lookup(*iter.key(), ht_value, locker);
+					uint32_t hash = globalbase_atomic_other->balancer_state->lookup(*iter.key(), ht_value, locker);
 					if (ht_value)
 					{
 						old_real_id = ht_value->real_unordered_id;
@@ -461,7 +452,7 @@ void worker_gc_t::handle_balancer_gc()
 					}
 					else
 					{
-						saved = globalbase_atomic_other->balancer_state.insert(hash, *iter.key(), value);
+						saved = globalbase_atomic_other->balancer_state->insert(hash, *iter.key(), value);
 					}
 
 					locker->unlock();
@@ -493,7 +484,7 @@ void worker_gc_t::handle_balancer_gc()
 				iter.lock();
 			}
 
-			if ((uint16_t)((uint16_t)globalbase_atomic->currentTime - (uint16_t)iter.value()->timestamp_last_packet) > 60) ///< @todo: BALANCER TIMEOUTS
+			if ((uint16_t)((uint16_t)globalbase_atomic->currentTime - (uint16_t)iter.value()->timestamp_last_packet) > balancer_state_ttl)
 			{
 				const auto& real_from_base = base.globalBase->balancer_reals[iter.value()->real_unordered_id];
 				++counters[real_from_base.counter_id + (tCounterId)balancer::gc_real_counter::sessions_destroyed];
@@ -1204,7 +1195,7 @@ void worker_gc_t::balancer_state_clear()
 	run_on_this_thread([&]() {
 		auto& globalbase_atomic = base_permanently.globalBaseAtomic;
 
-		for (auto iter : globalbase_atomic->balancer_state.range(offset, 64))
+		for (auto iter : globalbase_atomic->updater.balancer_state.range(offset, 64))
 		{
 			iter.lock();
 			if (iter.is_valid())
