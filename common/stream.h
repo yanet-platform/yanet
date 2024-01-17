@@ -279,6 +279,7 @@ inline void stream_in_t::pop(TType& value)
 	{
 		if (inBuffer.size() - inPosition < sizeof(TType))
 		{
+			memset(&value, 0, sizeof(TType));
 			inPosition = this->inBuffer.size();
 			failed = true;
 			return;
