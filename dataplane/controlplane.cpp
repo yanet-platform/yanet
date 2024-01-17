@@ -1024,7 +1024,7 @@ common::idp::balancer_connection::response cControlPlane::balancer_connection(co
 
 			const auto& base = worker_gc->bases[worker_gc->local_base_id & 1];
 
-			for (auto iter : worker_gc->base_permanently.globalBaseAtomic->balancer_state.range(offset, 64))
+			for (auto iter : worker_gc->base_permanently.globalBaseAtomic->updater.balancer_state.range(offset, 64))
 			{
 				if (iter.is_valid())
 				{

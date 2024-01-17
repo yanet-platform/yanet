@@ -7,7 +7,6 @@
 #include <unistd.h>
 
 #include <fstream>
-#include <iostream>
 #include <thread>
 
 #include <rte_eal.h>
@@ -29,6 +28,7 @@
 
 #include "common.h"
 #include "dataplane.h"
+#include "globalbase.h"
 #include "report.h"
 #include "sock_dev.h"
 #include "worker.h"
@@ -86,7 +86,9 @@ cDataPlane::cDataPlane() :
 	                {eConfigType::acl_values_size, YANET_CONFIG_ACL_VALUES_SIZE},
 	                {eConfigType::master_mempool_size, 8192},
 	                {eConfigType::nat64stateful_states_size, YANET_CONFIG_NAT64STATEFUL_HT_SIZE},
-	                {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE}};
+	                {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE},
+	                {eConfigType::balancer_state_ttl, 60},
+	                {eConfigType::balancer_state_ht_size, YANET_CONFIG_BALANCER_STATE_HT_SIZE}};
 }
 
 cDataPlane::~cDataPlane()
@@ -624,10 +626,17 @@ eResult cDataPlane::initGlobalBases()
 					return eResult::errorAllocatingMemory;
 				}
 
+				auto* balancer_state = hugepage_create_dynamic<dataplane::globalBase::balancer::state_ht>(socket_id, getConfigValue(eConfigType::balancer_state_ht_size), globalbase_atomic->updater.balancer_state);
+				if (!balancer_state)
+				{
+					return eResult::errorAllocatingMemory;
+				}
+
 				globalbase_atomic->fw4_state = ipv4_states_ht;
 				globalbase_atomic->fw6_state = ipv6_states_ht;
 				globalbase_atomic->nat64stateful_lan_state = nat64stateful_lan_state;
 				globalbase_atomic->nat64stateful_wan_state = nat64stateful_wan_state;
+				globalbase_atomic->balancer_state = balancer_state;
 			}
 
 			globalBaseAtomics[socket_id] = globalbase_atomic;
@@ -1759,6 +1768,16 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	if (exist(json, "kernel_interface_queue_size"))
 	{
 		configValues[eConfigType::kernel_interface_queue_size] = json["kernel_interface_queue_size"];
+	}
+
+	if (exist(json, "balancer_state_ttl"))
+	{
+		configValues[eConfigType::balancer_state_ttl] = json["balancer_state_ttl"];
+	}
+
+	if (exist(json, "balancer_state_ht_size"))
+	{
+		configValues[eConfigType::balancer_state_ht_size] = json["balancer_state_ht_size"];
 	}
 
 	return eResult::success;

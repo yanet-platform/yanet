@@ -76,6 +76,11 @@ using lan_ht = hashtable_mod_spinlock_dynamic<nat64stateful_lan_key, nat64statef
 using wan_ht = hashtable_mod_spinlock_dynamic<nat64stateful_wan_key, nat64stateful_wan_value, 16>;
 }
 
+namespace balancer
+{
+using state_ht = hashtable_mod_spinlock_dynamic<balancer_state_key_t, balancer_state_value_t, 16>;
+}
+
 class atomic
 {
 public:
@@ -92,6 +97,7 @@ public: ///< @todo
 		acl::ipv6_states_ht::updater fw6_state;
 		nat64stateful::lan_ht::updater nat64stateful_lan_state;
 		nat64stateful::wan_ht::updater nat64stateful_wan_state;
+		balancer::state_ht::updater balancer_state;
 	} updater;
 
 	hashtable_gc_t balancer_state_gc;
@@ -114,12 +120,7 @@ public: ///< @todo
 	acl::ipv6_states_ht* fw6_state;
 	nat64stateful::lan_ht* nat64stateful_lan_state;
 	nat64stateful::wan_ht* nat64stateful_wan_state;
-
-	hashtable_mod_spinlock<balancer_state_key_t,
-	                       balancer_state_value_t,
-	                       YANET_CONFIG_BALANCER_STATE_HT_SIZE,
-	                       16>
-	        balancer_state;
+	balancer::state_ht* balancer_state;
 };
 
 //

@@ -410,7 +410,7 @@ nlohmann::json cReport::convertWorkerGC(const worker_gc_t* worker)
 	const auto& base = worker->bases[worker->current_base_id];
 	json["base"]["globalBase"]["pointer"] = pointerToHex(base.globalBase);
 
-	json["balancer_state"] = convertHashtable(worker->base_permanently.globalBaseAtomic->balancer_state, worker->balancer_state_stats);
+	worker->base_permanently.globalBaseAtomic->updater.balancer_state.report(json["balancer_state"]);
 
 	return json;
 }

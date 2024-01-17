@@ -1,7 +1,5 @@
 #include <memory.h>
 
-#include <string>
-
 #include <rte_errno.h>
 
 #include "common.h"
@@ -1270,7 +1268,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 			return eResult::invalidId;
 		}
 
-		if (counter_id + (tCounterId)balancer::service_counter::size > YANET_CONFIG_COUNTERS_SIZE)
+		if (counter_id + (tCounterId)::balancer::service_counter::size > YANET_CONFIG_COUNTERS_SIZE)
 		{
 			YADECAP_LOG_ERROR("invalid counter_id: '%u'\n", counter_id);
 			return eResult::invalidId;
@@ -1334,7 +1332,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 
 		auto& real_unordered = balancer_reals[real_id];
 
-		if (counter_id + (tCounterId)balancer::real_counter::size > YANET_CONFIG_COUNTERS_SIZE)
+		if (counter_id + (tCounterId)::balancer::real_counter::size > YANET_CONFIG_COUNTERS_SIZE)
 		{
 			YADECAP_LOG_ERROR("invalid counter_id: '%u'\n", counter_id);
 			return eResult::invalidId;
@@ -1343,7 +1341,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		auto addr = ipv6_address_t::convert(destination);
 		if (real_unordered.counter_id != counter_id || real_unordered.destination != addr)
 		{
-			for (tCounterId i = 0; i < (tCounterId)balancer::real_counter::size; ++i)
+			for (tCounterId i = 0; i < (tCounterId)::balancer::real_counter::size; ++i)
 			{
 				uint64_t sum_worker = 0, sum_gc = 0;
 				for (const auto& [core_id, worker] : dataPlane->workers)
@@ -1438,22 +1436,22 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 	for (const auto& [core_id, worker] : dataPlane->workers)
 	{
 		(void)core_id;
-		sessions_created += worker->counters[counter_id + (tCounterId)balancer::real_counter::sessions_created];
-		sessions_destroyed += worker->counters[counter_id + (tCounterId)balancer::real_counter::sessions_destroyed];
+		sessions_created += worker->counters[counter_id + (tCounterId)::balancer::real_counter::sessions_created];
+		sessions_destroyed += worker->counters[counter_id + (tCounterId)::balancer::real_counter::sessions_destroyed];
 	}
-	sessions_created -= dataPlane->globalBaseAtomics[socketId]->counter_shifts[counter_id + (tCounterId)balancer::real_counter::sessions_created];
-	sessions_destroyed -= dataPlane->globalBaseAtomics[socketId]->counter_shifts[counter_id + (tCounterId)balancer::real_counter::sessions_destroyed];
+	sessions_created -= dataPlane->globalBaseAtomics[socketId]->counter_shifts[counter_id + (tCounterId)::balancer::real_counter::sessions_created];
+	sessions_destroyed -= dataPlane->globalBaseAtomics[socketId]->counter_shifts[counter_id + (tCounterId)::balancer::real_counter::sessions_destroyed];
 
 	uint64_t sessions_created_gc = 0;
 	uint64_t sessions_destroyed_gc = 0;
 	for (const auto& [node_id, worker_gc] : dataPlane->worker_gcs)
 	{
 		(void)node_id;
-		sessions_created_gc += worker_gc->counters[counter_id + (tCounterId)balancer::gc_real_counter::sessions_created];
-		sessions_destroyed_gc += worker_gc->counters[counter_id + (tCounterId)balancer::gc_real_counter::sessions_destroyed];
+		sessions_created_gc += worker_gc->counters[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_created];
+		sessions_destroyed_gc += worker_gc->counters[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_destroyed];
 	}
-	sessions_created_gc -= dataPlane->globalBaseAtomics[socketId]->gc_counter_shifts[counter_id + (tCounterId)balancer::gc_real_counter::sessions_created];
-	sessions_destroyed_gc -= dataPlane->globalBaseAtomics[socketId]->gc_counter_shifts[counter_id + (tCounterId)balancer::gc_real_counter::sessions_destroyed];
+	sessions_created_gc -= dataPlane->globalBaseAtomics[socketId]->gc_counter_shifts[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_created];
+	sessions_destroyed_gc -= dataPlane->globalBaseAtomics[socketId]->gc_counter_shifts[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_destroyed];
 	return (sessions_created - sessions_destroyed + sessions_created_gc - sessions_destroyed_gc) / dataPlane->numaNodesInUse;
 }
 
