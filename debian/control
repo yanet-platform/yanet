@@ -1,0 +1,8 @@
+Package: yanet
+Version: __VERSION__
+Architecture: amd64
+Section: net
+Maintainer: Timur Aitov <taitov@yandex-team.ru>
+Homepage: https://github.com/yanet-platform/yanet
+Description: Software forwarding traffic based on DPDK
+ YANET is an open-source extensible framework for software forwarding traffic based on DPDK
