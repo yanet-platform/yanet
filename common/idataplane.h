@@ -214,11 +214,6 @@ public:
 		return get<common::idp::requestType::get_shm_tsc_info, common::idp::get_shm_tsc_info::response>();
 	}
 
-	auto set_shm_tsc_state(const common::idp::get_shm_tsc_info::request& request) const
-	{
-		return get<common::idp::requestType::set_shm_tsc_state, eResult>(request);
-	}
-
 	auto dump_physical_port(const common::idp::dump_physical_port::request& request) const
 	{
 		return get<common::idp::requestType::dump_physical_port, eResult>(request);

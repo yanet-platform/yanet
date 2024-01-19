@@ -229,6 +229,14 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 			result = eResult::success;
 			serial = std::get<common::idp::updateGlobalBase::serial_update::request>(data);
 		}
+		else if (type == common::idp::updateGlobalBase::requestType::tsc_state_update)
+		{
+			result = tsc_state_update(std::get<common::idp::updateGlobalBase::tsc_state_update::request>(data));
+		}
+		else if (type == common::idp::updateGlobalBase::requestType::tscs_base_value_update)
+		{
+			result = tscs_base_value_update(std::get<common::idp::updateGlobalBase::tscs_base_value_update::request>(data));
+		}
 		else
 		{
 			YADECAP_LOG_ERROR("invalid request type\n");
@@ -733,6 +741,20 @@ eResult generation::tun64mappings_update(const common::idp::updateGlobalBase::tu
 			return eResult::isFull;
 		}
 	}
+	return eResult::success;
+}
+
+eResult generation::tsc_state_update(const common::idp::updateGlobalBase::tsc_state_update::request& request)
+{
+	tscs_active = request;
+	return eResult::success;
+}
+
+eResult generation::tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request)
+{
+	const auto& [offset, value] = request;
+	*(uint32_t*)((uintptr_t)(&tsc_base_values) + offset) = value;
+
 	return eResult::success;
 }
 

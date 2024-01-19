@@ -8,6 +8,7 @@
 #include "common/idataplane.h"
 #include "common/version.h"
 
+#include "dataplane/tsc_deltas.h"
 #include "helper.h"
 
 namespace show
@@ -869,11 +870,55 @@ void shm_tsc_info()
 	table.print();
 }
 
-void shm_tsc_set_state(std::string state)
+void shm_tsc_set_state(bool state)
 {
 	interface::dataPlane dataplane;
-	bool new_state = state == "true";
-	dataplane.set_shm_tsc_state(new_state);
+	common::idp::updateGlobalBase::request globalbase;
+	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::tsc_state_update,
+	                        state);
+	dataplane.updateGlobalBase(globalbase);
+}
+
+static const std::map<std::string, unsigned int> counter_name_to_offset = {
+        {"logicalPort_ingress_handle", offsetof(dataplane::perf::tsc_base_values, logicalPort_ingress_handle)},
+        {"acl_ingress_handle4", offsetof(dataplane::perf::tsc_base_values, acl_ingress_handle4)},
+        {"acl_ingress_handle6", offsetof(dataplane::perf::tsc_base_values, acl_ingress_handle6)},
+        {"tun64_ipv4_handle", offsetof(dataplane::perf::tsc_base_values, tun64_ipv4_handle)},
+        {"tun64_ipv6_handle", offsetof(dataplane::perf::tsc_base_values, tun64_ipv6_handle)},
+        {"route_handle4", offsetof(dataplane::perf::tsc_base_values, route_handle4)},
+        {"route_handle6", offsetof(dataplane::perf::tsc_base_values, route_handle6)},
+        {"decap_handle", offsetof(dataplane::perf::tsc_base_values, decap_handle)},
+        {"nat64stateful_lan_handle", offsetof(dataplane::perf::tsc_base_values, nat64stateful_lan_handle)},
+        {"nat64stateful_wan_handle", offsetof(dataplane::perf::tsc_base_values, nat64stateful_wan_handle)},
+        {"nat64stateless_egress_handle", offsetof(dataplane::perf::tsc_base_values, nat64stateless_egress_handle)},
+        {"nat64stateless_ingress_handle", offsetof(dataplane::perf::tsc_base_values, nat64stateless_ingress_handle)},
+        {"balancer_handle", offsetof(dataplane::perf::tsc_base_values, balancer_handle)},
+        {"balancer_icmp_reply_handle", offsetof(dataplane::perf::tsc_base_values, balancer_icmp_reply_handle)},
+        {"balancer_icmp_forward_handle", offsetof(dataplane::perf::tsc_base_values, balancer_icmp_forward_handle)},
+        {"route_tunnel_handle4", offsetof(dataplane::perf::tsc_base_values, route_tunnel_handle4)},
+        {"route_tunnel_handle6", offsetof(dataplane::perf::tsc_base_values, route_tunnel_handle6)},
+        {"acl_egress_handle4", offsetof(dataplane::perf::tsc_base_values, acl_egress_handle4)},
+        {"acl_egress_handle6", offsetof(dataplane::perf::tsc_base_values, acl_egress_handle6)},
+        {"logicalPort_egress_handle", offsetof(dataplane::perf::tsc_base_values, logicalPort_egress_handle)},
+        {"controlPlane_handle", offsetof(dataplane::perf::tsc_base_values, controlPlane_handle)},
+};
+
+void shm_tsc_set_base_value(std::string counter_name, uint32_t value)
+{
+	if (counter_name_to_offset.count(counter_name) != 0)
+	{
+		interface::dataPlane dataplane;
+		common::idp::updateGlobalBase::request globalbase;
+		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::tscs_base_value_update,
+		                        common::idp::updateGlobalBase::tscs_base_value_update::request{counter_name_to_offset.at(counter_name), value});
+		dataplane.updateGlobalBase(globalbase);
+	}
+	else
+	{
+		std::string args;
+		std::for_each(counter_name_to_offset.cbegin(), counter_name_to_offset.cend(), [&](const auto& e) { args += " " + e.first; });
+		throw std::string("invalid argument: ") + counter_name + ", supported types:" + args;
+	}
 }
 
 }

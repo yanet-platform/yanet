@@ -28,7 +28,8 @@ foreach arch : archs
         endif
 
         cpp_args_append = ['-march=' + arch,
-                           '-DYANET_CONFIG_SUFFIX=' + yanet_config]
+                           '-DYANET_CONFIG_SUFFIX=' + yanet_config,
+                           '-mlzcnt']
 
         executable(bin,
                    sources,

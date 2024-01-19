@@ -1240,12 +1240,6 @@ common::idp::get_shm_tsc_info::response cControlPlane::get_shm_tsc_info()
 	return response;
 }
 
-eResult cControlPlane::set_shm_tsc_state(const common::idp::get_shm_tsc_info::request& request)
-{
-	auto response = dataPlane->setShmTscState(request);
-	return response;
-}
-
 eResult cControlPlane::dump_physical_port(const common::idp::dump_physical_port::request& request)
 {
 	const auto& [interface_name, direction, state] = request;

@@ -155,7 +155,9 @@ enum class requestType : uint32_t
 	tun64_update,
 	tun64mappings_update,
 	serial_update,
-	dump_tags_ids
+	dump_tags_ids,
+	tsc_state_update,
+	tscs_base_value_update
 };
 
 namespace updateLogicalPort
@@ -468,6 +470,16 @@ namespace serial_update
 using request = uint32_t; ///< serial
 }
 
+namespace tsc_state_update
+{
+using request = bool;
+}
+
+namespace tscs_base_value_update
+{
+using request = std::tuple<uint32_t, uint32_t>;
+}
+
 using requestVariant = std::variant<std::tuple<>,
                                     updateLogicalPort::request,
                                     updateDecap::request,
@@ -500,8 +512,9 @@ using requestVariant = std::variant<std::tuple<>,
                                     dregress_neighbor_update::request,
                                     dregress_value_update::request,
                                     fwstate_synchronization_update::request,
-                                    sampler_update::request, /// + update_early_decap_flags::request
-                                    serial_update::request>;
+                                    sampler_update::request, /// + update_early_decap_flags::request, tsc_state_update::request
+                                    serial_update::request,
+                                    tscs_base_value_update::request>;
 
 using request = std::vector<std::tuple<requestType,
                                        requestVariant>>;
@@ -862,8 +875,6 @@ using tsc_meta = std::tuple<tCoreId, ///< core id
                             uint64_t>; /// offset
 
 using response = std::vector<tsc_meta>;
-using state = bool;
-using request = bool;
 }
 
 namespace dump_physical_port
@@ -930,8 +941,7 @@ using request = std::tuple<requestType,
                                         unrdup_vip_to_balancers::request,
                                         update_vip_vport_proto::request,
                                         get_counter_by_name::request,
-                                        dump_physical_port::request,
-                                        get_shm_tsc_info::request>>;
+                                        dump_physical_port::request>>;
 
 using response = std::variant<std::tuple<>,
                               updateGlobalBase::response, ///< + others which have eResult as response

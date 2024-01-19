@@ -16,6 +16,7 @@
 #include "flat.h"
 #include "hashtable.h"
 #include "lpm.h"
+#include "tsc_deltas.h"
 #include "type.h"
 
 /// @todo: move
@@ -177,6 +178,8 @@ protected:
 	eResult fwstate_synchronization_update(const common::idp::updateGlobalBase::fwstate_synchronization_update::request& request);
 	eResult tun64_update(const common::idp::updateGlobalBase::tun64_update::request& request);
 	eResult tun64mappings_update(const common::idp::updateGlobalBase::tun64mappings_update::request& request);
+	eResult tsc_state_update(const common::idp::updateGlobalBase::tsc_state_update::request& request);
+	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 
 	void evaluate_service_ring(uint32_t next_balancer_reals_id);
 	inline uint64_t count_real_connections(uint32_t counter_id);
@@ -296,6 +299,9 @@ public: ///< @todo
 	balancer_service_ring_t balancer_service_rings[2];
 
 	int64_t dump_id_to_tag[YANET_CONFIG_DUMP_ID_TO_TAG_SIZE];
+
+	bool tscs_active;
+	dataplane::perf::tsc_base_values tsc_base_values;
 };
 
 }

@@ -1410,12 +1410,6 @@ common::idp::get_shm_tsc_info::response cDataPlane::getShmTscInfo()
 	return result;
 }
 
-eResult cDataPlane::setShmTscState(common::idp::get_shm_tsc_info::state state)
-{
-	tscs_active = state;
-	return eResult::success;
-}
-
 std::map<std::string, common::uint64> cDataPlane::getPortStats(const tPortId& portId) const
 {
 	/// unsafe

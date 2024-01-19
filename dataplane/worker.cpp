@@ -511,34 +511,37 @@ inline void cWorker::handlePackets()
 	const auto& base = bases[localBaseId & 1];
 	const auto& globalbase = *base.globalBase;
 
-	auto tsc_start = dataPlane->tscs_active ? rte_get_tsc_cycles() : 0;
+	auto tsc_start = globalbase.tscs_active ? rte_get_tsc_cycles() : 0;
 	uint64_t tsc_end;
 	if (tsc_start)
 	{
 		tsc_deltas->iter_num++;
 	}
 
+	auto stack_size = logicalPort_ingress_stack.mbufsCount;
 	logicalPort_ingress_handle();
-	if (tsc_start)
+	if (tsc_start && likely(stack_size > 0))
 	{
 		tsc_end = rte_get_tsc_cycles();
-		tsc_deltas->logicalPort_ingress_handle += tsc_end - tsc_start;
+		dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->logicalPort_ingress_handle, globalbase.tsc_base_values.logicalPort_ingress_handle);
 		tsc_start = tsc_end;
 	}
 
+	stack_size = acl_ingress_stack4.mbufsCount;
 	acl_ingress_handle4();
-	if (tsc_start)
+	if (tsc_start && likely(stack_size > 0))
 	{
 		tsc_end = rte_get_tsc_cycles();
-		tsc_deltas->acl_ingress_handle4 += tsc_end - tsc_start;
+		dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->acl_ingress_handle4, globalbase.tsc_base_values.acl_ingress_handle4);
 		tsc_start = tsc_end;
 	}
 
+	stack_size = acl_ingress_stack6.mbufsCount;
 	acl_ingress_handle6();
-	if (tsc_start)
+	if (tsc_start && likely(stack_size > 0))
 	{
 		tsc_end = rte_get_tsc_cycles();
-		tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+		dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->acl_ingress_handle6, globalbase.tsc_base_values.acl_ingress_handle6);
 		tsc_start = tsc_end;
 	}
 
@@ -548,11 +551,13 @@ inline void cWorker::handlePackets()
 		{
 			acl_ingress_stack4 = after_early_decap_stack4;
 			after_early_decap_stack4.clear();
+
+			stack_size = acl_ingress_stack4.mbufsCount;
 			acl_ingress_handle4();
-			if (tsc_start)
+			if (tsc_start && likely(stack_size > 0))
 			{
 				tsc_end = rte_get_tsc_cycles();
-				tsc_deltas->acl_ingress_handle4 += tsc_end - tsc_start;
+				dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->acl_ingress_handle4, globalbase.tsc_base_values.acl_ingress_handle4);
 				tsc_start = tsc_end;
 			}
 		}
@@ -561,11 +566,13 @@ inline void cWorker::handlePackets()
 		{
 			acl_ingress_stack6 = after_early_decap_stack6;
 			after_early_decap_stack6.clear();
+
+			stack_size = acl_ingress_stack6.mbufsCount;
 			acl_ingress_handle6();
-			if (tsc_start)
+			if (tsc_start && likely(stack_size > 0))
 			{
 				tsc_end = rte_get_tsc_cycles();
-				tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+				dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->acl_ingress_handle6, globalbase.tsc_base_values.acl_ingress_handle6);
 				tsc_start = tsc_end;
 			}
 		}
@@ -573,158 +580,182 @@ inline void cWorker::handlePackets()
 
 	if (globalbase.tun64_enabled)
 	{
+		stack_size = tun64_stack4.mbufsCount;
 		tun64_ipv4_handle();
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->tun64_ipv4_handle += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->tun64_ipv4_handle, globalbase.tsc_base_values.tun64_ipv4_handle);
 			tsc_start = tsc_end;
 		}
 
+		stack_size = tun64_stack6.mbufsCount;
 		tun64_ipv6_handle();
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->tun64_ipv6_handle += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->tun64_ipv6_handle, globalbase.tsc_base_values.tun64_ipv6_handle);
 			tsc_start = tsc_end;
 		}
 	}
 
 	if (globalbase.decap_enabled)
 	{
+		stack_size = decap_stack.mbufsCount;
 		decap_handle();
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->decap_handle += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->decap_handle, globalbase.tsc_base_values.decap_handle);
 			tsc_start = tsc_end;
 		}
 	}
 
 	if (globalbase.nat64stateful_enabled)
 	{
+		stack_size = nat64stateful_lan_stack.mbufsCount;
 		nat64stateful_lan_handle();
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->nat64stateful_lan_handle, globalbase.tsc_base_values.nat64stateful_lan_handle);
 			tsc_start = tsc_end;
 		}
+
+		stack_size = nat64stateful_wan_stack.mbufsCount;
 		nat64stateful_wan_handle();
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->nat64stateful_wan_handle, globalbase.tsc_base_values.nat64stateful_wan_handle);
 			tsc_start = tsc_end;
 		}
 	}
 
 	if (globalbase.nat64stateless_enabled)
 	{
+		stack_size = nat64stateless_ingress_stack.mbufsCount;
 		nat64stateless_ingress_handle();
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->nat64stateless_ingress_handle, globalbase.tsc_base_values.nat64stateless_ingress_handle);
 			tsc_start = tsc_end;
 		}
+
+		stack_size = nat64stateless_egress_stack.mbufsCount;
 		nat64stateless_egress_handle();
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->nat64stateless_egress_handle, globalbase.tsc_base_values.nat64stateless_egress_handle);
 			tsc_start = tsc_end;
 		}
 	}
 
 	if (globalbase.balancer_enabled)
 	{
+		stack_size = balancer_stack.mbufsCount;
 		balancer_handle();
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->balancer_handle, globalbase.tsc_base_values.balancer_handle);
 			tsc_start = tsc_end;
 		}
+
+		stack_size = balancer_icmp_reply_stack.mbufsCount;
 		balancer_icmp_reply_handle(); // balancer replies instead of real (when client pings VS)
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->balancer_icmp_reply_handle, globalbase.tsc_base_values.balancer_icmp_reply_handle);
 			tsc_start = tsc_end;
 		}
+
+		stack_size = balancer_icmp_forward_stack.mbufsCount;
 		balancer_icmp_forward_handle(); // forward icmp message to other balancers (if not sent to one of this balancer's reals)
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->acl_ingress_handle6 += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->balancer_icmp_forward_handle, globalbase.tsc_base_values.balancer_icmp_forward_handle);
 			tsc_start = tsc_end;
 		}
 	}
 
+	stack_size = route_stack4.mbufsCount;
 	route_handle4();
-	if (tsc_start)
+	if (tsc_start && likely(stack_size > 0))
 	{
 		tsc_end = rte_get_tsc_cycles();
-		tsc_deltas->route_handle4 += tsc_end - tsc_start;
+		dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->route_handle4, globalbase.tsc_base_values.route_handle4);
 		tsc_start = tsc_end;
 	}
 
+	stack_size = route_stack6.mbufsCount;
 	route_handle6();
-	if (tsc_start)
+	if (tsc_start && likely(stack_size > 0))
 	{
 		tsc_end = rte_get_tsc_cycles();
-		tsc_deltas->route_handle6 += tsc_end - tsc_start;
+		dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->route_handle6, globalbase.tsc_base_values.route_handle6);
 		tsc_start = tsc_end;
 	}
 
+	stack_size = route_tunnel_stack4.mbufsCount;
 	route_tunnel_handle4();
-	if (tsc_start)
+	if (tsc_start && likely(stack_size > 0))
 	{
 		tsc_end = rte_get_tsc_cycles();
-		tsc_deltas->route_tunnel_handle4 += tsc_end - tsc_start;
+		dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->route_tunnel_handle4, globalbase.tsc_base_values.route_tunnel_handle4);
 		tsc_start = tsc_end;
 	}
 
+	stack_size = route_tunnel_stack6.mbufsCount;
 	route_tunnel_handle6();
-	if (tsc_start)
+	if (tsc_start && likely(stack_size > 0))
 	{
 		tsc_end = rte_get_tsc_cycles();
-		tsc_deltas->route_tunnel_handle6 += tsc_end - tsc_start;
+		dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->route_tunnel_handle6, globalbase.tsc_base_values.route_tunnel_handle6);
 		tsc_start = tsc_end;
 	}
 
 	if (globalbase.acl_egress_enabled)
 	{
+		stack_size = acl_egress_stack4.mbufsCount;
 		acl_egress_handle4();
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->acl_egress_handle4 += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->acl_egress_handle4, globalbase.tsc_base_values.acl_egress_handle4);
 			tsc_start = tsc_end;
 		}
 
+		stack_size = acl_egress_stack6.mbufsCount;
 		acl_egress_handle6();
-		if (tsc_start)
+		if (tsc_start && likely(stack_size > 0))
 		{
 			tsc_end = rte_get_tsc_cycles();
-			tsc_deltas->acl_egress_handle6 += tsc_end - tsc_start;
+			dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->acl_egress_handle6, globalbase.tsc_base_values.acl_egress_handle6);
 			tsc_start = tsc_end;
 		}
 	}
 
+	stack_size = logicalPort_egress_stack.mbufsCount;
 	logicalPort_egress_handle();
-	if (tsc_start)
+	if (tsc_start && likely(stack_size > 0))
 	{
 		tsc_end = rte_get_tsc_cycles();
-		tsc_deltas->logicalPort_egress_handle += tsc_end - tsc_start;
+		dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->logicalPort_egress_handle, globalbase.tsc_base_values.logicalPort_egress_handle);
 		tsc_start = tsc_end;
 	}
+
+	stack_size = controlPlane_stack.mbufsCount;
 	controlPlane_handle();
-	if (tsc_start)
+	if (tsc_start && likely(stack_size > 0))
 	{
 		tsc_end = rte_get_tsc_cycles();
-		tsc_deltas->controlPlane_handle += tsc_end - tsc_start;
+		dataplane::perf::write_to_hist((tsc_end - tsc_start) / stack_size, tsc_deltas->controlPlane_handle, globalbase.tsc_base_values.controlPlane_handle);
+		tsc_start = tsc_end;
 	}
 
 	physicalPort_egress_handle();
@@ -2351,8 +2382,6 @@ inline void cWorker::route_tunnel_handle6()
 		return;
 	}
 
-	auto tsc_start = rte_get_tsc_cycles();
-
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_tunnel_stack6.mbufsCount;
 	     mbuf_i++)
@@ -2446,9 +2475,6 @@ inline void cWorker::route_tunnel_handle6()
 	}
 
 	route_tunnel_stack6.clear();
-
-	auto tsc_end = rte_get_tsc_cycles();
-	tsc_deltas->route_tunnel_handle6 += tsc_end - tsc_start;
 }
 
 inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
