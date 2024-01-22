@@ -847,7 +847,7 @@ public:
 
 	bool subnetFor(const ipv4_address_t& other) const
 	{
-		return other.applyMask(mask()) == address();
+		return other.applyMask(mask()) == address().applyMask(mask());
 	}
 
 protected:
@@ -1104,7 +1104,7 @@ public:
 
 	bool subnetFor(const ipv6_address_t& other) const
 	{
-		return other.applyMask(mask()) == address();
+		return other.applyMask(mask()) == address().applyMask(mask());
 	}
 
 	bool subnetOf(const ipv6_prefix_t& other) const
@@ -1403,6 +1403,19 @@ public:
 		{
 			return std::get<ipv6_prefix_t>(prefix).applyMask(mask);
 		}
+	}
+
+	bool subnetFor(const ip_address_t& other) const
+	{
+		if (is_ipv4() && other.is_ipv4())
+		{
+			return get_ipv4().subnetFor(other.get_ipv4());
+		}
+		else if (is_ipv6() && other.is_ipv6())
+		{
+			return get_ipv6().subnetFor(other.get_ipv6());
+		}
+		return false;
 	}
 
 	void pop(stream_in_t& stream)

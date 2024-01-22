@@ -105,12 +105,22 @@ public:
 			{
 				if (interface.neighborIPv4Address)
 				{
-					interface_by_neighbors[*interface.neighborIPv4Address] = {interface.interfaceId, interface_name};
+					ip_prefix_t prefix(*interface.neighborIPv4Address, 32);
+					interface_by_neighbors[prefix] = {interface.interfaceId, interface_name};
 				}
 
 				if (interface.neighborIPv6Address)
 				{
-					interface_by_neighbors[*interface.neighborIPv6Address] = {interface.interfaceId, interface_name};
+					ip_prefix_t prefix(*interface.neighborIPv6Address, 128);
+					interface_by_neighbors[prefix] = {interface.interfaceId, interface_name};
+				}
+
+				for (const auto& prefix : interface.ip_prefixes)
+				{
+					if (!prefix.is_host())
+					{
+						interface_by_neighbors[prefix] = {interface.interfaceId, interface_name};
+					}
 				}
 			}
 
@@ -124,13 +134,15 @@ public:
 
 	std::optional<const std::tuple<tInterfaceId, std::string>*> get_interface_by_neighbor(const ip_address_t& address) const
 	{
-		auto it = interface_by_neighbors.find(address);
-		if (it == interface_by_neighbors.end())
+		for (const auto& [prefix, interface] : interface_by_neighbors)
 		{
-			return std::nullopt;
+			if (prefix.subnetFor(address))
+			{
+				return &interface;
+			}
 		}
 
-		return &it->second; ///< read only after update
+		return std::nullopt;
 	}
 
 	std::optional<const std::string*> get_vrf(const std::string& route_name) const
@@ -159,7 +171,7 @@ public:
 
 public:
 	std::map<std::string, controlplane::route::config_t> routes;
-	std::map<ip_address_t, std::tuple<tInterfaceId, std::string>> interface_by_neighbors;
+	std::map<ip_prefix_t, std::tuple<tInterfaceId, std::string>> interface_by_neighbors;
 	std::map<uint32_t, std::string> peers; ///< @todo: VRF
 	std::map<tSocketId, std::set<tInterfaceId>> socket_interfaces; ///< @todo: per route
 };
