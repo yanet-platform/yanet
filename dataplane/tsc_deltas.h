@@ -3,7 +3,9 @@
 #include <climits>
 #include <cmath>
 #include <cstdint>
+#include <rte_branch_prediction.h>
 #include <rte_build_config.h>
+#include <rte_cycles.h>
 #include <sys/types.h>
 #include <x86intrin.h>
 
@@ -68,21 +70,34 @@ struct tsc_deltas
 	uint16_t acl_egress_handle6[4];
 	uint16_t logicalPort_egress_handle[4];
 	uint16_t controlPlane_handle[4];
+	uint64_t tsc_start;
+
+	inline void write(uint32_t stack_size, uint16_t bins[4], uint32_t base)
+	{
+		if (!tsc_start || unlikely(stack_size == 0))
+		{
+			return;
+		}
+
+		auto tsc_end = rte_get_tsc_cycles();
+		auto shifted_delta = (int64_t)((tsc_end - tsc_start) / stack_size) - base;
+
+		if (shifted_delta > 0)
+		{
+			int floor_log_2 = sizeof(uint64_t) * CHAR_BIT - _lzcnt_u64(shifted_delta) - 1;
+			int bin_idx = std::min(std::max(floor_log_2 - YANET_TSC_BINS_SHIFT, 0), 4 - 1);
+			bins[bin_idx]++;
+		}
+
+		tsc_start = tsc_end;
+	}
+
 } __attribute__((__aligned__(2 * RTE_CACHE_LINE_SIZE)));
 
 static_assert(sizeof(tsc_deltas) <= 4 * RTE_CACHE_LINE_SIZE,
               "too much deltas");
 
-inline void write_to_hist(uint64_t counter, uint16_t bins[4], uint32_t base)
-{
-	int64_t cnt = (int64_t)counter - base;
-	if (cnt > 0)
-	{
-		int floor_log_2 = sizeof(uint64_t) * CHAR_BIT - _lzcnt_u64(cnt) - 1;
-		int bin_idx = std::min(std::max(floor_log_2 - YANET_TSC_BINS_SHIFT, 0), 4 - 1);
-		bins[bin_idx]++;
-	}
-}
+static_assert(std::is_pod_v<tsc_deltas> == true, "tsc structure is not pod");
 
 }
 
