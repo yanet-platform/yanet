@@ -171,6 +171,19 @@ eResult cWorker::init(const tCoreId& coreId,
 		return eResult::invalidCoreId;
 	}
 
+	acl_state_config.tcp_syn_ack_timeout = dataPlane->getConfigValue(eConfigType::acl_tcp_syn_ack_timeout);
+	acl_state_config.tcp_syn_timeout = dataPlane->getConfigValue(eConfigType::acl_tcp_syn_timeout);
+	acl_state_config.tcp_fin_timeout = dataPlane->getConfigValue(eConfigType::acl_tcp_fin_timeout);
+	acl_state_config.tcp_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_timeout);
+	acl_state_config.udp_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_udp_timeout);
+	acl_state_config.default_timeout = YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT;
+
+	balancer_state_config.tcp_syn_ack_timeout = dataPlane->getConfigValue(eConfigType::balancer_tcp_syn_ack_timeout);
+	balancer_state_config.tcp_syn_timeout = dataPlane->getConfigValue(eConfigType::balancer_tcp_syn_timeout);
+	balancer_state_config.tcp_fin_timeout = dataPlane->getConfigValue(eConfigType::balancer_tcp_fin_timeout);
+	balancer_state_config.tcp_timeout = dataPlane->getConfigValue(eConfigType::balancer_tcp_timeout);
+	balancer_state_config.udp_timeout = YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT;
+	balancer_state_config.default_timeout = YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT;
 	return eResult::success;
 }
 
@@ -4086,9 +4099,10 @@ inline void cWorker::balancer_handle()
 		{
 			const auto& real_unordered = base.globalBase->balancer_reals[value->real_unordered_id];
 			const auto& real_state = base.globalBase->balancer_real_states[value->real_unordered_id];
+
 			if (real_state.flags & YANET_BALANCER_FLAG_ENABLED)
 			{
-				value->timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime;
+				balancer_touch_state(mbuf, metadata, value);
 				locker->unlock();
 
 				balancer_tunnel(mbuf, service, real_unordered, real_unordered.counter_id);
@@ -4141,15 +4155,14 @@ inline void cWorker::balancer_handle()
 
 			const auto& real_id = ring->reals[range->start + (metadata->hash % range->size)];
 			const auto& real_unordered = base.globalBase->balancer_reals[real_id];
-
 			if (!value)
 			{
 				if (!(service.flags & YANET_BALANCER_OPS_FLAG))
 				{
 					dataplane::globalBase::balancer_state_value_t value;
+					balancer_touch_state(mbuf, metadata, &value);
 					value.real_unordered_id = real_id;
 					value.timestamp_create = basePermanently.globalBaseAtomic->currentTime;
-					value.timestamp_last_packet = value.timestamp_create;
 					value.timestamp_gc = value.timestamp_last_packet - 1; ///< touch gc
 
 					/// counter_id:
@@ -4168,9 +4181,9 @@ inline void cWorker::balancer_handle()
 				const auto& old_real = base.globalBase->balancer_reals[value->real_unordered_id];
 				++counters[old_real.counter_id + (tCounterId)balancer::real_counter::sessions_destroyed];
 				++counters[real_unordered.counter_id + (tCounterId)balancer::real_counter::sessions_created];
+				balancer_touch_state(mbuf, metadata, value);
 				value->real_unordered_id = real_id;
 				value->timestamp_create = basePermanently.globalBaseAtomic->currentTime;
-				value->timestamp_last_packet = value->timestamp_create;
 				value->timestamp_gc = value->timestamp_last_packet - 1; ///< touch gc
 			}
 
@@ -4688,7 +4701,7 @@ inline void cWorker::balancer_icmp_forward_handle()
 			const auto& real_state = base.globalBase->balancer_real_states[value->real_unordered_id];
 			if (real_state.flags & YANET_BALANCER_FLAG_ENABLED)
 			{
-				value->timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime;
+				balancer_touch_state(mbuf, metadata, value);
 				locker->unlock();
 
 				balancer_tunnel(mbuf, service, real_unordered, real_unordered.counter_id);
@@ -4831,7 +4844,7 @@ inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf,
 
 	// Copy the flow to prevent concurrent usage. In the other thread there can be garbage collector active.
 	common::globalBase::tFlow flow = value->flow;
-	value->last_seen = basePermanently.globalBaseAtomic->currentTime;
+	acl_touch_state(mbuf, metadata, value);
 	value->packets_since_last_sync++;
 	value->packets_backward++;
 	value->tcp.dst_flags |= flags;
@@ -4888,7 +4901,7 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 		dataplane::globalBase::fw_state_value_t value;
 		value.type = static_cast<dataplane::globalBase::fw_state_type>(metadata->transport_headerType);
 		value.owner = dataplane::globalBase::fw_state_owner_e::internal;
-		value.last_seen = basePermanently.globalBaseAtomic->currentTime;
+		acl_touch_state(mbuf, metadata, &value);
 		value.flow = flow;
 		value.acl_id = aclId;
 		value.last_sync = basePermanently.globalBaseAtomic->currentTime;
@@ -4912,7 +4925,7 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 			const uint32_t hash = atomic->fw4_state->lookup(key, lookup_value, locker);
 			if (lookup_value)
 			{
-				lookup_value->last_seen = basePermanently.globalBaseAtomic->currentTime;
+				acl_touch_state(mbuf, metadata, lookup_value);
 				lookup_value->packets_since_last_sync++;
 				lookup_value->packets_forward++;
 				lookup_value->tcp.src_flags |= flags;
@@ -4985,7 +4998,7 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 		dataplane::globalBase::fw_state_value_t value;
 		value.type = static_cast<dataplane::globalBase::fw_state_type>(metadata->transport_headerType);
 		value.owner = dataplane::globalBase::fw_state_owner_e::internal;
-		value.last_seen = basePermanently.globalBaseAtomic->currentTime;
+		acl_touch_state(mbuf, metadata, &value);
 		value.flow = flow;
 		value.acl_id = aclId;
 		value.last_sync = basePermanently.globalBaseAtomic->currentTime;
@@ -5009,7 +5022,7 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 			const uint32_t hash = atomic->fw6_state->lookup(key, lookup_value, locker);
 			if (lookup_value)
 			{
-				lookup_value->last_seen = basePermanently.globalBaseAtomic->currentTime;
+				acl_touch_state(mbuf, metadata, lookup_value);
 				lookup_value->packets_since_last_sync++;
 				lookup_value->packets_forward++;
 				lookup_value->tcp.src_flags |= flags;
@@ -5634,7 +5647,7 @@ inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf,
 
 	// Copy the flow to prevent concurrent usage. In the other thread there can be garbage collector active.
 	common::globalBase::tFlow flow = value->flow;
-	value->last_seen = basePermanently.globalBaseAtomic->currentTime;
+	acl_touch_state(mbuf, metadata, value);
 	value->packets_since_last_sync++;
 	value->packets_backward++;
 	value->tcp.dst_flags |= flags;
@@ -5988,4 +6001,47 @@ YANET_NEVER_INLINE void cWorker::slowWorkerFarmHandleFragment(rte_mbuf* mbuf)
 
 	preparePacket(mbuf);
 	slowWorker_entry_normalPriority(mbuf, common::globalBase::eFlowType::slowWorker_repeat);
+}
+
+inline void cWorker::acl_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value)
+{
+	value->last_seen = basePermanently.globalBaseAtomic->currentTime;
+	value->state_timeout = get_state_timeout(mbuf, metadata, acl_state_config);
+}
+
+inline void cWorker::balancer_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::balancer_state_value_t* value)
+{
+	value->timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime;
+	value->state_timeout = get_state_timeout(mbuf, metadata, balancer_state_config);
+}
+
+inline uint32_t cWorker::get_tcp_state_timeout(uint8_t flags, const dataplane::globalBase::state_timeout_config_t& state_timeout_config)
+{
+	if ((flags & RTE_TCP_SYN_FLAG) == RTE_TCP_SYN_FLAG)
+	{
+		if ((flags & RTE_TCP_ACK_FLAG) == RTE_TCP_ACK_FLAG)
+		{
+			return state_timeout_config.tcp_syn_ack_timeout;
+		}
+		return state_timeout_config.tcp_syn_timeout;
+	}
+	if (flags & RTE_TCP_FIN_FLAG)
+	{
+		return state_timeout_config.tcp_fin_timeout;
+	}
+	return state_timeout_config.tcp_timeout;
+}
+
+inline uint32_t cWorker::get_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, const dataplane::globalBase::state_timeout_config_t& state_timeout_config)
+{
+	if (metadata->transport_headerType == IPPROTO_TCP)
+	{
+		rte_tcp_hdr* tcpHeader = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+		return get_tcp_state_timeout(tcpHeader->tcp_flags, state_timeout_config);
+	}
+	if (metadata->transport_headerType == IPPROTO_UDP)
+	{
+		return state_timeout_config.udp_timeout;
+	}
+	return state_timeout_config.default_timeout;
 }

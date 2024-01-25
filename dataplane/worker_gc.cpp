@@ -415,7 +415,7 @@ void worker_gc_t::handle_balancer_gc()
 			}
 
 			iter.lock();
-			if (iter.value()->timestamp_gc != iter.value()->timestamp_last_packet) ///< @todo: BALANCER TIMEOUTS
+			if (iter.value()->timestamp_gc != iter.value()->timestamp_last_packet)
 			{
 				iter.value()->timestamp_gc = iter.value()->timestamp_last_packet;
 				auto value = *iter.value();
@@ -483,12 +483,14 @@ void worker_gc_t::handle_balancer_gc()
 
 				iter.lock();
 			}
-
-			if ((uint16_t)((uint16_t)globalbase_atomic->currentTime - (uint16_t)iter.value()->timestamp_last_packet) > balancer_state_ttl)
 			{
-				const auto& real_from_base = base.globalBase->balancer_reals[iter.value()->real_unordered_id];
-				++counters[real_from_base.counter_id + (tCounterId)balancer::gc_real_counter::sessions_destroyed];
-				iter.unset_valid();
+				auto* value = iter.value();
+				if (is_timeout(value->timestamp_last_packet, value->state_timeout))
+				{
+					const auto& real_from_base = base.globalBase->balancer_reals[value->real_unordered_id];
+					++counters[real_from_base.counter_id + (tCounterId)balancer::gc_real_counter::sessions_destroyed];
+					iter.unset_valid();
+				}
 			}
 			iter.unlock();
 		}
@@ -533,7 +535,7 @@ void worker_gc_t::handle_acl_gc()
 
 			if (value.type == dataplane::globalBase::fw_state_type::tcp)
 			{
-				if (current_time - value.last_seen >= globalbase_atomic->fw_state_config.tcp_timeout)
+				if (is_timeout(value.last_seen, value.state_timeout))
 				{
 					fw_state_remove_stack.emplace_back(fw_key);
 
