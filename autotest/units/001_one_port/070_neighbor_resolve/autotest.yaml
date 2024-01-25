@@ -31,7 +31,7 @@ steps:
     route0      kni0.200        fe80::1     42:42:A4:59:BE:A5
 
 - cli: neighbor insert route0 kni0.100 200.0.0.2 00:11:22:33:44:55
-- sleep: 1
+- cli: neighbor flush
 
 - cli_check: |
     YANET_FORMAT_COLUMNS=route_name,interface_name,ip_address,mac_address       neighbor show
@@ -42,7 +42,7 @@ steps:
     route0      kni0.200        fe80::1     42:42:A4:59:BE:A5
 
 - cli: neighbor remove route0 kni0.100 200.0.0.2
-- sleep: 1
+- cli: neighbor flush
 
 - cli_check: |
     YANET_FORMAT_COLUMNS=route_name,interface_name,ip_address,mac_address       neighbor show
