@@ -55,12 +55,19 @@ enum class eConfigType
 	acl_transport_ht_size,
 	acl_total_ht_size,
 	acl_values_size,
+	acl_tcp_syn_ack_timeout,
+	acl_tcp_syn_timeout,
+	acl_tcp_fin_timeout,
 	master_mempool_size,
 	nat64stateful_states_size,
 	kernel_interface_queue_size,
 	balancer_state_ttl,
 	balancer_state_ht_size,
 	tsc_active_state,
+	balancer_tcp_syn_ack_timeout,
+	balancer_tcp_syn_timeout,
+	balancer_tcp_fin_timeout,
+	balancer_tcp_timeout,
 };
 
 struct tDataPlaneConfig

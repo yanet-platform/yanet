@@ -91,9 +91,16 @@ cDataPlane::cDataPlane() :
 	                {eConfigType::master_mempool_size, 8192},
 	                {eConfigType::nat64stateful_states_size, YANET_CONFIG_NAT64STATEFUL_HT_SIZE},
 	                {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE},
-	                {eConfigType::balancer_state_ttl, 60},
+	                {eConfigType::balancer_state_ttl, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
 	                {eConfigType::balancer_state_ht_size, YANET_CONFIG_BALANCER_STATE_HT_SIZE},
-	                {eConfigType::tsc_active_state, YANET_CONFIG_TSC_ACTIVE_STATE}};
+	                {eConfigType::tsc_active_state, YANET_CONFIG_TSC_ACTIVE_STATE},
+	                {eConfigType::acl_tcp_syn_ack_timeout, YANET_CONFIG_STATE_TIMEOUT_DEFAULT},
+	                {eConfigType::acl_tcp_syn_timeout, YANET_CONFIG_STATE_TIMEOUT_DEFAULT},
+	                {eConfigType::acl_tcp_fin_timeout, YANET_CONFIG_STATE_TIMEOUT_DEFAULT},
+	                {eConfigType::balancer_tcp_syn_ack_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
+	                {eConfigType::balancer_tcp_syn_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
+	                {eConfigType::balancer_tcp_fin_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
+	                {eConfigType::balancer_tcp_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT}};
 }
 
 cDataPlane::~cDataPlane()
@@ -1948,6 +1955,34 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	if (exist(json, "tsc_active_state"))
 	{
 		configValues[eConfigType::tsc_active_state] = json["tsc_active_state"];
+	}
+	if (exist(json, "acl_tcp_syn_ack_timeout"))
+	{
+		configValues[eConfigType::acl_tcp_syn_ack_timeout] = json["acl_tcp_syn_ack_timeout"];
+	}
+	if (exist(json, "acl_tcp_syn_timeout"))
+	{
+		configValues[eConfigType::acl_tcp_syn_timeout] = json["acl_tcp_syn_timeout"];
+	}
+	if (exist(json, "acl_tcp_fin_timeout"))
+	{
+		configValues[eConfigType::acl_tcp_fin_timeout] = json["acl_tcp_fin_timeout"];
+	}
+	if (exist(json, "balancer_tcp_syn_ack_timeout"))
+	{
+		configValues[eConfigType::balancer_tcp_syn_ack_timeout] = json["balancer_tcp_syn_ack_timeout"];
+	}
+	if (exist(json, "balancer_tcp_syn_timeout"))
+	{
+		configValues[eConfigType::balancer_tcp_syn_timeout] = json["balancer_tcp_syn_timeout"];
+	}
+	if (exist(json, "balancer_tcp_fin_timeout"))
+	{
+		configValues[eConfigType::balancer_tcp_fin_timeout] = json["balancer_tcp_fin_timeout"];
+	}
+	if (exist(json, "balancer_tcp_timeout"))
+	{
+		configValues[eConfigType::balancer_tcp_timeout] = json["balancer_tcp_timeout"];
 	}
 
 	return eResult::success;

@@ -122,7 +122,6 @@ public: ///< @todo
 	nat64stateful::lan_ht* nat64stateful_lan_state;
 	nat64stateful::wan_ht* nat64stateful_wan_state;
 	balancer::state_ht* balancer_state;
-
 	bool tsc_active_state;
 };
 

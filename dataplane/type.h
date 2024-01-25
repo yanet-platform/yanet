@@ -587,9 +587,9 @@ struct balancer_service_t
 	uint32_t wlc_power;
 
 	/*
-		outer_source_network_flag:
-		zero byte stores the state for ipv4_router_source_network
-		first byte stores the state for ipv6_router_source_network
+	        outer_source_network_flag:
+	        zero byte stores the state for ipv4_router_source_network
+	        first byte stores the state for ipv6_router_source_network
 	*/
 	uint8_t outer_source_network_flag;
 	ipv4_prefix_t ipv4_outer_source_network;
@@ -711,6 +711,8 @@ struct fw_state_value_t
 	uint64_t packets_forward;
 	/// Acl ID used to determine synchronization ports
 	uint8_t acl_id;
+	/// State timeout
+	uint16_t state_timeout;
 
 	fw_state_value_t()
 	{}
@@ -797,8 +799,19 @@ struct balancer_state_value_t
 	uint32_t timestamp_create; ///< @todo: 16bit
 	uint16_t timestamp_last_packet;
 	uint16_t timestamp_gc;
-	uint32_t nap0; ///< @todo: DELETE
+	uint32_t state_timeout;
 };
+
+struct state_timeout_config_t
+{
+	uint32_t tcp_syn_ack_timeout;
+	uint32_t tcp_syn_timeout;
+	uint32_t tcp_fin_timeout;
+	uint32_t tcp_timeout;
+	uint32_t udp_timeout;
+	uint32_t default_timeout;
+};
+
 }
 
 }
