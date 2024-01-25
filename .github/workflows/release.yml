@@ -6,7 +6,7 @@ on:
       - 'v[0-9]+.[0-9]+'
 
 jobs:
-  build-debian-package-ubuntu22.04:
+  build-debian-package-jammy:
     name: build (Ubuntu 22.04)
     runs-on: builder
     container:
@@ -44,7 +44,7 @@ jobs:
           name: target_debian
           path: /export/yanet*.deb
 
-  build-debian-package-ubuntu18.04:
+  build-debian-package-bionic:
     name: build (Ubuntu 18.04)
     runs-on: builder
     container:
