@@ -636,7 +636,7 @@ void module::resolve(const dataplane::neighbor::key& key)
 	           sizeof(header),
 	           0,
 	           &address,
-	           address_length) == 0)
+	           address_length) == -1)
 	{
 		YANET_LOG_WARNING("neighbor_resolve: sendto(): %s\n",
 		                  strerror(errno));
