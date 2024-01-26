@@ -87,15 +87,13 @@ class Autotest:
         if self.p_autotest.returncode != 0:
             self.kill_processes()
             if self.debug:
-                with open("/tmp/yanet-dp.report", "r") as fin:
-                    print(fin.read())
+                os.system("yanet-cli dontdoit podumoi dataplane report")
             sys.exit(3)
 
         if (self.p_dataplane.poll() != None) or (self.p_controlplane.poll() != None):
             self.kill_processes()
             if self.debug:
-                with open("/tmp/yanet-dp.report", "r") as fin:
-                    print(fin.read())
+                os.system("yanet-cli dontdoit podumoi dataplane report")
             sys.exit(4)
 
         self.kill_processes()
