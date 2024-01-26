@@ -15,6 +15,7 @@
 #include "acl.h"
 #include "balancer.h"
 #include "config.h"
+#include "memory_manager.h"
 #include "neighbor.h"
 #include "result.h"
 #include "scheduler.h"
@@ -82,6 +83,8 @@ enum class requestType : uint32_t
 	neighbor_flush,
 	neighbor_update_interfaces,
 	neighbor_stats,
+	memory_manager_update,
+	memory_manager_stats,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -984,6 +987,21 @@ namespace neighbor_stats
 using response = common::neighbor::stats;
 }
 
+namespace memory_manager_update
+{
+using request = memory_manager::memory_group;
+}
+
+namespace memory_manager_stats
+{
+using object = std::tuple<std::string, ///< name
+                          tSocketId, ///< socket_id
+                          uint64_t>; ///< size
+
+using response = std::tuple<memory_manager::memory_group,
+                            std::vector<object>>;
+}
+
 //
 
 using request = std::tuple<requestType,
@@ -1005,7 +1023,8 @@ using request = std::tuple<requestType,
                                         dump_physical_port::request,
                                         neighbor_insert::request,
                                         neighbor_remove::request,
-                                        neighbor_update_interfaces::request>>;
+                                        neighbor_update_interfaces::request,
+                                        memory_manager_update::request>>;
 
 using response = std::variant<std::tuple<>,
                               updateGlobalBase::response, ///< + others which have eResult as response
@@ -1039,5 +1058,6 @@ using response = std::variant<std::tuple<>,
                               get_shm_info::response,
                               get_shm_tsc_info::response,
                               neighbor_show::response,
-                              neighbor_stats::response>;
+                              neighbor_stats::response,
+                              memory_manager_stats::response>;
 }

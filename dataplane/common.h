@@ -90,3 +90,13 @@ inline uint32_t yanet_hash_crc(const void* data, uint32_t init)
 //
 
 static_assert(CONFIG_YADECAP_PORTS_SIZE <= 0xFF, "invalid CONFIG_YADECAP_PORTS_SIZE");
+
+//
+
+namespace dataplane
+{
+
+class memory_pointer;
+class memory_manager;
+
+}

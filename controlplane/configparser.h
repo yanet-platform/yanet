@@ -39,6 +39,7 @@ protected:
 	void loadConfig_variables(controlplane::base_t& baseNext, const nlohmann::json& json);
 	void loadConfig_fqdns(controlplane::base_t& baseNext, const nlohmann::json& json, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_rib(controlplane::base_t& baseNext, const nlohmann::json& json);
+	void loadConfig_memory_group(common::memory_manager::memory_group& memory_group, const nlohmann::json& json);
 
 private:
 	common::idp::getConfig::response dataPlaneConfig;

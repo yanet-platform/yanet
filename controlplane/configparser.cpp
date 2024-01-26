@@ -130,6 +130,11 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 		{
 			loadConfig_rib(baseNext, rootJson["rib"]);
 		}
+
+		if (exist(rootJson, "memory_groups"))
+		{
+			loadConfig_memory_group(baseNext.root_memory_group, rootJson["memory_groups"]);
+		}
 	}
 	catch (const error_result_t& err)
 	{
@@ -1899,5 +1904,31 @@ void config_parser_t::loadConfig_rib(controlplane::base_t& baseNext,
 
 			vrf.emplace_back(std::move(base_rib));
 		}
+	}
+}
+
+void config_parser_t::loadConfig_memory_group(common::memory_manager::memory_group& memory_group,
+                                              const nlohmann::json& json)
+{
+	for (const auto& json_iter : json)
+	{
+		auto memory_group_next = std::make_shared<common::memory_manager::memory_group>();
+
+		std::string name = json_iter["name"].get<std::string>();
+		std::string limit = "0";
+		if (exist(json_iter, "limit"))
+		{
+			limit = json_iter["limit"].get<std::string>();
+		}
+
+		memory_group_next->name = name;
+		memory_group_next->limit = common::memory_manager::convert_string_to_bytes(std::move(limit));
+
+		if (exist(json_iter, "memory_groups"))
+		{
+			loadConfig_memory_group(*memory_group_next.get(), json_iter["memory_groups"]);
+		}
+
+		memory_group.memory_groups.emplace_back(memory_group_next);
 	}
 }

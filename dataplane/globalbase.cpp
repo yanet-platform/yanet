@@ -53,6 +53,78 @@ generation::~generation()
 {
 }
 
+eResult generation::init()
+{
+	eResult result = eResult::success;
+
+	{
+		updater.acl.network_ipv4_source = std::make_unique<acl::network_ipv4_source>("acl.network.v4.source.lpm",
+		                                                                             &dataPlane->memory_manager,
+		                                                                             socketId);
+		result = updater.acl.network_ipv4_source->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		acl.network.ipv4.source = updater.acl.network_ipv4_source->pointer;
+	}
+
+	{
+		updater.acl.network_ipv4_destination = std::make_unique<acl::network_ipv4_destination>("acl.network.v4.destination.lpm",
+		                                                                                       &dataPlane->memory_manager,
+		                                                                                       socketId);
+		result = updater.acl.network_ipv4_destination->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		acl.network.ipv4.destination = updater.acl.network_ipv4_destination->pointer;
+	}
+
+	{
+		updater.acl.network_ipv6_destination_ht = std::make_unique<acl::network_ipv6_destination_ht>("acl.network.v6.destination.ht",
+		                                                                                             &dataPlane->memory_manager,
+		                                                                                             socketId);
+		result = updater.acl.network_ipv6_destination_ht->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		acl.network.ipv6.destination_ht = updater.acl.network_ipv6_destination_ht->pointer;
+	}
+
+	{
+		updater.acl.transport_table = std::make_unique<acl::transport_table>("acl.transport.ht",
+		                                                                     &dataPlane->memory_manager,
+		                                                                     socketId);
+		result = updater.acl.transport_table->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		acl.transport_table = updater.acl.transport_table->pointer;
+	}
+
+	{
+		updater.acl.total_table = std::make_unique<acl::total_table>("acl.total.ht",
+		                                                             &dataPlane->memory_manager,
+		                                                             socketId);
+		result = updater.acl.total_table->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		acl.total_table = updater.acl.total_table->pointer;
+	}
+
+	return result;
+}
+
 eResult generation::update(const common::idp::updateGlobalBase::request& request)
 {
 	eResult result = eResult::success;
@@ -418,9 +490,6 @@ eResult generation::clear()
 	sampler_enabled = 0;
 	serial = 0;
 
-	updater.acl.network_ipv6_destination_ht.clear();
-	updater.acl.transport_table.clear();
-	updater.acl.total_table.clear();
 	acl.values[0] = {};
 	tun64mappingsTable.clear();
 
@@ -1860,12 +1929,14 @@ eResult generation::acl_network_ipv4_source(const common::idp::updateGlobalBase:
 {
 	eResult result = eResult::success;
 
-	result = updater.acl.network_ipv4_source.update(request);
+	result = updater.acl.network_ipv4_source->update(request);
 	if (result != eResult::success)
 	{
 		YANET_LOG_ERROR("acl.network.ipv4.source.update(): %s\n", result_to_c_str(result));
 		return result;
 	}
+
+	acl.network.ipv4.source = updater.acl.network_ipv4_source->pointer;
 
 	return result;
 }
@@ -1874,12 +1945,14 @@ eResult generation::acl_network_ipv4_destination(const common::idp::updateGlobal
 {
 	eResult result = eResult::success;
 
-	result = updater.acl.network_ipv4_destination.update(request);
+	result = updater.acl.network_ipv4_destination->update(request);
 	if (result != eResult::success)
 	{
 		YANET_LOG_ERROR("acl.network.ipv4.destination.update(): %s\n", result_to_c_str(result));
 		return result;
 	}
+
+	acl.network.ipv4.destination = updater.acl.network_ipv4_destination->pointer;
 
 	return result;
 }
@@ -1900,11 +1973,15 @@ eResult generation::acl_network_ipv6_source(const common::idp::updateGlobalBase:
 
 eResult generation::acl_network_ipv6_destination_ht(const common::idp::updateGlobalBase::acl_network_ipv6_destination_ht::request& request)
 {
-	auto result = updater.acl.network_ipv6_destination_ht.update(request);
-	if (result != eResult::success)
+	std::vector<std::tuple<ipv6_address_t, tAclGroupId>> request_convert;
+	for (const auto& [address, group_id] : request)
 	{
-		/// dont panic. this is fine
+		request_convert.emplace_back(ipv6_address_t::convert(address), group_id);
 	}
+
+	/// ignore error
+	updater.acl.network_ipv6_destination_ht->update(request_convert, false);
+	acl.network.ipv6.destination_ht = updater.acl.network_ipv6_destination_ht->pointer;
 
 	return eResult::success;
 }
@@ -2053,12 +2130,14 @@ eResult generation::acl_transport_table(const common::idp::updateGlobalBase::acl
 {
 	eResult result = eResult::success;
 
-	result = updater.acl.transport_table.update(request);
+	result = updater.acl.transport_table->update(request);
 	if (result != eResult::success)
 	{
 		YANET_LOG_ERROR("acl.transport_table.update(): %s\n", result_to_c_str(result));
 		return result;
 	}
+
+	acl.transport_table = updater.acl.transport_table->pointer;
 
 	return result;
 }
@@ -2067,12 +2146,14 @@ eResult generation::acl_total_table(const common::idp::updateGlobalBase::acl_tot
 {
 	eResult result = eResult::success;
 
-	result = updater.acl.total_table.update(request);
+	result = updater.acl.total_table->update(request);
 	if (result != eResult::success)
 	{
 		YANET_LOG_ERROR("acl.total_table.update(): %s\n", result_to_c_str(result));
 		return result;
 	}
+
+	acl.total_table = updater.acl.total_table->pointer;
 
 	return result;
 }

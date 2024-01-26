@@ -25,6 +25,7 @@
 #include "durations.h"
 #include "fqdn.h"
 #include "isystem.h"
+#include "memory_manager.h"
 #include "module.h"
 #include "nat46clat.h"
 #include "nat64stateful.h"
@@ -172,6 +173,7 @@ protected:
 	durations_t durations;
 	nat64stateful_t nat64stateful;
 	nat46clat::manager nat46clat;
+	controlplane::memory_manager::memory_manager memory_manager;
 
 	counter_manager_t counter_manager;
 

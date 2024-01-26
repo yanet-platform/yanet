@@ -236,6 +236,11 @@ public:
 		return buffer;
 	}
 
+	uint8_t* data()
+	{
+		return address.data();
+	}
+
 	const uint8_t* data() const
 	{
 		return address.data();

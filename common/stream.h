@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -60,6 +61,9 @@ public:
 
 	template<typename TType>
 	inline void pop(std::optional<TType>& optional);
+
+	template<typename TType>
+	inline void pop(std::shared_ptr<TType>& pointer);
 
 	inline bool isFailed();
 
@@ -219,6 +223,12 @@ public:
 		{
 			push((uint8_t)0);
 		}
+	}
+
+	template<typename TType>
+	inline void push(const std::shared_ptr<TType>& pointer)
+	{
+		push(*pointer.get());
 	}
 
 	inline const std::vector<uint8_t>& getBuffer()
@@ -448,6 +458,13 @@ inline void stream_in_t::pop(std::optional<TType>& optional)
 		pop(value);
 		optional = value;
 	}
+}
+
+template<typename TType>
+inline void stream_in_t::pop(std::shared_ptr<TType>& pointer)
+{
+	pointer = std::make_shared<TType>();
+	pop(*pointer.get());
 }
 
 inline bool stream_in_t::isFailed()

@@ -17,6 +17,7 @@
 #include "hashtable.h"
 #include "lpm.h"
 #include "type.h"
+#include "updater.h"
 
 /// @todo: move
 #define YADECAP_GB_DSCP_FLAG_MARK ((uint8_t)1)
@@ -61,14 +62,14 @@ struct transport_layer_t
 };
 
 /// @todo: move to config
-using network_ipv4_source = lpm4_24bit_8bit_id32_dynamic;
-using network_ipv4_destination = lpm4_24bit_8bit_id32_dynamic;
+using network_ipv4_source = dataplane::updater_lpm4_24bit_8bit_id32;
+using network_ipv4_destination = dataplane::updater_lpm4_24bit_8bit_id32;
 using network_ipv6_source = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
-using network_ipv6_destination_ht = hashtable_mod_id32_dynamic<ipv6_address_t, 1>;
+using network_ipv6_destination_ht = dataplane::updater_hashtable_mod_id32<ipv6_address_t, 1>;
 using network_ipv6_destination = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
 using network_table = dynamic_table<uint32_t>;
-using transport_table = hashtable_mod_id32_dynamic<common::acl::transport_key_t, 16>;
-using total_table = hashtable_mod_id32_dynamic<common::acl::total_key_t, 16>;
+using transport_table = dataplane::updater_hashtable_mod_id32<common::acl::transport_key_t, 16>;
+using total_table = dataplane::updater_hashtable_mod_id32<common::acl::total_key_t, 16>;
 }
 
 namespace nat64stateful
@@ -134,6 +135,7 @@ public:
 	~generation();
 
 public:
+	eResult init();
 	eResult update(const common::idp::updateGlobalBase::request& request);
 	eResult updateBalancer(const common::idp::updateGlobalBaseBalancer::request& request);
 	eResult get(const common::idp::getGlobalBase::request& request, common::idp::getGlobalBase::globalBase& globalBaseResponse) const;
@@ -193,14 +195,14 @@ public: ///< @todo
 	{
 		struct
 		{
-			acl::network_ipv4_source::updater network_ipv4_source;
-			acl::network_ipv4_destination::updater network_ipv4_destination;
+			std::unique_ptr<acl::network_ipv4_source> network_ipv4_source;
+			std::unique_ptr<acl::network_ipv4_destination> network_ipv4_destination;
 			acl::network_ipv6_source::updater network_ipv6_source;
-			acl::network_ipv6_destination_ht::updater network_ipv6_destination_ht;
+			std::unique_ptr<acl::network_ipv6_destination_ht> network_ipv6_destination_ht;
 			acl::network_ipv6_destination::updater network_ipv6_destination;
 			acl::network_table::updater network_table;
-			acl::transport_table::updater transport_table;
-			acl::total_table::updater total_table;
+			std::unique_ptr<acl::transport_table> transport_table;
+			std::unique_ptr<acl::total_table> total_table;
 		} acl;
 	} updater;
 
@@ -257,14 +259,14 @@ public: ///< @todo
 		{
 			struct
 			{
-				acl::network_ipv4_source* source;
-				acl::network_ipv4_destination* destination;
+				acl::network_ipv4_source::object_type* source;
+				acl::network_ipv4_destination::object_type* destination;
 			} ipv4;
 
 			struct
 			{
 				acl::network_ipv6_source* source;
-				acl::network_ipv6_destination_ht* destination_ht;
+				acl::network_ipv6_destination_ht::object_type* destination_ht;
 				acl::network_ipv6_destination* destination;
 			} ipv6;
 		} network;
@@ -275,8 +277,8 @@ public: ///< @todo
 		uint32_t transport_layers_mask;
 		acl::transport_layer_t* transport_layers;
 
-		acl::transport_table* transport_table;
-		acl::total_table* total_table;
+		acl::transport_table::object_type* transport_table;
+		acl::total_table::object_type* total_table;
 		common::acl::value_t* values;
 	} acl;
 

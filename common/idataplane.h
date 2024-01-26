@@ -258,6 +258,16 @@ public:
 		return get<common::idp::requestType::neighbor_stats, common::idp::neighbor_stats::response>();
 	}
 
+	auto memory_manager_update(const common::idp::memory_manager_update::request& request) const
+	{
+		return get<common::idp::requestType::memory_manager_update, eResult>(request);
+	}
+
+	auto memory_manager_stats() const
+	{
+		return get<common::idp::requestType::memory_manager_stats, common::idp::memory_manager_stats::response>();
+	}
+
 protected:
 	void connectToDataPlane() const
 	{
