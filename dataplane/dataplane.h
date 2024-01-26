@@ -357,12 +357,6 @@ protected:
 
 	common::idp::get_shm_tsc_info::response tscs_meta;
 
-	/// modules
-	cReport report;
-	std::unique_ptr<cControlPlane> controlPlane;
-	cBus bus;
-	dataplane::neighbor::module neighbor;
-
 	// array instead of the table - how many coreIds can be there?
 	std::unordered_map<uint32_t, std::unordered_map<std::string, uint64_t*>> coreId_to_stats_tables;
 
@@ -381,4 +375,11 @@ protected:
 	std::vector<std::thread> threads;
 
 	mutable std::mutex dpdk_mutex;
+
+public: ///< modules
+	cReport report;
+	std::unique_ptr<cControlPlane> controlPlane;
+	cBus bus;
+	dataplane::memory_manager memory_manager;
+	dataplane::neighbor::module neighbor;
 };

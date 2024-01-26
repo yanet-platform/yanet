@@ -32,6 +32,7 @@
 #include "common/result.h"
 #include "common/tsc_deltas.h"
 #include "dataplane.h"
+#include "debug_latch.h"
 #include "globalbase.h"
 #include "report.h"
 #include "sock_dev.h"
@@ -224,6 +225,12 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	numaNodesInUse = worker_gcs.size();
 
 	result = initQueues();
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
+	result = memory_manager.init(this);
 	if (result != eResult::success)
 	{
 		return result;
@@ -657,27 +664,14 @@ eResult cDataPlane::initGlobalBases()
 			return nullptr;
 		}
 
+		if (globalbase->init() != eResult::success)
 		{
-			auto* acl_network_ipv4_source = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv4_source>(socket_id, getConfigValue(eConfigType::acl_network_lpm4_chunks_size), globalbase->updater.acl.network_ipv4_source);
-			if (!acl_network_ipv4_source)
-			{
-				return nullptr;
-			}
+			return nullptr;
+		}
 
-			auto* acl_network_ipv4_destination = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv4_destination>(socket_id, getConfigValue(eConfigType::acl_network_lpm4_chunks_size), globalbase->updater.acl.network_ipv4_destination);
-			if (!acl_network_ipv4_destination)
-			{
-				return nullptr;
-			}
-
+		{
 			auto* acl_network_ipv6_source = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_source>(socket_id, getConfigValue(eConfigType::acl_network_source_lpm6_chunks_size), globalbase->updater.acl.network_ipv6_source);
 			if (!acl_network_ipv6_source)
-			{
-				return nullptr;
-			}
-
-			auto* acl_network_ipv6_destination_ht = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_destination_ht>(socket_id, getConfigValue(eConfigType::acl_network_destination_ht_size), globalbase->updater.acl.network_ipv6_destination_ht);
-			if (!acl_network_ipv6_destination_ht)
 			{
 				return nullptr;
 			}
@@ -714,18 +708,6 @@ eResult cDataPlane::initGlobalBases()
 				return nullptr;
 			}
 
-			auto* acl_transport_table = hugepage_create_dynamic<dataplane::globalBase::acl::transport_table>(socket_id, getConfigValue(eConfigType::acl_transport_ht_size), globalbase->updater.acl.transport_table);
-			if (!acl_transport_table)
-			{
-				return nullptr;
-			}
-
-			auto* acl_total_table = hugepage_create_dynamic<dataplane::globalBase::acl::total_table>(socket_id, getConfigValue(eConfigType::acl_total_ht_size), globalbase->updater.acl.total_table);
-			if (!acl_total_table)
-			{
-				return nullptr;
-			}
-
 			const auto acl_values_size = getConfigValue(eConfigType::acl_values_size);
 			if (acl_values_size < 2)
 			{
@@ -739,16 +721,11 @@ eResult cDataPlane::initGlobalBases()
 				return nullptr;
 			}
 
-			globalbase->acl.network.ipv4.source = acl_network_ipv4_source;
-			globalbase->acl.network.ipv4.destination = acl_network_ipv4_destination;
 			globalbase->acl.network.ipv6.source = acl_network_ipv6_source;
-			globalbase->acl.network.ipv6.destination_ht = acl_network_ipv6_destination_ht;
 			globalbase->acl.network.ipv6.destination = acl_network_ipv6_destination;
 			globalbase->acl.network_table = acl_network_table;
 			globalbase->acl.transport_layers_mask = acl_transport_layers_size - 1;
 			globalbase->acl.transport_layers = acl_transport_layers;
-			globalbase->acl.transport_table = acl_transport_table;
-			globalbase->acl.total_table = acl_total_table;
 			globalbase->acl.values = acl_values;
 		}
 

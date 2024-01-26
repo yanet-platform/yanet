@@ -484,6 +484,8 @@ public:
 	std::map<std::string, ///< vrf_name
 	         std::vector<base_rib>>
 	        rib;
+
+	common::memory_manager::memory_group root_memory_group;
 };
 
 //
