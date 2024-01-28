@@ -9,6 +9,7 @@
 #include <rte_ring.h>
 
 #include "common/result.h"
+#include "common/tsc_deltas.h"
 #include "common/type.h"
 
 #include "base.h"
@@ -16,7 +17,6 @@
 #include "globalbase.h"
 #include "samples.h"
 #include "sharedmemory.h"
-#include "tsc_deltas.h"
 
 class cDataPlane;
 class mControlPlane;

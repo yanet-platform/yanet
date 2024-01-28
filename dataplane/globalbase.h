@@ -10,13 +10,13 @@
 #include "common/counters.h"
 #include "common/idp.h"
 #include "common/result.h"
+#include "common/tsc_deltas.h"
 
 #include "common.h"
 #include "dynamic_table.h"
 #include "flat.h"
 #include "hashtable.h"
 #include "lpm.h"
-#include "tsc_deltas.h"
 #include "type.h"
 
 /// @todo: move
@@ -53,9 +53,9 @@ struct transport_layer_t
 	struct
 	{
 		/** @todo:
-			flat<uint8_t> type;
-			flat<uint8_t> code;
-			*/
+		        flat<uint8_t> type;
+		        flat<uint8_t> code;
+		        */
 		flat<uint16_t> type_code;
 		flat<uint16_t> identifier;
 	} icmp;
@@ -122,6 +122,7 @@ public: ///< @todo
 	                       YANET_CONFIG_BALANCER_STATE_HT_SIZE,
 	                       16>
 	        balancer_state;
+	bool tsc_active_state;
 };
 
 //

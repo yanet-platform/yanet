@@ -30,10 +30,10 @@
 #include "common.h"
 #include "common/idp.h"
 #include "common/result.h"
+#include "common/tsc_deltas.h"
 #include "dataplane.h"
 #include "report.h"
 #include "sock_dev.h"
-#include "tsc_deltas.h"
 #include "worker.h"
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_INFO;
@@ -89,7 +89,8 @@ cDataPlane::cDataPlane() :
 	                {eConfigType::acl_values_size, YANET_CONFIG_ACL_VALUES_SIZE},
 	                {eConfigType::master_mempool_size, 8192},
 	                {eConfigType::nat64stateful_states_size, YANET_CONFIG_NAT64STATEFUL_HT_SIZE},
-	                {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE}};
+	                {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE},
+	                {eConfigType::tsc_active_state, YANET_CONFIG_TSC_ACTIVE_STATE}};
 }
 
 cDataPlane::~cDataPlane()
@@ -1272,6 +1273,7 @@ eResult cDataPlane::allocateSharedMemory()
 		// deleting old shared memory if exists
 		if (int shmid = shmget(key, 0, 0) != -1)
 		{
+			YADECAP_LOG_INFO("IPC segment with key=%d marked for deletion.", key);
 			shmctl(shmid, IPC_RMID, NULL);
 		}
 
@@ -1776,6 +1778,11 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	if (exist(json, "kernel_interface_queue_size"))
 	{
 		configValues[eConfigType::kernel_interface_queue_size] = json["kernel_interface_queue_size"];
+	}
+
+	if (exist(json, "tsc_active_state"))
+	{
+		configValues[eConfigType::tsc_active_state] = json["tsc_active_state"];
 	}
 
 	return eResult::success;

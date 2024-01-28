@@ -439,6 +439,13 @@ public:
 		}
 	}
 
+	void render()
+	{
+		printf("\033[2J\033[H");
+		print_default();
+		table.clear();
+	}
+
 protected:
 	converter::config_t config;
 	std::vector<std::vector<std::string>> table;

@@ -28,6 +28,8 @@ atomic::atomic(cDataPlane* dataPlane,
 	memset(physicalPort_flags, 0, sizeof(physicalPort_flags));
 	memset(counter_shifts, 0, sizeof(counter_shifts));
 	memset(gc_counter_shifts, 0, sizeof(gc_counter_shifts));
+
+	tsc_active_state = dataPlane->getConfigValue(eConfigType::tsc_active_state);
 }
 
 atomic::~atomic()
