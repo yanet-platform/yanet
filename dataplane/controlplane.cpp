@@ -1641,6 +1641,9 @@ void cControlPlane::flush_kernel_interface(tPortId kernel_port_id,
 	stats.ipackets += txSize;
 	stats.ibytes += packetsLength;
 	count = 0;
+
+	/// cleanup mbufs from virtio driver
+	rte_eth_tx_done_cleanup(kernel_port_id, 0, 0);
 }
 
 void cControlPlane::flush_kernel_interface(tPortId kernel_port_id,
@@ -1659,6 +1662,9 @@ void cControlPlane::flush_kernel_interface(tPortId kernel_port_id,
 		rte_pktmbuf_free(mbuf);
 	}
 	count = 0;
+
+	/// cleanup mbufs from virtio driver
+	rte_eth_tx_done_cleanup(kernel_port_id, 0, 0);
 }
 
 void cControlPlane::mainThread()
