@@ -31,3 +31,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /target/bin/* /usr/bin/
 COPY --from=builder /target/share /usr/share
+COPY --from=builder /target/lib /usr/lib
+COPY --from=builder /target/include /usr/include
