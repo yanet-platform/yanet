@@ -11,7 +11,6 @@
 
 #include "common/idp.h"
 #include "common/result.h"
-#include "common/type.h"
 
 #include "type.h"
 

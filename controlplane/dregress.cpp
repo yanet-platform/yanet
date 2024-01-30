@@ -200,7 +200,6 @@ void dregress_t::prefix_flush()
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		compile(globalbase, generations.current());
-		compile_neighbors(globalbase, generations.current());
 	}
 
 	dataplane.updateGlobalBase(globalbase);
@@ -242,75 +241,6 @@ void dregress_t::compile(common::idp::updateGlobalBase::request& globalbase,
 	}
 }
 
-void dregress_t::compile_neighbors(common::idp::updateGlobalBase::request& globalbase,
-                                   const dregress::generation_t& generation)
-{
-	if (!update_neighbors)
-	{
-		return;
-	}
-
-	common::idp::updateGlobalBase::dregress_neighbor_update::request dregress_neighbor_update;
-	auto& [neighbor_v4, neighbor_v6] = dregress_neighbor_update;
-
-	for (const auto& [route_name, route] : generation.routes)
-	{
-		(void)route_name;
-
-		for (auto& [interface_name, interface] : route.interfaces)
-		{
-			if (interface.neighborIPv4Address)
-			{
-				if (exist(defaults_v4, *interface.neighborIPv4Address))
-				{
-					std::optional<mac_address_t> neighbor_mac_address_v4;
-
-					if (interface.static_neighbor_mac_address_v4)
-					{
-						neighbor_mac_address_v4 = *interface.static_neighbor_mac_address_v4;
-					}
-					else
-					{
-						neighbor_mac_address_v4 = controlPlane->get_mac_address(route.vrf, interface_name, *interface.neighborIPv4Address);
-					}
-
-					if (neighbor_mac_address_v4)
-					{
-						neighbor_v4.emplace(*neighbor_mac_address_v4, interface.flow);
-					}
-				}
-			}
-
-			if (interface.neighborIPv6Address)
-			{
-				if (exist(defaults_v6, *interface.neighborIPv6Address))
-				{
-					std::optional<mac_address_t> neighbor_mac_address_v6;
-
-					if (interface.static_neighbor_mac_address_v6)
-					{
-						neighbor_mac_address_v6 = *interface.static_neighbor_mac_address_v6;
-					}
-					else
-					{
-						neighbor_mac_address_v6 = controlPlane->get_mac_address(route.vrf, interface_name, *interface.neighborIPv6Address);
-					}
-
-					if (neighbor_mac_address_v6)
-					{
-						neighbor_v6.emplace(*neighbor_mac_address_v6, interface.flow);
-					}
-				}
-			}
-		}
-	}
-
-	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::dregress_neighbor_update,
-	                        dregress_neighbor_update);
-
-	update_neighbors = false;
-}
-
 void dregress_t::limit(common::icp::limit_summary::response& limits) const
 {
 	limit_insert(limits, "dregress.values", values.stats());
@@ -331,7 +261,6 @@ void dregress_t::reload(const controlplane::base_t& base_prev,
 		std::lock_guard<std::mutex> guard(mutex);
 		update_neighbors = true;
 		compile(globalbase, generations.next());
-		compile_neighbors(globalbase, generations.next());
 	}
 }
 
@@ -339,21 +268,6 @@ void dregress_t::reload_after()
 {
 	generations.switch_generation();
 	generations.next_unlock();
-}
-
-void dregress_t::mac_addresses_changed()
-{
-	common::idp::updateGlobalBase::request globalbase;
-
-	auto current_guard = generations.current_lock_guard();
-
-	{
-		std::lock_guard<std::mutex> guard(mutex);
-		update_neighbors = true;
-		compile_neighbors(globalbase, generations.current());
-	}
-
-	dataplane.updateGlobalBase(globalbase);
 }
 
 std::optional<uint32_t> dregress_t::value_insert(const dregress::value_key_t& value_key)

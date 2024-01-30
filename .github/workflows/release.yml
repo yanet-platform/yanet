@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+'
+
+jobs:
+  build-debian-package-jammy:
+    name: build (Ubuntu 22.04)
+    runs-on: builder
+    container:
+      image: yanetplatform/builder
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          export YANET_VERSION=${{github.ref_name}}
+          export YANET_VERSION=${YANET_VERSION:1}
+          export YANET_VERSION_MAJOR=${YANET_VERSION%.*}
+          export YANET_VERSION_MINOR=${YANET_VERSION#*.}
+          export YANET_VERSION_REVISION=${{github.run_number}}
+          export YANET_VERSION_HASH=${{github.sha}}
+          export YANET_VERSION_CUSTOM=stable
+          meson setup --prefix=/target \
+                      -Dtarget=release \
+                      -Dyanet_config=release,l3balancer,firewall \
+                      -Darch=corei7,broadwell,knl \
+                      -Dversion_major=$YANET_VERSION_MAJOR \
+                      -Dversion_minor=$YANET_VERSION_MINOR \
+                      -Dversion_revision=$YANET_VERSION_REVISION \
+                      -Dversion_hash=$YANET_VERSION_HASH \
+                      -Dversion_custom=$YANET_VERSION_CUSTOM \
+                      build
+          meson compile -C build
+      - run: meson install -C build
+      - run: |
+          cp -r debian /target/DEBIAN
+          sed -i "s/__VERSION__/${YANET_VERSION}/g" /target/DEBIAN/control
+      - run: |
+          mkdir /export
+          dpkg-deb -b "/target" /export/yanet_${YANET_VERSION}_ubuntu22.04.deb
+      - uses: actions/upload-artifact@v3
+        with:
+          name: target_debian
+          path: /export/yanet*.deb
+
+  build-debian-package-bionic:
+    name: build (Ubuntu 18.04)
+    runs-on: builder
+    container:
+      image: yanetplatform/builder_ubuntu18.04
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          export YANET_VERSION=${{github.ref_name}}
+          export YANET_VERSION=${YANET_VERSION:1}
+          export YANET_VERSION_MAJOR=${YANET_VERSION%.*}
+          export YANET_VERSION_MINOR=${YANET_VERSION#*.}
+          export YANET_VERSION_REVISION=${{github.run_number}}
+          export YANET_VERSION_HASH=${{github.sha}}
+          export YANET_VERSION_CUSTOM=stable
+          meson setup --prefix=/target \
+                      -Dtarget=release \
+                      -Dyanet_config=release,l3balancer,firewall \
+                      -Darch=corei7,broadwell,knl \
+                      -Dversion_major=$YANET_VERSION_MAJOR \
+                      -Dversion_minor=$YANET_VERSION_MINOR \
+                      -Dversion_revision=$YANET_VERSION_REVISION \
+                      -Dversion_hash=$YANET_VERSION_HASH \
+                      -Dversion_custom=$YANET_VERSION_CUSTOM \
+                      build
+          meson compile -C build
+      - run: meson install -C build
+      - run: |
+          cp -r debian /target/DEBIAN
+          sed -i "s/__VERSION__/${YANET_VERSION}/g" /target/DEBIAN/control
+      - run: |
+          mkdir /export
+          dpkg-deb -b "/target" /export/yanet_${YANET_VERSION}_ubuntu18.04.deb
+      - uses: actions/upload-artifact@v3
+        with:
+          name: target_debian
+          path: /export/yanet*.deb

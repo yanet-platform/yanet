@@ -1,4 +1,4 @@
-#include <inttypes.h>
+#include <cstdint>
 
 namespace common
 {
@@ -47,6 +47,9 @@ public:
 	{
 		uint32_t size;
 		uint32_t tag;
+		uint32_t in_logicalport_id;
+		uint32_t out_logicalport_id;
+		uint8_t flow_type;
 	} __attribute__((__aligned__(64)));
 
 	struct item_t

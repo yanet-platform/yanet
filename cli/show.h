@@ -14,7 +14,7 @@
 namespace show
 {
 
-void physicalPort()
+inline void physicalPort()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getPhysicalPorts();
@@ -50,9 +50,9 @@ void physicalPort()
 	table.print();
 }
 
-void physical_port_dump(const std::string& direction,
-                        const std::string& interface_name,
-                        const std::string& state)
+inline void physical_port_dump(const std::string& direction,
+                               const std::string& interface_name,
+                               const std::string& state)
 {
 	interface::dataPlane dataplane;
 
@@ -69,7 +69,7 @@ void physical_port_dump(const std::string& direction,
 	}
 }
 
-void logicalPort()
+inline void logicalPort()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getLogicalPorts();
@@ -109,7 +109,7 @@ static inline std::string convertToString(const common::defender::status& status
 	}
 }
 
-void defenders()
+inline void defenders()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getDefenders();
@@ -136,7 +136,7 @@ void defenders()
 namespace tun64
 {
 
-void summary(std::optional<std::string> module)
+inline void summary(std::optional<std::string> module)
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.tun64_tunnels();
@@ -168,7 +168,7 @@ void summary(std::optional<std::string> module)
 	table.print();
 }
 
-void announce(std::optional<std::string> module)
+inline void announce(std::optional<std::string> module)
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.tun64_prefixes();
@@ -195,7 +195,7 @@ void announce(std::optional<std::string> module)
 	table.print();
 }
 
-void mappings(std::optional<std::string> module)
+inline void mappings(std::optional<std::string> module)
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.tun64_mappings();
@@ -229,7 +229,7 @@ void mappings(std::optional<std::string> module)
 namespace decap
 {
 
-void summary()
+inline void summary()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getDecaps();
@@ -269,7 +269,7 @@ void summary()
 	table.print();
 }
 
-void announce()
+inline void announce()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getDecapPrefixes();
@@ -297,7 +297,7 @@ void announce()
 namespace nat64stateless
 {
 
-void summary()
+inline void summary()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getNat64statelesses();
@@ -323,7 +323,7 @@ void summary()
 	table.print();
 }
 
-void translation()
+inline void translation()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getNat64statelessTranslations();
@@ -356,7 +356,7 @@ void translation()
 	table.print();
 }
 
-void announce()
+inline void announce()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getNat64statelessPrefixes();
@@ -385,7 +385,7 @@ void announce()
 
 }
 
-void snmp()
+inline void snmp()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getPortStatsEx();
@@ -590,7 +590,7 @@ static void list_fw_rules(unsigned int mask, bool list)
 	table.print();
 }
 
-void fw(std::optional<std::string> str)
+inline void fw(std::optional<std::string> str)
 {
 	const auto type = str.value_or("original");
 
@@ -606,7 +606,7 @@ void fw(std::optional<std::string> str)
 	}
 }
 
-void fwlist(std::optional<std::string> str)
+inline void fwlist(std::optional<std::string> str)
 {
 	const auto type = str.value_or("generated");
 
@@ -622,7 +622,7 @@ void fwlist(std::optional<std::string> str)
 	}
 }
 
-void errors()
+inline void errors()
 {
 	table_t table;
 	table.insert("name", "counter");
@@ -638,7 +638,7 @@ void errors()
 	table.print();
 }
 
-void samples()
+inline void samples()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getSamples();
@@ -676,7 +676,7 @@ void samples()
 	table.print();
 }
 
-void samples_dump()
+inline void samples_dump()
 {
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getSamples();
@@ -704,7 +704,7 @@ void samples_dump()
 	std::cout << "]\n";
 }
 
-void values()
+inline void values()
 {
 	interface::controlPlane controlplane;
 	const auto controlplane_values = controlplane.controlplane_values();
@@ -724,7 +724,7 @@ void values()
 	table.print();
 }
 
-void durations()
+inline void durations()
 {
 	interface::controlPlane controlplane;
 	const auto controlplane_durations = controlplane.controlplane_durations();
@@ -744,7 +744,7 @@ void durations()
 	table.print();
 }
 
-void version()
+inline void version()
 {
 	table_t table;
 	table.insert("application",
@@ -797,8 +797,8 @@ void version()
 	table.print();
 }
 
-void counter_by_name(std::string counter_name,
-                     const std::optional<tCoreId>& core_id)
+inline void counter_by_name(std::string counter_name,
+                            const std::optional<tCoreId>& core_id)
 {
 	interface::dataPlane dataplane;
 
@@ -828,7 +828,7 @@ void counter_by_name(std::string counter_name,
 	table.print();
 }
 
-void shm_info()
+inline void shm_info()
 {
 	interface::dataPlane dataplane;
 	const auto response = dataplane.get_shm_info();

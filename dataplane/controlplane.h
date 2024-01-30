@@ -13,15 +13,12 @@
 
 #include <rte_ether.h>
 
-#include "common/btree.h"
-#include "common/ctree.h"
 #include "common/idp.h"
 #include "common/result.h"
 #include "common/type.h"
 
 #include "dregress.h"
 #include "fragmentation.h"
-#include "hashtable.h"
 #include "type.h"
 
 class cControlPlane ///< @todo: move to cDataPlane
@@ -193,7 +190,5 @@ protected:
 	std::chrono::high_resolution_clock::time_point prevTimePointForSWRateLimiter;
 
 	uint32_t icmpOutRemainder;
-
-	uint32_t currentTime;
 	uint32_t gc_step;
 };

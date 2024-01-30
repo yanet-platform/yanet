@@ -8,7 +8,6 @@
 #include <unistd.h>
 
 #include <fstream>
-#include <iostream>
 #include <thread>
 
 #include <rte_eal.h>
@@ -17,6 +16,7 @@
 #include <rte_lcore.h>
 #include <rte_malloc.h>
 #include <rte_ring.h>
+#include <rte_version.h>
 
 #include <numa.h>
 #include <numaif.h>
@@ -32,6 +32,7 @@
 #include "common/result.h"
 #include "common/tsc_deltas.h"
 #include "dataplane.h"
+#include "globalbase.h"
 #include "report.h"
 #include "sock_dev.h"
 #include "worker.h"
@@ -90,7 +91,9 @@ cDataPlane::cDataPlane() :
 	                {eConfigType::master_mempool_size, 8192},
 	                {eConfigType::nat64stateful_states_size, YANET_CONFIG_NAT64STATEFUL_HT_SIZE},
 	                {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE},
-	                {eConfigType::tsc_active_state, YANET_CONFIG_TSC_ACTIVE_STATE}};
+	                {eConfigType::tsc_active_state, YANET_CONFIG_TSC_ACTIVE_STATE},
+	                {eConfigType::balancer_state_ttl, 60},
+	                {eConfigType::balancer_state_ht_size, YANET_CONFIG_BALANCER_STATE_HT_SIZE}};
 }
 
 cDataPlane::~cDataPlane()
@@ -105,6 +108,8 @@ eResult cDataPlane::init(const std::string& binaryPath,
                          const std::string& configFilePath)
 {
 	eResult result = eResult::success;
+
+	current_time = time(nullptr);
 
 	result = parseConfig(configFilePath);
 	if (result != eResult::success)
@@ -240,6 +245,14 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	{
 		return result;
 	}
+
+	result = neighbor.init(this);
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
+	init_worker_base();
 
 	/// init sync barrier
 	int rc = pthread_barrier_init(&initPortBarrier, nullptr, workers.size());
@@ -628,10 +641,17 @@ eResult cDataPlane::initGlobalBases()
 					return eResult::errorAllocatingMemory;
 				}
 
+				auto* balancer_state = hugepage_create_dynamic<dataplane::globalBase::balancer::state_ht>(socket_id, getConfigValue(eConfigType::balancer_state_ht_size), globalbase_atomic->updater.balancer_state);
+				if (!balancer_state)
+				{
+					return eResult::errorAllocatingMemory;
+				}
+
 				globalbase_atomic->fw4_state = ipv4_states_ht;
 				globalbase_atomic->fw6_state = ipv6_states_ht;
 				globalbase_atomic->nat64stateful_lan_state = nat64stateful_lan_state;
 				globalbase_atomic->nat64stateful_wan_state = nat64stateful_wan_state;
+				globalbase_atomic->balancer_state = balancer_state;
 			}
 
 			globalBaseAtomics[socket_id] = globalbase_atomic;
@@ -784,6 +804,8 @@ eResult cDataPlane::initGlobalBases()
 		{
 			return result;
 		}
+
+		socket_ids.emplace(socketId);
 	}
 
 	for (const auto& configWorkerIter : config.workers)
@@ -802,6 +824,8 @@ eResult cDataPlane::initGlobalBases()
 		{
 			return result;
 		}
+
+		socket_ids.emplace(socketId);
 	}
 
 	return result;
@@ -846,6 +870,7 @@ eResult cDataPlane::initWorkers()
 
 		workers[coreId] = worker;
 		controlPlane->slowWorker = worker;
+		workers_vector.emplace_back(worker);
 
 		outQueueId++;
 	}
@@ -996,6 +1021,7 @@ eResult cDataPlane::initWorkers()
 
 		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[coreId]);
 		workers[coreId] = worker;
+		workers_vector.emplace_back(worker);
 
 		outQueueId++;
 	}
@@ -1075,6 +1101,7 @@ eResult cDataPlane::initWorkers()
 
 		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[core_id]);
 		worker_gcs[core_id] = worker;
+		socket_worker_gcs[socket_id] = worker;
 	}
 
 	return eResult::success;
@@ -1122,6 +1149,31 @@ eResult cDataPlane::initQueues()
 	}
 
 	return eResult::success;
+}
+
+void cDataPlane::init_worker_base()
+{
+	std::vector<std::tuple<tSocketId, dataplane::base::generation*>> base_nexts;
+	for (auto& [core_id, worker] : workers)
+	{
+		(void)core_id;
+
+		auto* base = &worker->bases[worker->currentBaseId];
+		auto* base_next = &worker->bases[worker->currentBaseId ^ 1];
+		base_nexts.emplace_back(worker->socketId, base);
+		base_nexts.emplace_back(worker->socketId, base_next);
+	}
+	for (auto& [core_id, worker] : worker_gcs)
+	{
+		(void)core_id;
+
+		auto* base = &worker->bases[worker->current_base_id];
+		auto* base_next = &worker->bases[worker->current_base_id ^ 1];
+		base_nexts.emplace_back(worker->socket_id, base);
+		base_nexts.emplace_back(worker->socket_id, base_next);
+	}
+
+	neighbor.update_worker_base(base_nexts);
 }
 
 void cDataPlane::hugepage_destroy(void* pointer)
@@ -1177,8 +1229,35 @@ int cDataPlane::lcoreThread(void* args)
 	return 0;
 }
 
+void cDataPlane::timestamp_thread()
+{
+	uint32_t prev_time = 0;
+
+	for (;;)
+	{
+		current_time = time(nullptr);
+
+		if (current_time != prev_time)
+		{
+			for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
+			{
+				(void)socket_id;
+				globalbase_atomic->currentTime = current_time;
+			}
+
+			prev_time = current_time;
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	}
+}
+
 void cDataPlane::start()
 {
+	threads.emplace_back([this]() {
+		timestamp_thread();
+	});
+
 	report.run();
 	bus.run();
 
@@ -1192,6 +1271,22 @@ void cDataPlane::join()
 
 	report.join();
 	bus.join();
+}
+
+const std::set<tSocketId>& cDataPlane::get_socket_ids() const
+{
+	return socket_ids;
+}
+
+const std::vector<cWorker*>& cDataPlane::get_workers() const
+{
+	return workers_vector;
+}
+
+void cDataPlane::run_on_worker_gc(const tSocketId socket_id,
+                                  const std::function<bool()>& callback)
+{
+	socket_worker_gcs.find(socket_id)->second->run_on_this_thread(callback);
 }
 
 uint64_t cDataPlane::getConfigValue(const eConfigType& type) const
@@ -1216,6 +1311,28 @@ eResult cDataPlane::allocateSharedMemory()
 		auto socket_id = numa_node_of_cpu(coreId);
 		if (socket_id == -1)
 		{
+			YADECAP_LOG_ERROR("numa_node_of_cpu err: %s\n", strerror(errno));
+			socket_id = 0;
+		}
+
+		if (number_of_workers_per_socket.find(socket_id) == number_of_workers_per_socket.end())
+		{
+			number_of_workers_per_socket[socket_id] = 1;
+		}
+		else
+		{
+			number_of_workers_per_socket[socket_id]++;
+		}
+	}
+
+	/// slow worker
+	{
+		const int coreId = config.controlPlaneCoreId;
+
+		auto socket_id = numa_node_of_cpu(coreId);
+		if (socket_id == -1)
+		{
+			YADECAP_LOG_ERROR("numa_node_of_cpu err: %s\n", strerror(errno));
 			socket_id = 0;
 		}
 
@@ -1268,13 +1385,20 @@ eResult cDataPlane::allocateSharedMemory()
 	key_t key = YANET_DEFAULT_IPC_SHMKEY;
 	for (const auto& [socket_id, size] : shm_size_per_socket)
 	{
-		numa_run_on_node(socket_id);
+		if (numa_run_on_node(socket_id) < 0)
+		{
+			YADECAP_LOG_ERROR("numa_run_on_node(%d): %s\n", socket_id, strerror(errno));
+		}
 
 		// deleting old shared memory if exists
-		if (int shmid = shmget(key, 0, 0) != -1)
+		int shmid = shmget(key, 0, 0);
+		if (shmid != -1)
 		{
-			YADECAP_LOG_INFO("IPC segment with key=%d marked for deletion.", key);
-			shmctl(shmid, IPC_RMID, NULL);
+			if (shmctl(shmid, IPC_RMID, NULL) < 0)
+			{
+				YADECAP_LOG_ERROR("shmctl(%d, IPC_RMID, NULL): %s\n", shmid, strerror(errno));
+				return eResult::errorInitSharedMemory;
+			}
 		}
 
 		int flags = IPC_CREAT | 0666;
@@ -1283,19 +1407,20 @@ eResult cDataPlane::allocateSharedMemory()
 			flags |= SHM_HUGETLB;
 		}
 
-		int shmid = shmget(key, size, flags);
+		shmid = shmget(key, size, flags);
 		if (shmid == -1)
 		{
-			YADECAP_LOG_ERROR("shmget(%d, %lu, %d) = %d\n", key, size, flags, errno);
+			YADECAP_LOG_ERROR("shmget(%d, %lu, %d): %s\n", key, size, flags, strerror(errno));
 			return eResult::errorInitSharedMemory;
 		}
 
 		void* shmaddr = shmat(shmid, NULL, 0);
 		if (shmaddr == (void*)-1)
 		{
-			YADECAP_LOG_ERROR("shmat(%d, NULL, %d) = %d\n", shmid, 0, errno);
+			YADECAP_LOG_ERROR("shmat(%d, NULL, %d): %s\n", shmid, 0, strerror(errno));
 			return eResult::errorInitSharedMemory;
 		}
+
 		shm_by_socket_id[socket_id] = std::make_tuple(key, shmaddr);
 
 		key++;
@@ -1316,11 +1441,6 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 	/// split memory per worker
 	for (auto& [core_id, worker] : workers)
 	{
-		if (core_id == 0)
-		{
-			continue;
-		}
-
 		const auto& socket_id = worker->socketId;
 		const auto& it = shm_by_socket_id.find(socket_id);
 		if (it == shm_by_socket_id.end())
@@ -1488,6 +1608,41 @@ std::optional<tPortId> cDataPlane::interface_name_to_port_id(const std::string& 
 
 	/// unknown interface
 	return std::nullopt;
+}
+
+void cDataPlane::switch_worker_base()
+{
+	std::lock_guard<std::mutex> guard(switch_worker_base_mutex);
+
+	/// collect all base_next
+	std::vector<std::tuple<tSocketId, dataplane::base::generation*>> base_nexts;
+	for (auto& [core_id, worker] : workers)
+	{
+		(void)core_id;
+
+		auto* base_next = &worker->bases[worker->currentBaseId ^ 1];
+		base_nexts.emplace_back(worker->socketId, base_next);
+	}
+	for (auto& [core_id, worker] : worker_gcs)
+	{
+		(void)core_id;
+
+		auto* base_next = &worker->bases[worker->current_base_id ^ 1];
+		base_nexts.emplace_back(worker->socket_id, base_next);
+	}
+
+	/// update base_next
+	{
+		std::lock_guard<std::mutex> guard(currentGlobalBaseId_mutex);
+		for (const auto& [socket_id, base_next] : base_nexts)
+		{
+			base_next->globalBase = globalBases[socket_id][currentGlobalBaseId ^ 1];
+		}
+	}
+	neighbor.update_worker_base(base_nexts);
+
+	/// switch
+	controlPlane->switchBase();
 }
 
 eResult cDataPlane::parseConfig(const std::string& configFilePath)
@@ -1783,6 +1938,16 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	if (exist(json, "tsc_active_state"))
 	{
 		configValues[eConfigType::tsc_active_state] = json["tsc_active_state"];
+	}
+
+	if (exist(json, "balancer_state_ttl"))
+	{
+		configValues[eConfigType::balancer_state_ttl] = json["balancer_state_ttl"];
+	}
+
+	if (exist(json, "balancer_state_ht_size"))
+	{
+		configValues[eConfigType::balancer_state_ht_size] = json["balancer_state_ht_size"];
 	}
 
 	return eResult::success;

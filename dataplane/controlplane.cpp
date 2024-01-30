@@ -8,6 +8,7 @@
 #include <rte_lcore.h>
 #include <rte_malloc.h>
 
+#include "common/fallback.h"
 #include "common/idp.h"
 #include "common/version.h"
 
@@ -1024,7 +1025,7 @@ common::idp::balancer_connection::response cControlPlane::balancer_connection(co
 
 			const auto& base = worker_gc->bases[worker_gc->local_base_id & 1];
 
-			for (auto iter : worker_gc->base_permanently.globalBaseAtomic->balancer_state.range(offset, 64))
+			for (auto iter : worker_gc->base_permanently.globalBaseAtomic->updater.balancer_state.range(offset, 64))
 			{
 				if (iter.is_valid())
 				{
@@ -1369,29 +1370,7 @@ void cControlPlane::switchGlobalBase()
 {
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
-	for (auto& iter : dataPlane->workers)
-	{
-		const auto& coreId = iter.first;
-		auto* worker = iter.second;
-		auto& baseNext = worker->bases[worker->currentBaseId ^ 1];
-		auto* globalBaseNext = dataPlane->globalBases[rte_lcore_to_socket_id(coreId)][dataPlane->currentGlobalBaseId ^ 1];
-
-		baseNext.globalBase = globalBaseNext;
-	}
-
-	for (auto& iter : dataPlane->worker_gcs)
-	{
-		const auto& coreId = iter.first;
-		auto* worker = iter.second;
-		auto& baseNext = worker->bases[worker->current_base_id ^ 1];
-		auto* globalBaseNext = dataPlane->globalBases[rte_lcore_to_socket_id(coreId)][dataPlane->currentGlobalBaseId ^ 1];
-
-		baseNext.globalBase = globalBaseNext;
-	}
-
-	YADECAP_MEMORY_BARRIER_COMPILE;
-
-	switchBase();
+	dataPlane->switch_worker_base();
 
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
@@ -1698,30 +1677,14 @@ void cControlPlane::mainThread()
 {
 	rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 
-	uint32_t prevTime = 0;
-
 	for (;;)
 	{
-		currentTime = time(nullptr);
-
 		if (dataPlane->config.SWNormalPriorityRateLimitPerWorker || dataPlane->config.SWICMPOutRateLimit)
 		{
 			SWRateLimiterTimeTracker();
 		}
 
 		slowWorker->slowWorkerBeforeHandlePackets();
-
-		if (currentTime != prevTime)
-		{
-			for (const auto& iter : dataPlane->globalBaseAtomics)
-			{
-				auto* globalBaseAtomic = iter.second;
-
-				globalBaseAtomic->currentTime = currentTime;
-			}
-
-			prevTime = currentTime;
-		};
 
 		/// dequeue packets from worker's rings
 		for (unsigned nIter = 0; nIter < YANET_CONFIG_RING_PRIORITY_RATIO; nIter++)

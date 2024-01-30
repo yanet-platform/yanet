@@ -4,7 +4,6 @@
 
 #include <sys/un.h>
 
-#include "define.h"
 #include "idp.h"
 #include "result.h"
 #include "sendrecv.h"
@@ -222,6 +221,41 @@ public:
 	auto balancer_state_clear() const
 	{
 		return get<common::idp::requestType::balancer_state_clear, eResult>();
+	}
+
+	auto neighbor_show() const
+	{
+		return get<common::idp::requestType::neighbor_show, common::idp::neighbor_show::response>();
+	}
+
+	auto neighbor_insert(const common::idp::neighbor_insert::request& request) const
+	{
+		return get<common::idp::requestType::neighbor_insert, eResult>(request);
+	}
+
+	auto neighbor_remove(const common::idp::neighbor_remove::request& request) const
+	{
+		return get<common::idp::requestType::neighbor_remove, eResult>(request);
+	}
+
+	auto neighbor_clear() const
+	{
+		return get<common::idp::requestType::neighbor_clear, eResult>();
+	}
+
+	auto neighbor_flush() const
+	{
+		return get<common::idp::requestType::neighbor_flush, eResult>();
+	}
+
+	auto neighbor_update_interfaces(const common::idp::neighbor_update_interfaces::request& request) const
+	{
+		return get<common::idp::requestType::neighbor_update_interfaces, eResult>(request);
+	}
+
+	auto neighbor_stats() const
+	{
+		return get<common::idp::requestType::neighbor_stats, common::idp::neighbor_stats::response>();
 	}
 
 protected:

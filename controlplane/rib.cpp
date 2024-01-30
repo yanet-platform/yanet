@@ -73,6 +73,51 @@ eResult rib_t::init()
 	return eResult::success;
 }
 
+void rib_t::reload(const controlplane::base_t& base_prev,
+                   const controlplane::base_t& base_next,
+                   common::idp::updateGlobalBase::request& globalbase)
+{
+	(void)base_prev;
+	(void)globalbase;
+
+	common::icp::rib_update::request request;
+
+	{
+		common::icp::rib_update::clear clear{"config", std::nullopt};
+		request.emplace_back(std::move(clear));
+	}
+
+	for (const auto& [vrf_name, rib_items] : base_next.rib)
+	{
+		common::icp::rib_update::insert request_insert = {"config",
+		                                                  vrf_name,
+		                                                  YANET_RIB_PRIORITY_DEFAULT,
+		                                                  {}};
+
+		for (const auto& rib_item : rib_items)
+		{
+			auto& prefixes = std::get<3>(request_insert)[{ip_address_t("::"), "", 0, {}, {}, {}, 0}]
+			                                            [""]
+			                                            [rib_item.nexthop];
+			prefixes.emplace_back(rib_item.prefix, "", std::vector<uint32_t>());
+		}
+
+		request.emplace_back(std::move(request_insert));
+	}
+
+	if (base_next.rib.size())
+	{
+		common::icp::rib_update::eor request_eor = {"config",
+		                                            "default",
+		                                            YANET_RIB_PRIORITY_DEFAULT,
+		                                            ip_address_t("::"),
+		                                            ""};
+		request.emplace_back(std::move(request_eor));
+	}
+
+	rib_update(request);
+}
+
 void rib_t::rib_update(const common::icp::rib_update::request& request)
 {
 	std::lock_guard<std::mutex> rib_update_guard(rib_update_mutex);

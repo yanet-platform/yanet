@@ -1,0 +1,52 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
+- ipv6Update: "::/0 -> fe80::1"
+- cli_check: |
+    YANET_FORMAT_COLUMNS=route_name,interface_name,ip_address,mac_address       neighbor show
+    route_name  interface_name  ip_address  mac_address
+    ----------  --------------  ----------  -----------
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sleep: 1
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+- sleep: 1
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
+- cli_check: |
+    YANET_FORMAT_COLUMNS=route_name,interface_name,ip_address,mac_address       neighbor show
+    route_name  interface_name  ip_address  mac_address
+    ----------  --------------  ----------  -----------------
+    route0      kni0.100        200.0.0.1   2C:2C:3D:76:29:FD
+    route0      kni0.200        fe80::1     42:42:A4:59:BE:A5
+
+- cli: neighbor insert route0 kni0.100 200.0.0.2 00:11:22:33:44:55
+- cli: neighbor flush
+
+- cli_check: |
+    YANET_FORMAT_COLUMNS=route_name,interface_name,ip_address,mac_address       neighbor show
+    route_name  interface_name  ip_address  mac_address
+    ----------  --------------  ----------  -----------------
+    route0      kni0.100        200.0.0.2   00:11:22:33:44:55
+    route0      kni0.100        200.0.0.1   2C:2C:3D:76:29:FD
+    route0      kni0.200        fe80::1     42:42:A4:59:BE:A5
+
+- cli: neighbor remove route0 kni0.100 200.0.0.2
+- cli: neighbor flush
+
+- cli_check: |
+    YANET_FORMAT_COLUMNS=route_name,interface_name,ip_address,mac_address       neighbor show
+    route_name  interface_name  ip_address  mac_address
+    ----------  --------------  ----------  -----------------
+    route0      kni0.100        200.0.0.1   2C:2C:3D:76:29:FD
+    route0      kni0.200        fe80::1     42:42:A4:59:BE:A5

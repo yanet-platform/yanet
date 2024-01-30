@@ -2423,6 +2423,12 @@ public:
 		return result;
 	}
 
+	range_t range()
+	{
+		range_t result(this, 0, total_size);
+		return result;
+	}
+
 protected:
 	struct chunk_t
 	{
@@ -2975,6 +2981,600 @@ protected:
 	{
 		spinlock_nonrecursive_t locker;
 		uint32_t valid_mask;
+		struct
+		{
+			key_t key;
+			value_t value;
+		} pairs[chunk_size];
+	} chunks[];
+
+	inline bool is_valid(const chunk_t& chunk, const uint32_t pair_index) const
+	{
+		return (chunk.valid_mask >> pair_index) & 1;
+	}
+
+	inline bool is_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
+	{
+		return !memcmp(&chunk.pairs[pair_index].key, &key, sizeof(key_t));
+	}
+
+	inline bool is_valid_and_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
+	{
+		return is_valid(chunk, pair_index) && is_equal(chunk, pair_index, key);
+	}
+};
+
+/// hashtable. only single thread. runtime allocation.
+///
+/// chunk
+/// [
+///   valid_mask
+///   key | value   <-- hash == 0
+///   key | value   <-- hash == 1
+///   key | value   <-- hash == 2
+///   key | value   <-- hash == 3 (chunk_size)
+/// ]
+/// chunk
+/// [
+///   valid_mask
+///   key | value   <-- hash == 4
+///   key | value   <-- hash == 5
+///   key | value   <-- hash == 6
+///   key | value   <-- hash == 7
+/// ]
+/// chunk
+/// [
+///   valid_mask
+///   key | value   <-- hash == 8
+///   key | value   <-- hash == 9
+///   key | value   <-- hash == 10
+///   key | value   <-- hash == 11 (total_size)
+/// ]
+template<typename key_t,
+         typename value_t,
+         uint32_t chunk_size>
+class hashtable_mod_dynamic
+{
+public:
+	using hashtable_t = hashtable_mod_dynamic<key_t, value_t, chunk_size>;
+
+	constexpr static uint32_t valid_mask_full = 0xFFFFFFFFu >> (32 - chunk_size);
+	constexpr static uint64_t keys_in_chunk_size = chunk_size;
+
+	static_assert(__builtin_popcount(chunk_size) == 1);
+	static_assert(chunk_size <= 32);
+
+public:
+	class iterator_t;
+	class range_t;
+
+	class stats_t
+	{
+	public:
+		stats_t()
+		{
+			memset(this, 0, sizeof(*this));
+		}
+
+		uint32_t keys_count;
+		std::array<uint32_t, chunk_size + 1> keys_in_chunks;
+		uint32_t longest_chain;
+	};
+
+	class updater
+	{
+	public:
+		void update_pointer(hashtable_t* hashtable,
+		                    const tSocketId socket_id,
+		                    const uint32_t total_size)
+		{
+			this->hashtable = hashtable;
+			this->socket_id = socket_id;
+			this->total_size = total_size;
+
+			hashtable->total_mask = (total_size / chunk_size) - 1;
+			hashtable->total_shift = __builtin_popcount(total_size / chunk_size - 1);
+		}
+
+		hashtable_t* get_pointer()
+		{
+			return hashtable;
+		}
+
+		const hashtable_t* get_pointer() const
+		{
+			return hashtable;
+		}
+
+	public:
+		range_t range(uint32_t& offset,
+		              const uint32_t step)
+		{
+			range_t result(hashtable, total_size, offset, step);
+
+			offset += step;
+			if (offset >= total_size)
+			{
+				offset = 0;
+			}
+
+			return result;
+		}
+
+		range_t range(uint32_t& offset,
+		              const uint32_t step) const
+		{
+			range_t result(hashtable, total_size, offset, step);
+
+			offset += step;
+			if (offset >= total_size)
+			{
+				offset = 0;
+			}
+
+			return result;
+		}
+
+		range_t range()
+		{
+			return range_t(hashtable, total_size, 0, total_size);
+		}
+
+		range_t range() const
+		{
+			return range_t(hashtable, total_size, 0, total_size);
+		}
+
+		range_t gc(uint32_t& offset,
+		           const uint32_t step)
+		{
+			range_t result(hashtable, total_size, offset, step);
+
+			/// calculate_stats
+			uint32_t from = offset;
+			uint32_t to = offset + step;
+			for (uint32_t chunk_id = (from / chunk_size) + !!(from % chunk_size);
+			     chunk_id < RTE_MIN(to / chunk_size + !!(to % chunk_size),
+			                        total_size / chunk_size);
+			     chunk_id++)
+			{
+				const auto& chunk = hashtable->chunks[chunk_id];
+
+				uint32_t pairs_in_chunk = __builtin_popcount(chunk.valid_mask);
+
+				auto& stats_next = stats.next();
+				stats_next.keys_count += pairs_in_chunk;
+				stats_next.keys_in_chunks[pairs_in_chunk]++;
+				stats_next.longest_chain = std::max(stats_next.longest_chain, pairs_in_chunk);
+			}
+
+			offset += step;
+			if (offset >= total_size)
+			{
+				stats.switch_generation();
+				offset = 0;
+			}
+
+			return result;
+		}
+
+		stats_t get_stats()
+		{
+			auto current_guard = stats.current_lock_guard();
+			return stats.current();
+		}
+
+		template<typename list_T> ///< @todo: common::idp::limits::response
+		void limits(list_T& list,
+		            const std::string& name) const
+		{
+			auto current_guard = stats.current_lock_guard();
+
+			list.emplace_back(name + ".keys",
+			                  socket_id,
+			                  stats.current().keys_count,
+			                  total_size);
+			list.emplace_back(name + ".longest_collision",
+			                  socket_id,
+			                  stats.current().longest_chain,
+			                  chunk_size);
+		}
+
+		template<typename json_t> ///< @todo: nlohmann::json
+		void report(json_t& json) const
+		{
+			auto current_guard = stats.current_lock_guard();
+
+			json["total_size"] = total_size;
+			json["keys_count"] = stats.current().keys_count;
+			for (unsigned int i = 0;
+			     i < stats.current().keys_in_chunks.size();
+			     i++)
+			{
+				json["keys_in_chunks"][i] = stats.current().keys_in_chunks[i];
+			}
+			json["longest_chain"] = stats.current().longest_chain;
+		}
+
+	protected:
+		hashtable_t* hashtable;
+		tSocketId socket_id;
+		uint32_t total_size;
+		generation_manager<stats_t> stats;
+	};
+
+public:
+	static size_t calculate_sizeof(const uint32_t total_size)
+	{
+		if (!(total_size / chunk_size))
+		{
+			YANET_LOG_ERROR("wrong total_size: %u\n", total_size);
+			return 0;
+		}
+
+		if (__builtin_popcount(total_size) != 1)
+		{
+			YANET_LOG_ERROR("wrong total_size: %u is non power of 2\n", total_size);
+			return 0;
+		}
+
+		return sizeof(hashtable_t) + (size_t)(total_size / chunk_size) * sizeof(chunk_t);
+	}
+
+public:
+	inline uint32_t lookup(const key_t& key,
+	                       value_t*& value)
+	{
+		uint32_t hash = calculate_hash(key);
+		auto& chunk = chunks[hash & total_mask];
+
+		value = nullptr;
+
+		const uint32_t pair_index = (hash >> total_shift) & (chunk_size - 1);
+		if (is_valid_and_equal(chunk, pair_index, key))
+		{
+			value = &chunk.pairs[pair_index].value;
+			return hash;
+		}
+
+		if (chunk_size == 1)
+		{
+			return hash;
+		}
+
+		/// check collision
+		uint32_t valid_mask = chunk.valid_mask;
+		for (unsigned int try_i = 1;
+		     try_i < chunk_size && valid_mask;
+		     try_i++)
+		{
+			const uint32_t pair_index = ((hash >> total_shift) + try_i) & (chunk_size - 1);
+			if (is_valid_and_equal(chunk, pair_index, key))
+			{
+				value = &chunk.pairs[pair_index].value;
+				return hash;
+			}
+			valid_mask &= 0xFFFFFFFFu ^ (1u << pair_index);
+		}
+
+		/// not found
+		return hash;
+	}
+
+	inline uint32_t lookup(const key_t& key,
+	                       value_t const*& value) const
+	{
+		uint32_t hash = calculate_hash(key);
+		auto& chunk = chunks[hash & total_mask];
+
+		value = nullptr;
+
+		const uint32_t pair_index = (hash >> total_shift) & (chunk_size - 1);
+		if (is_valid_and_equal(chunk, pair_index, key))
+		{
+			value = &chunk.pairs[pair_index].value;
+			return hash;
+		}
+
+		if (chunk_size == 1)
+		{
+			return hash;
+		}
+
+		/// check collision
+		uint32_t valid_mask = chunk.valid_mask;
+		for (unsigned int try_i = 1;
+		     try_i < chunk_size && valid_mask;
+		     try_i++)
+		{
+			const uint32_t pair_index = ((hash >> total_shift) + try_i) & (chunk_size - 1);
+			if (is_valid_and_equal(chunk, pair_index, key))
+			{
+				value = &chunk.pairs[pair_index].value;
+				return hash;
+			}
+			valid_mask &= 0xFFFFFFFFu ^ (1u << pair_index);
+		}
+
+		/// not found
+		return hash;
+	}
+
+	inline bool insert(const uint32_t hash,
+	                   const key_t& key,
+	                   const value_t& value)
+	{
+		auto& chunk = chunks[hash & total_mask];
+
+		const uint32_t pair_index = (hash >> total_shift) & (chunk_size - 1);
+		if (!is_valid(chunk, pair_index))
+		{
+			memcpy(&chunk.pairs[pair_index].key, &key, sizeof(key_t));
+			memcpy(&chunk.pairs[pair_index].value, &value, sizeof(value_t));
+			chunk.valid_mask |= 1u << pair_index;
+
+			return true;
+		}
+		/* else if (is_equal(chunk, pair_index, key))
+		{
+			/// hashtable is broken
+		} */
+
+		if (chunk_size == 1)
+		{
+			return false;
+		}
+
+		/// collision
+		if (chunk.valid_mask == valid_mask_full)
+		{
+			/// chunk is full
+			return false;
+		}
+
+		for (unsigned int try_i = 1;
+		     try_i < chunk_size;
+		     try_i++)
+		{
+			const uint32_t pair_index = ((hash >> total_shift) + try_i) & (chunk_size - 1);
+			if (!is_valid(chunk, pair_index))
+			{
+				memcpy(&chunk.pairs[pair_index].key, &key, sizeof(key_t));
+				memcpy(&chunk.pairs[pair_index].value, &value, sizeof(value_t));
+				chunk.valid_mask |= 1u << pair_index;
+
+				return true;
+			}
+			/* else if (is_equal(chunk, pair_index, key))
+			{
+				/// hashtable is broken
+			} */
+		}
+
+		/// chunk is full
+		return false;
+	}
+
+	inline bool insert_or_update(const key_t& key,
+	                             const value_t& value)
+	{
+		bool result = true;
+
+		value_t* ht_value;
+
+		uint32_t hash = lookup(key, ht_value);
+		if (ht_value)
+		{
+			*ht_value = value;
+		}
+		else
+		{
+			result = insert(hash, key, value);
+		}
+
+		return result;
+	}
+
+	inline bool remove(const key_t& key)
+	{
+		uint32_t hash = calculate_hash(key);
+		auto& chunk = chunks[hash & total_mask];
+
+		const uint32_t pair_index = (hash >> total_shift) & (chunk_size - 1);
+		if (is_valid_and_equal(chunk, pair_index, key))
+		{
+			chunk.valid_mask ^= 1u << pair_index;
+			return true;
+		}
+
+		if (chunk_size == 1)
+		{
+			/// not found
+			return false;
+		}
+
+		/// check collision
+		uint32_t valid_mask = chunk.valid_mask;
+		for (unsigned int try_i = 1;
+		     try_i < chunk_size && valid_mask;
+		     try_i++)
+		{
+			const uint32_t pair_index = ((hash >> total_shift) + try_i) & (chunk_size - 1);
+			if (is_valid_and_equal(chunk, pair_index, key))
+			{
+				chunk.valid_mask ^= 1u << pair_index;
+				return true;
+			}
+			valid_mask &= 0xFFFFFFFFu ^ (1u << pair_index);
+		}
+
+		/// not found
+		return false;
+	}
+
+	void clear()
+	{
+		for (uint32_t i = 0;
+		     i <= total_mask;
+		     i++)
+		{
+			auto& chunk = chunks[i];
+			chunk.valid_mask = 0;
+		}
+	}
+
+	inline static uint32_t calculate_hash(const key_t& key)
+	{
+		uint32_t result = 0;
+
+		unsigned int offset = 0;
+
+		for (unsigned int i = 0;
+		     i < sizeof(key_t) / 8;
+		     i++)
+		{
+			result = rte_hash_crc_8byte(*(((const uint64_t*)&key) + offset / 8), result);
+			offset += 8;
+		}
+
+		if (sizeof(key_t) & 0x4)
+		{
+			result = rte_hash_crc_4byte(*(((const uint32_t*)&key) + offset / 4), result);
+			offset += 4;
+		}
+
+		if (sizeof(key_t) & 0x2)
+		{
+			result = rte_hash_crc_2byte(*(((const uint16_t*)&key) + offset / 2), result);
+			offset += 2;
+		}
+
+		if (sizeof(key_t) & 0x1)
+		{
+			result = rte_hash_crc_1byte(*(((const uint8_t*)&key) + offset), result);
+		}
+
+		return result;
+	}
+
+public:
+	class iterator_t
+	{
+	public:
+		iterator_t(hashtable_t* hashtable,
+		           const uint32_t index) :
+		        hashtable(hashtable),
+		        index(index)
+		{
+		}
+
+		iterator_t operator++()
+		{
+			index++;
+			return *this;
+		}
+
+		bool operator!=(const iterator_t& second) const
+		{
+			return index != second.index;
+		}
+
+		iterator_t& operator*()
+		{
+			return *this;
+		}
+
+	public:
+		bool is_valid()
+		{
+			const uint32_t pair_index = index % chunk_size;
+			return chunk().valid_mask & (1u << pair_index);
+		}
+
+		void unset_valid()
+		{
+			const uint32_t pair_index = index % chunk_size;
+			chunk().valid_mask &= 0xFFFFFFFFu ^ (1u << pair_index);
+		}
+
+		const key_t* key()
+		{
+			const uint32_t pair_index = index % chunk_size;
+			return &chunk().pairs[pair_index].key;
+		}
+
+		value_t* value()
+		{
+			const uint32_t pair_index = index % chunk_size;
+			return &chunk().pairs[pair_index].value;
+		}
+
+		auto& chunk()
+		{
+			return hashtable->chunks[index / chunk_size];
+		}
+
+	protected:
+		friend class updater;
+		hashtable_t* hashtable;
+		uint32_t index;
+	};
+
+	class range_t
+	{
+	public:
+		range_t(hashtable_t* hashtable,
+		        const uint32_t total_size,
+		        const uint32_t offset,
+		        const uint32_t step) :
+		        hashtable(hashtable),
+		        total_size(total_size),
+		        offset(offset),
+		        step(step)
+		{
+		}
+
+		iterator_t begin() const
+		{
+			return {hashtable,
+			        RTE_MIN(offset, total_size)};
+		}
+
+		iterator_t end() const
+		{
+			return {hashtable,
+			        RTE_MIN(offset + step, total_size)};
+		}
+
+	protected:
+		hashtable_t* hashtable;
+		uint32_t total_size;
+		uint32_t offset;
+		uint32_t step;
+	};
+
+	range_t range(const updater& updater,
+	              uint32_t& offset,
+	              const uint32_t step)
+	{
+		range_t result(this, updater.total_size, offset, step);
+
+		offset += step;
+		if (offset >= updater.total_size)
+		{
+			offset = 0;
+		}
+
+		return result;
+	}
+
+protected:
+	uint32_t total_mask;
+	uint32_t total_shift;
+
+	struct chunk_t
+	{
+		uint64_t valid_mask;
 		struct
 		{
 			key_t key;

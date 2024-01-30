@@ -1,16 +1,15 @@
 #pragma once
 
-#include <list>
 #include <mutex>
 #include <queue>
 
 #include "base.h"
 #include "common.h"
-#include "globalbase.h"
-#include "samples.h"
+#include "hashtable.h"
 
 #include "common/generation.h"
 #include "common/idp.h"
+#include "hashtable.h"
 
 class worker_gc_t
 {
@@ -62,6 +61,8 @@ public:
 	dataplane::base::permanently base_permanently;
 	common::worker_gc::stats_t stats;
 	dataplane::base::generation bases[2];
+
+	uint16_t balancer_state_ttl;
 
 	YADECAP_CACHE_ALIGNED(align1);
 

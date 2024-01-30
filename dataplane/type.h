@@ -5,11 +5,8 @@
 
 #include "common/balancer.h"
 #include "common/config.h"
-#include "common/fallback.h"
 #include "common/scheduler.h"
 #include "common/type.h"
-
-#include "common.h"
 
 class cDataPlane;
 class cControlPlane;
@@ -298,8 +295,6 @@ struct tInterface
 {
 	/// @todo: uint8_t enabled;
 
-	rte_ether_addr neighbor_ether_address_v4;
-	rte_ether_addr neighbor_ether_address_v6;
 	tAclId aclId;
 	common::globalBase::tFlow flow;
 };
@@ -350,6 +345,15 @@ struct tNat64stateless
 	/// @todo: egressFlow;
 };
 
+struct nat46clat_t
+{
+	ipv6_address_t ipv6_source;
+	ipv6_address_t ipv6_destination;
+	tCounterId counter_id;
+	uint8_t ipv4_dscp_flags;
+	common::globalBase::tFlow flow;
+};
+
 static_assert(CONFIG_YADECAP_INTERFACES_SIZE <= 0xFFFF, "invalid size");
 
 struct balancer_t
@@ -378,25 +382,20 @@ struct dregress_t
 struct nexthop ///< @todo
 {
 	tInterfaceId interfaceId : 16;
+	uint16_t flags;
+	ipv6_address_t neighbor_address;
 	uint32_t labelExpTransport; ///< @todo: rename first
 	uint32_t labelExpService; ///< @todo: rename second
 };
 
 struct nexthop_tunnel_t
 {
-	union
-	{
-		struct
-		{
-			tInterfaceId interface_id : 8;
-			tCounterId counter_id : 24;
-		};
-
-		uint32_t atomic1;
-	};
-
+	tInterfaceId interface_id : 16;
+	uint16_t flags;
+	tCounterId counter_id;
 	uint32_t label;
 	ipv6_address_t nexthop_address;
+	ipv6_address_t neighbor_address;
 };
 
 static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid YANET_CONFIG_COUNTERS_SIZE");
@@ -420,8 +419,6 @@ struct route_value_t
 		} interface;
 	};
 };
-
-static_assert(sizeof(route_value_t) == 192, "invalid size of route_value_t");
 
 struct route_tunnel_value_t
 {

@@ -12,7 +12,7 @@ steps:
 - ipv6Update: "::/0 -> fe80::1"
 - ipv6LabelledUpdate:
   - "cccc::/16 -> caca::123|210"
-  - "dddd::/16 -> fe80::1|211"
+  - "dddd::/16 -> cbcb::1|211"
 - sendPackets:
   - port: kni0
     send: 001-send.pcap

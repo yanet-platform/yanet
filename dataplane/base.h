@@ -8,8 +8,7 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
-#include "common/result.h"
-
+#include "neighbor.h"
 #include "type.h"
 
 namespace dataplane::base
@@ -80,11 +79,13 @@ class generation
 {
 public:
 	generation() :
-	        globalBase(nullptr)
+	        globalBase(nullptr),
+	        neighbor_hashtable(nullptr)
 	{
 	}
 
 	dataplane::globalBase::generation* globalBase;
+	dataplane::neighbor::hashtable const* neighbor_hashtable;
 } __rte_aligned(2 * RTE_CACHE_LINE_SIZE);
 
 }

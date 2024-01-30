@@ -102,6 +102,10 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 				{
 					loadConfig_balancer(baseNext, id, moduleJson, rootFilePath, jsons);
 				}
+				else if (type == "nat46clat")
+				{
+					loadConfig_nat46clat(baseNext, id, moduleJson, rootFilePath, jsons);
+				}
 				else
 				{
 					throw error_result_t(eResult::invalidType, "unknown module type: " + type);
@@ -120,6 +124,11 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 			{
 				loadConfig_fqdns(baseNext, path_json, rootFilePath, jsons);
 			}
+		}
+
+		if (exist(rootJson, "rib"))
+		{
+			loadConfig_rib(baseNext, rootJson["rib"]);
 		}
 	}
 	catch (const error_result_t& err)
@@ -246,7 +255,7 @@ void config_parser_t::loadConfig_route(controlplane::base_t& baseNext,
 			{
 				for (const auto& ipAddressJson : interfaceJson["ipAddresses"])
 				{
-					interface.ipAddresses.emplace(ipAddressJson.get<std::string>());
+					interface.ip_prefixes.emplace(ipAddressJson.get<std::string>());
 				}
 			}
 
@@ -994,6 +1003,87 @@ void config_parser_t::loadConfig_nat64stateless_translations(controlplane::base_
 		                                                   baseNext.nat64statelessTranslationsCount};
 		baseNext.nat64statelessTranslationsCount++;
 	}
+}
+
+void config_parser_t::loadConfig_nat46clat(controlplane::base_t& baseNext,
+                                           const std::string& moduleId,
+                                           const nlohmann::json& moduleJson,
+                                           const std::string& rootFilePath,
+                                           const std::map<std::string, nlohmann::json>& jsons)
+{
+	(void)rootFilePath;
+	(void)jsons;
+
+	auto& nat46clat = baseNext.nat46clats[moduleId];
+	nat46clat_id_t nat46clat_id = baseNext.nat46clats.size();
+
+	nat46clat.ipv6_source = moduleJson["ipv6_source"].get<std::string>();
+	nat46clat.ipv6_destination = moduleJson["ipv6_destination"].get<std::string>();
+
+	for (const auto& prefix_json : moduleJson["ipv6_prefixes"])
+	{
+		common::ipv6_prefix_t ipv6_prefix(prefix_json.get<std::string>());
+		nat46clat.ipv6_prefixes.emplace(ipv6_prefix);
+	}
+
+	for (const auto& prefix_json : moduleJson["ipv4_prefixes"])
+	{
+		common::ipv4_prefix_t ipv4_prefix(prefix_json.get<std::string>());
+		nat46clat.ipv4_prefixes.emplace(ipv4_prefix);
+	}
+
+	if (exist(moduleJson, "announces"))
+	{
+		for (const auto& prefix_json : moduleJson["announces"])
+		{
+			nat46clat.announces.emplace(prefix_json.get<std::string>());
+		}
+	}
+
+	if (exist(moduleJson, "dscpMarkType"))
+	{
+		using common::eDscpMarkType;
+
+		std::string dscpMarkTypeString = moduleJson["dscpMarkType"];
+
+		if (dscpMarkTypeString == "never")
+		{
+			nat46clat.dscp_mark_type = eDscpMarkType::never;
+		}
+		else if (dscpMarkTypeString == "onlyDefault")
+		{
+			nat46clat.dscp_mark_type = eDscpMarkType::onlyDefault;
+
+			if (exist(moduleJson, "dscp"))
+			{
+				nat46clat.dscp = moduleJson["dscp"];
+			}
+			else
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "dscp not set");
+			}
+		}
+		else if (dscpMarkTypeString == "always")
+		{
+			nat46clat.dscp_mark_type = eDscpMarkType::always;
+
+			if (exist(moduleJson, "dscp"))
+			{
+				nat46clat.dscp = moduleJson["dscp"];
+			}
+			else
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "dscp not set");
+			}
+		}
+		else
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "invalid dscpMarkType: " + dscpMarkTypeString);
+		}
+	}
+
+	nat46clat.next_module = moduleJson.value("nextModule", "");
+	nat46clat.nat46clat_id = nat46clat_id;
 }
 
 void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,
@@ -1788,6 +1878,26 @@ void config_parser_t::loadConfig_fqdns(controlplane::base_t& baseNext,
 			{
 				map_ip.emplace_back(json_fqdn);
 			}
+		}
+	}
+}
+
+void config_parser_t::loadConfig_rib(controlplane::base_t& baseNext,
+                                     const nlohmann::json& json)
+{
+	for (const auto& json_iter : json.items())
+	{
+		const auto& name = json_iter.key();
+		const auto& rib_items = json_iter.value();
+
+		auto& vrf = baseNext.rib[name];
+		for (const auto& json_rib_item : rib_items)
+		{
+			controlplane::base_rib base_rib;
+			base_rib.prefix = json_rib_item["prefix"].get<std::string>();
+			base_rib.nexthop = json_rib_item["nexthop"].get<std::string>();
+
+			vrf.emplace_back(std::move(base_rib));
 		}
 	}
 }

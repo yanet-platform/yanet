@@ -1,7 +1,5 @@
 #include <memory.h>
 
-#include <string>
-
 #include <rte_errno.h>
 
 #include "common.h"
@@ -9,6 +7,7 @@
 #include "globalbase.h"
 #include "worker.h"
 
+#include "common/counters.h"
 #include "common/define.h"
 
 #include "debug_latch.h"
@@ -104,6 +103,10 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		else if (type == common::idp::updateGlobalBase::requestType::updateNat64statelessTranslation)
 		{
 			result = updateNat64statelessTranslation(std::get<common::idp::updateGlobalBase::updateNat64statelessTranslation::request>(data));
+		}
+		else if (type == common::idp::updateGlobalBase::requestType::nat46clat_update)
+		{
+			result = nat46clat_update(std::get<common::idp::updateGlobalBase::nat46clat_update::request>(data));
 		}
 		else if (type == common::idp::updateGlobalBase::requestType::update_balancer)
 		{
@@ -203,7 +206,7 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		}
 		else if (type == common::idp::updateGlobalBase::requestType::dregress_neighbor_update)
 		{
-			result = dregress_neighbor_update(std::get<common::idp::updateGlobalBase::dregress_neighbor_update::request>(data));
+			/// @deprecated
 		}
 		else if (type == common::idp::updateGlobalBase::requestType::dregress_value_update)
 		{
@@ -409,6 +412,7 @@ eResult generation::clear()
 	decap_enabled = 0;
 	nat64stateful_enabled = 0;
 	nat64stateless_enabled = 0;
+	nat46clat_enabled = 0;
 	balancer_enabled = 0;
 	acl_egress_enabled = 0;
 	sampler_enabled = 0;
@@ -885,7 +889,7 @@ eResult generation::update_route(const common::idp::updateGlobalBase::update_rou
 
 eResult generation::updateInterface(const common::idp::updateGlobalBase::updateInterface::request& request)
 {
-	const auto& [interfaceId, neighbor_ether_address_v4, neighbor_ether_address_v6, aclId, flow] = request;
+	const auto& [interfaceId, aclId, flow] = request;
 
 	if (interfaceId >= CONFIG_YADECAP_INTERFACES_SIZE)
 	{
@@ -912,24 +916,6 @@ eResult generation::updateInterface(const common::idp::updateGlobalBase::updateI
 	{
 		YADECAP_LOG_ERROR("invalid aclId\n");
 		return eResult::invalidAclId;
-	}
-
-	if (neighbor_ether_address_v4)
-	{
-		memcpy(interface.neighbor_ether_address_v4.addr_bytes, (*neighbor_ether_address_v4).data(), 6); ///< @todo: convert
-	}
-	else
-	{
-		interface.neighbor_ether_address_v4.addr_bytes[0] = 1;
-	}
-
-	if (neighbor_ether_address_v6)
-	{
-		memcpy(interface.neighbor_ether_address_v6.addr_bytes, (*neighbor_ether_address_v6).data(), 6); ///< @todo: convert
-	}
-	else
-	{
-		interface.neighbor_ether_address_v6.addr_bytes[0] = 1;
 	}
 
 	interface.flow = flow;
@@ -1158,6 +1144,72 @@ eResult generation::updateNat64statelessTranslation(const common::idp::updateGlo
 	return eResult::success;
 }
 
+eResult generation::nat46clat_update(const common::idp::updateGlobalBase::nat46clat_update::request& request)
+{
+	const auto& [nat46clat_id, ipv6_source, ipv6_destination, dscp_mark_type, dscp, counter_id, flow] = request;
+
+	if (nat46clat_id >= YANET_CONFIG_NAT46CLATS_SIZE)
+	{
+		YADECAP_LOG_ERROR("invalid nat46clat_id: '%u'\n", nat46clat_id);
+		return eResult::invalidId;
+	}
+
+	if (flow.type != common::globalBase::eFlowType::route &&
+	    flow.type != common::globalBase::eFlowType::route_tunnel &&
+	    flow.type != common::globalBase::eFlowType::controlPlane &&
+	    flow.type != common::globalBase::eFlowType::drop)
+	{
+		YADECAP_LOG_ERROR("invalid flow\n");
+		return eResult::invalidFlow;
+	}
+
+	if (!checkFlow(flow))
+	{
+		YADECAP_LOG_ERROR("invalid flow\n");
+		return eResult::invalidFlow;
+	}
+
+	auto& nat46clat = nat46clats[nat46clat_id];
+	nat46clat.ipv6_source = ipv6_address_t::convert(ipv6_source);
+	nat46clat.ipv6_destination = ipv6_address_t::convert(ipv6_destination);
+	nat46clat.counter_id = counter_id;
+	nat46clat.flow = flow;
+
+	if (dscp_mark_type == common::eDscpMarkType::never)
+	{
+		nat46clat.ipv4_dscp_flags = 0;
+	}
+	else if (dscp_mark_type == common::eDscpMarkType::onlyDefault)
+	{
+		if (dscp > 0x3F)
+		{
+			YADECAP_LOG_ERROR("invalid dscp\n");
+			return eResult::invalidArguments;
+		}
+
+		nat46clat.ipv4_dscp_flags = (dscp << 2) | YADECAP_GB_DSCP_FLAG_MARK;
+	}
+	else if (dscp_mark_type == common::eDscpMarkType::always)
+	{
+		if (dscp > 0x3F)
+		{
+			YADECAP_LOG_ERROR("invalid dscp\n");
+			return eResult::invalidArguments;
+		}
+
+		nat46clat.ipv4_dscp_flags = (dscp << 2) | YADECAP_GB_DSCP_FLAG_ALWAYS_MARK;
+	}
+	else
+	{
+		YADECAP_LOG_ERROR("invalid dscp_mark_type\n");
+		return eResult::invalidArguments;
+	}
+
+	nat46clat_enabled = 1;
+
+	return eResult::success;
+}
+
 eResult generation::update_balancer(const common::idp::updateGlobalBase::update_balancer::request& request)
 {
 	const auto& [balancer_id, source_ipv6, source_ipv4, flow] = request;
@@ -1222,7 +1274,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 			return eResult::invalidId;
 		}
 
-		if (counter_id + (tCounterId)balancer::service_counter::size > YANET_CONFIG_COUNTERS_SIZE)
+		if (counter_id + (tCounterId)::balancer::service_counter::size > YANET_CONFIG_COUNTERS_SIZE)
 		{
 			YADECAP_LOG_ERROR("invalid counter_id: '%u'\n", counter_id);
 			return eResult::invalidId;
@@ -1286,7 +1338,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 
 		auto& real_unordered = balancer_reals[real_id];
 
-		if (counter_id + (tCounterId)balancer::real_counter::size > YANET_CONFIG_COUNTERS_SIZE)
+		if (counter_id + (tCounterId)::balancer::real_counter::size > YANET_CONFIG_COUNTERS_SIZE)
 		{
 			YADECAP_LOG_ERROR("invalid counter_id: '%u'\n", counter_id);
 			return eResult::invalidId;
@@ -1295,7 +1347,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		auto addr = ipv6_address_t::convert(destination);
 		if (real_unordered.counter_id != counter_id || real_unordered.destination != addr)
 		{
-			for (tCounterId i = 0; i < (tCounterId)balancer::real_counter::size; ++i)
+			for (tCounterId i = 0; i < (tCounterId)::balancer::real_counter::size; ++i)
 			{
 				uint64_t sum_worker = 0, sum_gc = 0;
 				for (const auto& [core_id, worker] : dataPlane->workers)
@@ -1390,22 +1442,22 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 	for (const auto& [core_id, worker] : dataPlane->workers)
 	{
 		(void)core_id;
-		sessions_created += worker->counters[counter_id + (tCounterId)balancer::real_counter::sessions_created];
-		sessions_destroyed += worker->counters[counter_id + (tCounterId)balancer::real_counter::sessions_destroyed];
+		sessions_created += worker->counters[counter_id + (tCounterId)::balancer::real_counter::sessions_created];
+		sessions_destroyed += worker->counters[counter_id + (tCounterId)::balancer::real_counter::sessions_destroyed];
 	}
-	sessions_created -= dataPlane->globalBaseAtomics[socketId]->counter_shifts[counter_id + (tCounterId)balancer::real_counter::sessions_created];
-	sessions_destroyed -= dataPlane->globalBaseAtomics[socketId]->counter_shifts[counter_id + (tCounterId)balancer::real_counter::sessions_destroyed];
+	sessions_created -= dataPlane->globalBaseAtomics[socketId]->counter_shifts[counter_id + (tCounterId)::balancer::real_counter::sessions_created];
+	sessions_destroyed -= dataPlane->globalBaseAtomics[socketId]->counter_shifts[counter_id + (tCounterId)::balancer::real_counter::sessions_destroyed];
 
 	uint64_t sessions_created_gc = 0;
 	uint64_t sessions_destroyed_gc = 0;
 	for (const auto& [node_id, worker_gc] : dataPlane->worker_gcs)
 	{
 		(void)node_id;
-		sessions_created_gc += worker_gc->counters[counter_id + (tCounterId)balancer::gc_real_counter::sessions_created];
-		sessions_destroyed_gc += worker_gc->counters[counter_id + (tCounterId)balancer::gc_real_counter::sessions_destroyed];
+		sessions_created_gc += worker_gc->counters[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_created];
+		sessions_destroyed_gc += worker_gc->counters[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_destroyed];
 	}
-	sessions_created_gc -= dataPlane->globalBaseAtomics[socketId]->gc_counter_shifts[counter_id + (tCounterId)balancer::gc_real_counter::sessions_created];
-	sessions_destroyed_gc -= dataPlane->globalBaseAtomics[socketId]->gc_counter_shifts[counter_id + (tCounterId)balancer::gc_real_counter::sessions_destroyed];
+	sessions_created_gc -= dataPlane->globalBaseAtomics[socketId]->gc_counter_shifts[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_created];
+	sessions_destroyed_gc -= dataPlane->globalBaseAtomics[socketId]->gc_counter_shifts[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_destroyed];
 	return (sessions_created - sessions_destroyed + sessions_created_gc - sessions_destroyed_gc) / dataPlane->numaNodesInUse;
 }
 
@@ -1570,7 +1622,7 @@ eResult generation::route_value_update(const common::idp::updateGlobalBase::rout
 		     ecmp_i < request_interface.size();
 		     ecmp_i++)
 		{
-			const auto& [interface_id, labels] = request_interface[ecmp_i];
+			const auto& [interface_id, labels, neighbor_address, nexthop_flags] = request_interface[ecmp_i];
 
 			if (interface_id >= CONFIG_YADECAP_INTERFACES_SIZE)
 			{
@@ -1579,6 +1631,8 @@ eResult generation::route_value_update(const common::idp::updateGlobalBase::rout
 			}
 
 			route_value.interface.nexthops[ecmp_i].interfaceId = interface_id;
+			route_value.interface.nexthops[ecmp_i].flags = nexthop_flags;
+			route_value.interface.nexthops[ecmp_i].neighbor_address = ipv6_address_t::convert(neighbor_address);
 
 			if (labels.size() == 0)
 			{
@@ -1755,7 +1809,7 @@ eResult generation::route_tunnel_value_update(const common::idp::updateGlobalBas
 		     ecmp_i < nexthops.size();
 		     ecmp_i++)
 		{
-			const auto& [interface_id, counter_id, label, nexthop_address] = nexthops[ecmp_i];
+			const auto& [interface_id, counter_id, label, nexthop_address, neighbor_address, nexthop_flags] = nexthops[ecmp_i];
 
 			if (interface_id >= CONFIG_YADECAP_INTERFACES_SIZE)
 			{
@@ -1764,9 +1818,11 @@ eResult generation::route_tunnel_value_update(const common::idp::updateGlobalBas
 			}
 
 			route_tunnel_value.interface.nexthops[ecmp_i].interface_id = interface_id;
+			route_tunnel_value.interface.nexthops[ecmp_i].flags = nexthop_flags;
 			route_tunnel_value.interface.nexthops[ecmp_i].counter_id = counter_id;
 			route_tunnel_value.interface.nexthops[ecmp_i].label = label;
 			route_tunnel_value.interface.nexthops[ecmp_i].nexthop_address = ipv6_address_t::convert(nexthop_address);
+			route_tunnel_value.interface.nexthops[ecmp_i].neighbor_address = ipv6_address_t::convert(neighbor_address);
 		}
 
 		route_tunnel_value.interface.weight_start = weight_start;
@@ -2108,20 +2164,6 @@ eResult generation::dregress_local_prefix_update(const common::idp::updateGlobal
 			dataPlane->controlPlane->dregress.local_prefixes_v6.emplace(prefix.get_ipv6());
 		}
 	}
-
-	return result;
-}
-
-eResult generation::dregress_neighbor_update(const common::idp::updateGlobalBase::dregress_neighbor_update::request& request)
-{
-	eResult result = eResult::success;
-
-	const auto& [neighbor_v4, neighbor_v6] = request;
-
-	std::lock_guard<std::mutex> guard(dataPlane->controlPlane->dregress.neighbor_mutex);
-
-	dataPlane->controlPlane->dregress.neighbor_v4 = neighbor_v4;
-	dataPlane->controlPlane->dregress.neighbor_v6 = neighbor_v6;
 
 	return result;
 }

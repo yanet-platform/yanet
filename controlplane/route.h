@@ -15,8 +15,12 @@
 namespace route
 {
 
+using directly_connected_destination_t = std::tuple<tInterfaceId, ///< interface_id
+                                                    std::string>; ///< interface_name
+
 using destination_t = std::variant<std::set<std::tuple<ip_address_t,
                                                        std::vector<uint32_t>>>,
+                                   directly_connected_destination_t, ///< via interface
                                    uint32_t>; ///< virtual_port_id
 
 using value_key_t = std::tuple<std::tuple<std::string, ///< vrf
@@ -27,7 +31,8 @@ using value_key_t = std::tuple<std::tuple<std::string, ///< vrf
 using value_interface_t = std::tuple<ip_address_t,
                                      tInterfaceId,
                                      std::string,
-                                     std::vector<uint32_t>>;
+                                     std::vector<uint32_t>,
+                                     ip_address_t>; ///< neighbor_address
 
 using lookup_t = std::tuple<ip_address_t, ///< nexthop
                             std::string,
@@ -62,7 +67,8 @@ using tunnel_value_interface_t = std::tuple<ip_address_t, ///< nexthop
                                             std::string, ///< interface_name
                                             uint32_t, ///< peer_id
                                             uint32_t, ///< origin_as
-                                            uint32_t>; ///< weight
+                                            uint32_t, ///< weight
+                                            ip_address_t>; ///< neighbor_address
 
 using tunnel_lookup_t = std::tuple<ip_address_t, ///< nexthop
                                    std::string, ///< interface_name
@@ -112,6 +118,8 @@ public:
 		}
 
 		peers[0] = "unknown";
+
+		socket_interfaces = base_next.socket_interfaces;
 	}
 
 	std::optional<const std::tuple<tInterfaceId, std::string>*> get_interface_by_neighbor(const ip_address_t& address) const
@@ -141,10 +149,19 @@ public:
 		return &peers;
 	}
 
+	void inline for_each_socket(const std::function<void(const tSocketId& socketId, const std::set<tInterfaceId>& interfaces)>& function) const
+	{
+		for (const auto& [socket_id, interfaces] : socket_interfaces)
+		{
+			function(socket_id, interfaces);
+		}
+	}
+
 public:
 	std::map<std::string, controlplane::route::config_t> routes;
 	std::map<ip_address_t, std::tuple<tInterfaceId, std::string>> interface_by_neighbors;
 	std::map<uint32_t, std::string> peers; ///< @todo: VRF
+	std::map<tSocketId, std::set<tInterfaceId>> socket_interfaces; ///< @todo: per route
 };
 
 class generation_neighbors_t
@@ -179,9 +196,8 @@ public:
 	void reload_before() override;
 	void reload(const controlplane::base_t& base_prev, const controlplane::base_t& base_next, common::idp::updateGlobalBase::request& globalbase) override;
 	void reload_after() override;
-	void mac_addresses_changed() override;
 
-	void prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix, const std::vector<rib::pptn_t>& pptns, const std::variant<std::monostate, rib::nexthop_map_t, uint32_t>& value);
+	void prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix, const std::vector<rib::pptn_t>& pptns, const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value);
 	void tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority_orig, const ip_prefix_t& prefix, const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value);
 
 	void prefix_flush();

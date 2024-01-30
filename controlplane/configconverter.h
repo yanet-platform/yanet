@@ -32,6 +32,7 @@ protected:
 	void processDecap();
 	void processNat64stateful();
 	void processNat64();
+	void processNat46clat();
 	void processTun64();
 	void processBalancer();
 	void processDregress();
@@ -55,6 +56,7 @@ protected:
 	void acl_rules_nat64stateless(controlplane::base::acl_t& acl, const std::string& nextModule, const std::string& entry) const;
 	void acl_rules_nat64stateless_ingress(controlplane::base::acl_t& acl, const std::string& nextModule) const;
 	void acl_rules_nat64stateless_egress(controlplane::base::acl_t& acl, const std::string& nextModule) const;
+	void acl_rules_nat46clat(controlplane::base::acl_t& acl, const std::string& next_module) const;
 	void acl_rules_dregress(controlplane::base::acl_t& acl, const std::string& nextModule) const;
 	void acl_rules_balancer(controlplane::base::acl_t& acl, const std::string& nextModule) const;
 	void acl_rules_early_decap(controlplane::base::acl_t& acl) const;

@@ -2,12 +2,10 @@
 #include <netdb.h>
 
 #include "common/idp.h"
-#include "common/stream.h"
 #include "common/version.h"
 
 #include "acl.h"
 #include "bus.h"
-#include "common.h"
 #include "configconverter.h"
 #include "configparser.h"
 #include "controlplane.h"
@@ -55,6 +53,7 @@ eResult cControlPlane::init(const std::string& jsonFilePath)
 	modules.emplace_back(&fqdn);
 	modules.emplace_back(&durations);
 	modules.emplace_back(&nat64stateful);
+	modules.emplace_back(&nat46clat);
 
 	for (auto* module : modules)
 	{
@@ -145,6 +144,10 @@ eResult cControlPlane::init(const std::string& jsonFilePath)
 		return command_version();
 	});
 
+	register_command(common::icp::requestType::convert, [this](const common::icp::request& request) {
+		return command_convert(std::get<common::icp::convert::request>(std::get<1>(request)));
+	});
+
 	if (!jsonFilePath.empty())
 	{
 		std::ifstream fromFileStream(jsonFilePath);
@@ -192,11 +195,6 @@ void cControlPlane::start()
 	}
 
 	threads.emplace_back([this] { main_thread(); });
-
-#ifdef CONFIG_YADECAP_AUTOTEST
-#else // CONFIG_YADECAP_AUTOTEST
-	threads.emplace_back([this] { mac_address_resolve_thread(); });
-#endif // CONFIG_YADECAP_AUTOTEST
 }
 
 void cControlPlane::stop()
@@ -830,6 +828,33 @@ common::icp::version::response cControlPlane::command_version()
 	        version_custom()};
 }
 
+common::icp::convert::response cControlPlane::command_convert(const common::icp::convert::request& request)
+{
+	common::icp::convert::response response;
+	if (request == "logical_module")
+	{
+		return convert_logical_module();
+	}
+
+	return response;
+}
+
+common::icp::convert::response cControlPlane::convert_logical_module()
+{
+	common::icp::convert::response response;
+
+	generations.current_lock();
+	auto logicalport_id_to_name = generations.current().logicalport_id_to_name;
+	generations.current_unlock();
+
+	for (auto [id, name] : logicalport_id_to_name)
+	{
+		response.push_back({id, name});
+	}
+
+	return response;
+}
+
 eResult cControlPlane::loadConfig(const std::string& rootFilePath,
                                   const nlohmann::json& rootJson,
                                   const std::map<std::string, nlohmann::json>& jsons)
@@ -971,44 +996,6 @@ void cControlPlane::main_thread()
 	}
 }
 
-void cControlPlane::mac_address_resolve_thread()
-{
-	while (!flagStop)
-	{
-		bool mac_addresses_changed = false;
-
-		{
-			std::unique_lock mac_addresses_lock(mac_addresses_mutex);
-
-			for (auto& [key, mac_address] : this->mac_addresses)
-			{
-				const auto& [vrf, interface_name, address] = key;
-				(void)vrf;
-
-				const auto mac_address_next = system.getMacAddress(interface_name, address);
-				if (mac_address_next)
-				{
-					if ((!mac_address) ||
-					    *mac_address != *mac_address_next)
-					{
-						mac_address = mac_address_next;
-						mac_addresses_changed = true;
-					}
-				}
-			}
-		}
-
-		if (mac_addresses_changed)
-		{
-			for (auto* module : modules)
-			{
-				module->mac_addresses_changed();
-			}
-		}
-
-		std::this_thread::sleep_for(std::chrono::seconds{8});
-	}
-}
 void cControlPlane::register_service(google::protobuf::Service* service)
 {
 	services[service->GetDescriptor()->name()] = service;

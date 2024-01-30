@@ -26,6 +26,7 @@
 #include "fqdn.h"
 #include "isystem.h"
 #include "module.h"
+#include "nat46clat.h"
 #include "nat64stateful.h"
 #include "route.h"
 #include "tun64.h"
@@ -99,18 +100,6 @@ public:
 		}
 	}
 
-	void inline forEachSocket(const std::function<void(const tSocketId& socketId, const std::set<tInterfaceId>& interfaces)>& function) const
-	{
-		generations.current_lock();
-		std::map<tSocketId, std::set<tInterfaceId>> socket_interfaces = generations.current().socket_interfaces;
-		generations.current_unlock();
-
-		for (const auto& [socket_id, interfaces] : socket_interfaces)
-		{
-			function(socket_id, interfaces);
-		}
-	}
-
 protected: /** commands */
 	common::icp::getPhysicalPorts::response getPhysicalPorts() const;
 	common::icp::getLogicalPorts::response getLogicalPorts() const;
@@ -133,6 +122,9 @@ protected: /** commands */
 	common::icp::getAclConfig::response command_getAclConfig(common::icp::getAclConfig::request);
 	common::icp::loadConfig::response command_loadConfig(const common::icp::loadConfig::request& request);
 	common::icp::version::response command_version();
+	common::icp::convert::response command_convert(const common::icp::convert::request& request);
+
+	common::icp::convert::response convert_logical_module();
 
 protected:
 	/// @todo: config_t::load()
@@ -141,7 +133,6 @@ protected:
 	void addConfig(uint32_t serial, const controlplane::base_t& config);
 
 	void main_thread();
-	void mac_address_resolve_thread();
 
 protected:
 	friend class telegraf_t;
@@ -181,6 +172,7 @@ protected:
 	fqdn_t fqdn;
 	durations_t durations;
 	nat64stateful_t nat64stateful;
+	nat46clat::manager nat46clat;
 
 	counter_manager_t counter_manager;
 

@@ -159,6 +159,8 @@ nlohmann::json cReport::getReport()
 	}
 	jsonReport["memory_total"] = memory_total;
 
+	dataPlane->neighbor.report(jsonReport);
+
 	return jsonReport;
 }
 
@@ -410,7 +412,7 @@ nlohmann::json cReport::convertWorkerGC(const worker_gc_t* worker)
 	const auto& base = worker->bases[worker->current_base_id];
 	json["base"]["globalBase"]["pointer"] = pointerToHex(base.globalBase);
 
-	json["balancer_state"] = convertHashtable(worker->base_permanently.globalBaseAtomic->balancer_state, worker->balancer_state_stats);
+	worker->base_permanently.globalBaseAtomic->updater.balancer_state.report(json["balancer_state"]);
 
 	return json;
 }
@@ -761,8 +763,6 @@ nlohmann::json cReport::convertGlobalBase(const dataplane::globalBase::generatio
 
 		nlohmann::json jsonInterface;
 		jsonInterface["interfaceId"] = interfaceId;
-		jsonInterface["neighbor_ether_address_v4"] = convertEtherAddressToString(interface.neighbor_ether_address_v4);
-		jsonInterface["neighbor_ether_address_v6"] = convertEtherAddressToString(interface.neighbor_ether_address_v6);
 		jsonInterface["flow"] = convertFlow(interface.flow);
 
 		json["interfaces"].emplace_back(jsonInterface);

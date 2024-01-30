@@ -15,6 +15,7 @@
 #include "acl.h"
 #include "balancer.h"
 #include "config.h"
+#include "neighbor.h"
 #include "result.h"
 #include "scheduler.h"
 #include "type.h"
@@ -74,6 +75,13 @@ enum class requestType : uint32_t
 	set_shm_tsc_state,
 	dump_physical_port,
 	balancer_state_clear,
+	neighbor_show,
+	neighbor_insert,
+	neighbor_remove,
+	neighbor_clear,
+	neighbor_flush,
+	neighbor_update_interfaces,
+	neighbor_stats,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -155,9 +163,10 @@ enum class requestType : uint32_t
 	tun64_update,
 	tun64mappings_update,
 	serial_update,
-	dump_tags_ids,
 	tsc_state_update,
-	tscs_base_value_update
+	tscs_base_value_update,
+	nat46clat_update,
+	dump_tags_ids
 };
 
 namespace updateLogicalPort
@@ -202,8 +211,6 @@ using request = std::tuple<tRouteId,
 namespace updateInterface
 {
 using request = std::tuple<tInterfaceId,
-                           std::optional<mac_address_t>, ///< neighbor_ether_address_v4
-                           std::optional<mac_address_t>, ///< neighbor_ether_address_v6
                            tAclId,
                            common::globalBase::tFlow>;
 }
@@ -251,6 +258,17 @@ using request = std::tuple<tNat64statelessTranslationId,
                            ipv6_address_t, ///< ipv6DestinationAddress
                            ipv4_address_t, ///< ipv4Address
                            std::optional<std::tuple<uint16_t, uint16_t>>>; ///< ingressPort, egressPort
+}
+
+namespace nat46clat_update
+{
+using request = std::tuple<nat46clat_id_t,
+                           ipv6_address_t, ///< ipv6_source
+                           ipv6_address_t, ///< ipv6_destination
+                           eDscpMarkType, ///< dscp_type
+                           uint8_t, ///< dscp
+                           tCounterId,
+                           common::globalBase::flow_t>;
 }
 
 namespace update_balancer
@@ -363,8 +381,10 @@ using request = lpm::request;
 
 namespace route_value_update
 {
-using interface = std::vector<std::tuple<tInterfaceId,
-                                         std::vector<uint32_t>>>;
+using interface = std::vector<std::tuple<tInterfaceId, ///< interface_id
+                                         std::vector<uint32_t>, ///< labels
+                                         ip_address_t, ///< neighbor_address
+                                         uint16_t>>; ///< nexthop_flags
 
 using request = std::tuple<uint32_t, ///< route_value_id
                            tSocketId,
@@ -389,7 +409,9 @@ using interface = std::tuple<uint32_t, ///< weight_start
                              std::vector<std::tuple<tInterfaceId,
                                                     tCounterId,
                                                     uint32_t, ///< label
-                                                    ip_address_t>>>; ///< nexthop_address
+                                                    ip_address_t, ///< nexthop_address
+                                                    ip_address_t, ///< neighbor_address
+                                                    uint16_t>>>; ///< nexthop_flags
 
 using request = std::tuple<uint32_t, ///< route_tunnel_value_id
                            tSocketId,
@@ -413,7 +435,7 @@ namespace dregress_local_prefix_update
 using request = std::set<ip_prefix_t>;
 }
 
-namespace dregress_neighbor_update
+namespace dregress_neighbor_update ///< @deprecated
 {
 using request = std::tuple<std::set<std::tuple<common::mac_address_t, common::globalBase::tFlow>>,
                            std::set<std::tuple<common::mac_address_t, common::globalBase::tFlow>>>;
@@ -513,8 +535,9 @@ using requestVariant = std::variant<std::tuple<>,
                                     dregress_value_update::request,
                                     fwstate_synchronization_update::request,
                                     sampler_update::request, /// + update_early_decap_flags::request, tsc_state_update::request
+                                    tscs_base_value_update::request,
                                     serial_update::request,
-                                    tscs_base_value_update::request>;
+                                    nat46clat_update::request>;
 
 using request = std::vector<std::tuple<requestType,
                                        requestVariant>>;
@@ -925,6 +948,44 @@ using request = std::tuple<id, ///< latch id
 using response = eResult;
 }
 
+namespace neighbor_show
+{
+using response = std::vector<std::tuple<std::string, ///< route_name
+                                        std::string, ///< interface_name
+                                        ip_address_t, ///< ip_address
+                                        mac_address_t, ///< mac_address
+                                        std::optional<uint32_t>>>; ///< last_update_timestamp
+}
+
+namespace neighbor_insert
+{
+using request = std::tuple<std::string, ///< route_name
+                           std::string, ///< interface_name
+                           ip_address_t, ///< ip_address
+                           mac_address_t>; ///< mac_address
+}
+
+namespace neighbor_remove
+{
+using request = std::tuple<std::string, ///< route_name
+                           std::string, ///< interface_name
+                           ip_address_t>; ///< ip_address
+}
+
+namespace neighbor_update_interfaces
+{
+using request = std::vector<std::tuple<tInterfaceId, ///< interface_id
+                                       std::string, ///< route_name
+                                       std::string>>; ///< interface_name
+}
+
+namespace neighbor_stats
+{
+using response = common::neighbor::stats;
+}
+
+//
+
 using request = std::tuple<requestType,
                            std::variant<std::tuple<>,
                                         updateGlobalBase::request,
@@ -941,7 +1002,10 @@ using request = std::tuple<requestType,
                                         unrdup_vip_to_balancers::request,
                                         update_vip_vport_proto::request,
                                         get_counter_by_name::request,
-                                        dump_physical_port::request>>;
+                                        dump_physical_port::request,
+                                        neighbor_insert::request,
+                                        neighbor_remove::request,
+                                        neighbor_update_interfaces::request>>;
 
 using response = std::variant<std::tuple<>,
                               updateGlobalBase::response, ///< + others which have eResult as response
@@ -973,6 +1037,7 @@ using response = std::variant<std::tuple<>,
                               samples::response,
                               get_counter_by_name::response,
                               get_shm_info::response,
-                              get_shm_tsc_info::response>;
-
+                              get_shm_tsc_info::response,
+                              neighbor_show::response,
+                              neighbor_stats::response>;
 }

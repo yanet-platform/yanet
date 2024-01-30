@@ -1,8 +1,11 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
+#include "common/fallback.h"
+
 #include "checksum.h"
 #include "controlplane.h"
+#include "dataplane.h"
 #include "dregress.h"
 #include "metadata.h"
 #include "worker.h"
@@ -156,7 +159,18 @@ void dregress_t::insert(rte_mbuf* mbuf)
 					flags |= YANET_DREGRESS_FLAG_NH_IS_IPV4;
 				}
 
-				connections->insert(key, {loss_count, ack_count, labelled_nexthop, label, community, prefix_address, peer_as, origin_as, (uint16_t)controlplane->currentTime, flags, prefix_mask});
+				connections->insert(key,
+				                    {loss_count,
+				                     ack_count,
+				                     labelled_nexthop,
+				                     label,
+				                     community,
+				                     prefix_address,
+				                     peer_as,
+				                     origin_as,
+				                     (uint16_t)dataplane->get_current_time(),
+				                     flags,
+				                     prefix_mask});
 
 				if (tcpHeader->tcp_flags & TCP_FIN_FLAG)
 				{
@@ -283,7 +297,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 			labelled_nexthop = value->nexthop;
 			labelled_label = value->label;
 
-			value->timestamp = (uint16_t)controlplane->currentTime;
+			value->timestamp = (uint16_t)dataplane->get_current_time();
 
 			if (tcpHeader->tcp_flags & (TCP_FIN_FLAG | TCP_RST_FLAG))
 			{
@@ -375,48 +389,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 
 	/// @todo: opt
 	controlplane->slowWorker->preparePacket(mbuf);
-
-	common::globalBase::tFlow flow = dregress.flow;
-	{
-		/// try send to logical port
-
-		common::mac_address_t neighbor;
-
-		{
-			std::lock_guard<std::mutex> guard(neighbor_mutex);
-
-			if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
-			{
-				if (neighbor_v4.size())
-				{
-					const auto& [dregress_neighbor, dregress_flow] = *std::next(neighbor_v4.begin(), metadata->hash % neighbor_v4.size());
-
-					neighbor = dregress_neighbor;
-					flow = dregress_flow;
-				}
-			}
-			else
-			{
-				if (neighbor_v6.size())
-				{
-					const auto& [dregress_neighbor, dregress_flow] = *std::next(neighbor_v6.begin(), metadata->hash % neighbor_v6.size());
-
-					neighbor = dregress_neighbor;
-					flow = dregress_flow;
-				}
-			}
-		}
-
-		if (!neighbor.is_default())
-		{
-			generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
-			memcpy(ethernetHeader->dst_addr.addr_bytes,
-			       neighbor.data(),
-			       6);
-		}
-	}
-
-	controlplane->sendPacketToSlowWorker(mbuf, flow);
+	controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
 }
 
 void dregress_t::handle()
@@ -430,7 +403,7 @@ void dregress_t::handle()
 		{
 			if (iter.value()->flags & YANET_DREGRESS_FLAG_FIN)
 			{
-				if ((uint16_t)(controlplane->currentTime - iter.value()->timestamp) > 8) ///< @todo: tag:DREGRESS_CONFIG
+				if ((uint16_t)(dataplane->get_current_time() - iter.value()->timestamp) > 8) ///< @todo: tag:DREGRESS_CONFIG
 				{
 					iter.unsetValid();
 
@@ -439,7 +412,7 @@ void dregress_t::handle()
 			}
 			else
 			{
-				if ((uint16_t)(controlplane->currentTime - iter.value()->timestamp) > 60) ///< @todo: tag:DREGRESS_CONFIG
+				if ((uint16_t)(dataplane->get_current_time() - iter.value()->timestamp) > 60) ///< @todo: tag:DREGRESS_CONFIG
 				{
 					iter.unsetValid();
 

@@ -659,6 +659,11 @@ void tAutotest::recvThread(std::string interfaceName,
 				}
 			}
 			success = false;
+
+			if (expect_pcaps.size() == 1)
+			{
+				expect_pcaps[0].advance();
+			}
 		}
 
 		packetsCount++;
@@ -1276,6 +1281,12 @@ void tAutotest::mainThread()
 
 		fflushSharedMemory();
 
+		/// clear dataplane states
+		{
+			dataPlane.balancer_state_clear();
+			dataPlane.neighbor_clear();
+		}
+
 		try
 		{
 			{
@@ -1292,9 +1303,12 @@ void tAutotest::mainThread()
 					YANET_LOG_ERROR("invalid config: eResult %d\n", static_cast<std::uint32_t>(result));
 					throw "";
 				}
+				controlPlane.rib_flush();
 
 				this->request.swap(request);
 			}
+
+			dataPlane.neighbor_flush();
 
 			YAML::Node yamlRoot = YAML::LoadFile(configFilePath + "/autotest.yaml");
 
@@ -1459,11 +1473,6 @@ void tAutotest::mainThread()
 			std::abort();
 		}
 
-		/// clear dataplane states
-		{
-			dataPlane.balancer_state_clear();
-		}
-
 		YANET_LOG_PRINT(ANSI_COLOR_GREEN "done '%s'\n\n" ANSI_COLOR_RESET, configFilePath.data());
 		fflush(stdout);
 		fflush(stderr);
@@ -1613,6 +1622,7 @@ bool nAutotest::tAutotest::step_reload(const YAML::Node& yamlStep)
 		YANET_LOG_ERROR("invalid config: eResult %d\n", static_cast<std::uint32_t>(result));
 		return false;
 	}
+	controlPlane.rib_flush();
 
 	this->request.swap(request);
 

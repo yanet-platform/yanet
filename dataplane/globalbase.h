@@ -7,7 +7,6 @@
 #include <rte_ether.h>
 #include <rte_ip.h>
 
-#include "common/counters.h"
 #include "common/idp.h"
 #include "common/result.h"
 #include "common/tsc_deltas.h"
@@ -78,6 +77,11 @@ using lan_ht = hashtable_mod_spinlock_dynamic<nat64stateful_lan_key, nat64statef
 using wan_ht = hashtable_mod_spinlock_dynamic<nat64stateful_wan_key, nat64stateful_wan_value, 16>;
 }
 
+namespace balancer
+{
+using state_ht = hashtable_mod_spinlock_dynamic<balancer_state_key_t, balancer_state_value_t, 16>;
+}
+
 class atomic
 {
 public:
@@ -94,6 +98,7 @@ public: ///< @todo
 		acl::ipv6_states_ht::updater fw6_state;
 		nat64stateful::lan_ht::updater nat64stateful_lan_state;
 		nat64stateful::wan_ht::updater nat64stateful_wan_state;
+		balancer::state_ht::updater balancer_state;
 	} updater;
 
 	hashtable_gc_t balancer_state_gc;
@@ -116,12 +121,8 @@ public: ///< @todo
 	acl::ipv6_states_ht* fw6_state;
 	nat64stateful::lan_ht* nat64stateful_lan_state;
 	nat64stateful::wan_ht* nat64stateful_wan_state;
+	balancer::state_ht* balancer_state;
 
-	hashtable_mod_spinlock<balancer_state_key_t,
-	                       balancer_state_value_t,
-	                       YANET_CONFIG_BALANCER_STATE_HT_SIZE,
-	                       16>
-	        balancer_state;
 	bool tsc_active_state;
 };
 
@@ -149,6 +150,7 @@ protected:
 	eResult nat64stateful_pool_update(const common::idp::updateGlobalBase::nat64stateful_pool_update::request& request);
 	eResult updateNat64stateless(const common::idp::updateGlobalBase::updateNat64stateless::request& request);
 	eResult updateNat64statelessTranslation(const common::idp::updateGlobalBase::updateNat64statelessTranslation::request& request);
+	eResult nat46clat_update(const common::idp::updateGlobalBase::nat46clat_update::request& request);
 	eResult update_balancer(const common::idp::updateGlobalBase::update_balancer::request& request);
 	eResult update_balancer_services(const common::idp::updateGlobalBase::update_balancer_services::request& request);
 	eResult update_balancer_unordered_real(const common::idp::updateGlobalBaseBalancer::update_balancer_unordered_real::request& request);
@@ -174,7 +176,6 @@ protected:
 	eResult dregress_prefix_remove(const common::idp::updateGlobalBase::dregress_prefix_remove::request& request);
 	eResult dregress_prefix_clear();
 	eResult dregress_local_prefix_update(const common::idp::updateGlobalBase::dregress_local_prefix_update::request& request);
-	eResult dregress_neighbor_update(const common::idp::updateGlobalBase::dregress_neighbor_update::request& request);
 	eResult dregress_value_update(const common::idp::updateGlobalBase::dregress_value_update::request& request);
 	eResult fwstate_synchronization_update(const common::idp::updateGlobalBase::fwstate_synchronization_update::request& request);
 	eResult tun64_update(const common::idp::updateGlobalBase::tun64_update::request& request);
@@ -215,6 +216,7 @@ public: ///< @todo
 	tInterface interfaces[CONFIG_YADECAP_INTERFACES_SIZE];
 	nat64stateful_t nat64statefuls[YANET_CONFIG_NAT64STATEFULS_SIZE];
 	tNat64stateless nat64statelesses[CONFIG_YADECAP_NAT64STATELESSES_SIZE];
+	nat46clat_t nat46clats[YANET_CONFIG_NAT46CLATS_SIZE];
 	balancer_t balancers[YANET_CONFIG_BALANCERS_SIZE];
 	dregress_t dregresses[CONFIG_YADECAP_DREGRESS_SIZE]; ///< @todo: slow global base
 	fw_state_sync_config_t fw_state_sync_configs[CONFIG_YADECAP_ACLS_SIZE];
@@ -223,6 +225,7 @@ public: ///< @todo
 	uint8_t decap_enabled;
 	uint8_t nat64stateful_enabled;
 	uint8_t nat64stateless_enabled;
+	uint8_t nat46clat_enabled;
 	uint8_t balancer_enabled;
 	uint8_t acl_egress_enabled;
 	uint8_t sampler_enabled;

@@ -6,6 +6,7 @@
 
 #include "common/controlplaneconfig.h"
 #include "common/idp.h"
+#include "common/nat46clat.h"
 #include "common/type.h"
 #include "libfwparser/fw_parser.h"
 
@@ -417,6 +418,15 @@ public:
 
 //
 
+class base_rib
+{
+public:
+	ip_prefix_t prefix;
+	ip_address_t nexthop;
+};
+
+//
+
 class base_t
 {
 public:
@@ -448,6 +458,7 @@ public:
 	std::map<std::string, base::decap_t> decaps;
 	std::map<std::string, nat64stateful::config_t> nat64statefuls;
 	std::map<std::string, base::nat64stateless_t> nat64statelesses;
+	std::map<std::string, nat46clat::config> nat46clats;
 	std::map<std::string, base::acl_t> acls;
 	std::map<std::string, dregress::config_t> dregresses;
 	std::map<std::string, balancer::config_t> balancers;
@@ -469,6 +480,10 @@ public:
 	        vrf_fqdns;
 
 	uint32_t nat64stateful_pool_size;
+
+	std::map<std::string, ///< vrf_name
+	         std::vector<base_rib>>
+	        rib;
 };
 
 //

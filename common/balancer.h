@@ -1,6 +1,6 @@
 #pragma once
 
-#include "type.h"
+#include <inttypes.h>
 
 namespace balancer
 {

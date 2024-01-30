@@ -317,6 +317,26 @@ public:
 		return get<common::icp::requestType::version, common::icp::version::response>();
 	}
 
+	auto nat46clat_config() const
+	{
+		return get<common::icp::requestType::nat46clat_config, common::icp::nat46clat_config::response>();
+	}
+
+	auto nat46clat_announce() const
+	{
+		return get<common::icp::requestType::nat46clat_announce, common::icp::nat46clat_announce::response>();
+	}
+
+	auto nat46clat_stats() const
+	{
+		return get<common::icp::requestType::nat46clat_stats, common::icp::nat46clat_stats::response>();
+	}
+
+	auto convert(const common::icp::convert::request& request) const
+	{
+		return get<common::icp::requestType::convert, common::icp::convert::response>(request);
+	}
+
 protected:
 	void connectToControlPlane() const
 	{

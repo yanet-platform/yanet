@@ -101,6 +101,7 @@ void unsafe()
 	const auto& [responseSlowWorker, hashtable_gc] = responseSlowWorkerHashtableGC;
 
 	const auto static_counters = dataplane.getCounters(vector_range(0, (tCounterId)common::globalBase::static_counter_type::size));
+	const auto neighbor_stats = dataplane.neighbor_stats();
 
 	const auto durations = controlplane.controlplane_durations();
 
@@ -348,6 +349,28 @@ void unsafe()
 		                       {{"name", name}},
 		                       {{"value", counter}});
 	}
+
+	const auto nat46clat_stats = controlplane.nat46clat_stats();
+	for (const auto& [module_name, stats] : nat46clat_stats)
+	{
+		using nat46clat::module_counter; ///< C++20: using enum
+
+		influxdb_format::print("nat46clat",
+		                       {{"name", module_name}},
+		                       {{"lan_packets", stats[(size_t)module_counter::lan_packets]},
+		                        {"lan_bytes", stats[(size_t)module_counter::lan_bytes]},
+		                        {"wan_packets", stats[(size_t)module_counter::wan_packets]},
+		                        {"wan_bytes", stats[(size_t)module_counter::wan_bytes]}});
+	}
+
+	influxdb_format::print("neighbor",
+	                       {},
+	                       {{"hashtable_insert_success", neighbor_stats.hashtable_insert_success},
+	                        {"hashtable_insert_error", neighbor_stats.hashtable_insert_error},
+	                        {"hashtable_remove_success", neighbor_stats.hashtable_remove_success},
+	                        {"hashtable_remove_error", neighbor_stats.hashtable_remove_error},
+	                        {"netlink_neighbor_update", neighbor_stats.netlink_neighbor_update},
+	                        {"resolve", neighbor_stats.resolve}});
 }
 
 void dregress()

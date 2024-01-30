@@ -104,6 +104,8 @@ extern LogPriority logPriority;
 #define YANET_NETWORK_FLAG_NOT_FIRST_FRAGMENT ((uint8_t)(1u << 1))
 #define YANET_NETWORK_FLAG_HAS_EXTENSION ((uint8_t)(1u << 2))
 
+#define YANET_NEXTHOP_FLAG_DIRECTLY ((uint16_t)(1u << 0))
+
 /// @todo: move
 template<typename map_T,
          typename key_T>

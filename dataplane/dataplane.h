@@ -21,6 +21,7 @@
 #include "bus.h"
 #include "controlplane.h"
 #include "globalbase.h"
+#include "neighbor.h"
 #include "report.h"
 #include "type.h"
 #include "worker_gc.h"
@@ -58,6 +59,8 @@ enum class eConfigType
 	nat64stateful_states_size,
 	kernel_interface_queue_size,
 	tsc_active_state,
+	balancer_state_ttl,
+	balancer_state_ht_size,
 };
 
 struct tDataPlaneConfig
@@ -125,28 +128,16 @@ public:
 	uint64_t getConfigValue(const eConfigType& type) const;
 	std::map<std::string, common::uint64> getPortStats(const tPortId& portId) const;
 	std::optional<tPortId> interface_name_to_port_id(const std::string& interface_name);
+	const std::set<tSocketId>& get_socket_ids() const;
+	const std::vector<cWorker*>& get_workers() const;
+	void run_on_worker_gc(const tSocketId socket_id, const std::function<bool()>& callback);
 
-protected:
-	eResult parseConfig(const std::string& configFilePath);
-	eResult parseJsonPorts(const nlohmann::json& json);
-	eResult parseConfigValues(const nlohmann::json& json);
-	eResult parseRateLimits(const nlohmann::json& json);
-	eResult parseSharedMemory(const nlohmann::json& json);
-	eResult checkConfig();
+	void switch_worker_base();
 
-	eResult initEal(const std::string& binaryPath, const std::string& filePrefix);
-	eResult initPorts();
-	eResult initRingPorts();
-	eResult initGlobalBases();
-	eResult initWorkers();
-	eResult initQueues();
-
-	eResult allocateSharedMemory();
-	eResult splitSharedMemoryPerWorkers();
-
-	std::optional<uint64_t> getCounterValueByName(const std::string& counter_name, uint32_t coreId);
-	common::idp::get_shm_info::response getShmInfo();
-	common::idp::get_shm_tsc_info::response getShmTscInfo();
+	inline uint32_t get_current_time() const
+	{
+		return current_time;
+	}
 
 	template<typename type,
 	         typename... args_t>
@@ -284,7 +275,31 @@ protected:
 	void hugepage_destroy(void* pointer);
 	void hugepage_debug(tSocketId socket_id);
 
+protected:
+	eResult parseConfig(const std::string& configFilePath);
+	eResult parseJsonPorts(const nlohmann::json& json);
+	eResult parseConfigValues(const nlohmann::json& json);
+	eResult parseRateLimits(const nlohmann::json& json);
+	eResult parseSharedMemory(const nlohmann::json& json);
+	eResult checkConfig();
+
+	eResult initEal(const std::string& binaryPath, const std::string& filePrefix);
+	eResult initPorts();
+	eResult initRingPorts();
+	eResult initGlobalBases();
+	eResult initWorkers();
+	eResult initQueues();
+	void init_worker_base();
+
+	eResult allocateSharedMemory();
+	eResult splitSharedMemoryPerWorkers();
+
+	std::optional<uint64_t> getCounterValueByName(const std::string& counter_name, uint32_t coreId);
+	common::idp::get_shm_info::response getShmInfo();
+	common::idp::get_shm_tsc_info::response getShmTscInfo();
+
 	static int lcoreThread(void* args);
+	void timestamp_thread();
 
 protected:
 	friend class cWorker;
@@ -337,6 +352,7 @@ protected:
 	cReport report;
 	std::unique_ptr<cControlPlane> controlPlane;
 	cBus bus;
+	dataplane::neighbor::module neighbor;
 
 	// array instead of the table - how many coreIds can be there?
 	std::unordered_map<uint32_t, std::unordered_map<std::string, uint64_t*>> coreId_to_stats_tables;
@@ -345,4 +361,13 @@ protected:
 
 	std::mutex hugepage_pointers_mutex;
 	std::map<void*, hugepage_pointer> hugepage_pointers;
+
+	std::set<tSocketId> socket_ids;
+	std::map<tSocketId, worker_gc_t*> socket_worker_gcs;
+	std::vector<cWorker*> workers_vector;
+
+	std::mutex switch_worker_base_mutex;
+	uint32_t current_time;
+
+	std::vector<std::thread> threads;
 };
