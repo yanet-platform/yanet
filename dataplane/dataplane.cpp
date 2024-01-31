@@ -1591,7 +1591,7 @@ void cDataPlane::switch_worker_base()
 		std::lock_guard<std::mutex> guard(currentGlobalBaseId_mutex);
 		for (const auto& [socket_id, base_next] : base_nexts)
 		{
-			base_next->globalBase = globalBases[socket_id][currentGlobalBaseId ^ 1];
+			base_next->globalBase = globalBases[socket_id][currentGlobalBaseId];
 		}
 	}
 	neighbor.update_worker_base(base_nexts);
