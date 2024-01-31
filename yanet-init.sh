@@ -2,7 +2,7 @@
 
 case "$1" in
 	start)
-		cat /etc/yadecap/hugepages | tee /sys/devices/system/node/node*/hugepages/hugepages-1048576kB/nr_hugepages
+		cat /etc/yanet/hugepages | tee /sys/devices/system/node/node*/hugepages/hugepages-1048576kB/nr_hugepages
 		echo "off" | tee /sys/devices/system/cpu/smt/control || true
 
 		;;
