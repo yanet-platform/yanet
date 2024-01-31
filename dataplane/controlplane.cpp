@@ -1358,14 +1358,14 @@ void cControlPlane::switchGlobalBase()
 {
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
-	dataPlane->switch_worker_base();
-
-	YADECAP_MEMORY_BARRIER_COMPILE;
-
 	{
 		std::lock_guard<std::mutex> guard(dataPlane->currentGlobalBaseId_mutex);
 		dataPlane->currentGlobalBaseId ^= 1;
 	}
+
+	YADECAP_MEMORY_BARRIER_COMPILE;
+
+	dataPlane->switch_worker_base();
 
 	YADECAP_MEMORY_BARRIER_COMPILE;
 }
