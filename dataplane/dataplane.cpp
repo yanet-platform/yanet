@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <cstdint>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -27,6 +28,9 @@
 #include <sys/mman.h>
 
 #include "common.h"
+#include "common/idp.h"
+#include "common/result.h"
+#include "common/tsc_deltas.h"
 #include "dataplane.h"
 #include "globalbase.h"
 #include "report.h"
@@ -88,7 +92,8 @@ cDataPlane::cDataPlane() :
 	                {eConfigType::nat64stateful_states_size, YANET_CONFIG_NAT64STATEFUL_HT_SIZE},
 	                {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE},
 	                {eConfigType::balancer_state_ttl, 60},
-	                {eConfigType::balancer_state_ht_size, YANET_CONFIG_BALANCER_STATE_HT_SIZE}};
+	                {eConfigType::balancer_state_ht_size, YANET_CONFIG_BALANCER_STATE_HT_SIZE},
+	                {eConfigType::tsc_active_state, YANET_CONFIG_TSC_ACTIVE_STATE}};
 }
 
 cDataPlane::~cDataPlane()
@@ -1365,6 +1370,17 @@ eResult cDataPlane::allocateSharedMemory()
 		}
 	}
 
+	for (const auto& [socket_id, num] : number_of_workers_per_socket)
+	{
+		auto it = shm_size_per_socket.find(socket_id);
+		if (it == shm_size_per_socket.end())
+		{
+			it = shm_size_per_socket.emplace_hint(it, socket_id, 0);
+		}
+
+		it->second += sizeof(dataplane::perf::tsc_deltas) * (num + ((int)socket_id == numa_node_of_cpu(config.controlPlaneCoreId)));
+	}
+
 	/// allocating IPC shared memory
 	key_t key = YANET_DEFAULT_IPC_SHMKEY;
 	for (const auto& [socket_id, size] : shm_size_per_socket)
@@ -1474,6 +1490,25 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 		}
 	}
 
+	for (auto& [core_id, worker] : workers)
+	{
+		const auto& socket_id = worker->socketId;
+		const auto& it = shm_by_socket_id.find(socket_id);
+		if (it == shm_by_socket_id.end())
+		{
+			continue;
+		}
+		const auto& [key, shm] = it->second;
+
+		auto offset = offsets[shm];
+		worker->tsc_deltas = (dataplane::perf::tsc_deltas*)((intptr_t)shm + offset);
+		memset(worker->tsc_deltas, 0, sizeof(dataplane::perf::tsc_deltas));
+		offsets[shm] += sizeof(dataplane::perf::tsc_deltas);
+
+		auto meta = common::idp::get_shm_tsc_info::tsc_meta(core_id, socket_id, key, offset);
+		tscs_meta.emplace_back(meta);
+	}
+
 	return eResult::success;
 }
 
@@ -1483,6 +1518,16 @@ common::idp::get_shm_info::response cDataPlane::getShmInfo()
 	result.reserve(dumps_meta.size());
 
 	std::copy(dumps_meta.begin(), dumps_meta.end(), std::back_inserter(result));
+
+	return result;
+}
+
+common::idp::get_shm_tsc_info::response cDataPlane::getShmTscInfo()
+{
+	common::idp::get_shm_tsc_info::response result;
+	result.reserve(tscs_meta.size());
+
+	std::copy(tscs_meta.begin(), tscs_meta.end(), std::back_inserter(result));
 
 	return result;
 }
@@ -1898,6 +1943,11 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	if (exist(json, "balancer_state_ht_size"))
 	{
 		configValues[eConfigType::balancer_state_ht_size] = json["balancer_state_ht_size"];
+	}
+
+	if (exist(json, "tsc_active_state"))
+	{
+		configValues[eConfigType::tsc_active_state] = json["tsc_active_state"];
 	}
 
 	return eResult::success;

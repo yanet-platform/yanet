@@ -71,6 +71,8 @@ enum class requestType : uint32_t
 	version,
 	get_counter_by_name,
 	get_shm_info,
+	get_shm_tsc_info,
+	set_shm_tsc_state,
 	dump_physical_port,
 	balancer_state_clear,
 	neighbor_show,
@@ -162,7 +164,9 @@ enum class requestType : uint32_t
 	tun64mappings_update,
 	serial_update,
 	nat46clat_update,
-	dump_tags_ids
+	dump_tags_ids,
+	tsc_state_update,
+	tscs_base_value_update
 };
 
 namespace updateLogicalPort
@@ -488,6 +492,16 @@ namespace serial_update
 using request = uint32_t; ///< serial
 }
 
+namespace tsc_state_update
+{
+using request = bool;
+}
+
+namespace tscs_base_value_update
+{
+using request = std::tuple<uint32_t, uint32_t>;
+}
+
 using requestVariant = std::variant<std::tuple<>,
                                     updateLogicalPort::request,
                                     updateDecap::request,
@@ -520,9 +534,10 @@ using requestVariant = std::variant<std::tuple<>,
                                     dregress_neighbor_update::request,
                                     dregress_value_update::request,
                                     fwstate_synchronization_update::request,
-                                    sampler_update::request, /// + update_early_decap_flags::request
+                                    sampler_update::request, /// + update_early_decap_flags::request, tsc_state_update::request
                                     serial_update::request,
-                                    nat46clat_update::request>;
+                                    nat46clat_update::request,
+                                    tscs_base_value_update::request>;
 
 using request = std::vector<std::tuple<requestType,
                                        requestVariant>>;
@@ -875,6 +890,16 @@ using dump_meta = std::tuple<std::string, ///< ring name
 using response = std::vector<dump_meta>;
 }
 
+namespace get_shm_tsc_info
+{
+using tsc_meta = std::tuple<tCoreId, ///< core id
+                            tSocketId, ///< socket id
+                            key_t, /// ipc shm key
+                            uint64_t>; /// offset
+
+using response = std::vector<tsc_meta>;
+}
+
 namespace dump_physical_port
 {
 using request = std::tuple<std::string, ///< interface_name
@@ -1012,6 +1037,7 @@ using response = std::variant<std::tuple<>,
                               samples::response,
                               get_counter_by_name::response,
                               get_shm_info::response,
+                              get_shm_tsc_info::response,
                               neighbor_show::response,
                               neighbor_stats::response>;
 }

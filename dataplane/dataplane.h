@@ -60,6 +60,7 @@ enum class eConfigType
 	kernel_interface_queue_size,
 	balancer_state_ttl,
 	balancer_state_ht_size,
+	tsc_active_state,
 };
 
 struct tDataPlaneConfig
@@ -295,6 +296,7 @@ protected:
 
 	std::optional<uint64_t> getCounterValueByName(const std::string& counter_name, uint32_t coreId);
 	common::idp::get_shm_info::response getShmInfo();
+	common::idp::get_shm_tsc_info::response getShmTscInfo();
 
 	static int lcoreThread(void* args);
 	void timestamp_thread();
@@ -343,6 +345,8 @@ protected:
 
 	common::idp::get_shm_info::response dumps_meta;
 	std::map<std::string, uint64_t> tag_to_id;
+
+	common::idp::get_shm_tsc_info::response tscs_meta;
 
 	/// modules
 	cReport report;

@@ -97,6 +97,18 @@ void fillValue(std::optional<TArg>& value, const std::string& string)
 	}
 }
 
+void fillValue(bool& value, const std::string& string)
+{
+	if (string == "false" || string == "true")
+	{
+		value = string == "true";
+	}
+	else
+	{
+		throw std::string("invalid argument, must be true or false");
+	}
+}
+
 void fillValue(uint8_t& value, const std::string& string)
 {
 	value = std::stoull(string, nullptr, 0);
@@ -425,6 +437,13 @@ public:
 		{
 			print_default();
 		}
+	}
+
+	void render()
+	{
+		printf("\033[2J\033[H");
+		print_default();
+		table.clear();
 	}
 
 protected:

@@ -9,6 +9,7 @@
 
 #include "common/idp.h"
 #include "common/result.h"
+#include "common/tsc_deltas.h"
 
 #include "common.h"
 #include "dynamic_table.h"
@@ -51,9 +52,9 @@ struct transport_layer_t
 	struct
 	{
 		/** @todo:
-			flat<uint8_t> type;
-			flat<uint8_t> code;
-			*/
+		        flat<uint8_t> type;
+		        flat<uint8_t> code;
+		        */
 		flat<uint16_t> type_code;
 		flat<uint16_t> identifier;
 	} icmp;
@@ -121,6 +122,8 @@ public: ///< @todo
 	nat64stateful::lan_ht* nat64stateful_lan_state;
 	nat64stateful::wan_ht* nat64stateful_wan_state;
 	balancer::state_ht* balancer_state;
+
+	bool tsc_active_state;
 };
 
 //
@@ -177,6 +180,8 @@ protected:
 	eResult fwstate_synchronization_update(const common::idp::updateGlobalBase::fwstate_synchronization_update::request& request);
 	eResult tun64_update(const common::idp::updateGlobalBase::tun64_update::request& request);
 	eResult tun64mappings_update(const common::idp::updateGlobalBase::tun64mappings_update::request& request);
+	eResult tsc_state_update(const common::idp::updateGlobalBase::tsc_state_update::request& request);
+	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 
 	void evaluate_service_ring(uint32_t next_balancer_reals_id);
 	inline uint64_t count_real_connections(uint32_t counter_id);
@@ -298,6 +303,9 @@ public: ///< @todo
 	balancer_service_ring_t balancer_service_rings[2];
 
 	int64_t dump_id_to_tag[YANET_CONFIG_DUMP_ID_TO_TAG_SIZE];
+
+	bool tscs_active;
+	dataplane::perf::tsc_base_values tsc_base_values;
 };
 
 }
