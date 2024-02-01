@@ -9,6 +9,7 @@
 #include <rte_ring.h>
 
 #include "common/result.h"
+#include "common/tsc_deltas.h"
 #include "common/type.h"
 
 #include "base.h"
@@ -316,7 +317,7 @@ protected:
 	rte_ring* ring_highPriority;
 	rte_ring* ring_normalPriority;
 	rte_ring* ring_lowPriority;
-
+	dataplane::perf::tsc_deltas* tsc_deltas;
 	rte_ring* ring_toFreePackets;
 
 	rte_ring* ring_log;
