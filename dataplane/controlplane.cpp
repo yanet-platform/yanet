@@ -2595,11 +2595,11 @@ void cControlPlane::handlePacket_repeat(rte_mbuf* mbuf)
 	{
 		const rte_vlan_hdr* vlanHeader = rte_pktmbuf_mtod_offset(mbuf, rte_vlan_hdr*, sizeof(rte_ether_hdr));
 
-		metadata->flow.data.logicalPortId = (rte_be_to_cpu_16(vlanHeader->vlan_tci & 0xFF0F) << 3) | metadata->fromPortId;
+		metadata->flow.data.logicalPortId = CALCULATE_LOGICALPORT_ID(metadata->fromPortId, rte_be_to_cpu_16(vlanHeader->vlan_tci));
 	}
 	else
 	{
-		metadata->flow.data.logicalPortId = metadata->fromPortId;
+		metadata->flow.data.logicalPortId = CALCULATE_LOGICALPORT_ID(metadata->fromPortId, 0);
 	}
 
 	/// @todo: opt

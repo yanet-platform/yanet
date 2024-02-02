@@ -85,6 +85,8 @@ extern LogPriority logPriority;
 
 #define YANET_BALANCER_OPS_FLAG ((uint8_t)(1u << 1))
 
+#define CALCULATE_LOGICALPORT_ID(portId, vlanId) ((portId << 13) | ((vlanId & 0xFFF) << 1) | 1)
+
 #if __cpp_exceptions
 #define YANET_THROW(string) throw string
 #else // __cpp_exceptions

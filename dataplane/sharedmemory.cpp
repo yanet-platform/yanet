@@ -2,6 +2,8 @@
 #include "common/type.h"
 #include "metadata.h"
 
+using namespace sharedmemory;
+
 eResult cSharedMemory::init(void* memory, int unit_size, int units_number)
 {
 	buffer = common::bufferring(memory, unit_size, units_number);
@@ -21,11 +23,11 @@ void cSharedMemory::write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_typ
 
 	uint64_t wpos = (buffer.ring->header.before) % buffer.units_number;
 	buffer.ring->header.before++;
-	common::bufferring::item_t* item = (common::bufferring::item_t*)((uintptr_t)buffer.ring->memory + (wpos * buffer.unit_size));
+	item_t* item = (item_t*)((uintptr_t)buffer.ring->memory + (wpos * buffer.unit_size));
 
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-	uint64_t memory_size = buffer.unit_size - sizeof(cSharedMemory::ring_header_t);
+	uint64_t memory_size = buffer.unit_size - sizeof(ring_header_t);
 	uint64_t copy_size = RTE_MIN(memory_size, mbuf->data_len);
 
 	item->header.size = copy_size;

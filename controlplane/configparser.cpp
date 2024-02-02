@@ -227,7 +227,7 @@ void config_parser_t::loadConfig_logicalPort(controlplane::base_t& baseNext,
 
 	//
 
-	logicalPort.logicalPortId = (logicalPort.vlanId << 3) | logicalPort.physicalPortId;
+	logicalPort.logicalPortId = CALCULATE_LOGICALPORT_ID(logicalPort.physicalPortId, logicalPort.vlanId);
 	baseNext.logicalport_id_to_name[logicalPort.logicalPortId] = moduleId;
 }
 

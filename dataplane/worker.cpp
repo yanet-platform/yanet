@@ -1018,7 +1018,7 @@ inline void cWorker::handlePackets()
 }
 
 static_assert(CONFIG_YADECAP_PORTS_SIZE == 8, "(vlanId << 3) | metadata->fromPortId");
-static_assert(CONFIG_YADECAP_LOGICALPORTS_SIZE == CONFIG_YADECAP_PORTS_SIZE * 4096, "base.globalBase->logicalPorts[(vlanId << 3) | metadata->fromPortId]");
+static_assert(CONFIG_YADECAP_LOGICALPORTS_SIZE == CONFIG_YADECAP_PORTS_SIZE * 8192, "base.globalBase->logicalPorts[CALCULATE_LOGICALPORT_ID(metadata->fromPortId, vlanId)]");
 
 inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port_i)
 {
@@ -1048,11 +1048,11 @@ inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port
 		{
 			const rte_vlan_hdr* vlanHeader = rte_pktmbuf_mtod_offset(mbuf, rte_vlan_hdr*, sizeof(rte_ether_hdr));
 
-			metadata->flow.data.logicalPortId = (rte_be_to_cpu_16(vlanHeader->vlan_tci & 0xFF0F) << 3) | metadata->fromPortId;
+			metadata->flow.data.logicalPortId = CALCULATE_LOGICALPORT_ID(metadata->fromPortId, rte_be_to_cpu_16(vlanHeader->vlan_tci));
 		}
 		else
 		{
-			metadata->flow.data.logicalPortId = metadata->fromPortId;
+			metadata->flow.data.logicalPortId = CALCULATE_LOGICALPORT_ID(metadata->fromPortId, 0);
 		}
 		metadata->in_logicalport_id = metadata->flow.data.logicalPortId;
 
