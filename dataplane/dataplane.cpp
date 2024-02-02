@@ -1358,13 +1358,13 @@ eResult cDataPlane::allocateSharedMemory()
 	{
 		const auto& [dump_size, dump_count] = ring_cfg.second;
 
-		auto unit_size = sizeof(cSharedMemory::item_header_t) + dump_size;
+		auto unit_size = sizeof(sharedmemory::item_header_t) + dump_size;
 		if (unit_size % RTE_CACHE_LINE_SIZE != 0)
 		{
 			unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
 		}
 
-		auto size = sizeof(cSharedMemory::ring_header_t) + unit_size * dump_count;
+		auto size = sizeof(sharedmemory::ring_header_t) + unit_size * dump_count;
 
 		for (const auto& [socket_id, num] : number_of_workers_per_socket)
 		{
@@ -1462,13 +1462,13 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 		{
 			const auto& [dump_size, units_number] = ring_cfg;
 
-			auto unit_size = sizeof(cSharedMemory::item_header_t) + dump_size;
+			auto unit_size = sizeof(sharedmemory::item_header_t) + dump_size;
 			if (unit_size % RTE_CACHE_LINE_SIZE != 0)
 			{
 				unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
 			}
 
-			auto size = sizeof(cSharedMemory::ring_header_t) + unit_size * units_number;
+			auto size = sizeof(sharedmemory::ring_header_t) + unit_size * units_number;
 			if (size % RTE_CACHE_LINE_SIZE != 0)
 			{
 				size += RTE_CACHE_LINE_SIZE - size % RTE_CACHE_LINE_SIZE; /// round up
@@ -1480,7 +1480,7 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 
 			auto memaddr = (void*)((intptr_t)shm + offset);
 
-			cSharedMemory ring;
+			sharedmemory::cSharedMemory ring;
 
 			ring.init(memaddr, unit_size, units_number);
 
