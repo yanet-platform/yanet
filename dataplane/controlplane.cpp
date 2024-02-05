@@ -1,4 +1,5 @@
 #include <linux/if.h>
+#include <optional>
 #include <sys/ioctl.h>
 #include <sys/un.h>
 
@@ -1033,6 +1034,7 @@ common::idp::balancer_connection::response cControlPlane::balancer_connection(co
 					iter.unlock();
 
 					const auto& balancer_id = key.balancer_id;
+					const auto& l3_balancing = key.l3_balancing;
 					const auto& virtual_ip = common::ip_address_t(key.addr_type, key.ip_destination.bytes);
 
 					const auto& proto = key.protocol;
@@ -1081,11 +1083,11 @@ common::idp::balancer_connection::response cControlPlane::balancer_connection(co
 					auto& connections = response_connections[{balancer_id,
 					                                          virtual_ip,
 					                                          proto,
-					                                          rte_be_to_cpu_16(virtual_port),
-					                                          {real_ip, rte_be_to_cpu_16(real_port)}}];
+					                                          l3_balancing ? std::nullopt : std::make_optional(rte_be_to_cpu_16(virtual_port)),
+					                                          {real_ip, l3_balancing ? std::nullopt : std::make_optional(rte_be_to_cpu_16(real_port))}}];
 
 					connections.emplace_back(client_ip,
-					                         rte_be_to_cpu_16(client_port),
+					                         l3_balancing ? std::nullopt : std::make_optional(rte_be_to_cpu_16(client_port)),
 					                         value.timestamp_create,
 					                         value.timestamp_last_packet,
 					                         value.timestamp_gc);

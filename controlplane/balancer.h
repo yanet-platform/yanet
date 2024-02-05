@@ -17,11 +17,11 @@ namespace balancer
 {
 
 using real_key_t = std::tuple<common::ip_address_t,
-                              uint16_t>; ///< port
+                              std::optional<uint16_t>>; ///< port
 
 using service_key_t = std::tuple<common::ip_address_t,
                                  uint8_t, ///< proto
-                                 uint16_t>; ///< port
+                                 std::optional<uint16_t>>; ///< port
 
 using service_counter_key_t = std::tuple<std::string, ///< module_name
                                          service_key_t>;

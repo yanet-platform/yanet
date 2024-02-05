@@ -1,3 +1,5 @@
+#include <optional>
+
 #include "balancer.h"
 #include "controlplane.h"
 
@@ -112,7 +114,11 @@ void balancer_t::RealFind(
 					proto_service_key->set_proto(::common::icp_proto::NetProto::udp);
 					break;
 			}
-			proto_service_key->set_port(port);
+
+			if (port.has_value())
+			{
+				proto_service_key->set_port(port.value());
+			}
 
 			const auto& [scheduler, version, reals] = service_value;
 
@@ -126,7 +132,12 @@ void balancer_t::RealFind(
 			{
 				auto proto_real = proto_service->add_reals();
 				setip(proto_real->mutable_ip(), ip);
-				proto_real->set_port(port);
+
+				if (port.has_value())
+				{
+					proto_real->set_port(port.value());
+				}
+
 				proto_real->set_enabled(enabled);
 				proto_real->set_weight(weight);
 				proto_real->set_connections(connections);
@@ -150,11 +161,11 @@ void balancer_t::Real(
 		request.push_back({real.module(),
 		                   convert_to_ip_address(real.virtual_ip()),
 		                   real.proto() == common::icp_proto::NetProto::tcp ? IPPROTO_TCP : IPPROTO_UDP,
-		                   real.virtual_port(),
+		                   real.has_virtual_port() ? std::make_optional(real.virtual_port()) : std::nullopt,
 		                   convert_to_ip_address(real.real_ip()),
-		                   real.real_port(),
+		                   real.has_real_port() ? std::make_optional(real.real_port()) : std::nullopt,
 		                   real.enable(),
-		                   real.has_weight() ? std::optional<uint32_t>(real.weight()) : std::nullopt});
+		                   real.has_weight() ? std::make_optional(real.weight()) : std::nullopt});
 	}
 
 	balancer_real(request);
@@ -259,7 +270,7 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 
 	for (const auto& [module_name, balancer] : base_next.balancers)
 	{
-		std::unordered_set<std::tuple<common::ip_address_t, uint16_t, uint8_t>> vip_vport_proto;
+		std::unordered_set<std::tuple<common::ip_address_t, std::optional<uint16_t>, uint8_t>> vip_vport_proto;
 
 		for (const auto& [service_id,
 		                  virtual_ip,
