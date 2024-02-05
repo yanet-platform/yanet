@@ -1719,7 +1719,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			common::ip_address_t real_ip(real_json["ip"].get<std::string>());
 
 			reals.emplace_back(real_ip,
-			                   std::stoll(real_json["port"].get<std::string>(), nullptr, 0),
+			                   exist(real_json, "port") ? std::make_optional(std::stoll(real_json["port"].get<std::string>(), nullptr, 0)) : std::nullopt,
 			                   weight);
 
 			balancer.reals_count++;
@@ -1737,6 +1737,11 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			flags |= YANET_BALANCER_FIX_MSS_FLAG;
 		}
 
+		if (!exist(service_json, "vport"))
+		{
+			flags |= YANET_BALANCER_PURE_L3;
+		}
+
 		auto proto = controlplane::balancer::to_proto(service_json["proto"].get<std::string>());
 
 		if (service_json.value("ops", false) && proto == IPPROTO_UDP)
@@ -1747,7 +1752,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 		balancer.services.emplace_back(baseNext.services_count + 1, ///< 0 is invalid id
 		                               service_json["vip"].get<std::string>(),
 		                               proto,
-		                               std::stoll(service_json["vport"].get<std::string>(), nullptr, 0),
+		                               exist(service_json, "vport") ? std::make_optional(std::stoll(service_json["vport"].get<std::string>(), nullptr, 0)) : std::nullopt,
 		                               service_version,
 		                               scheduler,
 		                               scheduler_params,

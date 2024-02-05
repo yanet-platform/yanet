@@ -296,7 +296,7 @@ namespace telegraf_balancer_service
 {
 using service = std::tuple<common::ip_address_t, ///< virtual_ip
                            uint8_t, ///< proto
-                           uint16_t, ///< virtual_port
+                           std::optional<uint16_t>, ///< virtual_port
                            uint64_t, ///< connections
                            uint64_t, ///< packets
                            uint64_t, ///< bytes
@@ -448,14 +448,14 @@ using response = std::map<std::tuple<balancer_id_t,
                                      std::string>, ///< module
                           std::map<std::tuple<common::ip_address_t, ///< virtual_ip
                                               uint8_t, ///< proto
-                                              uint16_t>, ///< virtual_port
+                                              std::optional<uint16_t>>, ///< virtual_port
                                    service>>;
 }
 
 namespace balancer_real_find
 {
 using real = std::tuple<common::ip_address_t, ///< real_ip
-                        uint16_t, ///< real_port
+                        std::optional<uint16_t>, ///< real_port
                         bool, ///< enabled
                         uint32_t, ///< weight
                         uint64_t, ///< connections
@@ -477,7 +477,7 @@ using response = std::map<std::tuple<balancer_id_t,
                                      std::string>, ///< module
                           std::map<std::tuple<common::ip_address_t, ///< virtual_ip
                                               uint8_t, ///< proto
-                                              uint16_t>, ///< virtual_port
+                                              std::optional<uint16_t>>, ///< virtual_port
                                    service>>;
 }
 
@@ -486,9 +486,9 @@ namespace balancer_real
 using real = std::tuple<std::string, ///< module
                         common::ip_address_t, ///< virtual_ip
                         uint8_t, ///< proto
-                        uint16_t, ///< virtual_port
+                        std::optional<uint16_t>, ///< virtual_port
                         common::ip_address_t, ///< real_ip
-                        uint16_t, ///< real_port
+                        std::optional<uint16_t>, ///< real_port
                         bool, ///< enable
                         std::optional<uint32_t>>; ///< weight
 

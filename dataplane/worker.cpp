@@ -16,6 +16,7 @@
 #include <rte_udp.h>
 
 #include "common/counters.h"
+#include "common/define.h"
 #include "common/fallback.h"
 #include "common/nat46clat.h"
 
@@ -409,7 +410,7 @@ YANET_NEVER_INLINE void cWorker::mainThread()
 	}
 }
 
-inline void cWorker::calcHash(rte_mbuf* mbuf)
+inline void cWorker::calcHash(rte_mbuf* mbuf, uint8_t flags)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -430,7 +431,7 @@ inline void cWorker::calcHash(rte_mbuf* mbuf)
 		metadata->hash = rte_hash_crc(&ipv6Header->src_addr, 16 + 16, metadata->hash);
 	}
 
-	if (!(metadata->network_flags & YANET_NETWORK_FLAG_NOT_FIRST_FRAGMENT))
+	if (!((metadata->network_flags & YANET_NETWORK_FLAG_NOT_FIRST_FRAGMENT) || (flags & YANET_BALANCER_PURE_L3)))
 	{
 		if (metadata->transport_headerType == IPPROTO_ICMP)
 		{
@@ -4002,7 +4003,11 @@ inline void cWorker::balancer_handle()
 		rte_mbuf* mbuf = balancer_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		calcHash(mbuf);
+		///                                                     [metadata->flow.data.balancer.service_id];
+		const balancer_service_id_t service_id = metadata->flow.data.atomic >> 8;
+		const auto& service = base.globalBase->balancer_services[service_id];
+
+		calcHash(mbuf, service.flags);
 		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
 
 		auto& key = balancer_keys[mbuf_i];
@@ -4012,6 +4017,7 @@ inline void cWorker::balancer_handle()
 
 			key.balancer_id = metadata->flow.data.balancer.id;
 			key.protocol = metadata->transport_headerType;
+			key.l3_balancing = service.flags & YANET_BALANCER_PURE_L3;
 			key.addr_type = 4;
 			memset(key.ip_source.nap, 0, sizeof(key.ip_source.nap));
 			key.ip_source.mapped_ipv4_address.address = ipv4Header->src_addr;
@@ -4019,6 +4025,12 @@ inline void cWorker::balancer_handle()
 			key.ip_destination.mapped_ipv4_address.address = ipv4Header->dst_addr;
 			key.port_source = 0;
 			key.port_destination = 0;
+
+			if (key.l3_balancing)
+			{
+				continue;
+			}
+
 			if (metadata->transport_headerType == IPPROTO_TCP)
 			{
 				rte_tcp_hdr* tcpHeader = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
@@ -4046,11 +4058,18 @@ inline void cWorker::balancer_handle()
 
 			key.balancer_id = metadata->flow.data.balancer.id;
 			key.protocol = metadata->transport_headerType;
+			key.l3_balancing = service.flags & YANET_BALANCER_PURE_L3;
 			key.addr_type = 6;
 			memcpy(key.ip_source.bytes, ipv6Header->src_addr, 16);
 			memcpy(key.ip_destination.bytes, ipv6Header->dst_addr, 16);
 			key.port_source = 0;
 			key.port_destination = 0;
+
+			if (key.l3_balancing)
+			{
+				continue;
+			}
+
 			if (metadata->transport_headerType == IPPROTO_TCP)
 			{
 				rte_tcp_hdr* tcpHeader = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
@@ -4088,7 +4107,6 @@ inline void cWorker::balancer_handle()
 
 		const auto& balancer = base.globalBase->balancers[metadata->flow.data.balancer.id];
 
-		///                                                     [metadata->flow.data.balancer.service_id];
 		const balancer_service_id_t service_id = metadata->flow.data.atomic >> 8;
 		const auto& service = base.globalBase->balancer_services[service_id];
 
@@ -4538,6 +4556,10 @@ inline void cWorker::balancer_icmp_forward_handle()
 		rte_mbuf* mbuf = balancer_icmp_forward_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
+		///                                                     [metadata->flow.data.balancer.service_id];
+		const balancer_service_id_t service_id = metadata->flow.data.atomic >> 8;
+		const auto& service = base.globalBase->balancer_services[service_id];
+
 		auto& key = balancer_keys[mbuf_i];
 
 		if (metadata->transport_headerType == IPPROTO_ICMP)
@@ -4576,6 +4598,7 @@ inline void cWorker::balancer_icmp_forward_handle()
 			key.balancer_id = metadata->flow.data.balancer.id; // filled previously by metadata->flow = flow;
 
 			key.protocol = inner_metadata.transport_headerType;
+			key.l3_balancing = service.flags & YANET_BALANCER_PURE_L3;
 			key.addr_type = 4;
 
 			memset(key.ip_source.nap, 0, sizeof(key.ip_source.nap)); // swapped src and dst to determine key
@@ -4585,6 +4608,11 @@ inline void cWorker::balancer_icmp_forward_handle()
 
 			key.port_source = 0;
 			key.port_destination = 0;
+
+			if (key.l3_balancing)
+			{
+				continue;
+			}
 
 			if (key.protocol == IPPROTO_TCP)
 			{
@@ -4642,6 +4670,7 @@ inline void cWorker::balancer_icmp_forward_handle()
 			key.balancer_id = metadata->flow.data.balancer.id; // filled previously by metadata->flow = flow;
 
 			key.protocol = inner_metadata.transport_headerType;
+			key.l3_balancing = service.flags & YANET_BALANCER_PURE_L3;
 			key.addr_type = 6;
 
 			memcpy(key.ip_source.bytes, innerIpv6Header->dst_addr, 16); // swapped src and dst to determine key
@@ -4649,6 +4678,11 @@ inline void cWorker::balancer_icmp_forward_handle()
 
 			key.port_source = 0;
 			key.port_destination = 0;
+
+			if (key.l3_balancing)
+			{
+				continue;
+			}
 
 			if (key.protocol == IPPROTO_TCP)
 			{
@@ -4693,7 +4727,6 @@ inline void cWorker::balancer_icmp_forward_handle()
 
 		const auto& balancer = base.globalBase->balancers[metadata->flow.data.balancer.id];
 
-		///                                                     [metadata->flow.data.balancer.service_id];
 		const balancer_service_id_t service_id = metadata->flow.data.atomic >> 8;
 		const auto& service = base.globalBase->balancer_services[service_id];
 

@@ -2653,12 +2653,12 @@ struct hash<common::ip_address_t>
 };
 
 template<>
-struct hash<std::tuple<common::ip_address_t, uint16_t, uint8_t>>
+struct hash<std::tuple<common::ip_address_t, std::optional<uint16_t>, uint8_t>>
 {
-	std::size_t operator()(const std::tuple<common::ip_address_t, uint16_t, uint8_t> vip_vport_proto) const
+	std::size_t operator()(const std::tuple<common::ip_address_t, std::optional<uint16_t>, uint8_t> vip_vport_proto) const
 	{
 		common::ip_address_t vip = std::get<0>(vip_vport_proto);
-		uint16_t vport = std::get<1>(vip_vport_proto);
+		std::optional<uint16_t> vport = std::get<1>(vip_vport_proto);
 		uint8_t proto = std::get<2>(vip_vport_proto);
 
 		std::size_t res = 0;
