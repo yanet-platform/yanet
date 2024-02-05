@@ -1,0 +1,77 @@
+steps:
+- ipv4Update:
+  - "0.0.0.0/0 -> 200.0.0.1"
+  - "100.0.0.0/8 -> 100.0.0.5"
+- ipv6Update: "::/0 -> fe80::1"
+- cli:
+  - balancer real enable balancer0 10.0.0.16 tcp any 100.0.0.1 any
+  - balancer real enable balancer0 10.0.0.16 udp 0 100.0.0.1 0
+  - balancer real enable balancer0 10.0.0.16 udp 0 100.0.0.2 0
+  - balancer real enable balancer0 10.0.0.16 udp 0 100.0.0.3 0
+  - balancer real enable balancer0 10.0.0.16 udp 0 100.0.0.4 0
+
+  - balancer real enable balancer0 2004:dead:beef::1 tcp any 2006::1 any
+  - balancer real enable balancer0 2004:dead:beef::1 udp 80 2006::1 80
+  - balancer real enable balancer0 2004:dead:beef::1 udp 80 2006::2 80
+  - balancer real enable balancer0 2004:dead:beef::1 udp 80 2006::3 80
+  - balancer real enable balancer0 2004:dead:beef::1 udp 80 2006::4 80
+  - balancer real flush
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 any
+    module     virtual_ip         proto  virtual_port  scheduler  real_ip    real_port  enabled  weight  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  ---------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.16          tcp    n/s           rr         100.0.0.1  n/s        true     1       0            0        0
+    balancer0  10.0.0.16          tcp    n/s           rr         100.0.0.2  n/s        false    1       0            0        0
+    balancer0  10.0.0.16          tcp    n/s           rr         100.0.0.3  n/s        false    1       0            0        0
+    balancer0  10.0.0.16          tcp    n/s           rr         100.0.0.4  n/s        false    1       0            0        0
+    balancer0  10.0.0.16          udp    0             rr         100.0.0.1  0          true     1       0            0        0
+    balancer0  10.0.0.16          udp    0             rr         100.0.0.2  0          true     1       0            0        0
+    balancer0  10.0.0.16          udp    0             rr         100.0.0.3  0          true     1       0            0        0
+    balancer0  10.0.0.16          udp    0             rr         100.0.0.4  0          true     1       0            0        0
+    balancer0  2004:dead:beef::1  tcp    n/s           rr         2006::1    n/s        true     1       0            0        0
+    balancer0  2004:dead:beef::1  tcp    n/s           rr         2006::2    n/s        false    1       0            0        0
+    balancer0  2004:dead:beef::1  tcp    n/s           rr         2006::3    n/s        false    1       0            0        0
+    balancer0  2004:dead:beef::1  tcp    n/s           rr         2006::4    n/s        false    1       0            0        0
+    balancer0  2004:dead:beef::1  udp    80            rr         2006::1    80         true     1       0            0        0
+    balancer0  2004:dead:beef::1  udp    80            rr         2006::2    80         true     1       0            0        0
+    balancer0  2004:dead:beef::1  udp    80            rr         2006::3    80         true     1       0            0        0
+    balancer0  2004:dead:beef::1  udp    80            rr         2006::4    80         true     1       0            0        0
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- cli:
+  - balancer real enable balancer0 10.0.0.16 tcp any 100.0.0.2 any
+  - balancer real enable balancer0 10.0.0.16 tcp any 100.0.0.3 any
+  - balancer real enable balancer0 10.0.0.16 tcp any 100.0.0.4 any
+  - balancer real enable balancer0 2004:dead:beef::1 tcp any 2006::2 any
+  - balancer real enable balancer0 2004:dead:beef::1 tcp any 2006::3 any
+  - balancer real enable balancer0 2004:dead:beef::1 tcp any 2006::4 any
+  - balancer real flush
+- sleep: 1
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+- sleep : 1
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+- sleep: 1
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 any tcp
+    module     virtual_ip         proto  virtual_port  scheduler  real_ip    real_port  enabled  weight  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  ---------  ---------  -------  ------  -----------  -------  -----
+    balancer0  10.0.0.16          tcp    n/s           rr         100.0.0.1  n/s        true     1       2            8        624
+    balancer0  10.0.0.16          tcp    n/s           rr         100.0.0.2  n/s        true     1       1            3        234
+    balancer0  10.0.0.16          tcp    n/s           rr         100.0.0.3  n/s        true     1       1            3        234
+    balancer0  10.0.0.16          tcp    n/s           rr         100.0.0.4  n/s        true     1       2            6        468
+    balancer0  2004:dead:beef::1  tcp    n/s           rr         2006::1    n/s        true     1       3            11       1298
+    balancer0  2004:dead:beef::1  tcp    n/s           rr         2006::2    n/s        true     1       1            3        354
+    balancer0  2004:dead:beef::1  tcp    n/s           rr         2006::3    n/s        true     1       1            3        354
+    balancer0  2004:dead:beef::1  tcp    n/s           rr         2006::4    n/s        true     1       1            3        354

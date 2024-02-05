@@ -250,10 +250,10 @@ void real_find(std::string module_string,
 				table.insert(balancer.module(),
 				             virtual_ip,
 				             proto_string,
-				             service.key().port(),
+				             service.key().has_port() ? std::make_optional(service.key().port()) : std::nullopt,
 				             service.scheduler(),
 				             real_ip,
-				             real.port(),
+				             real.has_port() ? std::make_optional(real.port()) : std::nullopt,
 				             real.enabled(),
 				             real.weight(),
 				             connections,
@@ -309,10 +309,10 @@ void state(std::string module,
 	std::map<balancer_id_t,
 	         std::map<std::tuple<common::ip_address_t, ///< virtual_ip
 	                             uint8_t, ///< proto
-	                             uint16_t>, ///< virtual_port
+	                             std::optional<uint16_t>>, ///< virtual_port
 	                  std::map<common::idp::balancer_connection::real_key,
 	                           std::map<std::tuple<common::ip_address_t, ///< client_ip
-	                                               uint16_t>, ///< client_port
+	                                               std::optional<uint16_t>>, ///< client_port
 	                                    std::tuple<uint32_t, ///< timestamp_create
 	                                               uint16_t>>>>>
 	        total_connections; ///< timestamp_last_packet
@@ -411,9 +411,9 @@ namespace real
 void change_state(const std::string& module,
                   const common::ip_address_t& virtual_ip,
                   const std::string& proto,
-                  const uint16_t& virtual_port,
+                  const std::optional<uint16_t>& virtual_port,
                   const common::ip_address_t& real_ip,
-                  const uint16_t& real_port,
+                  const std::optional<uint16_t>& real_port,
                   const bool enable,
                   std::optional<uint32_t> weight)
 {
@@ -433,9 +433,17 @@ void change_state(const std::string& module,
 	{
 		YANET_LOG_WARNING("undefined net protocol requested: %s", proto.c_str());
 	}
-	real->set_virtual_port(virtual_port);
+
 	setip(real->mutable_real_ip(), real_ip);
-	real->set_real_port(real_port);
+	if (virtual_port.has_value())
+	{
+		real->set_virtual_port(virtual_port.value());
+	}
+	if (real_port.has_value())
+	{
+		real->set_real_port(real_port.value());
+	}
+
 	real->set_enable(enable);
 
 	if (weight)
@@ -450,9 +458,9 @@ void change_state(const std::string& module,
 void enable(const std::string& module,
             const common::ip_address_t& virtual_ip,
             const std::string& proto,
-            const uint16_t& virtual_port,
+            const std::optional<uint16_t>& virtual_port,
             const common::ip_address_t& real_ip,
-            const uint16_t& real_port,
+            const std::optional<uint16_t>& real_port,
             std::optional<uint32_t> weight)
 {
 	change_state(module, virtual_ip, proto, virtual_port, real_ip, real_port, true, weight);
@@ -461,9 +469,9 @@ void enable(const std::string& module,
 void disable(const std::string& module,
              const common::ip_address_t& virtual_ip,
              const std::string& proto,
-             const uint16_t& virtual_port,
+             const std::optional<uint16_t>& virtual_port,
              const common::ip_address_t& real_ip,
-             const uint16_t& real_port)
+             const std::optional<uint16_t>& real_port)
 {
 	change_state(module, virtual_ip, proto, virtual_port, real_ip, real_port, false, std::nullopt);
 }

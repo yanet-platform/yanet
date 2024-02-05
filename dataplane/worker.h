@@ -74,7 +74,7 @@ protected:
 
 	YANET_NEVER_INLINE void mainThread();
 
-	inline void calcHash(rte_mbuf* mbuf);
+	inline void calcHash(rte_mbuf* mbuf, uint8_t without_ports = 0);
 	void preparePacket(rte_mbuf* mbuf); ///< @todo: inline
 
 	constexpr static uint32_t translation_ignore = 0xFFFFFFFFu;

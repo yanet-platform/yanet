@@ -780,7 +780,8 @@ struct balancer_state_key_t
 {
 	uint8_t balancer_id;
 	uint8_t protocol;
-	uint16_t addr_type; // 4=ip4, 6=ip6.
+	uint8_t l3_balancing;
+	uint8_t addr_type; // 4=ip4, 6=ip6.
 
 	ipv6_address_t ip_source;
 	ipv6_address_t ip_destination;

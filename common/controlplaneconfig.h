@@ -298,13 +298,13 @@ constexpr const char* from_proto(const uint8_t& proto)
 }
 
 using real_t = std::tuple<common::ip_address_t,
-                          uint16_t, ///< port
+                          std::optional<uint16_t>, ///< port
                           uint32_t>; ///< weight
 
 using service_t = std::tuple<balancer_service_id_t,
                              common::ip_address_t, ///< vip
                              uint8_t, ///< proto
-                             uint16_t, ///< vport
+                             std::optional<uint16_t>, ///< vport
                              std::optional<std::string>, ///< version
                              ::balancer::scheduler,
                              ::balancer::scheduler_params,

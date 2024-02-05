@@ -185,7 +185,7 @@ protected:
 	// provided by unrdup.cfg, used to clone some icmp packets to neighbor balancers, index is balancer_id
 	std::vector<std::unordered_map<common::ip_address_t, std::unordered_set<common::ip_address_t>>> vip_to_balancers;
 	// check presence prior to cloning
-	std::vector<std::unordered_set<std::tuple<common::ip_address_t, uint16_t, uint8_t>>> vip_vport_proto;
+	std::vector<std::unordered_set<std::tuple<common::ip_address_t, std::optional<uint16_t>, uint8_t>>> vip_vport_proto;
 
 	std::chrono::high_resolution_clock::time_point prevTimePointForSWRateLimiter;
 
