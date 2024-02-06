@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdio>
 #include <map>
 #include <set>
 #include <sstream>
@@ -377,8 +378,6 @@ public:
 		bool header = true;
 		for (auto& row : table)
 		{
-			row.resize(columns_order.size());
-
 			printf("%-*s",
 			       columnLengths[columns_order[0]],
 			       row[columns_order[0]].data());
@@ -441,7 +440,9 @@ public:
 
 	void render()
 	{
-		printf("\033[2J\033[H");
+		printf("\033[H\033[2J");
+		fflush(stdout);
+
 		print_default();
 		table.clear();
 	}
