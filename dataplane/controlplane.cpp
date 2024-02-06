@@ -423,16 +423,15 @@ common::idp::get_dregress_counters::response cControlPlane::get_dregress_counter
 
 common::idp::get_ports_stats::response cControlPlane::get_ports_stats()
 {
-	/// unsafe
-
 	common::idp::get_ports_stats::response response;
+
+	std::lock_guard<std::mutex> guard(mutex);
 
 	for (const auto& [portId, port] : dataPlane->ports)
 	{
 		(void)port;
 
 		rte_eth_stats stats;
-		memset(&stats, 0, sizeof(stats));
 		rte_eth_stats_get(portId, &stats);
 
 		uint64_t physicalPort_egress_drops = 0;
@@ -636,9 +635,9 @@ common::idp::getAclCounters::response cControlPlane::getAclCounters()
 
 common::idp::getPortStatsEx::response cControlPlane::getPortStatsEx()
 {
-	std::lock_guard<std::mutex> guard(mutex);
-
 	common::idp::getPortStatsEx::response response;
+
+	std::lock_guard<std::mutex> guard(mutex);
 
 	for (const auto& portIter : dataPlane->ports)
 	{
