@@ -46,7 +46,6 @@ public:
 	eResult reloadConfig();
 
 	eResult getPhysicalPortName(const tPortId& portId, std::string& name) const;
-	std::optional<common::mac_address_t> get_mac_address(const std::string& vrf, const std::string& interface_name, const common::ip_address_t& address);
 
 	template<typename T_function>
 	void register_command(const common::icp::requestType& type, const T_function& function)
@@ -196,12 +195,5 @@ private:
 	/// used only in loadConfig()
 	controlplane::base_t base;
 
-	/// @todo: move to new module
-	std::mutex mac_addresses_mutex;
-	std::map<std::tuple<std::string, ///< vrf
-	                    std::string, ///< interface_name
-	                    common::ip_address_t>, ///< neighbor
-	         std::optional<common::mac_address_t>>
-	        mac_addresses;
 	void register_service(google::protobuf::Service* service);
 };

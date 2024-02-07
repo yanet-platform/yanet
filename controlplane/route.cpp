@@ -777,10 +777,6 @@ void route_t::compile_interface(common::idp::updateGlobalBase::request& globalba
 				{
 					neighbor_mac_address_v4 = *interface.static_neighbor_mac_address_v4;
 				}
-				else
-				{
-					neighbor_mac_address_v4 = controlPlane->get_mac_address(route.vrf, interface_name, *interface.neighborIPv4Address);
-				}
 			}
 
 			if (interface.neighborIPv6Address)
@@ -788,10 +784,6 @@ void route_t::compile_interface(common::idp::updateGlobalBase::request& globalba
 				if (interface.static_neighbor_mac_address_v6)
 				{
 					neighbor_mac_address_v6 = *interface.static_neighbor_mac_address_v6;
-				}
-				else
-				{
-					neighbor_mac_address_v6 = controlPlane->get_mac_address(route.vrf, interface_name, *interface.neighborIPv6Address);
 				}
 			}
 
