@@ -256,24 +256,52 @@ def check_default_v6(route):
 
 @Decorator.logger_function
 @Decorator.skip_function()
+def check_neighbor_v4(address_row, neighbors):
+    for neighbor_row in neighbors:
+        if (
+            address_row["module"] == neighbor_row["route_name"]
+            and address_row["interface"] == neighbor_row["interface_name"]
+            and address_row["neighbor_v4"] == neighbor_row["ip_address"]
+        ):
+            return True
+    return False
+
+
+@Decorator.logger_function
+@Decorator.skip_function()
+def check_neighbor_v6(address_row, neighbors):
+    for neighbor_row in neighbors:
+        if (
+            address_row["module"] == neighbor_row["route_name"]
+            and address_row["interface"] == neighbor_row["interface_name"]
+            and address_row["neighbor_v6"] == neighbor_row["ip_address"]
+        ):
+            return True
+    return False
+
+
+@Decorator.logger_function
+@Decorator.skip_function()
 def check_interfaces_neighbor_v4():
     interfaces = Executer.get("yanet-cli route interface")
+    neighbors = Executer.get("yanet-cli neighbor show")
     for row in interfaces:
-        if row["neighbor_mac_address_v4"] != "n/s":
-            return
-
-    raise Exception(f"check_interfaces_neighbor_v4()")
+        if row["neighbor_v4"] != "n/s":
+            if not check_neighbor_v4(row, neighbors):
+                raise Exception(f"check_interfaces_neighbor_v4(): {row}")
+    return
 
 
 @Decorator.logger_function
 @Decorator.skip_function()
 def check_interfaces_neighbor_v6():
     interfaces = Executer.get("yanet-cli route interface")
+    neighbors = Executer.get("yanet-cli neighbor show")
     for row in interfaces:
-        if row["neighbor_mac_address_v6"] != "n/s":
-            return
-
-    raise Exception(f"check_interfaces_neighbor_v6()")
+        if row["neighbor_v6"] != "n/s":
+            if not check_neighbor_v6(row, neighbors):
+                raise Exception(f"check_interfaces_neighbor_v6(): {row}")
+    return
 
 
 @Decorator.logger_function
