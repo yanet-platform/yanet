@@ -259,23 +259,6 @@ eResult cControlPlane::getPhysicalPortName(const tPortId& portId,
 	return eResult::invalidPortId;
 }
 
-std::optional<common::mac_address_t> cControlPlane::get_mac_address(const std::string& vrf,
-                                                                    const std::string& interface_name,
-                                                                    const common::ip_address_t& address)
-{
-	std::lock_guard mac_addresses_lock(mac_addresses_mutex);
-
-	const auto key = std::make_tuple(vrf, interface_name, address);
-
-	auto it = mac_addresses.find(key);
-	if (it == mac_addresses.end())
-	{
-		it = mac_addresses.emplace_hint(it, key, system.getMacAddress(interface_name, address));
-	}
-
-	return it->second;
-}
-
 common::icp::getPhysicalPorts::response cControlPlane::getPhysicalPorts() const
 {
 	common::icp::getPhysicalPorts::response response;
