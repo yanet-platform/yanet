@@ -1,13 +1,8 @@
-#include <fcntl.h>
 #include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 #include <rte_ethdev.h>
 #include <rte_mempool.h>
 
-#include "common.h"
 #include "dataplane.h"
 #include "report.h"
 #include "worker.h"
@@ -55,57 +50,8 @@ nlohmann::json convertHashtable(const hashtable_mod_T& hashtable, const stats_T&
 } // namespace
 
 cReport::cReport(cDataPlane* dataPlane) :
-        dataPlane(dataPlane),
-        serverSocket(-1)
+        dataPlane(dataPlane)
 {
-}
-
-eResult cReport::init()
-{
-	serverSocket = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
-	if (serverSocket < 0)
-	{
-		serverSocket = -1;
-		return eResult::errorSocket;
-	}
-
-	if (fcntl(serverSocket, F_GETFL) & O_NONBLOCK)
-	{
-		if (fcntl(serverSocket, F_SETFL, fcntl(serverSocket, F_GETFL) & (~O_NONBLOCK)) < 0)
-		{
-			return eResult::errorSocket;
-		}
-	}
-
-	int one = 1;
-	if (setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) < 0)
-	{
-		return eResult::errorSocket;
-	}
-
-	return eResult::success;
-}
-
-void cReport::run()
-{
-	thread = std::thread([this] { mainLoop(); });
-}
-
-void cReport::stop()
-{
-	if (serverSocket != -1)
-	{
-		shutdown(serverSocket, SHUT_RDWR);
-		close(serverSocket);
-	}
-}
-
-void cReport::join()
-{
-	if (thread.joinable())
-	{
-		thread.join();
-	}
 }
 
 nlohmann::json cReport::getReport()
@@ -162,63 +108,6 @@ nlohmann::json cReport::getReport()
 	dataPlane->neighbor.report(jsonReport);
 
 	return jsonReport;
-}
-
-static void sendAll(int socket, const char* buffer, size_t bufferSize)
-{
-	size_t total = 0;
-
-	while (total < bufferSize)
-	{
-		int sendSize = send(socket, buffer + total, bufferSize - total, MSG_NOSIGNAL);
-		if (sendSize <= 0)
-		{
-			return;
-		}
-
-		total += sendSize;
-	}
-}
-
-void cReport::mainLoop()
-{
-	sockaddr_in6 address;
-	memset((char*)&address, 0, sizeof(address));
-	address.sin6_family = AF_INET6;
-	address.sin6_addr = in6addr_any;
-	address.sin6_port = htons(29929); ///< @todo
-
-	if (bind(serverSocket, (struct sockaddr*)&address, sizeof(address)) < 0)
-	{
-		YADECAP_LOG_ERROR("bind()\n");
-		return;
-	}
-
-	if (listen(serverSocket, 64) < 0)
-	{
-		YADECAP_LOG_ERROR("listen()\n");
-		return;
-	}
-
-	for (;;)
-	{
-		struct sockaddr_in6 address;
-		socklen_t addressLength = sizeof(address);
-		int clientSocket = accept(serverSocket, (struct sockaddr*)&address, &addressLength);
-		if (clientSocket < 0)
-		{
-			continue;
-		}
-
-		nlohmann::json jsonReport = getReport();
-
-		std::string dump = jsonReport.dump();
-		sendAll(clientSocket, dump.data(), dump.size());
-
-		close(clientSocket);
-	}
-
-	serverSocket = -1;
 }
 
 std::string pointerToHex(const void* pointer)
@@ -309,7 +198,7 @@ nlohmann::json cReport::convertWorker(const cWorker* worker)
 	     counterId < CONFIG_YADECAP_COUNTERS_SIZE;
 	     counterId++)
 	{
-		json["counters"].emplace_back(worker->counters[counterId]);
+	        json["counters"].emplace_back(worker->counters[counterId]);
 	}
 	*/
 
