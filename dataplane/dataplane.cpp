@@ -235,12 +235,6 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		return result;
 	}
 
-	result = report.init();
-	if (result != eResult::success)
-	{
-		return result;
-	}
-
 	result = controlPlane->init(config.use_kernel_interface);
 	if (result != eResult::success)
 	{
@@ -1265,7 +1259,6 @@ void cDataPlane::start()
 		timestamp_thread();
 	});
 
-	report.run();
 	bus.run();
 
 	/// run forwarding plane and control plane
@@ -1276,7 +1269,6 @@ void cDataPlane::join()
 {
 	rte_eal_mp_wait_lcore();
 
-	report.join();
 	bus.join();
 }
 
