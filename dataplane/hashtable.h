@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <memory.h>
 
 #include <rte_byteorder.h>
@@ -14,8 +15,63 @@
 
 #include "common.h"
 
+#include "ext/murmurhash3.h"
+#include "ext/xxhash32.h"
+
 namespace dataplane
 {
+
+template<typename key_t>
+using hash_function_t = uint32_t(const key_t&);
+
+template<typename key_t>
+inline uint32_t calculate_hash_crc(const key_t& key)
+{
+	uint32_t result = 0;
+
+	unsigned int offset = 0;
+
+	for (unsigned int i = 0;
+			i < sizeof(key_t) / 8;
+			i++)
+	{
+		result = rte_hash_crc_8byte(*(((const uint64_t*)&key) + offset / 8), result);
+		offset += 8;
+	}
+
+	if (sizeof(key_t) & 0x4)
+	{
+		result = rte_hash_crc_4byte(*(((const uint32_t*)&key) + offset / 4), result);
+		offset += 4;
+	}
+
+	if (sizeof(key_t) & 0x2)
+	{
+		result = rte_hash_crc_2byte(*(((const uint16_t*)&key) + offset / 2), result);
+		offset += 2;
+	}
+
+	if (sizeof(key_t) & 0x1)
+	{
+		result = rte_hash_crc_1byte(*(((const uint8_t*)&key) + offset), result);
+	}
+
+	return result;
+}
+
+template<typename key_t>
+inline uint32_t calculate_hash_murmur3(const key_t& key)
+{
+	uint32_t result;
+	MurmurHash3_x86_32(&key, sizeof(key), 19, &result);
+	return result;
+}
+
+template<typename key_t>
+inline uint32_t calculate_hash_xxh32(const key_t& key)
+{
+	return XXHash32::hash(&key, sizeof(key), 19);
+}
 
 class spinlock_t final
 {
@@ -1408,7 +1464,8 @@ template<typename key_t,
          uint32_t total_size,
          uint32_t chunk_size,
          unsigned int valid_bit_offset = 0,
-         unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
+         unsigned int burst_size = YANET_CONFIG_BURST_SIZE,
+         hash_function_t<key_t> calculate_hash = calculate_hash_crc<key_t>>
 class hashtable_mod_id32
 {
 public:
@@ -1668,40 +1725,6 @@ public:
 		return eResult::isFull;
 	}
 
-	inline static uint32_t calculate_hash(const key_t& key)
-	{
-		uint32_t result = 0;
-
-		unsigned int offset = 0;
-
-		for (unsigned int i = 0;
-		     i < sizeof(key_t) / 8;
-		     i++)
-		{
-			result = rte_hash_crc_8byte(*(((const uint64_t*)&key) + offset / 8), result);
-			offset += 8;
-		}
-
-		if (sizeof(key_t) & 0x4)
-		{
-			result = rte_hash_crc_4byte(*(((const uint32_t*)&key) + offset / 4), result);
-			offset += 4;
-		}
-
-		if (sizeof(key_t) & 0x2)
-		{
-			result = rte_hash_crc_2byte(*(((const uint16_t*)&key) + offset / 2), result);
-			offset += 2;
-		}
-
-		if (sizeof(key_t) & 0x1)
-		{
-			result = rte_hash_crc_1byte(*(((const uint8_t*)&key) + offset), result);
-		}
-
-		return result;
-	}
-
 	void clear()
 	{
 		for (uint32_t i = 0;
@@ -1738,11 +1761,12 @@ protected:
 
 template<typename key_t,
          uint32_t chunk_size,
-         unsigned int valid_bit_offset = 0>
+         unsigned int valid_bit_offset = 0,
+         hash_function_t<key_t> calculate_hash = calculate_hash_crc<key_t>>
 class hashtable_mod_id32_dynamic
 {
 public:
-	using hashtable_t = hashtable_mod_id32_dynamic<key_t, chunk_size, valid_bit_offset>;
+	using hashtable_t = hashtable_mod_id32_dynamic<key_t, chunk_size, valid_bit_offset, calculate_hash>;
 
 	constexpr static uint32_t mask_full = 0xFFFFFFFFu;
 	constexpr static uint32_t shift_valid = (32 - 1 - valid_bit_offset);
@@ -2011,40 +2035,6 @@ public:
 		return mask;
 	}
 
-	inline static uint32_t calculate_hash(const key_t& key)
-	{
-		uint32_t result = 0;
-
-		unsigned int offset = 0;
-
-		for (unsigned int i = 0;
-		     i < sizeof(key_t) / 8;
-		     i++)
-		{
-			result = rte_hash_crc_8byte(*(((const uint64_t*)&key) + offset / 8), result);
-			offset += 8;
-		}
-
-		if (sizeof(key_t) & 0x4)
-		{
-			result = rte_hash_crc_4byte(*(((const uint32_t*)&key) + offset / 4), result);
-			offset += 4;
-		}
-
-		if (sizeof(key_t) & 0x2)
-		{
-			result = rte_hash_crc_2byte(*(((const uint16_t*)&key) + offset / 2), result);
-			offset += 2;
-		}
-
-		if (sizeof(key_t) & 0x1)
-		{
-			result = rte_hash_crc_1byte(*(((const uint8_t*)&key) + offset), result);
-		}
-
-		return result;
-	}
-
 protected:
 	uint32_t total_mask;
 
@@ -2113,7 +2103,8 @@ public:
 template<typename key_t,
          typename value_t,
          uint32_t total_size,
-         uint32_t chunk_size>
+         uint32_t chunk_size,
+         hash_function_t<key_t> calculate_hash = calculate_hash_crc<key_t>>
 class hashtable_mod_spinlock
 {
 public:
@@ -2250,40 +2241,6 @@ public:
 		}
 
 		locker->unlock();
-		return result;
-	}
-
-	inline static uint32_t calculate_hash(const key_t& key)
-	{
-		uint32_t result = 0;
-
-		unsigned int offset = 0;
-
-		for (unsigned int i = 0;
-		     i < sizeof(key_t) / 8;
-		     i++)
-		{
-			result = rte_hash_crc_8byte(*(((const uint64_t*)&key) + offset / 8), result);
-			offset += 8;
-		}
-
-		if (sizeof(key_t) & 0x4)
-		{
-			result = rte_hash_crc_4byte(*(((const uint32_t*)&key) + offset / 4), result);
-			offset += 4;
-		}
-
-		if (sizeof(key_t) & 0x2)
-		{
-			result = rte_hash_crc_2byte(*(((const uint16_t*)&key) + offset / 2), result);
-			offset += 2;
-		}
-
-		if (sizeof(key_t) & 0x1)
-		{
-			result = rte_hash_crc_1byte(*(((const uint8_t*)&key) + offset), result);
-		}
-
 		return result;
 	}
 
@@ -2487,11 +2444,12 @@ protected:
 /// ]
 template<typename key_t,
          typename value_t,
-         uint32_t chunk_size>
+         uint32_t chunk_size,
+         hash_function_t<key_t> calculate_hash = calculate_hash_crc<key_t>>
 class hashtable_mod_spinlock_dynamic
 {
 public:
-	using hashtable_t = hashtable_mod_spinlock_dynamic<key_t, value_t, chunk_size>;
+	using hashtable_t = hashtable_mod_spinlock_dynamic<key_t, value_t, chunk_size, calculate_hash>;
 
 	constexpr static uint32_t valid_mask_full = 0xFFFFFFFFu >> (32 - chunk_size);
 	constexpr static uint64_t keys_in_chunk_size = chunk_size;
@@ -2818,40 +2776,6 @@ public:
 		}
 	}
 
-	inline static uint32_t calculate_hash(const key_t& key)
-	{
-		uint32_t result = 0;
-
-		unsigned int offset = 0;
-
-		for (unsigned int i = 0;
-		     i < sizeof(key_t) / 8;
-		     i++)
-		{
-			result = rte_hash_crc_8byte(*(((const uint64_t*)&key) + offset / 8), result);
-			offset += 8;
-		}
-
-		if (sizeof(key_t) & 0x4)
-		{
-			result = rte_hash_crc_4byte(*(((const uint32_t*)&key) + offset / 4), result);
-			offset += 4;
-		}
-
-		if (sizeof(key_t) & 0x2)
-		{
-			result = rte_hash_crc_2byte(*(((const uint16_t*)&key) + offset / 2), result);
-			offset += 2;
-		}
-
-		if (sizeof(key_t) & 0x1)
-		{
-			result = rte_hash_crc_1byte(*(((const uint8_t*)&key) + offset), result);
-		}
-
-		return result;
-	}
-
 public:
 	class iterator_t
 	{
@@ -3032,11 +2956,12 @@ protected:
 /// ]
 template<typename key_t,
          typename value_t,
-         uint32_t chunk_size>
+         uint32_t chunk_size,
+         hash_function_t<key_t> calculate_hash = calculate_hash_crc<key_t>>
 class hashtable_mod_dynamic
 {
 public:
-	using hashtable_t = hashtable_mod_dynamic<key_t, value_t, chunk_size>;
+	using hashtable_t = hashtable_mod_dynamic<key_t, value_t, chunk_size, calculate_hash>;
 
 	constexpr static uint32_t valid_mask_full = 0xFFFFFFFFu >> (32 - chunk_size);
 	constexpr static uint64_t keys_in_chunk_size = chunk_size;
@@ -3421,40 +3346,6 @@ public:
 			auto& chunk = chunks[i];
 			chunk.valid_mask = 0;
 		}
-	}
-
-	inline static uint32_t calculate_hash(const key_t& key)
-	{
-		uint32_t result = 0;
-
-		unsigned int offset = 0;
-
-		for (unsigned int i = 0;
-		     i < sizeof(key_t) / 8;
-		     i++)
-		{
-			result = rte_hash_crc_8byte(*(((const uint64_t*)&key) + offset / 8), result);
-			offset += 8;
-		}
-
-		if (sizeof(key_t) & 0x4)
-		{
-			result = rte_hash_crc_4byte(*(((const uint32_t*)&key) + offset / 4), result);
-			offset += 4;
-		}
-
-		if (sizeof(key_t) & 0x2)
-		{
-			result = rte_hash_crc_2byte(*(((const uint16_t*)&key) + offset / 2), result);
-			offset += 2;
-		}
-
-		if (sizeof(key_t) & 0x1)
-		{
-			result = rte_hash_crc_1byte(*(((const uint8_t*)&key) + offset), result);
-		}
-
-		return result;
 	}
 
 public:
