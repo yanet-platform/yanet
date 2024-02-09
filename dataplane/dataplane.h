@@ -80,6 +80,7 @@ struct tDataPlaneConfig
 	*/
 	std::map<std::string, ///< interfaceName
 	         std::tuple<std::string, ///< pci
+	                    std::string, ///< name
 	                    bool, ///< symmetric_mode
 	                    uint64_t ///< rssFlags
 	                    >>

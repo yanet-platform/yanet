@@ -64,6 +64,7 @@ public:
 		tQueueId inQueueId;
 	} workerPorts[CONFIG_YADECAP_WORKER_PORTS_SIZE];
 
+	tPortId ports[CONFIG_YADECAP_PORTS_SIZE];
 	unsigned int ports_count;
 	tQueueId outQueueId;
 

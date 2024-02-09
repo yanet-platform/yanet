@@ -160,15 +160,6 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		return result;
 	}
 
-	/// sanity check
-	if (rte_eth_dev_count_avail() != ports.size())
-	{
-		YADECAP_LOG_ERROR("invalid ports count: %u != %lu\n",
-		                  rte_eth_dev_count_avail(),
-		                  ports.size());
-		return eResult::invalidPortsCount;
-	}
-
 	mempool_log = rte_mempool_create("log", YANET_CONFIG_SAMPLES_SIZE, sizeof(samples::sample_t), 0, 0, NULL, NULL, NULL, NULL, SOCKET_ID_ANY, MEMPOOL_F_NO_IOVA_CONTIG);
 
 	result = initGlobalBases();
@@ -465,16 +456,17 @@ eResult cDataPlane::initPorts()
 	for (const auto& configPortIter : config.ports)
 	{
 		const std::string& interfaceName = configPortIter.first;
-		const auto& [pci, symmetric_mode, rss_flags] = configPortIter.second;
+		const auto& [pci, name, symmetric_mode, rss_flags] = configPortIter.second;
+		(void)pci;
 
 		tPortId portId;
-		if (strncmp(pci.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
+		if (strncmp(name.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
 		{
-			portId = sock_dev_create(pci.data(), 0);
+			portId = sock_dev_create(name.data(), 0);
 		}
-		else if (rte_eth_dev_get_port_by_name(pci.data(), &portId))
+		else if (rte_eth_dev_get_port_by_name(name.data(), &portId))
 		{
-			YADECAP_LOG_ERROR("invalid pci: '%s'\n", pci.data());
+			YADECAP_LOG_ERROR("invalid name: '%s'\n", name.data());
 			remove_keys.emplace_back(interfaceName);
 			continue;
 		}
@@ -586,17 +578,6 @@ eResult cDataPlane::initPorts()
 	for (const auto& interface_name : remove_keys)
 	{
 		config.ports.erase(interface_name);
-	}
-
-	for (const auto& [port_id, port] : ports)
-	{
-		(void)port;
-
-		if (port_id >= ports.size())
-		{
-			YADECAP_LOG_ERROR("invalid portId: '%u'\n", port_id);
-			return eResult::invalidPortId;
-		}
 	}
 
 	return eResult::success;
@@ -853,7 +834,12 @@ eResult cDataPlane::initWorkers()
 		dataplane::base::permanently basePermanently;
 		basePermanently.globalBaseAtomic = globalBaseAtomics[socket_id];
 		basePermanently.outQueueId = outQueueId; ///< 0
-		basePermanently.ports_count = ports.size();
+		basePermanently.ports_count = 0;
+		for (const auto& portIter : ports)
+		{
+			basePermanently.ports[basePermanently.ports_count++] = portIter.first;
+		}
+
 		basePermanently.SWNormalPriorityRateLimitPerWorker = config.SWNormalPriorityRateLimitPerWorker;
 
 		dataplane::base::generation base;
@@ -929,11 +915,14 @@ eResult cDataPlane::initWorkers()
 			basePermanently.nat64stateful_numa_id = rte_cpu_to_be_16(socket_id);
 		}
 
+		basePermanently.ports_count = 0;
 		for (const auto& [port_id, port] : ports)
 		{
 			const auto& [interface_name, rx_queues, tx_queues_count, mac_address, pci, symmetric_mode] = port;
 			(void)mac_address;
 			(void)pci;
+
+			basePermanently.ports[basePermanently.ports_count++] = port_id;
 
 			if (exist(rx_queues, coreId))
 			{
@@ -999,7 +988,6 @@ eResult cDataPlane::initWorkers()
 		}
 
 		basePermanently.outQueueId = outQueueId;
-		basePermanently.ports_count = ports.size();
 
 		dataplane::base::generation base;
 		{
@@ -1759,6 +1747,7 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 	{
 		std::string interfaceName = portJson["interfaceName"];
 		std::string pci = portJson["pci"];
+		std::string name = pci;
 		bool symmetric_mode = false;
 		uint64_t rss_flags = 0;
 
@@ -1766,6 +1755,11 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 		{
 			YADECAP_LOG_ERROR("interfaceName '%s' already exist\n", interfaceName.data());
 			return eResult::invalidConfigurationFile;
+		}
+
+		if (exist(portJson, "name"))
+		{
+			name = portJson["name"];
 		}
 
 		if (exist(portJson, "symmetric_mode"))
@@ -1787,7 +1781,7 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 			rss_flags = RTE_ETH_RSS_IP;
 		}
 
-		config.ports[interfaceName] = {pci, symmetric_mode, rss_flags};
+		config.ports[interfaceName] = {pci, name, symmetric_mode, rss_flags};
 
 		for (tCoreId coreId : portJson["coreIds"])
 		{
@@ -2036,20 +2030,21 @@ eResult cDataPlane::checkConfig()
 	}
 
 	{
-		std::set<std::string> pcis;
+		std::set<std::string> names;
 		for (const auto& portIter : config.ports)
 		{
-			const auto& [pci, symmetric_mode, rss_flags] = portIter.second;
+			const auto& [pci, name, symmetric_mode, rss_flags] = portIter.second;
+			(void)pci;
 			(void)symmetric_mode;
 			(void)rss_flags;
 
-			if (exist(pcis, pci))
+			if (exist(names, name))
 			{
-				YADECAP_LOG_ERROR("pci '%s' already exist\n", pci.data());
+				YADECAP_LOG_ERROR("pci '%s' already exist\n", name.data());
 				return eResult::invalidConfigurationFile;
 			}
 
-			pcis.emplace(pci);
+			names.emplace(name);
 		}
 	}
 
@@ -2133,7 +2128,8 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 
 	for (const auto& port : config.ports)
 	{
-		const auto& [pci, symmetric_mode, rss_flags] = port.second;
+		const auto& [pci, name, symmetric_mode, rss_flags] = port.second;
+		(void)name;
 		(void)symmetric_mode;
 		(void)rss_flags;
 

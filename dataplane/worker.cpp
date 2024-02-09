@@ -1091,10 +1091,11 @@ inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port
 
 inline void cWorker::physicalPort_egress_handle()
 {
-	for (tPortId portId = 0;
-	     portId < basePermanently.ports_count;
-	     portId++)
+	for (uint32_t portId_i = 0;
+	     portId_i < basePermanently.ports_count;
+	     portId_i++)
 	{
+		const auto portId = basePermanently.ports[portId_i];
 		if (unlikely(physicalPort_stack[portId].mbufsCount == 0))
 		{
 			continue;

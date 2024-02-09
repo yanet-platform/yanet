@@ -623,7 +623,7 @@ eResult generation::updateLogicalPort(const common::idp::updateGlobalBase::updat
 		YADECAP_LOG_ERROR("invalid logicalPortId: '%u'\n", logicalPortId);
 		return eResult::invalidLogicalPortId;
 	}
-	if (portId >= dataPlane->ports.size())
+	if (!exist(dataPlane->ports, portId))
 	{
 		YADECAP_LOG_ERROR("invalid portId: '%u'\n", portId);
 		return eResult::invalidPortId;
