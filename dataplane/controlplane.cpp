@@ -102,8 +102,10 @@ void cControlPlane::start()
 	}
 
 	/// start devices
-	for (tPortId portId = 0; portId < rte_eth_dev_count_avail(); portId++)
+	for (const auto& portIter : dataPlane->ports)
 	{
+		const tPortId& portId = portIter.first;
+
 		int rc = rte_eth_dev_start(portId);
 		if (rc)
 		{
@@ -319,11 +321,9 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 			const auto& worker = dataPlane->workers.find(coreId)->second;
 
 			std::map<tPortId, common::worker::stats::port> portsStats;
-			for (tPortId portId = 0;
-			     portId < dataPlane->ports.size();
-			     portId++)
+			for (const auto& portIter : dataPlane->ports)
 			{
-				portsStats[portId] = worker->statsPorts[portId];
+				portsStats[portIter.first] = worker->statsPorts[portIter.first];
 			}
 
 			response[coreId] = {worker->iteration,
@@ -338,11 +338,9 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 		for (const auto& [coreId, worker] : dataPlane->workers)
 		{
 			std::map<tPortId, common::worker::stats::port> portsStats;
-			for (tPortId portId = 0;
-			     portId < dataPlane->ports.size();
-			     portId++)
+			for (const auto& portIter : dataPlane->ports)
 			{
-				portsStats[portId] = worker->statsPorts[portId];
+				portsStats[portIter.first] = worker->statsPorts[portIter.first];
 			}
 
 			response[coreId] = {worker->iteration,
