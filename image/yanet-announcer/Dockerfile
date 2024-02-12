@@ -4,6 +4,7 @@ FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     iproute2 \
+    netbase \
     bird2
 
 COPY --from=yanet /usr/bin/yanet-cli /usr/bin/yanet-cli

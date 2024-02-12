@@ -27,7 +27,8 @@ FROM ubuntu:22.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
-    iproute2
+    iproute2 \
+    netbase
 
 COPY --from=builder /target/bin/* /usr/bin/
 COPY --from=builder /target/share /usr/share
