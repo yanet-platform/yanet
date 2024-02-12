@@ -28,7 +28,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     iproute2 \
     ibverbs-providers \
-    libibverbs-dev
+    libibverbs-dev \
+    netbase
 
 COPY --from=builder /target/bin/* /usr/bin/
 COPY --from=builder /target/share /usr/share
