@@ -17,6 +17,7 @@
 
 #include "common/counters.h"
 #include "common/fallback.h"
+#include "common/nat46clat.h"
 
 #include "checksum.h"
 #include "common.h"
@@ -3725,6 +3726,9 @@ inline void cWorker::nat46clat_lan_handle()
 		const auto& nat46clat = base.globalBase->nat46clats[metadata->flow.data.nat46clat_id];
 
 		nat46clat_lan_translation(mbuf, nat46clat);
+
+		counters[nat46clat.counter_id + (tCounterId)nat46clat::module_counter::lan_packets]++;
+		counters[nat46clat.counter_id + (tCounterId)nat46clat::module_counter::lan_bytes] += mbuf->pkt_len;
 		nat46clat_lan_flow(mbuf, nat46clat.flow);
 	}
 
@@ -3801,6 +3805,9 @@ inline void cWorker::nat46clat_wan_handle()
 		const auto& nat46clat = base.globalBase->nat46clats[metadata->flow.data.nat46clat_id];
 
 		nat46clat_wan_translation(mbuf, nat46clat);
+
+		counters[nat46clat.counter_id + (tCounterId)nat46clat::module_counter::wan_packets]++;
+		counters[nat46clat.counter_id + (tCounterId)nat46clat::module_counter::wan_bytes] += mbuf->pkt_len;
 		nat46clat_wan_flow(mbuf, nat46clat.flow);
 	}
 
