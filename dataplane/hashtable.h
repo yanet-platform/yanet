@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdint.h>
 #include <memory.h>
+#include <stdint.h>
 
 #include <rte_byteorder.h>
 #include <rte_common.h>
@@ -32,8 +32,8 @@ inline uint32_t calculate_hash_crc(const key_t& key)
 	unsigned int offset = 0;
 
 	for (unsigned int i = 0;
-			i < sizeof(key_t) / 8;
-			i++)
+	     i < sizeof(key_t) / 8;
+	     i++)
 	{
 		result = rte_hash_crc_8byte(*(((const uint64_t*)&key) + offset / 8), result);
 		offset += 8;
