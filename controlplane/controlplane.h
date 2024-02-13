@@ -144,6 +144,7 @@ protected:
 	friend class balancer_t;
 	friend class tun64_t;
 	friend class config_converter_t;
+	friend class controlplane::module::bird_t;
 
 	volatile bool flagStop;
 
