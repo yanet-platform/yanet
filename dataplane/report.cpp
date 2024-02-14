@@ -326,14 +326,22 @@ nlohmann::json cReport::convertPort(const tPortId& portId)
 	json["socketId"] = rte_eth_dev_socket_id(portId);
 
 	rte_eth_link link;
-	rte_eth_link_get_nowait(portId, &link);
+	{
+		std::lock_guard<std::mutex> guard(dataPlane->dpdk_mutex);
+		rte_eth_link_get_nowait(portId, &link);
+	}
 	json["link"]["speed"] = link.link_speed;
 	json["link"]["duplex"] = (link.link_duplex == 0 ? "half" : "full");
 	json["link"]["autoneg"] = (link.link_autoneg == 0 ? "autoneg" : "fixed");
 	json["link"]["status"] = (link.link_status == 0 ? "down" : "up");
 
 	rte_eth_stats stats;
-	if (!rte_eth_stats_get(portId, &stats))
+	int rc = 1;
+	{
+		std::lock_guard<std::mutex> guard(dataPlane->dpdk_mutex);
+		rc = rte_eth_stats_get(portId, &stats);
+	}
+	if (!rc)
 	{
 		json["stats"]["ipackets"] = stats.ipackets;
 		json["stats"]["opackets"] = stats.opackets;

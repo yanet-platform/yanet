@@ -378,4 +378,6 @@ protected:
 	uint32_t current_time;
 
 	std::vector<std::thread> threads;
+
+	mutable std::mutex dpdk_mutex;
 };
