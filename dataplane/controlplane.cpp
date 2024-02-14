@@ -423,14 +423,15 @@ common::idp::get_ports_stats::response cControlPlane::get_ports_stats()
 {
 	common::idp::get_ports_stats::response response;
 
-	std::lock_guard<std::mutex> guard(mutex);
-
 	for (const auto& [portId, port] : dataPlane->ports)
 	{
 		(void)port;
 
 		rte_eth_stats stats;
-		rte_eth_stats_get(portId, &stats);
+		{
+			std::lock_guard<std::mutex> guard(dataPlane->dpdk_mutex);
+			rte_eth_stats_get(portId, &stats);
+		}
 
 		uint64_t physicalPort_egress_drops = 0;
 		for (const auto& [coreId, worker] : dataPlane->workers)

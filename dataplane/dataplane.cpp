@@ -565,7 +565,10 @@ eResult cDataPlane::initPorts()
 			return eResult::errorInitEthernetDevice;
 		}
 
-		rte_eth_stats_reset(portId);
+		{
+			std::lock_guard<std::mutex> guard(dpdk_mutex);
+			rte_eth_stats_reset(portId);
+		}
 
 		ports[portId] = {interfaceName,
 		                 rx_queues,
@@ -1527,7 +1530,10 @@ std::map<std::string, common::uint64> cDataPlane::getPortStats(const tPortId& po
 
 	{
 		rte_eth_link link;
-		rte_eth_link_get_nowait(portId, &link);
+		{
+			std::lock_guard<std::mutex> guard(dpdk_mutex);
+			rte_eth_link_get_nowait(portId, &link);
+		}
 
 		if (link.link_speed == RTE_ETH_SPEED_NUM_UNKNOWN)
 		{
@@ -1547,8 +1553,13 @@ std::map<std::string, common::uint64> cDataPlane::getPortStats(const tPortId& po
 
 	rte_eth_xstat_name xstatNames[xstatNamesSize];
 	rte_eth_xstat xstats[xstatsSize];
-	int xstatNamesCount_i = rte_eth_xstats_get_names(portId, xstatNames, xstatNamesSize);
-	int xstatsCount_i = rte_eth_xstats_get(portId, xstats, xstatsSize);
+	int xstatNamesCount_i = 0;
+	int xstatsCount_i = 0;
+	{
+		std::lock_guard<std::mutex> guard(dpdk_mutex);
+		xstatNamesCount_i = rte_eth_xstats_get_names(portId, xstatNames, xstatNamesSize);
+		xstatsCount_i = rte_eth_xstats_get(portId, xstats, xstatsSize);
+	}
 
 	if (xstatNamesCount_i <= 0 ||
 	    xstatsCount_i <= 0)
