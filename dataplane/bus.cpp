@@ -382,6 +382,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = dataPlane->memory_manager.memory_manager_update(std::get<common::idp::memory_manager_update::request>(std::get<1>(request)));
 		}
+		else if (type == common::idp::requestType::memory_manager_stats)
+		{
+			response = dataPlane->memory_manager.memory_manager_stats();
+		}
 		else
 		{
 			stats.errors[(uint32_t)common::idp::errorType::busParse]++;
