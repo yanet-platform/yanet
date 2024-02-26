@@ -12,6 +12,7 @@
 #include "helper.h"
 #include "latch.h"
 #include "limit.h"
+#include "memory_manager.h"
 #include "nat46clat.h"
 #include "nat64stateful.h"
 #include "neighbor.h"
@@ -91,6 +92,8 @@ std::vector<std::tuple<std::string,
                     {"limit", "", [](const auto& args) { call(limit::summary, args); }},
                     {"values", "", [](const auto& args) { call(show::values, args); }},
                     {"durations", "", [](const auto& args) { call(show::durations, args); }},
+                    {"memory show", "", [](const auto& args) { call(memory_manager::show, args); }},
+                    {"memory group", "", [](const auto& args) { call(memory_manager::group, args); }},
                     {"dump", "[in|out|drop] [interface_name] [enable|disable]", [](const auto& args) { call(show::physical_port_dump, args); }},
                     {},
                     {"show errors", "", [](const auto& args) { call(show::errors, args); }},

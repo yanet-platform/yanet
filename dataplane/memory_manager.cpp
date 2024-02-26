@@ -44,7 +44,7 @@ inline std::string to_hex(const void* pointer)
 
 void memory_manager::report(nlohmann::json& json)
 {
-	std::lock_guard<std::mutex> guard(pointers_mutex);
+	std::lock_guard<std::mutex> guard(mutex);
 	for (const auto& [pointer, memory_pointer] : pointers)
 	{
 		nlohmann::json json_object;
@@ -58,8 +58,30 @@ void memory_manager::report(nlohmann::json& json)
 
 eResult memory_manager::memory_manager_update(const common::idp::memory_manager_update::request& request)
 {
+	std::lock_guard<std::mutex> guard(mutex);
 	root_memory_group = request;
 	return eResult::success;
+}
+
+common::idp::memory_manager_stats::response memory_manager::memory_manager_stats()
+{
+	common::idp::memory_manager_stats::response response;
+	auto& [response_memory_group, response_objects] = response;
+
+	{
+		std::lock_guard<std::mutex> guard(mutex);
+
+		response_memory_group = root_memory_group;
+		for (const auto& [pointer, memory_pointer] : pointers)
+		{
+			(void)pointer;
+			response_objects.emplace_back(memory_pointer.name,
+			                              memory_pointer.socket_id,
+			                              memory_pointer.size);
+		}
+	}
+
+	return response;
 }
 
 void* memory_manager::alloc(const char* name,
@@ -78,27 +100,34 @@ void* memory_manager::alloc(const char* name,
 
 	size += 2 * RTE_CACHE_LINE_SIZE;
 
-	YANET_LOG_INFO("yanet_alloc(name: '%s', socket: %u, size: %lu)\n",
-	               name,
-	               socket_id,
-	               size);
-
-	void* pointer = rte_malloc_socket(nullptr,
-	                                  size,
-	                                  RTE_CACHE_LINE_SIZE,
-	                                  socket_id);
-	if (pointer == nullptr)
+	void* pointer = nullptr;
 	{
-		YANET_LOG_ERROR("error allocation memory (name: '%s', socket: %u, size: %lu)\n",
-		                name,
-		                socket_id,
-		                size);
-		debug(socket_id);
-		return nullptr;
-	}
+		std::lock_guard<std::mutex> guard(mutex);
 
-	{
-		std::lock_guard<std::mutex> guard(pointers_mutex);
+		YANET_LOG_INFO("yanet_alloc(name: '%s', socket: %u, size: %lu)\n",
+		               name,
+		               socket_id,
+		               size);
+
+		if (!check_memory_limit(name, size))
+		{
+			return nullptr;
+		}
+
+		pointer = rte_malloc_socket(nullptr,
+		                            size,
+		                            RTE_CACHE_LINE_SIZE,
+		                            socket_id);
+		if (pointer == nullptr)
+		{
+			YANET_LOG_ERROR("error allocation memory (name: '%s', socket: %u, size: %lu)\n",
+			                name,
+			                socket_id,
+			                size);
+			debug(socket_id);
+			return nullptr;
+		}
+
 		pointers.try_emplace(pointer, name, socket_id, size, pointer, [destructor](void* pointer) {
 			destructor(pointer);
 			rte_free(pointer);
@@ -110,7 +139,7 @@ void* memory_manager::alloc(const char* name,
 
 void memory_manager::destroy(void* pointer)
 {
-	std::lock_guard<std::mutex> guard(pointers_mutex);
+	std::lock_guard<std::mutex> guard(mutex);
 
 	auto it = pointers.find(pointer);
 	if (it == pointers.end())
@@ -134,6 +163,65 @@ void memory_manager::debug(tSocketId socket_id)
 		YANET_LOG_INFO("alloc_count: %u\n", stats.alloc_count);
 		YANET_LOG_INFO("heap_allocsz_bytes: %lu MB\n", stats.heap_allocsz_bytes / (1024 * 1024));
 	}
+}
+
+bool memory_manager::check_memory_limit(const std::string& name,
+                                        const uint64_t size)
+{
+	bool result = true;
+	std::map<std::string, ///< object_name
+	         common::uint64> ///< current
+	        currents;
+
+	for (const auto& [pointer, memory_pointer] : pointers)
+	{
+		(void)pointer;
+
+		uint64_t object_size = memory_pointer.size;
+		if (memory_pointer.name == name)
+		{
+			object_size = size;
+		}
+
+		currents[memory_pointer.name] = std::max(currents[memory_pointer.name].value,
+		                                         object_size);
+	}
+
+	root_memory_group.for_each([&](const auto& memory_group,
+	                               const std::set<std::string>& object_names) {
+		bool check = false;
+		uint64_t group_total = 0;
+		for (const auto& object_name : object_names)
+		{
+			group_total += currents[object_name];
+
+			if (object_name == name)
+			{
+				check = true;
+			}
+		}
+
+		if (check && memory_group.limit)
+		{
+			if (group_total > memory_group.limit)
+			{
+				YANET_LOG_ERROR("memory limit for '%s': group '%s': %lu of %lu\n",
+				                name.data(),
+				                memory_group.name.data(),
+				                group_total,
+				                memory_group.limit);
+				for (const auto& object_name : object_names)
+				{
+					YANET_LOG_ERROR("  object '%s': %lu\n",
+					                object_name.data(),
+					                currents[object_name].value);
+				}
+				result = false;
+			}
+		}
+	});
+
+	return result;
 }
 
 void dataplane::memory_manager::limits(common::idp::limits::response& response)

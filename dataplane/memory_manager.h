@@ -35,6 +35,7 @@ public:
 	void report(nlohmann::json& json);
 	void limits(common::idp::limits::response& response);
 	eResult memory_manager_update(const common::idp::memory_manager_update::request& request);
+	common::idp::memory_manager_stats::response memory_manager_stats();
 
 	void* alloc(
 	        const char* name,
@@ -63,13 +64,14 @@ public:
 
 	void destroy(void* pointer);
 	void debug(tSocketId socket_id);
+	bool check_memory_limit(const std::string& name, const uint64_t size);
 
 protected:
 	cDataPlane* dataplane;
-	common::memory_manager::memory_group root_memory_group;
 
-	std::mutex pointers_mutex;
+	std::mutex mutex;
 	std::map<void*, memory_pointer> pointers;
+	common::memory_manager::memory_group root_memory_group;
 };
 
 }

@@ -3,17 +3,30 @@
 #include <array>
 #include <cstdio>
 #include <map>
-#include <set>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <type_traits>
-#include <variant>
 #include <vector>
 
 #include <nlohmann/json.hpp>
 
 #include "converter.h"
+
+template<typename type>
+static std::string to_percent(const type current, const type maximum)
+{
+	double percent = 0.0;
+	if (maximum)
+	{
+		percent = (double)current / (double)maximum;
+		percent *= (double)100;
+	}
+
+	std::stringstream stream;
+	stream << std::fixed << std::setprecision(2) << percent;
+	return stream.str();
+}
 
 std::vector<std::string> split(const char* string,
                                const char delimiter)
