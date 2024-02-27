@@ -1,0 +1,15 @@
+steps:
+- cli_check: |
+    YANET_FORMAT_COLUMNS=group,maximum        memory group
+    group                           maximum
+    ------------------------------  ----------
+    acl.network.ht                  1048576
+    acl.transport.ht                67108864
+    acl.total.ht                    67108864
+    acl.network.v4.source.lpm       71303168
+    acl.network.v4.destination.lpm  71303168
+    acl.network.v6.source.lpm       1073741824
+    acl.network.v6.destination.ht   262144
+    acl.network.v6.destination.lpm  1073741824
+    acl.network                     157286400
+    acl                             277872640
