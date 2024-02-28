@@ -102,6 +102,8 @@ void unsafe()
 
 	const auto static_counters = dataplane.getCounters(vector_range(0, (tCounterId)common::globalBase::static_counter_type::size));
 	const auto neighbor_stats = dataplane.neighbor_stats();
+	const auto memory_stats = dataplane.memory_manager_stats();
+	const auto& [memory_groups, memory_objects] = memory_stats;
 
 	const auto durations = controlplane.controlplane_durations();
 
@@ -371,6 +373,56 @@ void unsafe()
 	                        {"hashtable_remove_error", neighbor_stats.hashtable_remove_error},
 	                        {"netlink_neighbor_update", neighbor_stats.netlink_neighbor_update},
 	                        {"resolve", neighbor_stats.resolve}});
+
+	/// memory
+	{
+		std::map<std::string, ///< object_name
+		         common::uint64> ///< current
+		        currents;
+
+		uint64_t total = 0;
+		for (const auto& [name, socket_id, current] : memory_objects)
+		{
+			total += current;
+
+			currents[name] = std::max(currents[name].value,
+			                          current);
+
+			influxdb_format::print("memory",
+			                       {{"name", name},
+			                        {"socket_id", socket_id}},
+			                       {{"current", current}});
+		}
+
+		influxdb_format::print("memory",
+		                       {{"name", "total"}},
+		                       {{"current", total}});
+
+		memory_groups.for_each([&](const auto& memory_group,
+		                           const std::set<std::string>& object_names) {
+			if (memory_group.name.empty())
+			{
+				return;
+			}
+
+			uint64_t group_total = 0;
+			for (const auto& object_name : object_names)
+			{
+				group_total += currents[object_name];
+			}
+
+			uint64_t maximum = 0;
+			if (memory_group.limit)
+			{
+				maximum = memory_group.limit;
+			}
+
+			influxdb_format::print("memory",
+			                       {{"group", memory_group.name}},
+			                       {{"current", group_total},
+			                        {"maximum", maximum}});
+		});
+	}
 }
 
 void dregress()
