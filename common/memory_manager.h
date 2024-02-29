@@ -38,6 +38,11 @@ inline uint64_t convert_string_to_bytes(std::string string)
 class memory_group
 {
 public:
+	memory_group() :
+	        limit(0)
+	{
+	}
+
 	template<typename callback_t>
 	std::set<std::string> for_each(const callback_t& callback) const
 	{
