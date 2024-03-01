@@ -562,10 +562,9 @@ void rib_t::rib_eor(const common::icp::rib_update::eor& request)
 
 void rib_t::rib_flush(bool force_flush)
 {
-	std::lock_guard<std::mutex> rib_update_guard(rib_update_mutex);
-
 	bool flush;
 	{
+		std::lock_guard<std::mutex> rib_update_guard(rib_update_mutex);
 		std::lock_guard<std::mutex> prefixes_guard(prefixes_mutex);
 		std::lock_guard<std::mutex> prefixes_rebuild_guard(prefixes_rebuild_mutex);
 
@@ -594,18 +593,17 @@ void rib_t::rib_flush(bool force_flush)
 			}
 		}
 
-		flush = prefixes_reb.size();
+		flush = force_flush || prefixes_reb.size();
 		prefixes_reb.clear();
+
+		need_flushing = false;
 	}
 
-	if (force_flush ||
-	    flush)
+	if (flush)
 	{
 		controlPlane->route.prefix_flush();
 		controlPlane->dregress.prefix_flush();
 	}
-
-	need_flushing = false;
 }
 
 common::icp::rib_summary::response rib_t::rib_summary()
