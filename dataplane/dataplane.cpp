@@ -84,15 +84,7 @@ cDataPlane::cDataPlane() :
 	        {eConfigType::sample_gc_step, 512},
 	        {eConfigType::acl_states4_ht_size, YANET_CONFIG_ACL_STATES4_HT_SIZE},
 	        {eConfigType::acl_states6_ht_size, YANET_CONFIG_ACL_STATES6_HT_SIZE},
-	        {eConfigType::acl_network_lpm4_chunks_size, YANET_CONFIG_ACL_NETWORK_LPM4_EXTENDED_CHUNKS_SIZE},
-	        {eConfigType::acl_network_source_lpm6_chunks_size, YANET_CONFIG_ACL_NETWORK_SOURCE_LPM6_CHUNKS_SIZE},
-	        {eConfigType::acl_network_destination_lpm6_chunks_size, YANET_CONFIG_ACL_NETWORK_DESTINATION_LPM6_CHUNKS_SIZE},
-	        {eConfigType::acl_network_destination_ht_size, YANET_CONFIG_ACL_NETWORK_DESTINATION_HT_SIZE},
-	        {eConfigType::acl_network_table_size, YANET_CONFIG_ACL_NETWORK_TABLE_SIZE},
 	        {eConfigType::acl_transport_layers_size, YANET_CONFIG_ACL_TRANSPORT_LAYERS_SIZE},
-	        {eConfigType::acl_transport_ht_size, YANET_CONFIG_ACL_TRANSPORT_HT_SIZE},
-	        {eConfigType::acl_total_ht_size, YANET_CONFIG_ACL_TOTAL_HT_SIZE},
-	        {eConfigType::acl_values_size, YANET_CONFIG_ACL_VALUES_SIZE},
 	        {eConfigType::master_mempool_size, 8192},
 	        {eConfigType::nat64stateful_states_size, YANET_CONFIG_NAT64STATEFUL_HT_SIZE},
 	        {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE},
@@ -1841,41 +1833,9 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	{
 		configValues[eConfigType::acl_states6_ht_size] = json["acl_states6_ht_size"];
 	}
-	if (exist(json, "acl_network_lpm4_chunks_size"))
-	{
-		configValues[eConfigType::acl_network_lpm4_chunks_size] = json["acl_network_lpm4_chunks_size"];
-	}
-	if (exist(json, "acl_network_source_lpm6_chunks_size"))
-	{
-		configValues[eConfigType::acl_network_source_lpm6_chunks_size] = json["acl_network_source_lpm6_chunks_size"];
-	}
-	if (exist(json, "acl_network_destination_lpm6_chunks_size"))
-	{
-		configValues[eConfigType::acl_network_destination_lpm6_chunks_size] = json["acl_network_destination_lpm6_chunks_size"];
-	}
-	if (exist(json, "acl_network_destination_ht_size"))
-	{
-		configValues[eConfigType::acl_network_destination_ht_size] = json["acl_network_destination_ht_size"];
-	}
-	if (exist(json, "acl_network_table_size"))
-	{
-		configValues[eConfigType::acl_network_table_size] = json["acl_network_table_size"];
-	}
 	if (exist(json, "acl_transport_layers_size"))
 	{
 		configValues[eConfigType::acl_transport_layers_size] = json["acl_transport_layers_size"];
-	}
-	if (exist(json, "acl_transport_ht_size"))
-	{
-		configValues[eConfigType::acl_transport_ht_size] = json["acl_transport_ht_size"];
-	}
-	if (exist(json, "acl_total_ht_size"))
-	{
-		configValues[eConfigType::acl_total_ht_size] = json["acl_total_ht_size"];
-	}
-	if (exist(json, "acl_values_size"))
-	{
-		configValues[eConfigType::acl_values_size] = json["acl_values_size"];
 	}
 
 	if (exist(json, "master_mempool_size"))
