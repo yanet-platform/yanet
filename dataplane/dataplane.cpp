@@ -34,6 +34,7 @@
 #include "dataplane.h"
 #include "debug_latch.h"
 #include "globalbase.h"
+#include "lpm.h"
 #include "report.h"
 #include "sock_dev.h"
 #include "worker.h"

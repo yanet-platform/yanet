@@ -274,10 +274,6 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::getReport, request);
 		}
-		else if (type == common::idp::requestType::getGlobalBaseStats)
-		{
-			response = callWithResponse(&cControlPlane::getGlobalBaseStats, request);
-		}
 		else if (type == common::idp::requestType::lpm4LookupAddress)
 		{
 			response = callWithResponse(&cControlPlane::lpm4LookupAddress, request);

@@ -57,7 +57,6 @@ enum class requestType : uint32_t
 	getConfig,
 	getErrors,
 	getReport,
-	getGlobalBaseStats,
 	lpm4LookupAddress,
 	lpm6LookupAddress,
 	nat64stateful_state,
@@ -745,14 +744,6 @@ namespace getReport
 using response = std::string;
 }
 
-namespace getGlobalBaseStats
-{
-using stats = std::tuple<common::uint64, ///< lpm4ExtendedChunksCount
-                         common::uint64>; ///< lpm6ExtendedChunksCount
-
-using response = std::map<tSocketId, stats>;
-}
-
 namespace lpm4LookupAddress
 {
 using request = uint32_t; ///< ipAddress
@@ -1043,7 +1034,6 @@ using response = std::variant<std::tuple<>,
                               getConfig::response,
                               getErrors::response,
                               getReport::response,
-                              getGlobalBaseStats::response,
                               lpm4LookupAddress::response,
                               lpm6LookupAddress::response,
                               nat64stateful_state::response,

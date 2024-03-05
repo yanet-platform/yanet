@@ -53,7 +53,6 @@ public:
 	common::idp::getConfig::response getConfig() const;
 	common::idp::getErrors::response getErrors();
 	common::idp::getReport::response getReport();
-	common::idp::getGlobalBaseStats::response getGlobalBaseStats();
 	common::idp::lpm4LookupAddress::response lpm4LookupAddress(const common::idp::lpm4LookupAddress::request& request);
 	common::idp::lpm6LookupAddress::response lpm6LookupAddress(const common::idp::lpm6LookupAddress::request& request);
 	common::idp::limits::response limits();
