@@ -751,27 +751,6 @@ common::idp::getReport::response cControlPlane::getReport()
 	return dataPlane->report.getReport().dump(2);
 }
 
-common::idp::getGlobalBaseStats::response cControlPlane::getGlobalBaseStats()
-{
-	std::lock_guard<std::mutex> guard(mutex);
-
-	common::idp::getGlobalBaseStats::response response;
-
-	for (auto& iter : dataPlane->globalBases)
-	{
-		const tSocketId& socketId = iter.first;
-		const auto* globalBase = iter.second[dataPlane->currentGlobalBaseId];
-
-		auto lpm4stats = globalBase->route_lpm4.getStats();
-		auto lpm6stats = globalBase->route_lpm6.getStats();
-
-		response[socketId] = {lpm4stats.extendedChunksCount,
-		                      lpm6stats.extendedChunksCount};
-	}
-
-	return response;
-}
-
 /// @todo: rename, move
 common::idp::value getLookupValue(const dataplane::globalBase::route_value_t& lpmValue)
 {
@@ -851,7 +830,7 @@ common::idp::lpm4LookupAddress::response cControlPlane::lpm4LookupAddress(const 
 		const auto* globalBase = iter.second[dataPlane->currentGlobalBaseId];
 
 		uint32_t valueId;
-		if (globalBase->route_lpm4.lookup(ipAddress, &valueId))
+		if (globalBase->route_lpm4->lookup(ipAddress, &valueId))
 		{
 			response[socketId] = {true,
 			                      valueId,
@@ -883,7 +862,7 @@ common::idp::lpm6LookupAddress::response cControlPlane::lpm6LookupAddress(const 
 		const auto* globalBase = iter.second[dataPlane->currentGlobalBaseId];
 
 		uint32_t valueId;
-		if (globalBase->route_lpm6.lookup(request, &valueId))
+		if (globalBase->route_lpm6->lookup(request, &valueId))
 		{
 			response[socketId] = {true,
 			                      valueId,
@@ -951,26 +930,10 @@ common::idp::limits::response cControlPlane::limits()
 		{
 			const auto* globalBase = generations[dataPlane->currentGlobalBaseId];
 
-			limit_insert(response,
-			             "route.v4.lpm.extended_chunks",
-			             socket_id,
-			             globalBase->route_lpm4.getStats().extendedChunksCount,
-			             CONFIG_YADECAP_LPM4_EXTENDED_SIZE);
-			limit_insert(response,
-			             "route.v6.lpm.extended_chunks",
-			             socket_id,
-			             globalBase->route_lpm6.getStats().extendedChunksCount,
-			             CONFIG_YADECAP_LPM6_EXTENDED_SIZE);
-			limit_insert(response,
-			             "route.tunnel.v4.lpm.extended_chunks",
-			             socket_id,
-			             globalBase->route_tunnel_lpm4.getStats().extendedChunksCount,
-			             YANET_CONFIG_ROUTE_TUNNEL_LPM4_EXTENDED_SIZE);
-			limit_insert(response,
-			             "route.tunnel.v6.lpm.extended_chunks",
-			             socket_id,
-			             globalBase->route_tunnel_lpm6.getStats().extendedChunksCount,
-			             YANET_CONFIG_ROUTE_TUNNEL_LPM6_EXTENDED_SIZE);
+			globalBase->updater.route_lpm4->limits(response);
+			globalBase->updater.route_lpm6->limits(response);
+			globalBase->updater.route_tunnel_lpm4->limits(response);
+			globalBase->updater.route_tunnel_lpm6->limits(response);
 
 			globalBase->updater.acl.network_table->limits(response);
 			globalBase->updater.acl.transport_table->limits(response);
