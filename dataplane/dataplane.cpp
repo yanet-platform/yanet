@@ -1838,6 +1838,11 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 		configValues[eConfigType::master_mempool_size] = json["master_mempool_size"];
 	}
 
+	if (exist(json, "nat64stateful_states_size"))
+	{
+		configValues[eConfigType::nat64stateful_states_size] = json["nat64stateful_states_size"];
+	}
+
 	if (exist(json, "kernel_interface_queue_size"))
 	{
 		configValues[eConfigType::kernel_interface_queue_size] = json["kernel_interface_queue_size"];
