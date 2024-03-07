@@ -61,39 +61,49 @@ cDataPlane::cDataPlane() :
         controlPlane(new cControlPlane(this)),
         bus(this)
 {
-	configValues = {{eConfigType::port_rx_queue_size, 4096},
-	                {eConfigType::port_tx_queue_size, 4096},
-	                {eConfigType::ring_highPriority_size, 64},
-	                {eConfigType::ring_normalPriority_size, 256},
-	                {eConfigType::ring_lowPriority_size, 64},
-	                {eConfigType::ring_toFreePackets_size, 64},
-	                {eConfigType::ring_log_size, 1024},
-	                {eConfigType::fragmentation_size, 1024},
-	                {eConfigType::fragmentation_timeout_first, 32},
-	                {eConfigType::fragmentation_timeout_last, 16},
-	                {eConfigType::fragmentation_packets_per_flow, 64},
-	                {eConfigType::stateful_firewall_tcp_timeout, 120},
-	                {eConfigType::stateful_firewall_udp_timeout, 30},
-	                {eConfigType::stateful_firewall_other_protocols_timeout, 16},
-	                {eConfigType::gc_step, 8},
-	                {eConfigType::sample_gc_step, 512},
-	                {eConfigType::acl_states4_ht_size, YANET_CONFIG_ACL_STATES4_HT_SIZE},
-	                {eConfigType::acl_states6_ht_size, YANET_CONFIG_ACL_STATES6_HT_SIZE},
-	                {eConfigType::acl_network_lpm4_chunks_size, YANET_CONFIG_ACL_NETWORK_LPM4_EXTENDED_CHUNKS_SIZE},
-	                {eConfigType::acl_network_source_lpm6_chunks_size, YANET_CONFIG_ACL_NETWORK_SOURCE_LPM6_CHUNKS_SIZE},
-	                {eConfigType::acl_network_destination_lpm6_chunks_size, YANET_CONFIG_ACL_NETWORK_DESTINATION_LPM6_CHUNKS_SIZE},
-	                {eConfigType::acl_network_destination_ht_size, YANET_CONFIG_ACL_NETWORK_DESTINATION_HT_SIZE},
-	                {eConfigType::acl_network_table_size, YANET_CONFIG_ACL_NETWORK_TABLE_SIZE},
-	                {eConfigType::acl_transport_layers_size, YANET_CONFIG_ACL_TRANSPORT_LAYERS_SIZE},
-	                {eConfigType::acl_transport_ht_size, YANET_CONFIG_ACL_TRANSPORT_HT_SIZE},
-	                {eConfigType::acl_total_ht_size, YANET_CONFIG_ACL_TOTAL_HT_SIZE},
-	                {eConfigType::acl_values_size, YANET_CONFIG_ACL_VALUES_SIZE},
-	                {eConfigType::master_mempool_size, 8192},
-	                {eConfigType::nat64stateful_states_size, YANET_CONFIG_NAT64STATEFUL_HT_SIZE},
-	                {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE},
-	                {eConfigType::balancer_state_ttl, 60},
-	                {eConfigType::balancer_state_ht_size, YANET_CONFIG_BALANCER_STATE_HT_SIZE},
-	                {eConfigType::tsc_active_state, YANET_CONFIG_TSC_ACTIVE_STATE}};
+	configValues = {
+	        {eConfigType::port_rx_queue_size, 4096},
+	        {eConfigType::port_tx_queue_size, 4096},
+	        {eConfigType::ring_highPriority_size, 64},
+	        {eConfigType::ring_normalPriority_size, 256},
+	        {eConfigType::ring_lowPriority_size, 64},
+	        {eConfigType::ring_toFreePackets_size, 64},
+	        {eConfigType::ring_log_size, 1024},
+	        {eConfigType::fragmentation_size, 1024},
+	        {eConfigType::fragmentation_timeout_first, 32},
+	        {eConfigType::fragmentation_timeout_last, 16},
+	        {eConfigType::fragmentation_packets_per_flow, 64},
+	        {eConfigType::stateful_firewall_tcp_timeout, 120},
+	        {eConfigType::stateful_firewall_tcp_syn_timeout, YANET_CONFIG_STATE_TIMEOUT_DEFAULT},
+	        {eConfigType::stateful_firewall_tcp_syn_ack_timeout, YANET_CONFIG_STATE_TIMEOUT_DEFAULT},
+	        {eConfigType::stateful_firewall_tcp_fin_timeout, YANET_CONFIG_STATE_TIMEOUT_DEFAULT},
+	        {eConfigType::stateful_firewall_udp_timeout, 30},
+	        {eConfigType::stateful_firewall_other_protocols_timeout, 16},
+	        {eConfigType::gc_step, 8},
+	        {eConfigType::sample_gc_step, 512},
+	        {eConfigType::acl_states4_ht_size, YANET_CONFIG_ACL_STATES4_HT_SIZE},
+	        {eConfigType::acl_states6_ht_size, YANET_CONFIG_ACL_STATES6_HT_SIZE},
+	        {eConfigType::acl_network_lpm4_chunks_size, YANET_CONFIG_ACL_NETWORK_LPM4_EXTENDED_CHUNKS_SIZE},
+	        {eConfigType::acl_network_source_lpm6_chunks_size, YANET_CONFIG_ACL_NETWORK_SOURCE_LPM6_CHUNKS_SIZE},
+	        {eConfigType::acl_network_destination_lpm6_chunks_size, YANET_CONFIG_ACL_NETWORK_DESTINATION_LPM6_CHUNKS_SIZE},
+	        {eConfigType::acl_network_destination_ht_size, YANET_CONFIG_ACL_NETWORK_DESTINATION_HT_SIZE},
+	        {eConfigType::acl_network_table_size, YANET_CONFIG_ACL_NETWORK_TABLE_SIZE},
+	        {eConfigType::acl_transport_layers_size, YANET_CONFIG_ACL_TRANSPORT_LAYERS_SIZE},
+	        {eConfigType::acl_transport_ht_size, YANET_CONFIG_ACL_TRANSPORT_HT_SIZE},
+	        {eConfigType::acl_total_ht_size, YANET_CONFIG_ACL_TOTAL_HT_SIZE},
+	        {eConfigType::acl_values_size, YANET_CONFIG_ACL_VALUES_SIZE},
+	        {eConfigType::master_mempool_size, 8192},
+	        {eConfigType::nat64stateful_states_size, YANET_CONFIG_NAT64STATEFUL_HT_SIZE},
+	        {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE},
+	        {eConfigType::balancer_state_ht_size, YANET_CONFIG_BALANCER_STATE_HT_SIZE},
+	        {eConfigType::tsc_active_state, YANET_CONFIG_TSC_ACTIVE_STATE},
+	        {eConfigType::balancer_tcp_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
+	        {eConfigType::balancer_tcp_syn_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
+	        {eConfigType::balancer_tcp_syn_ack_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
+	        {eConfigType::balancer_tcp_fin_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
+	        {eConfigType::balancer_udp_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
+	        {eConfigType::balancer_other_protocols_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
+	};
 }
 
 cDataPlane::~cDataPlane()
@@ -1857,9 +1867,38 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	{
 		configValues[eConfigType::fragmentation_packets_per_flow] = json["fragmentation_packets_per_flow"];
 	}
+	/*
+	  The decoding order of four options bellow is important. The first one
+	  is more common and sets a timeout value for any tcp session whereas
+	  three following aloow one to set timeouts more precissely basing on
+	  the last processed tcp session packet flags. So if any of flag-based
+	  options is ommitted the more common option should be applied.
+	*/
 	if (exist(json, "stateful_firewall_tcp_timeout"))
 	{
 		configValues[eConfigType::stateful_firewall_tcp_timeout] = json["stateful_firewall_tcp_timeout"];
+		/* Set the same value as a default for all descendant options. */
+		configValues[eConfigType::stateful_firewall_tcp_syn_timeout] = configValues[eConfigType::stateful_firewall_tcp_timeout];
+		configValues[eConfigType::stateful_firewall_tcp_syn_ack_timeout] = configValues[eConfigType::stateful_firewall_tcp_timeout];
+		configValues[eConfigType::stateful_firewall_tcp_fin_timeout] = configValues[eConfigType::stateful_firewall_tcp_timeout];
+	}
+	/*
+	   Syn Ack is descendant of Syn state so as we do not have `is-set`
+	   flag for option we should preserve the decoding order.
+	*/
+	if (exist(json, "stateful_firewall_tcp_syn_timeout"))
+	{
+		configValues[eConfigType::stateful_firewall_tcp_syn_timeout] = json["stateful_firewall_tcp_syn_timeout"];
+		/* Set the value as default for Syn-Ack timeouts. */
+		configValues[eConfigType::stateful_firewall_tcp_syn_ack_timeout] = configValues[eConfigType::stateful_firewall_tcp_syn_timeout];
+	}
+	if (exist(json, "stateful_firewall_tcp_syn_ack_timeout"))
+	{
+		configValues[eConfigType::stateful_firewall_tcp_syn_ack_timeout] = json["stateful_firewall_tcp_syn_ack_timeout"];
+	}
+	if (exist(json, "stateful_firewall_tcp_fin_timeout"))
+	{
+		configValues[eConfigType::stateful_firewall_tcp_fin_timeout] = json["stateful_firewall_tcp_fin_timeout"];
 	}
 	if (exist(json, "stateful_firewall_udp_timeout"))
 	{
@@ -1932,11 +1971,6 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 		configValues[eConfigType::kernel_interface_queue_size] = json["kernel_interface_queue_size"];
 	}
 
-	if (exist(json, "balancer_state_ttl"))
-	{
-		configValues[eConfigType::balancer_state_ttl] = json["balancer_state_ttl"];
-	}
-
 	if (exist(json, "balancer_state_ht_size"))
 	{
 		configValues[eConfigType::balancer_state_ht_size] = json["balancer_state_ht_size"];
@@ -1945,6 +1979,47 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	if (exist(json, "tsc_active_state"))
 	{
 		configValues[eConfigType::tsc_active_state] = json["tsc_active_state"];
+	}
+	/*
+	  The decoding order of four options bellow is important. The first one
+	  is more common and sets a timeout value for any tcp session whereas
+	  three following aloow one to set timeouts more precissely basing on
+	  the last processed tcp session packet flags. So if any of flag-based
+	  options is ommitted the more common option should be applied.
+	*/
+	if (exist(json, "balancer_tcp_timeout"))
+	{
+		configValues[eConfigType::balancer_tcp_timeout] = json["balancer_tcp_timeout"];
+		/* Set the same value as a default for all descendant options. */
+		configValues[eConfigType::balancer_tcp_syn_timeout] = configValues[eConfigType::balancer_tcp_timeout];
+		configValues[eConfigType::balancer_tcp_syn_ack_timeout] = configValues[eConfigType::balancer_tcp_timeout];
+		configValues[eConfigType::balancer_tcp_fin_timeout] = configValues[eConfigType::balancer_tcp_timeout];
+	}
+	/*
+	   Syn Ack is descendant of Syn state so as we do not have `is-set`
+	   flag for option we should preserve the decoding order.
+	*/
+	if (exist(json, "balancer_tcp_syn_timeout"))
+	{
+		configValues[eConfigType::balancer_tcp_syn_timeout] = json["balancer_tcp_syn_timeout"];
+		/* Set the value as default for Syn-Ack timeouts. */
+		configValues[eConfigType::balancer_tcp_syn_ack_timeout] = configValues[eConfigType::balancer_tcp_syn_timeout];
+	}
+	if (exist(json, "balancer_tcp_syn_ack_timeout"))
+	{
+		configValues[eConfigType::balancer_tcp_syn_ack_timeout] = json["balancer_tcp_syn_ack_timeout"];
+	}
+	if (exist(json, "balancer_tcp_fin_timeout"))
+	{
+		configValues[eConfigType::balancer_tcp_fin_timeout] = json["balancer_tcp_fin_timeout"];
+	}
+	if (exist(json, "balancer_udp_timeout"))
+	{
+		configValues[eConfigType::balancer_udp_timeout] = json["balancer_udp_timeout"];
+	}
+	if (exist(json, "balancer_other_protocols_timeout"))
+	{
+		configValues[eConfigType::balancer_other_protocols_timeout] = json["balancer_other_protocols_timeout"];
 	}
 
 	return eResult::success;

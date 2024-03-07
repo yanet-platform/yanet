@@ -57,8 +57,6 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 
 	this->controlplane = dataplane->controlPlane.get();
 
-	this->balancer_state_ttl = (uint16_t)dataplane->getConfigValue(eConfigType::balancer_state_ttl);
-
 	for (const auto& [port_id, port] : dataplane->ports)
 	{
 		(void)port;
@@ -415,7 +413,7 @@ void worker_gc_t::handle_balancer_gc()
 			}
 
 			iter.lock();
-			if (iter.value()->timestamp_gc != iter.value()->timestamp_last_packet) ///< @todo: BALANCER TIMEOUTS
+			if (iter.value()->timestamp_gc != iter.value()->timestamp_last_packet)
 			{
 				iter.value()->timestamp_gc = iter.value()->timestamp_last_packet;
 				auto value = *iter.value();
@@ -483,10 +481,10 @@ void worker_gc_t::handle_balancer_gc()
 
 				iter.lock();
 			}
-
-			if ((uint16_t)((uint16_t)globalbase_atomic->currentTime - (uint16_t)iter.value()->timestamp_last_packet) > balancer_state_ttl)
+			auto* value = iter.value();
+			if (is_timeout(value->timestamp_last_packet, value->state_timeout))
 			{
-				const auto& real_from_base = base.globalBase->balancer_reals[iter.value()->real_unordered_id];
+				const auto& real_from_base = base.globalBase->balancer_reals[value->real_unordered_id];
 				++counters[real_from_base.counter_id + (tCounterId)balancer::gc_real_counter::sessions_destroyed];
 				iter.unset_valid();
 			}
@@ -533,7 +531,7 @@ void worker_gc_t::handle_acl_gc()
 
 			if (value.type == dataplane::globalBase::fw_state_type::tcp)
 			{
-				if (current_time - value.last_seen >= globalbase_atomic->fw_state_config.tcp_timeout)
+				if (is_timeout(value.last_seen, value.state_timeout))
 				{
 					fw_state_remove_stack.emplace_back(fw_key);
 
@@ -560,7 +558,7 @@ void worker_gc_t::handle_acl_gc()
 			}
 			else if (value.type == dataplane::globalBase::fw_state_type::udp)
 			{
-				if (current_time - value.last_seen >= globalbase_atomic->fw_state_config.udp_timeout)
+				if (is_timeout(value.last_seen, value.state_timeout))
 				{
 					fw_state_remove_stack.emplace_back(fw_key);
 
@@ -585,7 +583,7 @@ void worker_gc_t::handle_acl_gc()
 			}
 			else
 			{
-				if (current_time - value.last_seen >= globalbase_atomic->fw_state_config.other_protocols_timeout)
+				if (is_timeout(value.last_seen, value.state_timeout))
 				{
 					fw_state_remove_stack.emplace_back(fw_key);
 
@@ -641,7 +639,7 @@ void worker_gc_t::handle_acl_gc()
 
 			if (value.type == dataplane::globalBase::fw_state_type::tcp)
 			{
-				if (current_time - value.last_seen >= globalbase_atomic->fw_state_config.tcp_timeout)
+				if (is_timeout(value.last_seen, value.state_timeout))
 				{
 					fw_state_remove_stack.emplace_back(fw_key);
 
@@ -668,7 +666,7 @@ void worker_gc_t::handle_acl_gc()
 			}
 			else if (value.type == dataplane::globalBase::fw_state_type::udp)
 			{
-				if (current_time - value.last_seen >= globalbase_atomic->fw_state_config.udp_timeout)
+				if (is_timeout(value.last_seen, value.state_timeout))
 				{
 					fw_state_remove_stack.emplace_back(fw_key);
 
@@ -693,7 +691,7 @@ void worker_gc_t::handle_acl_gc()
 			}
 			else
 			{
-				if (current_time - value.last_seen >= globalbase_atomic->fw_state_config.other_protocols_timeout)
+				if (is_timeout(value.last_seen, value.state_timeout))
 				{
 					fw_state_remove_stack.emplace_back(fw_key);
 
@@ -925,10 +923,10 @@ void worker_gc_t::handle_free_mbuf()
 	}
 }
 
-inline bool worker_gc_t::is_timeout(const uint16_t timestamp,
-                                    const uint16_t timeout)
+inline bool worker_gc_t::is_timeout(const uint32_t timestamp,
+                                    const uint32_t timeout)
 {
-	return ((uint16_t)(current_time - timestamp) > timeout);
+	return ((uint32_t)(current_time - timestamp) > timeout);
 }
 
 inline void worker_gc_t::correct_timestamp(uint16_t& timestamp,

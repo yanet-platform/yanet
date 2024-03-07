@@ -685,6 +685,8 @@ struct fw_state_value_t
 	/// to specific state variables if any) to figure out when it's time to
 	/// collect inactive sessions.
 	uint32_t last_seen;
+	/// State timeout
+	uint32_t state_timeout;
 	/// Flow value of the corresponding rule.
 	common::globalBase::tFlow flow;
 	/// Unix time of when the last sync packet was emitted.
@@ -795,10 +797,21 @@ struct balancer_state_value_t
 {
 	uint32_t real_unordered_id;
 	uint32_t timestamp_create; ///< @todo: 16bit
-	uint16_t timestamp_last_packet;
-	uint16_t timestamp_gc;
-	uint32_t nap0; ///< @todo: DELETE
+	uint32_t timestamp_last_packet;
+	uint32_t timestamp_gc;
+	uint32_t state_timeout;
 };
+
+struct state_timeout_config_t
+{
+	uint32_t tcp_syn_ack_timeout;
+	uint32_t tcp_syn_timeout;
+	uint32_t tcp_fin_timeout;
+	uint32_t tcp_timeout;
+	uint32_t udp_timeout;
+	uint32_t default_timeout;
+};
+
 }
 
 }
