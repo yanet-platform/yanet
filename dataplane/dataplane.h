@@ -41,6 +41,9 @@ enum class eConfigType
 	fragmentation_packets_per_flow,
 	stateful_firewall_udp_timeout,
 	stateful_firewall_tcp_timeout,
+	stateful_firewall_tcp_syn_timeout,
+	stateful_firewall_tcp_syn_ack_timeout,
+	stateful_firewall_tcp_fin_timeout,
 	stateful_firewall_other_protocols_timeout,
 	gc_step,
 	sample_gc_step,
@@ -58,9 +61,14 @@ enum class eConfigType
 	master_mempool_size,
 	nat64stateful_states_size,
 	kernel_interface_queue_size,
-	balancer_state_ttl,
 	balancer_state_ht_size,
 	tsc_active_state,
+	balancer_udp_timeout,
+	balancer_tcp_timeout,
+	balancer_tcp_syn_timeout,
+	balancer_tcp_syn_ack_timeout,
+	balancer_tcp_fin_timeout,
+	balancer_other_protocols_timeout,
 };
 
 struct tDataPlaneConfig

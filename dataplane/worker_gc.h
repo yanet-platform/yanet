@@ -38,7 +38,7 @@ protected:
 	void handle_callbacks();
 	void handle_free_mbuf();
 
-	bool is_timeout(const uint16_t timestamp, const uint16_t timeout);
+	bool is_timeout(const uint32_t timestamp, const uint32_t timeout);
 	void correct_timestamp(uint16_t& timestamp, const uint16_t last_seen_max = YANET_CONFIG_STATE_TIMEOUT_MAX);
 	uint16_t calc_last_seen(const uint16_t timestamp);
 
@@ -61,8 +61,6 @@ public:
 	dataplane::base::permanently base_permanently;
 	common::worker_gc::stats_t stats;
 	dataplane::base::generation bases[2];
-
-	uint16_t balancer_state_ttl;
 
 	YADECAP_CACHE_ALIGNED(align1);
 

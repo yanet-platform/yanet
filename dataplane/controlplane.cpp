@@ -2827,6 +2827,30 @@ bool cControlPlane::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 			value.packets_forward = 0;
 			value.tcp.unpack(payload->flags);
 
+			uint32_t state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_other_protocols_timeout);
+			if (payload->proto == IPPROTO_UDP)
+			{
+				state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_udp_timeout);
+			}
+			else if (payload->proto == IPPROTO_TCP)
+			{
+				state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_timeout);
+				uint8_t flags = value.tcp.src_flags | value.tcp.dst_flags;
+				if (flags & (uint8_t)common::fwstate::tcp_flags_e::ACK)
+				{
+					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_syn_ack_timeout);
+				}
+				else if (flags & (uint8_t)common::fwstate::tcp_flags_e::SYN)
+				{
+					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_syn_timeout);
+				}
+				if (flags & (uint8_t)common::fwstate::tcp_flags_e::FIN)
+				{
+					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_fin_timeout);
+				}
+			}
+			value.state_timeout = state_timeout;
+
 			for (auto& [socketId, globalBaseAtomic] : dataPlane->globalBaseAtomics)
 			{
 				(void)socketId;
@@ -2841,6 +2865,7 @@ bool cControlPlane::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 					lookup_value->last_seen = slowWorker->basePermanently.globalBaseAtomic->currentTime;
 					lookup_value->tcp.src_flags |= value.tcp.src_flags;
 					lookup_value->tcp.dst_flags |= value.tcp.dst_flags;
+					lookup_value->state_timeout = std::max(lookup_value->state_timeout, value.state_timeout);
 				}
 				else
 				{
@@ -2882,6 +2907,30 @@ bool cControlPlane::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 			value.packets_forward = 0;
 			value.tcp.unpack(payload->flags);
 
+			uint32_t state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_other_protocols_timeout);
+			if (payload->proto == IPPROTO_UDP)
+			{
+				state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_udp_timeout);
+			}
+			else if (payload->proto == IPPROTO_TCP)
+			{
+				state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_timeout);
+				uint8_t flags = value.tcp.src_flags | value.tcp.dst_flags;
+				if (flags & (uint8_t)common::fwstate::tcp_flags_e::ACK)
+				{
+					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_syn_ack_timeout);
+				}
+				else if (flags & (uint8_t)common::fwstate::tcp_flags_e::SYN)
+				{
+					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_syn_timeout);
+				}
+				if (flags & (uint8_t)common::fwstate::tcp_flags_e::FIN)
+				{
+					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_fin_timeout);
+				}
+			}
+			value.state_timeout = state_timeout;
+
 			for (auto& [socketId, globalBaseAtomic] : dataPlane->globalBaseAtomics)
 			{
 				(void)socketId;
@@ -2896,6 +2945,7 @@ bool cControlPlane::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 					lookup_value->last_seen = slowWorker->basePermanently.globalBaseAtomic->currentTime;
 					lookup_value->tcp.src_flags |= value.tcp.src_flags;
 					lookup_value->tcp.dst_flags |= value.tcp.dst_flags;
+					lookup_value->state_timeout = std::max(lookup_value->state_timeout, value.state_timeout);
 				}
 				else
 				{
