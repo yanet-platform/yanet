@@ -177,7 +177,6 @@ protected:
 	inline void balancer_icmp_forward_handle();
 	inline void balancer_ipv6_source(rte_ipv6_hdr* header, const ipv6_address_t& balancer, const dataplane::globalBase::balancer_service_t& service, const rte_ipv4_hdr* ipv4HeaderInner, const rte_ipv6_hdr* ipv6HeaderInner);
 	inline void balancer_ipv4_source(rte_ipv4_hdr* header, const ipv4_address_t& balancer, const dataplane::globalBase::balancer_service_t& service);
-	inline void balancer_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::balancer_state_value_t* value);
 
 	/// fw state
 	inline bool acl_try_keepstate(rte_mbuf* mbuf);
@@ -192,7 +191,6 @@ protected:
 	inline void acl_egress_handle6();
 	inline void acl_egress_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 	inline void acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAclId aclId);
-	inline void acl_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value);
 
 	inline void dregress_entry(rte_mbuf* mbuf);
 
@@ -206,9 +204,6 @@ protected:
 	inline void slowWorker_entry_highPriority(rte_mbuf* mbuf, const common::globalBase::eFlowType& flowType); ///< @todo: DELETE and OPT
 	inline void slowWorker_entry_normalPriority(rte_mbuf* mbuf, const common::globalBase::eFlowType& flowType); ///< @todo: DELETE and OPT
 	inline void slowWorker_entry_lowPriority(rte_mbuf* mbuf); ///< @todo: DELETE and OPT
-
-	inline uint32_t get_tcp_state_timeout(uint8_t flags, const dataplane::globalBase::state_timeout_config_t& state_timeout_config);
-	inline uint32_t get_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, const dataplane::globalBase::state_timeout_config_t& state_timeout_config);
 
 protected:
 	/// @todo: move to slow_worker_t
@@ -339,9 +334,6 @@ protected:
 	sharedmemory::cSharedMemory dumpRings[YANET_CONFIG_SHARED_RINGS_NUMBER];
 
 	samples::Sampler sampler;
-
-	dataplane::globalBase::state_timeout_config_t acl_state_config;
-	dataplane::globalBase::state_timeout_config_t balancer_state_config;
 
 public:
 	/// use this table for pass resolve neighbor MAC

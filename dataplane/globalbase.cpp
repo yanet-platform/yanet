@@ -338,16 +338,16 @@ eResult generation::get(const common::idp::getGlobalBase::request& request,
 	/** @todo
 	for (const auto& interfaceId : std::get<2>(request))
 	{
-	        if (interfaceId >= CONFIG_YADECAP_INTERFACES_SIZE)
-	        {
-	                YADECAP_LOG_ERROR("invalid interfaceId: '%u'\n", interfaceId);
-	                return eResult::invalidInterfaceId;
-	        }
+		if (interfaceId >= CONFIG_YADECAP_INTERFACES_SIZE)
+		{
+			YADECAP_LOG_ERROR("invalid interfaceId: '%u'\n", interfaceId);
+			return eResult::invalidInterfaceId;
+		}
 
-	        const auto& interface = interfaces[interfaceId];
+		const auto& interface = interfaces[interfaceId];
 
-	        std::get<2>(globalBaseResponse)[interfaceId] = {convert(interface.neighborEtherAddress),
-	                                                        interface.flow};
+		std::get<2>(globalBaseResponse)[interfaceId] = {convert(interface.neighborEtherAddress),
+		                                                interface.flow};
 	}
 	*/
 
