@@ -2653,133 +2653,35 @@ protected:
 class lpm6_16x8bit_id32_dynamic
 {
 public:
-	class updater
+	constexpr static uint64_t extended_chunks_size_min = 8;
+
+	struct stats_t
 	{
-	public:
-		updater() :
-		        lpm(nullptr),
-		        chunks_size(0)
-		{
-		}
-
-		void update_pointer(lpm6_16x8bit_id32_dynamic* lpm,
-		                    const tSocketId socket_id,
-		                    const unsigned int chunks_size)
-		{
-			this->lpm = lpm;
-			this->socket_id = socket_id;
-			this->chunks_size = chunks_size;
-		}
-
-		eResult update(const std::vector<common::acl::tree_chunk_8bit_t>& from_chunks)
-		{
-			chunks_count = 1; ///< 0 is root chunk
-			remap_chunks.resize(0);
-			remap_chunks.resize(from_chunks.size(), 0);
-			return update_chunk(from_chunks, root_chunk_id, root_chunk_id);
-		}
-
-	public:
-		template<typename list_T> ///< @todo: common::idp::limits::response
-		void limits(list_T& list,
-		            const std::string& name) const
-		{
-			list.emplace_back(name + ".chunks",
-			                  socket_id,
-			                  chunks_count,
-			                  chunks_size);
-		}
-
-		template<typename json_t> ///< @todo: nlohmann::json
-		void report(json_t& json) const
-		{
-			json["chunks_count"] = chunks_count;
-		}
-
-	protected:
-		inline unsigned int allocate_chunk()
-		{
-			if (chunks_count >= chunks_size)
-			{
-				return 0;
-			}
-
-			unsigned int new_chunk_id = chunks_count;
-			chunks_count++;
-
-			return new_chunk_id;
-		}
-
-		eResult update_chunk(const std::vector<common::acl::tree_chunk_8bit_t>& from_chunks,
-		                     const unsigned int from_chunk_id,
-		                     const unsigned int chunk_id)
-		{
-			auto& chunk = lpm->chunks[chunk_id];
-			chunk = {}; ///< @todo: delete?
-
-			const auto& from_chunk = from_chunks[from_chunk_id];
-
-			memcpy(chunk.values, from_chunk.values, (1u << 8) * sizeof(common::acl::tree_value_t));
-
-			std::vector<std::tuple<unsigned int, unsigned int>> nexts;
-
-			for (uint32_t i = 0;
-			     i < (1u << bits);
-			     i++)
-			{
-				auto& chunk_value = chunk.values[i];
-
-				if (chunk_value.id & 0x80000000u) ///< is_chunk_id
-				{
-					auto& chunk_id = remap_chunks[chunk_value.id ^ 0x80000000u];
-					if (!chunk_id)
-					{
-						chunk_id = allocate_chunk();
-						if (!chunk_id)
-						{
-							return eResult::isFull;
-						}
-
-						nexts.emplace_back(chunk_value.id ^ 0x80000000u, chunk_id);
-					}
-
-					chunk_value.id = chunk_id ^ 0x80000000u;
-				}
-			}
-
-			for (const auto& [next_from_chunk_id, next_chunk_id] : nexts)
-			{
-				auto result = update_chunk(from_chunks, next_from_chunk_id, next_chunk_id);
-				if (result != eResult::success)
-				{
-					return result;
-				}
-			}
-
-			return eResult::success;
-		}
-
-	public:
-		lpm6_16x8bit_id32_dynamic* lpm;
-		tSocketId socket_id;
-		unsigned int chunks_size;
-		unsigned int chunks_count;
+		uint32_t extended_chunks_size;
+		unsigned int extended_chunks_count;
 		std::vector<unsigned int> remap_chunks;
 	};
 
-public:
-	static size_t calculate_sizeof(const unsigned int chunks_size)
+	static uint64_t calculate_sizeof(const uint64_t extended_chunks_size)
 	{
-		if (!chunks_size)
+		if (!extended_chunks_size)
 		{
-			YANET_LOG_ERROR("wrong chunks_size: %u\n", chunks_size);
+			YANET_LOG_ERROR("wrong extended_chunks_size: %lu\n", extended_chunks_size);
 			return 0;
 		}
 
-		return (size_t)chunks_size * sizeof(chunk_t);
+		return sizeof(lpm6_16x8bit_id32_dynamic) + extended_chunks_size * sizeof(chunk_t);
 	}
 
 public:
+	lpm6_16x8bit_id32_dynamic()
+	{
+		for (auto& value : chunks[0].values)
+		{
+			value.id = 0;
+		}
+	}
+
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
 	inline void lookup(const ipv6_address_t (&addresses)[burst_size],
 	                   uint32_t (&group_ids)[burst_size],
@@ -2861,11 +2763,89 @@ public:
 		}
 	}
 
+	eResult fill(stats_t& stats, const std::vector<common::acl::tree_chunk_8bit_t>& values)
+	{
+		stats.extended_chunks_count = 1; ///< 0 is root chunk
+		stats.remap_chunks.resize(0);
+		stats.remap_chunks.resize(values.size(), 0);
+
+		if (values.empty())
+		{
+			return eResult::success;
+		}
+
+		return update_chunk(stats, values, root_chunk_id, root_chunk_id);
+	}
+
 protected:
 	constexpr static unsigned int bits = 8;
 	constexpr static unsigned int root_chunk_id = 0;
 	constexpr static uint32_t mask_full = 0xFFFFFFFFu;
 
+	inline unsigned int allocate_extended_chunk(stats_t& stats)
+	{
+		if (stats.extended_chunks_count >= stats.extended_chunks_size)
+		{
+			return 0;
+		}
+
+		unsigned int new_chunk_id = stats.extended_chunks_count;
+		stats.extended_chunks_count++;
+
+		return new_chunk_id;
+	}
+
+	eResult update_chunk(stats_t& stats,
+	                     const std::vector<common::acl::tree_chunk_8bit_t>& from_chunks,
+	                     const unsigned int from_chunk_id,
+	                     const unsigned int chunk_id)
+	{
+		auto& chunk = chunks[chunk_id];
+		chunk = {}; ///< @todo: delete?
+
+		const auto& from_chunk = from_chunks[from_chunk_id];
+
+		memcpy(chunk.values, from_chunk.values, (1u << 8) * sizeof(common::acl::tree_value_t));
+
+		std::vector<std::tuple<unsigned int, unsigned int>> nexts;
+
+		for (uint32_t i = 0;
+		     i < (1u << bits);
+		     i++)
+		{
+			auto& chunk_value = chunk.values[i];
+
+			if (chunk_value.id & 0x80000000u) ///< is_chunk_id
+			{
+				auto& chunk_id = stats.remap_chunks[chunk_value.id ^ 0x80000000u];
+				if (!chunk_id)
+				{
+					chunk_id = allocate_extended_chunk(stats);
+					if (!chunk_id)
+					{
+						return eResult::isFull;
+					}
+
+					nexts.emplace_back(chunk_value.id ^ 0x80000000u, chunk_id);
+				}
+
+				chunk_value.id = chunk_id ^ 0x80000000u;
+			}
+		}
+
+		for (const auto& [next_from_chunk_id, next_chunk_id] : nexts)
+		{
+			auto result = update_chunk(stats, from_chunks, next_from_chunk_id, next_chunk_id);
+			if (result != eResult::success)
+			{
+				return result;
+			}
+		}
+
+		return eResult::success;
+	}
+
+protected:
 	struct value_t
 	{
 		value_t() :

@@ -67,7 +67,7 @@ using network_ipv4_destination = dataplane::updater_lpm4_24bit_8bit_id32;
 using network_ipv6_source = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
 using network_ipv6_destination_ht = dataplane::updater_hashtable_mod_id32<ipv6_address_t, 1>;
 using network_ipv6_destination = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
-using network_table = dynamic_table<uint32_t>;
+using network_table = dataplane::updater_dynamic_table<uint32_t>;
 using transport_table = dataplane::updater_hashtable_mod_id32<common::acl::transport_key_t, 16>;
 using total_table = dataplane::updater_hashtable_mod_id32<common::acl::total_key_t, 16>;
 }
@@ -198,10 +198,10 @@ public: ///< @todo
 		{
 			std::unique_ptr<acl::network_ipv4_source> network_ipv4_source;
 			std::unique_ptr<acl::network_ipv4_destination> network_ipv4_destination;
-			acl::network_ipv6_source::updater network_ipv6_source;
+			std::unique_ptr<acl::network_ipv6_source> network_ipv6_source;
 			std::unique_ptr<acl::network_ipv6_destination_ht> network_ipv6_destination_ht;
-			acl::network_ipv6_destination::updater network_ipv6_destination;
-			acl::network_table::updater network_table;
+			std::unique_ptr<acl::network_ipv6_destination> network_ipv6_destination;
+			std::unique_ptr<acl::network_table> network_table;
 			std::unique_ptr<acl::transport_table> transport_table;
 			std::unique_ptr<acl::total_table> total_table;
 		} acl;
@@ -266,13 +266,13 @@ public: ///< @todo
 
 			struct
 			{
-				acl::network_ipv6_source* source;
+				acl::network_ipv6_source::object_type* source;
 				acl::network_ipv6_destination_ht::object_type* destination_ht;
-				acl::network_ipv6_destination* destination;
+				acl::network_ipv6_destination::object_type* destination;
 			} ipv6;
 		} network;
 
-		acl::network_table* network_table;
+		acl::network_table::object_type* network_table;
 		flat<uint8_t> network_flags;
 
 		uint32_t transport_layers_mask;

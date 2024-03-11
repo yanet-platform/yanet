@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdio>
 #include <ctime>
 #include <map>
 #include <optional>
