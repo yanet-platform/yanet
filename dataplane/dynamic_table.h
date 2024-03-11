@@ -2,12 +2,9 @@
 
 #include <inttypes.h>
 
-#include <vector>
-
 #include "common/config.h"
 #include "common/define.h"
 #include "common/result.h"
-#include "common/type.h"
 
 namespace dataplane
 {
@@ -18,85 +15,15 @@ class dynamic_table
 public:
 	using table_t = dynamic_table<value_t>;
 
-	class updater
+	constexpr static uint32_t keys_size_min = 8;
+
+	struct stats_t
 	{
-	public:
-		updater()
-		{
-		}
-
-		void update_pointer(table_t* table,
-		                    const tSocketId socket_id,
-		                    const uint32_t size)
-		{
-			this->table = table;
-			this->socket_id = socket_id;
-			this->size = size;
-		}
-
-		eResult update(const uint32_t width,
-		               const std::vector<value_t>& values)
-		{
-			keys_count = 0;
-
-			if (width == 0)
-			{
-				table->width_bits = 0;
-				return eResult::success;
-			}
-
-			if (__builtin_popcount(width) != 1)
-			{
-				YANET_LOG_ERROR("wrong width: %u\n", width);
-				return eResult::invalidCount;
-			}
-
-			if (values.size() > size)
-			{
-				YANET_LOG_ERROR("wrong size: %lu\n", values.size());
-				return eResult::invalidCount;
-			}
-
-			table->width_bits = __builtin_popcount(width - 1);
-			memcpy(table->values, values.data(), values.size() * sizeof(value_t));
-
-			keys_count = values.size();
-
-			return eResult::success;
-		}
-
-	public:
-		template<typename list_T> ///< @todo: common::idp::limits::response
-		void limits(list_T& list,
-		            const std::string& name) const
-		{
-			list.emplace_back(name + ".keys",
-			                  socket_id,
-			                  keys_count,
-			                  size);
-		}
-
-		template<typename json_t> ///< @todo: nlohmann::json
-		void report(json_t& json) const
-		{
-			json["keys_count"] = keys_count;
-			json["width"] = 1u << table->width_bits;
-		}
-
-	public:
-		table_t* table;
-		tSocketId socket_id;
-		uint32_t size;
-		unsigned int keys_count;
+		uint32_t keys_count;
+		uint32_t keys_size;
 	};
 
-public:
-	dynamic_table() :
-	        width_bits(0)
-	{
-	}
-
-	static size_t calculate_sizeof(const uint32_t size)
+	static uint64_t calculate_sizeof(const uint32_t size)
 	{
 		if (!size)
 		{
@@ -108,6 +35,11 @@ public:
 	}
 
 public:
+	dynamic_table() :
+	        width_bits(0)
+	{
+	}
+
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
 	inline void lookup(const uint32_t (&k1s)[burst_size],
 	                   const uint32_t (&k2s)[burst_size],
@@ -132,7 +64,39 @@ public:
 		return values[(k1 << width_bits) + k2];
 	}
 
-public:
+	eResult fill(stats_t& stats,
+	             const uint32_t width,
+	             const std::vector<value_t>& values)
+	{
+		stats.keys_count = 0;
+
+		if (width == 0)
+		{
+			width_bits = 0;
+			return eResult::success;
+		}
+
+		if (__builtin_popcount(width) != 1)
+		{
+			YANET_LOG_ERROR("wrong width: %u\n", width);
+			return eResult::invalidCount;
+		}
+
+		if (values.size() > stats.keys_size)
+		{
+			YANET_LOG_ERROR("wrong size: %lu\n", values.size());
+			return eResult::invalidCount;
+		}
+
+		width_bits = __builtin_popcount(width - 1);
+		memcpy(this->values, values.data(), values.size() * sizeof(value_t));
+
+		stats.keys_count = values.size();
+
+		return eResult::success;
+	}
+
+protected:
 	uint32_t width_bits;
 	value_t values[];
 };

@@ -670,24 +670,6 @@ eResult cDataPlane::initGlobalBases()
 		}
 
 		{
-			auto* acl_network_ipv6_source = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_source>(socket_id, getConfigValue(eConfigType::acl_network_source_lpm6_chunks_size), globalbase->updater.acl.network_ipv6_source);
-			if (!acl_network_ipv6_source)
-			{
-				return nullptr;
-			}
-
-			auto* acl_network_ipv6_destination = hugepage_create_dynamic<dataplane::globalBase::acl::network_ipv6_destination>(socket_id, getConfigValue(eConfigType::acl_network_destination_lpm6_chunks_size), globalbase->updater.acl.network_ipv6_destination);
-			if (!acl_network_ipv6_destination)
-			{
-				return nullptr;
-			}
-
-			auto* acl_network_table = hugepage_create_dynamic<dataplane::globalBase::acl::network_table>(socket_id, getConfigValue(eConfigType::acl_network_table_size), globalbase->updater.acl.network_table);
-			if (!acl_network_table)
-			{
-				return nullptr;
-			}
-
 			const auto acl_transport_layers_size = getConfigValue(eConfigType::acl_transport_layers_size);
 			if ((!acl_transport_layers_size) ||
 			    acl_transport_layers_size > 0xFFFFFFFFull)
@@ -721,9 +703,6 @@ eResult cDataPlane::initGlobalBases()
 				return nullptr;
 			}
 
-			globalbase->acl.network.ipv6.source = acl_network_ipv6_source;
-			globalbase->acl.network.ipv6.destination = acl_network_ipv6_destination;
-			globalbase->acl.network_table = acl_network_table;
 			globalbase->acl.transport_layers_mask = acl_transport_layers_size - 1;
 			globalbase->acl.transport_layers = acl_transport_layers;
 			globalbase->acl.values = acl_values;
