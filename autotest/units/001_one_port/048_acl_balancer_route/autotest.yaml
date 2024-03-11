@@ -133,7 +133,7 @@ steps:
     expect: 008-expect.pcap
 - values:
   - controlplane balancer.reals_unordered.size 12
-  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.reals_unordered_ids_unused.size 2097139
   - controlplane balancer.real_counters.size 12
 - cli:
   - balancer real disable balancer0 10.0.0.1 tcp 80 2000::1 80
@@ -203,44 +203,44 @@ steps:
     balancer0  10.0.0.1    tcp    80            rr         2000::1  80         false    1       7            15       1470
 - values:
   - controlplane balancer.reals_unordered.size 12
-  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.reals_unordered_ids_unused.size 2097139
   - controlplane balancer.real_counters.size 12
 - reload: controlplane.2.conf
 - values:
   - controlplane balancer.reals_unordered.size 12
-  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.reals_unordered_ids_unused.size 2097139
   - controlplane balancer.real_counters.size 12
 - sleep: 10
 - values:
   - controlplane balancer.reals_unordered.size 12
-  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.reals_unordered_ids_unused.size 2097139
   - controlplane balancer.real_counters.size 12
 - sleep: 90
 - values:
   - controlplane balancer.reals_unordered.size 12
-  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.reals_unordered_ids_unused.size 2097139
   - controlplane balancer.real_counters.size 12
 - reload: controlplane.2.conf
 - values:
   - controlplane balancer.reals_unordered.size 0
-  - controlplane balancer.reals_unordered_ids_unused.size 1023
+  - controlplane balancer.reals_unordered_ids_unused.size 2097151
   - controlplane balancer.real_counters.size 0
 - reload: controlplane.2.conf
 - values:
   - controlplane balancer.reals_unordered.size 0
-  - controlplane balancer.reals_unordered_ids_unused.size 1023
+  - controlplane balancer.reals_unordered_ids_unused.size 2097151
   - controlplane balancer.real_counters.size 0
 - reload: controlplane.conf
 - values:
   - controlplane balancer.reals_unordered.size 12
-  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.reals_unordered_ids_unused.size 2097139
   - controlplane balancer.real_counters.size 12
 - reload: controlplane.2.conf
 - sleep: 30
 - reload: controlplane.conf
 - values:
   - controlplane balancer.reals_unordered.size 12
-  - controlplane balancer.reals_unordered_ids_unused.size 1011
+  - controlplane balancer.reals_unordered_ids_unused.size 2097139
   - controlplane balancer.real_counters.size 12
 - sleep: 4
 - cli_check: |

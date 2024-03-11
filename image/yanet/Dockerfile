@@ -10,7 +10,6 @@ COPY . /project
 RUN meson setup --prefix=/target \
                 -Dtarget=release \
                 -Dstrip=true \
-                -Dyanet_config=release,firewall,l3balancer,low_memory \
                 -Darch=corei7,broadwell,knl \
                 -Dversion_major=$YANET_VERSION_MAJOR \
                 -Dversion_minor=$YANET_VERSION_MINOR \
