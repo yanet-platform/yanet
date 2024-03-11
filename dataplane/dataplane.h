@@ -60,6 +60,7 @@ enum class eConfigType
 	balancer_tcp_syn_ack_timeout,
 	balancer_tcp_fin_timeout,
 	balancer_other_protocols_timeout,
+	neighbor_ht_size,
 };
 
 struct tDataPlaneConfig
@@ -139,142 +140,6 @@ public:
 		return current_time;
 	}
 
-	template<typename type,
-	         typename... args_t>
-	type* hugepage_create_static(int socket_id,
-	                             const args_t&... args)
-	{
-		size_t size = sizeof(type) + 2 * RTE_CACHE_LINE_SIZE;
-
-		YADECAP_LOG_INFO("yanet_alloc(size: %lu, align: %u, socket: %u)\n",
-		                 size,
-		                 RTE_CACHE_LINE_SIZE,
-		                 socket_id);
-
-		void* pointer = rte_zmalloc_socket(nullptr,
-		                                   size,
-		                                   RTE_CACHE_LINE_SIZE,
-		                                   socket_id);
-		if (pointer == nullptr)
-		{
-			YADECAP_LOG_ERROR("yanet_alloc(size: %lu)\n", size);
-			hugepage_debug(socket_id);
-			return nullptr;
-		}
-
-		type* result = new ((type*)pointer) type(args...);
-
-		{
-			std::lock_guard<std::mutex> guard(hugepage_pointers_mutex);
-			hugepage_pointers.try_emplace(result, size, [result]() {
-				YADECAP_LOG_INFO("yanet_free()\n");
-				result->~type();
-				rte_free(result);
-			});
-		}
-
-		return result;
-	}
-
-	template<typename type,
-	         typename... args_t>
-	type* hugepage_create_static_array(int socket_id, const size_t count, const args_t&... args)
-	{
-		size_t size = count * sizeof(type) + 2 * RTE_CACHE_LINE_SIZE;
-
-		YADECAP_LOG_INFO("yanet_alloc(size: %lu, align: %u, socket: %u)\n",
-		                 size,
-		                 RTE_CACHE_LINE_SIZE,
-		                 socket_id);
-
-		void* pointer = rte_zmalloc_socket(nullptr,
-		                                   size,
-		                                   RTE_CACHE_LINE_SIZE,
-		                                   socket_id);
-		if (pointer == nullptr)
-		{
-			YADECAP_LOG_ERROR("yanet_alloc(size: %lu)\n", size);
-			hugepage_debug(socket_id);
-			return nullptr;
-		}
-
-		for (size_t i = 0;
-		     i < count;
-		     i++)
-		{
-			new (((type*)pointer) + i) type(args...);
-		}
-
-		{
-			std::lock_guard<std::mutex> guard(hugepage_pointers_mutex);
-			hugepage_pointers.try_emplace(pointer, size, [pointer, count]() {
-				YADECAP_LOG_INFO("yanet_free()\n");
-				for (size_t i = 0;
-				     i < count;
-				     i++)
-				{
-					type* result = ((type*)pointer) + i;
-					result->~type();
-				}
-				rte_free(pointer);
-			});
-		}
-
-		return (type*)pointer;
-	}
-
-	template<typename type,
-	         typename elems_t,
-	         typename updater_type,
-	         typename... args_t>
-	type* hugepage_create_dynamic(int socket_id,
-	                              elems_t elems,
-	                              updater_type& updater,
-	                              const args_t&... args)
-	{
-		size_t size = type::calculate_sizeof(elems);
-		if (!size)
-		{
-			return nullptr;
-		}
-
-		size += 2 * RTE_CACHE_LINE_SIZE;
-
-		YADECAP_LOG_INFO("yanet_alloc(size: %lu, align: %u, socket: %u)\n",
-		                 size,
-		                 RTE_CACHE_LINE_SIZE,
-		                 socket_id);
-
-		void* pointer = rte_zmalloc_socket(nullptr,
-		                                   size,
-		                                   RTE_CACHE_LINE_SIZE,
-		                                   socket_id);
-		if (pointer == nullptr)
-		{
-			YADECAP_LOG_ERROR("yanet_alloc(size: %lu)\n", size);
-			hugepage_debug(socket_id);
-			return nullptr;
-		}
-
-		type* result = new ((type*)pointer) type(args...);
-
-		{
-			std::lock_guard<std::mutex> guard(hugepage_pointers_mutex);
-			hugepage_pointers.try_emplace(result, size, [result]() {
-				YADECAP_LOG_INFO("yanet_free()\n");
-				result->~type();
-				rte_free(result);
-			});
-		}
-
-		updater.update_pointer(result, socket_id, elems, args...);
-
-		return result;
-	}
-
-	void hugepage_destroy(void* pointer);
-	void hugepage_debug(tSocketId socket_id);
-
 protected:
 	eResult parseConfig(const std::string& configFilePath);
 	eResult parseJsonPorts(const nlohmann::json& json);
@@ -352,9 +217,6 @@ protected:
 	std::unordered_map<uint32_t, std::unordered_map<std::string, uint64_t*>> coreId_to_stats_tables;
 
 	std::map<tSocketId, std::tuple<key_t, void*>> shm_by_socket_id;
-
-	std::mutex hugepage_pointers_mutex;
-	std::map<void*, hugepage_pointer> hugepage_pointers;
 
 	std::set<tSocketId> socket_ids;
 	std::map<tSocketId, worker_gc_t*> socket_worker_gcs;
