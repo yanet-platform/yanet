@@ -136,6 +136,21 @@ eResult generation::init()
 	}
 
 	{
+		updater.acl.transport_layers = std::make_unique<acl::transport_layers>("acl.transport.layers",
+		                                                                       &dataPlane->memory_manager,
+		                                                                       socketId);
+		result = updater.acl.transport_layers->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		acl.transport_layers = updater.acl.transport_layers->pointer;
+	}
+
+	acl.transport_layers_mask = 0;
+
+	{
 		updater.acl.transport_table = std::make_unique<acl::transport_table>("acl.transport.ht",
 		                                                                     &dataPlane->memory_manager,
 		                                                                     socketId);
@@ -159,6 +174,19 @@ eResult generation::init()
 		}
 
 		acl.total_table = updater.acl.total_table->pointer;
+	}
+
+	{
+		updater.acl.values = std::make_unique<acl::values>("acl.values",
+		                                                   &dataPlane->memory_manager,
+		                                                   socketId);
+		result = updater.acl.values->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		acl.values = updater.acl.values->pointer;
 	}
 
 	return result;
@@ -529,7 +557,6 @@ eResult generation::clear()
 	sampler_enabled = 0;
 	serial = 0;
 
-	acl.values[0] = {};
 	tun64mappingsTable.clear();
 
 	for (unsigned int fw_state_sync_config_id = 0;
@@ -2080,13 +2107,14 @@ eResult generation::acl_transport_layers(const common::idp::updateGlobalBase::ac
 {
 	eResult result = eResult::success;
 
-	if (request.size() > dataPlane->getConfigValue(eConfigType::acl_transport_layers_size))
+	result = updater.acl.transport_layers->create(request.size());
+	if (result != eResult::success)
 	{
-		YANET_LOG_ERROR("acl.transport_layers: invalid layers size: %lu > %lu\n",
-		                request.size(),
-		                dataPlane->getConfigValue(eConfigType::acl_transport_layers_size));
-		return eResult::invalidCount;
+		YANET_LOG_ERROR("acl.transport_layers.create(): %s\n", result_to_c_str(result));
+		return result;
 	}
+
+	acl.transport_layers = updater.acl.transport_layers->pointer;
 
 	for (unsigned int layer_id = 0;
 	     layer_id < request.size();
@@ -2168,6 +2196,8 @@ eResult generation::acl_transport_layers(const common::idp::updateGlobalBase::ac
 		}
 	}
 
+	acl.transport_layers_mask = upper_power_of_two(request.size()) - 1;
+
 	return result;
 }
 
@@ -2205,13 +2235,16 @@ eResult generation::acl_total_table(const common::idp::updateGlobalBase::acl_tot
 
 eResult generation::acl_values(const common::idp::updateGlobalBase::acl_values::request& request)
 {
-	if (request.size() > dataPlane->getConfigValue(eConfigType::acl_values_size))
+	eResult result = eResult::success;
+
+	result = updater.acl.values->create(request.size());
+	if (result != eResult::success)
 	{
-		YANET_LOG_ERROR("acl.values: %lu > %lu\n",
-		                request.size(),
-		                dataPlane->getConfigValue(eConfigType::acl_values_size));
-		return eResult::isFull;
+		YANET_LOG_ERROR("acl.values.create(): %s\n", result_to_c_str(result));
+		return result;
 	}
+
+	acl.values = updater.acl.values->pointer;
 
 	std::copy(request.begin(), request.end(), acl.values);
 

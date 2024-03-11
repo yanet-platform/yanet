@@ -12,7 +12,6 @@
 #include "common/tsc_deltas.h"
 
 #include "common.h"
-#include "dynamic_table.h"
 #include "flat.h"
 #include "hashtable.h"
 #include "lpm.h"
@@ -68,8 +67,10 @@ using network_ipv6_source = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
 using network_ipv6_destination_ht = dataplane::updater_hashtable_mod_id32<ipv6_address_t, 1>;
 using network_ipv6_destination = YANET_CONFIG_ACL_NETWORK_LPM6_TYPE;
 using network_table = dataplane::updater_dynamic_table<uint32_t>;
+using transport_layers = dataplane::updater_array<transport_layer_t>;
 using transport_table = dataplane::updater_hashtable_mod_id32<common::acl::transport_key_t, 16>;
 using total_table = dataplane::updater_hashtable_mod_id32<common::acl::total_key_t, 16>;
+using values = dataplane::updater_array<common::acl::value_t>;
 }
 
 namespace nat64stateful
@@ -202,8 +203,10 @@ public: ///< @todo
 			std::unique_ptr<acl::network_ipv6_destination_ht> network_ipv6_destination_ht;
 			std::unique_ptr<acl::network_ipv6_destination> network_ipv6_destination;
 			std::unique_ptr<acl::network_table> network_table;
+			std::unique_ptr<acl::transport_layers> transport_layers;
 			std::unique_ptr<acl::transport_table> transport_table;
 			std::unique_ptr<acl::total_table> total_table;
+			std::unique_ptr<acl::values> values;
 		} acl;
 	} updater;
 
@@ -274,13 +277,12 @@ public: ///< @todo
 
 		acl::network_table::object_type* network_table;
 		flat<uint8_t> network_flags;
-
 		uint32_t transport_layers_mask;
-		acl::transport_layer_t* transport_layers;
+		acl::transport_layers::object_type* transport_layers;
 
 		acl::transport_table::object_type* transport_table;
 		acl::total_table::object_type* total_table;
-		common::acl::value_t* values;
+		acl::values::object_type* values;
 	} acl;
 
 	YADECAP_CACHE_ALIGNED(align5);

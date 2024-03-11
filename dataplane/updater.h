@@ -152,6 +152,9 @@ public:
 		stats.extended_chunks_size = std::max((uint64_t)object_type::extended_chunks_size_min,
 		                                      values.size());
 
+		/// destroy pointer if exist
+		clear();
+
 		for (;;)
 		{
 			pointer = memory_manager->create<object_type>(name.data(),
@@ -353,6 +356,9 @@ public:
 		stats.keys_size = std::max(object_type::keys_size_min,
 		                           (uint32_t)values.size());
 
+		/// destroy pointer if exist
+		clear();
+
 		for (;;)
 		{
 			pointer = memory_manager->create<object_type>(name.data(),
@@ -414,6 +420,84 @@ protected:
 	tSocketId socket_id;
 
 	typename object_type::stats_t stats;
+
+public:
+	object_type* pointer;
+};
+
+//
+
+template<typename type>
+class updater_array
+{
+public:
+	using object_type = type;
+
+	updater_array(const char* name,
+	              dataplane::memory_manager* memory_manager,
+	              const tSocketId socket_id) :
+	        name(name),
+	        memory_manager(memory_manager),
+	        socket_id(socket_id),
+	        pointer(nullptr)
+	{
+	}
+
+	eResult init()
+	{
+		return create(0);
+	}
+
+	eResult create(uint64_t count)
+	{
+		if (!count)
+		{
+			count = 1;
+		}
+
+		/// destroy pointer if exist
+		clear();
+
+		pointer = memory_manager->create_static_array<object_type>(name.data(),
+		                                                           count,
+		                                                           socket_id);
+		if (pointer == nullptr)
+		{
+			return eResult::errorAllocatingMemory;
+		}
+
+		this->count = count;
+
+		return eResult::success;
+	}
+
+	void clear()
+	{
+		if (pointer)
+		{
+			memory_manager->destroy(pointer);
+			pointer = nullptr;
+		}
+	}
+
+	void limits(common::idp::limits::response& limits) const
+	{
+		limits.emplace_back(name,
+		                    socket_id,
+		                    count,
+		                    count);
+	}
+
+	void report(nlohmann::json& report) const
+	{
+		report["pointer"] = to_hex(pointer);
+	}
+
+protected:
+	std::string name;
+	dataplane::memory_manager* memory_manager;
+	tSocketId socket_id;
+	uint64_t count;
 
 public:
 	object_type* pointer;
