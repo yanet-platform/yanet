@@ -203,12 +203,16 @@ eResult module::init(cDataPlane* dataplane)
 {
 	this->dataplane = dataplane;
 
+	auto ht_size = dataplane->getConfigValue(eConfigType::neighbor_ht_size);
 	generation_hashtable.fill([&](neighbor::generation_hashtable& hashtable) {
 		for (const auto socket_id : dataplane->get_socket_ids())
 		{
-			dataplane->hugepage_create_dynamic<dataplane::neighbor::hashtable>(socket_id,
-			                                                                   64 * 1024,
-			                                                                   hashtable.hashtable_updater[socket_id]);
+			auto* pointer = dataplane->memory_manager.create<dataplane::neighbor::hashtable>("neighbor.ht",
+			                                                                                 socket_id,
+			                                                                                 dataplane::neighbor::hashtable::calculate_sizeof(ht_size));
+			hashtable.hashtable_updater[socket_id].update_pointer(pointer,
+			                                                      socket_id,
+			                                                      ht_size);
 		}
 	});
 

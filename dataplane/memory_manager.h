@@ -64,6 +64,24 @@ public:
 
 	template<typename type,
 	         typename... args_t>
+	type* create_static(const char* name,
+	                    const tSocketId socket_id,
+	                    const args_t&... args)
+	{
+		void* pointer = alloc(name, socket_id, sizeof(type), [](void* pointer) {
+			reinterpret_cast<type*>(pointer)->~type();
+		});
+
+		if (pointer == nullptr)
+		{
+			return nullptr;
+		}
+
+		return new (reinterpret_cast<type*>(pointer)) type(args...);
+	}
+
+	template<typename type,
+	         typename... args_t>
 	type* create_static_array(const char* name,
 	                          const uint64_t count,
 	                          const tSocketId socket_id,

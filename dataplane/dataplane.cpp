@@ -40,21 +40,6 @@
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_INFO;
 
-YADECAP_UNUSED
-static void printHugepageMemory(const char* prefix, tSocketId socketId) ///< @todo
-{
-	rte_malloc_socket_stats stats;
-	if (rte_malloc_get_socket_stats(socketId, &stats) == 0)
-	{
-		YADECAP_LOG_INFO("%sheap_totalsz_bytes: %lu MB\n", prefix, stats.heap_totalsz_bytes / (1024 * 1024));
-		YADECAP_LOG_INFO("%sheap_freesz_bytes: %lu MB\n", prefix, stats.heap_freesz_bytes / (1024 * 1024));
-		YADECAP_LOG_INFO("%sgreatest_free_size: %lu MB\n", prefix, stats.greatest_free_size / (1024 * 1024));
-		YADECAP_LOG_INFO("%sfree_count: %u\n", prefix, stats.free_count);
-		YADECAP_LOG_INFO("%salloc_count: %u\n", prefix, stats.alloc_count);
-		YADECAP_LOG_INFO("%sheap_allocsz_bytes: %lu MB\n", prefix, stats.heap_allocsz_bytes / (1024 * 1024));
-	}
-}
-
 cDataPlane::cDataPlane() :
         currentGlobalBaseId(0),
         globalBaseSerial(0),
@@ -95,6 +80,7 @@ cDataPlane::cDataPlane() :
 	        {eConfigType::balancer_tcp_fin_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
 	        {eConfigType::balancer_udp_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
 	        {eConfigType::balancer_other_protocols_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
+	        {eConfigType::neighbor_ht_size, 64 * 1024},
 	};
 }
 
@@ -594,44 +580,63 @@ eResult cDataPlane::initGlobalBases()
 	auto create_globalbase_atomics = [this](const tSocketId& socket_id) -> eResult {
 		if (globalBaseAtomics.find(socket_id) == globalBaseAtomics.end())
 		{
-			auto* globalbase_atomic = hugepage_create_static<dataplane::globalBase::atomic>(socket_id,
-			                                                                                this,
-			                                                                                socket_id);
+			auto* globalbase_atomic = memory_manager.create_static<dataplane::globalBase::atomic>("globalbase.atomic",
+			                                                                                      socket_id,
+			                                                                                      this,
+			                                                                                      socket_id);
 			if (!globalbase_atomic)
 			{
 				return eResult::errorAllocatingMemory;
 			}
 
 			{
-				auto* ipv4_states_ht = hugepage_create_dynamic<dataplane::globalBase::acl::ipv4_states_ht>(socket_id, getConfigValue(eConfigType::acl_states4_ht_size), globalbase_atomic->updater.fw4_state);
+				using namespace dataplane::globalBase;
+
+				auto* ipv4_states_ht = memory_manager.create<acl::ipv4_states_ht>("acl.state.v4.ht",
+				                                                                  socket_id,
+				                                                                  acl::ipv4_states_ht::calculate_sizeof(getConfigValue(eConfigType::acl_states4_ht_size)));
 				if (!ipv4_states_ht)
 				{
 					return eResult::errorAllocatingMemory;
 				}
 
-				auto* ipv6_states_ht = hugepage_create_dynamic<dataplane::globalBase::acl::ipv6_states_ht>(socket_id, getConfigValue(eConfigType::acl_states6_ht_size), globalbase_atomic->updater.fw6_state);
+				auto* ipv6_states_ht = memory_manager.create<acl::ipv6_states_ht>("acl.state.v6.ht",
+				                                                                  socket_id,
+				                                                                  acl::ipv6_states_ht::calculate_sizeof(getConfigValue(eConfigType::acl_states6_ht_size)));
 				if (!ipv6_states_ht)
 				{
 					return eResult::errorAllocatingMemory;
 				}
 
-				auto* nat64stateful_lan_state = hugepage_create_dynamic<dataplane::globalBase::nat64stateful::lan_ht>(socket_id, getConfigValue(eConfigType::nat64stateful_states_size), globalbase_atomic->updater.nat64stateful_lan_state);
+				auto* nat64stateful_lan_state = memory_manager.create<nat64stateful::lan_ht>("nat64stateful.state.lan.ht",
+				                                                                             socket_id,
+				                                                                             nat64stateful::lan_ht::calculate_sizeof(getConfigValue(eConfigType::nat64stateful_states_size)));
 				if (!nat64stateful_lan_state)
 				{
 					return eResult::errorAllocatingMemory;
 				}
 
-				auto* nat64stateful_wan_state = hugepage_create_dynamic<dataplane::globalBase::nat64stateful::wan_ht>(socket_id, getConfigValue(eConfigType::nat64stateful_states_size), globalbase_atomic->updater.nat64stateful_wan_state);
+				auto* nat64stateful_wan_state = memory_manager.create<nat64stateful::wan_ht>("nat64stateful.state.wan.ht",
+				                                                                             socket_id,
+				                                                                             nat64stateful::wan_ht::calculate_sizeof(getConfigValue(eConfigType::nat64stateful_states_size)));
 				if (!nat64stateful_wan_state)
 				{
 					return eResult::errorAllocatingMemory;
 				}
 
-				auto* balancer_state = hugepage_create_dynamic<dataplane::globalBase::balancer::state_ht>(socket_id, getConfigValue(eConfigType::balancer_state_ht_size), globalbase_atomic->updater.balancer_state);
+				auto* balancer_state = memory_manager.create<dataplane::globalBase::balancer::state_ht>("balancer.state.ht",
+				                                                                                        socket_id,
+				                                                                                        dataplane::globalBase::balancer::state_ht::calculate_sizeof(getConfigValue(eConfigType::balancer_state_ht_size)));
 				if (!balancer_state)
 				{
 					return eResult::errorAllocatingMemory;
 				}
+
+				globalbase_atomic->updater.fw4_state.update_pointer(ipv4_states_ht, socket_id, getConfigValue(eConfigType::acl_states4_ht_size));
+				globalbase_atomic->updater.fw6_state.update_pointer(ipv6_states_ht, socket_id, getConfigValue(eConfigType::acl_states6_ht_size));
+				globalbase_atomic->updater.nat64stateful_lan_state.update_pointer(nat64stateful_lan_state, socket_id, getConfigValue(eConfigType::nat64stateful_states_size));
+				globalbase_atomic->updater.nat64stateful_wan_state.update_pointer(nat64stateful_wan_state, socket_id, getConfigValue(eConfigType::nat64stateful_states_size));
+				globalbase_atomic->updater.balancer_state.update_pointer(balancer_state, socket_id, getConfigValue(eConfigType::balancer_state_ht_size));
 
 				globalbase_atomic->fw4_state = ipv4_states_ht;
 				globalbase_atomic->fw6_state = ipv6_states_ht;
@@ -647,9 +652,10 @@ eResult cDataPlane::initGlobalBases()
 	};
 
 	auto create_globalbase = [this](const tSocketId& socket_id) -> dataplane::globalBase::generation* {
-		auto* globalbase = hugepage_create_static<dataplane::globalBase::generation>(socket_id,
-		                                                                             this,
-		                                                                             socket_id);
+		auto* globalbase = memory_manager.create_static<dataplane::globalBase::generation>("globalbase.generation",
+		                                                                                   socket_id,
+		                                                                                   this,
+		                                                                                   socket_id);
 		if (!globalbase)
 		{
 			return nullptr;
@@ -738,8 +744,9 @@ eResult cDataPlane::initWorkers()
 
 		YADECAP_LOG_INFO("initWorker. coreId: %u [slow worker]\n", coreId);
 
-		auto* worker = hugepage_create_static<cWorker>(socket_id,
-		                                               this);
+		auto* worker = memory_manager.create_static<cWorker>("worker",
+		                                                     socket_id,
+		                                                     this);
 		if (!worker)
 		{
 			return eResult::errorAllocatingMemory;
@@ -783,8 +790,9 @@ eResult cDataPlane::initWorkers()
 
 		YADECAP_LOG_INFO("initWorker. coreId: %u\n", coreId);
 
-		auto* worker = hugepage_create_static<cWorker>(socket_id,
-		                                               this);
+		auto* worker = memory_manager.create_static<cWorker>("worker",
+		                                                     socket_id,
+		                                                     this);
 		if (!worker)
 		{
 			return eResult::errorAllocatingMemory;
@@ -936,8 +944,9 @@ eResult cDataPlane::initWorkers()
 
 		YADECAP_LOG_INFO("initWorker. coreId: %u [worker_gc]\n", core_id);
 
-		auto* worker = hugepage_create_static<worker_gc_t>(socket_id,
-		                                                   this);
+		auto* worker = memory_manager.create_static<worker_gc_t>("worker_gc",
+		                                                         socket_id,
+		                                                         this);
 		if (!worker)
 		{
 			return eResult::errorAllocatingMemory;
@@ -1077,32 +1086,6 @@ void cDataPlane::init_worker_base()
 	}
 
 	neighbor.update_worker_base(base_nexts);
-}
-
-void cDataPlane::hugepage_destroy(void* pointer)
-{
-	auto it = hugepage_pointers.find(pointer);
-	if (it == hugepage_pointers.end())
-	{
-		YADECAP_LOG_ERROR("unknown pointer: %p\n", pointer);
-		return;
-	}
-
-	hugepage_pointers.erase(it);
-}
-
-void cDataPlane::hugepage_debug(tSocketId socket_id)
-{
-	rte_malloc_socket_stats stats;
-	if (rte_malloc_get_socket_stats(socket_id, &stats) == 0)
-	{
-		YADECAP_LOG_INFO("heap_totalsz_bytes: %lu MB\n", stats.heap_totalsz_bytes / (1024 * 1024));
-		YADECAP_LOG_INFO("heap_freesz_bytes: %lu MB\n", stats.heap_freesz_bytes / (1024 * 1024));
-		YADECAP_LOG_INFO("greatest_free_size: %lu MB\n", stats.greatest_free_size / (1024 * 1024));
-		YADECAP_LOG_INFO("free_count: %u\n", stats.free_count);
-		YADECAP_LOG_INFO("alloc_count: %u\n", stats.alloc_count);
-		YADECAP_LOG_INFO("heap_allocsz_bytes: %lu MB\n", stats.heap_allocsz_bytes / (1024 * 1024));
-	}
 }
 
 int cDataPlane::lcoreThread(void* args)
@@ -1897,6 +1880,10 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	if (exist(json, "balancer_other_protocols_timeout"))
 	{
 		configValues[eConfigType::balancer_other_protocols_timeout] = json["balancer_other_protocols_timeout"];
+	}
+	if (exist(json, "neighbor_ht_size"))
+	{
+		configValues[eConfigType::neighbor_ht_size] = json["neighbor_ht_size"];
 	}
 
 	return eResult::success;

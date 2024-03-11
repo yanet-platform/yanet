@@ -92,19 +92,6 @@ nlohmann::json cReport::getReport()
 	jsonReport["controlPlane"] = convertControlPlane(dataPlane->controlPlane.get());
 	jsonReport["bus"] = convertBus(&dataPlane->bus);
 
-	size_t memory_total = 0;
-	{
-		std::lock_guard<std::mutex> guard(dataPlane->hugepage_pointers_mutex);
-		for (const auto& [pointer, hugepage] : dataPlane->hugepage_pointers)
-		{
-			(void)pointer;
-
-			jsonReport["memory"].emplace_back(hugepage.size);
-			memory_total += hugepage.size;
-		}
-	}
-	jsonReport["memory_total"] = memory_total;
-
 	dataPlane->neighbor.report(jsonReport);
 	dataPlane->memory_manager.report(jsonReport);
 
