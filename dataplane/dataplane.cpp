@@ -84,7 +84,6 @@ cDataPlane::cDataPlane() :
 	        {eConfigType::sample_gc_step, 512},
 	        {eConfigType::acl_states4_ht_size, YANET_CONFIG_ACL_STATES4_HT_SIZE},
 	        {eConfigType::acl_states6_ht_size, YANET_CONFIG_ACL_STATES6_HT_SIZE},
-	        {eConfigType::acl_transport_layers_size, YANET_CONFIG_ACL_TRANSPORT_LAYERS_SIZE},
 	        {eConfigType::master_mempool_size, 8192},
 	        {eConfigType::nat64stateful_states_size, YANET_CONFIG_NAT64STATEFUL_HT_SIZE},
 	        {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE},
@@ -1832,10 +1831,6 @@ eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 	if (exist(json, "acl_states6_ht_size"))
 	{
 		configValues[eConfigType::acl_states6_ht_size] = json["acl_states6_ht_size"];
-	}
-	if (exist(json, "acl_transport_layers_size"))
-	{
-		configValues[eConfigType::acl_transport_layers_size] = json["acl_transport_layers_size"];
 	}
 
 	if (exist(json, "master_mempool_size"))

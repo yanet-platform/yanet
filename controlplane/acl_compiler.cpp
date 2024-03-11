@@ -4,7 +4,7 @@
 using namespace acl;
 
 compiler_t::compiler_t() :
-        transport_layers_size(0),
+        transport_layers_size_max(1),
         transport_layers_shift(0),
         network_ipv4_source(this),
         network_ipv4_destination(this),
@@ -17,12 +17,12 @@ compiler_t::compiler_t() :
 {
 }
 
-void compiler_t::compile(const unsigned int transport_layers_size,
-                         const std::vector<rule_t>& unwind_rules,
-                         result_t& result)
+void compiler_t::compile(const std::vector<rule_t>& unwind_rules,
+                         result_t& result,
+                         const unsigned int transport_layers_size_max)
 {
-	this->transport_layers_size = transport_layers_size;
-	this->transport_layers_shift = __builtin_popcount(transport_layers_size - 1);
+	this->transport_layers_size_max = transport_layers_size_max;
+	this->transport_layers_shift = __builtin_popcount(transport_layers_size_max - 1);
 
 	YANET_LOG_INFO("acl::compile: rules: %lu\n", unwind_rules.size());
 
@@ -420,21 +420,8 @@ void compiler_t::transport_compile()
 
 	transport.distribute();
 
-	unsigned int layer_id;
-	for (layer_id = 0;
-	     layer_id < transport_layers_size;
-	     layer_id++)
-	{
-		const auto& layer = transport.layers[layer_id];
-
-		if (layer.filter_ids_set.empty())
-		{
-			break;
-		}
-	}
-
-	YANET_LOG_INFO("acl::compile: layers: %u\n",
-	               layer_id);
+	YANET_LOG_INFO("acl::compile: layers: %lu\n",
+	               transport.layers.size());
 
 	transport.compile();
 	transport.populate();

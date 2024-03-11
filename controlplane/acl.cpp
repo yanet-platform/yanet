@@ -973,8 +973,7 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 	return rules;
 }
 
-void compile(const unsigned int transport_layers_size,
-             const std::map<std::string, controlplane::base::acl_t>& acls,
+void compile(const std::map<std::string, controlplane::base::acl_t>& acls,
              const iface_map_t& iface_map,
              result_t& result)
 {
@@ -984,7 +983,7 @@ void compile(const unsigned int transport_layers_size,
 
 		YANET_LOG_INFO("acl::compile: unwind\n");
 		auto rules_used = unwind_used_rules(acls, iface_map, nullptr, result);
-		compiler.compile(transport_layers_size, rules_used, result);
+		compiler.compile(rules_used, result);
 	}
 	catch (const std::exception& ex)
 	{
@@ -1027,8 +1026,7 @@ uint8_t string_to_proto(const std::string& string)
 	return it->second;
 }
 
-std::set<uint32_t> lookup(const unsigned int transport_layers_size,
-                          const std::map<std::string, controlplane::base::acl_t>& acls,
+std::set<uint32_t> lookup(const std::map<std::string, controlplane::base::acl_t>& acls,
                           const iface_map_t& ifaces,
                           const std::optional<std::string>& module,
                           const std::optional<std::string>& direction,
@@ -1105,7 +1103,7 @@ std::set<uint32_t> lookup(const unsigned int transport_layers_size,
 		auto rules_used = unwind_used_rules(acls, ifaces, filter, unwind_result);
 
 		acl::compiler_t compiler;
-		compiler.compile(transport_layers_size, rules_used, unwind_result);
+		compiler.compile(rules_used, unwind_result);
 
 		for (const auto rule_id : compiler.used_rules)
 		{

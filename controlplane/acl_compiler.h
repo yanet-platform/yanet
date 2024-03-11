@@ -52,9 +52,9 @@ public:
 	compiler_t();
 
 public:
-	void compile(const unsigned int transport_layers_size,
-	             const std::vector<rule_t>& unwind_rules,
-	             result_t& result);
+	void compile(const std::vector<rule_t>& unwind_rules,
+	             result_t& result,
+	             const unsigned int transport_layers_size = 2048);
 
 	void clear();
 	void collect(const std::vector<rule_t>& unwind_rules);
@@ -67,7 +67,7 @@ public:
 	void value_compile();
 
 public:
-	unsigned int transport_layers_size;
+	unsigned int transport_layers_size_max;
 	unsigned int transport_layers_shift;
 
 	std::vector<compiler::rule_t> rules;
