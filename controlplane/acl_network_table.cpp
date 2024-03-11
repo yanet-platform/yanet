@@ -194,7 +194,7 @@ void network_table_t::remap()
 	remap_group_ids.resize(group_id, 0);
 
 	for (unsigned int layer_id = 0;
-	     layer_id < compiler->transport_layers_size;
+	     layer_id < compiler->transport.layers.size();
 	     layer_id++)
 	{
 		const auto& layer = compiler->transport.layers[layer_id];

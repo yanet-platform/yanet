@@ -224,7 +224,7 @@ bool memory_manager::check_memory_limit(const std::string& name,
 	return result;
 }
 
-void dataplane::memory_manager::limits(common::idp::limits::response& response)
+void memory_manager::limits(common::idp::limits::response& response)
 {
 	(void)response;
 }

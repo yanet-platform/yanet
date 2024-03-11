@@ -49,7 +49,6 @@ enum class eConfigType
 	sample_gc_step,
 	acl_states4_ht_size,
 	acl_states6_ht_size,
-	acl_transport_layers_size,
 	master_mempool_size,
 	nat64stateful_states_size,
 	kernel_interface_queue_size,

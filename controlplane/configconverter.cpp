@@ -1838,12 +1838,7 @@ void config_converter_t::buildAcl()
 	auto iface_map = acl::ifaceMapping(baseNext.logicalPorts, baseNext.routes);
 	try
 	{
-		const auto& [dataplane_physicalports, dataplane_workers, dataplane_values] = controlplane->dataPlaneConfig;
-		(void)dataplane_physicalports;
-		(void)dataplane_workers;
-
-		acl::compile(dataplane_values[(unsigned int)common::idp::getConfig::value_type::acl_transport_layers_size],
-		             baseNext.acls,
+		acl::compile(baseNext.acls,
 		             iface_map,
 		             result);
 	}

@@ -69,8 +69,7 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
                      const std::optional<std::string>& transport_flags,
                      const std::optional<std::string>& keepstate);
 
-std::set<uint32_t> lookup(const unsigned int transport_layers_size,
-                          const std::map<std::string, controlplane::base::acl_t>& acls,
+std::set<uint32_t> lookup(const std::map<std::string, controlplane::base::acl_t>& acls,
                           const acl::iface_map_t& ifaces,
                           const std::optional<std::string>& module,
                           const std::optional<std::string>& direction,
@@ -81,8 +80,7 @@ std::set<uint32_t> lookup(const unsigned int transport_layers_size,
                           const std::optional<std::string>& transport_source,
                           const std::optional<std::string>& transport_destination);
 
-void compile(const unsigned int transport_layers_size,
-             const std::map<std::string, controlplane::base::acl_t>& acls,
+void compile(const std::map<std::string, controlplane::base::acl_t>& acls,
              const acl::iface_map_t& ifaces,
              result_t& result);
 

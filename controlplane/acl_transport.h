@@ -80,6 +80,9 @@ public:
 	                    std::set<unsigned int>>,
 	         std::vector<unsigned int>>
 	        variation;
+
+protected:
+	layer& get_layer(unsigned int layer_id);
 };
 
 }

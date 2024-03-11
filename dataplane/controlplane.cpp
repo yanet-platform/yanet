@@ -734,7 +734,6 @@ common::idp::getConfig::response cControlPlane::getConfig() const
 	/// @todo: worker_gcs
 
 	response_values.resize((unsigned int)common::idp::getConfig::value_type::size);
-	response_values[(unsigned int)common::idp::getConfig::value_type::acl_transport_layers_size] = dataPlane->getConfigValue(eConfigType::acl_transport_layers_size);
 
 	return response;
 }

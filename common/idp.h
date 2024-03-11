@@ -717,9 +717,8 @@ using response = std::tuple<std::map<tCoreId, worker>>;
 
 namespace getConfig
 {
-enum class value_type
+enum class value_type ///< @todo: delete
 {
-	acl_transport_layers_size,
 	size,
 };
 

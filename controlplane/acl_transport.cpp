@@ -42,20 +42,8 @@ unsigned int transport_t::collect(const unsigned int rule_id,
 
 void transport_t::prepare()
 {
-	layers.resize(compiler->transport_layers_size);
-	for (auto& layer : layers)
-	{
-		layer.protocol_id.resize(filter_ids.size());
-		layer.tcp_source_id.resize(filter_ids.size());
-		layer.tcp_destination_id.resize(filter_ids.size());
-		layer.tcp_flags_id.resize(filter_ids.size());
-		layer.udp_source_id.resize(filter_ids.size());
-		layer.udp_destination_id.resize(filter_ids.size());
-		layer.icmpv4_type_code_id.resize(filter_ids.size());
-		layer.icmpv4_identifier_id.resize(filter_ids.size());
-		layer.icmpv6_type_code_id.resize(filter_ids.size());
-		layer.icmpv6_identifier_id.resize(filter_ids.size());
-	}
+	/// prepare first layer
+	get_layer(0);
 }
 
 void transport_t::emplace_variation(const unsigned int network_table_group_id,
@@ -82,10 +70,10 @@ void transport_t::distribute()
 		size_t best_filter_ids_count = (size_t)-1;
 
 		for (unsigned int layer_id = 0;
-		     layer_id < compiler->transport_layers_size;
+		     layer_id < compiler->transport_layers_size_max;
 		     layer_id++)
 		{
-			const auto& layer = layers[layer_id];
+			const auto& layer = get_layer(layer_id);
 
 			std::set<unsigned int> merged_filter_ids; ///< @todo: bitmask
 			merged_filter_ids = layer.filter_ids_set;
@@ -118,7 +106,7 @@ void transport_t::distribute()
 void transport_t::compile()
 {
 	for (unsigned int layer_id = 0;
-	     layer_id < compiler->transport_layers_size;
+	     layer_id < layers.size();
 	     layer_id++)
 	{
 		auto& layer = layers[layer_id];
@@ -157,7 +145,7 @@ void transport_t::compile()
 	}
 
 	for (unsigned int layer_id = 0;
-	     layer_id < compiler->transport_layers_size;
+	     layer_id < layers.size();
 	     layer_id++)
 	{
 		auto& layer = layers[layer_id];
@@ -176,7 +164,7 @@ void transport_t::compile()
 void transport_t::populate()
 {
 	for (unsigned int layer_id = 0;
-	     layer_id < compiler->transport_layers_size;
+	     layer_id < layers.size();
 	     layer_id++)
 	{
 		auto& layer = layers[layer_id];
@@ -194,4 +182,30 @@ void transport_t::populate()
 
 void transport_t::remap()
 {
+}
+
+transport_t::layer& transport_t::get_layer(unsigned int layer_id)
+{
+	if (layer_id >= layers.size())
+	{
+		/// prepare new layer
+
+		layers.resize(layer_id + 1);
+
+		{
+			auto& layer = layers[layer_id];
+			layer.protocol_id.resize(filter_ids.size());
+			layer.tcp_source_id.resize(filter_ids.size());
+			layer.tcp_destination_id.resize(filter_ids.size());
+			layer.tcp_flags_id.resize(filter_ids.size());
+			layer.udp_source_id.resize(filter_ids.size());
+			layer.udp_destination_id.resize(filter_ids.size());
+			layer.icmpv4_type_code_id.resize(filter_ids.size());
+			layer.icmpv4_identifier_id.resize(filter_ids.size());
+			layer.icmpv6_type_code_id.resize(filter_ids.size());
+			layer.icmpv6_identifier_id.resize(filter_ids.size());
+		}
+	}
+
+	return layers[layer_id];
 }

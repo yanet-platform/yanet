@@ -35,7 +35,7 @@ unsigned int transport_table_t::collect(const unsigned int rule_id, const filter
 
 void transport_table_t::prepare()
 {
-	threads_count = std::min(compiler->transport_layers_size, threads_count);
+	threads_count = std::min((unsigned int)compiler->transport.layers.size(), threads_count);
 
 	for (unsigned int thread_id = 0;
 	     thread_id < threads_count;
@@ -114,7 +114,7 @@ void transport_table::thread_t::prepare()
 	transport_table_filter_id_group_ids.resize(transport_table->filter_ids.size());
 
 	for (unsigned int layer_id = thread_id;
-	     layer_id < transport_table->compiler->transport_layers_size;
+	     layer_id < transport_table->compiler->transport.layers.size();
 	     layer_id += threads_count)
 	{
 		const auto& transport_layer = transport_table->compiler->transport.layers[layer_id];
@@ -175,7 +175,7 @@ void transport_table::thread_t::compile()
 		std::vector<tAclGroupId> network_table_group_ids_next = network_table_group_ids_orig;
 
 		for (unsigned int layer_id = thread_id;
-		     layer_id < transport_table->compiler->transport_layers_size;
+		     layer_id < transport_table->compiler->transport.layers.size();
 		     layer_id += threads_count)
 		{
 			const auto& transport_layer = transport_table->compiler->transport.layers[layer_id];
@@ -342,7 +342,7 @@ void transport_table::thread_t::populate()
 		std::vector<tAclGroupId> network_table_group_ids_next = network_table_group_ids_orig;
 
 		for (unsigned int layer_id = thread_id;
-		     layer_id < transport_table->compiler->transport_layers_size;
+		     layer_id < transport_table->compiler->transport.layers.size();
 		     layer_id += threads_count)
 		{
 			const auto& transport_layer = transport_table->compiler->transport.layers[layer_id];
@@ -499,7 +499,7 @@ void transport_table::thread_t::populate()
 void transport_table::thread_t::result()
 {
 	for (unsigned int layer_id = thread_id;
-	     layer_id < transport_table->compiler->transport_layers_size;
+	     layer_id < transport_table->compiler->transport.layers.size();
 	     layer_id += threads_count)
 	{
 		const auto& transport_layer = transport_table->compiler->transport.layers[layer_id];
