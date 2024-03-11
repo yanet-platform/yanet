@@ -8,7 +8,7 @@ Open new terminal:
 $ cd yanet
 $ docker run --rm -it -v $PWD:/project yanetplatform/builder
 
-# meson setup -Dyanet_config=low_memory build_release
+# meson setup build_release
 # meson compile -C build_release
 ```
 Uses the `low_memory` configuration with a reduced memory limit for the ACL, Firewall/NAT64/balancer states, etc.

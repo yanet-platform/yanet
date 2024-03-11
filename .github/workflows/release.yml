@@ -23,7 +23,6 @@ jobs:
           export YANET_VERSION_CUSTOM=stable
           meson setup --prefix=/target \
                       -Dtarget=release \
-                      -Dyanet_config=release,l3balancer,firewall \
                       -Darch=corei7,broadwell,knl \
                       -Dversion_major=$YANET_VERSION_MAJOR \
                       -Dversion_minor=$YANET_VERSION_MINOR \
@@ -65,7 +64,6 @@ jobs:
           export YANET_VERSION_CUSTOM=stable
           meson setup --prefix=/target \
                       -Dtarget=release \
-                      -Dyanet_config=release,l3balancer,firewall \
                       -Darch=corei7,broadwell,knl \
                       -Dversion_major=$YANET_VERSION_MAJOR \
                       -Dversion_minor=$YANET_VERSION_MINOR \
