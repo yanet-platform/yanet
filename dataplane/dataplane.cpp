@@ -669,45 +669,6 @@ eResult cDataPlane::initGlobalBases()
 			return nullptr;
 		}
 
-		{
-			const auto acl_transport_layers_size = getConfigValue(eConfigType::acl_transport_layers_size);
-			if ((!acl_transport_layers_size) ||
-			    acl_transport_layers_size > 0xFFFFFFFFull)
-			{
-				YANET_LOG_ERROR("wrong acl_transport_layers_size: %lu\n", acl_transport_layers_size);
-				return nullptr;
-			}
-
-			if (__builtin_popcount(acl_transport_layers_size) != 1)
-			{
-				YANET_LOG_ERROR("wrong acl_transport_layers_size: %lu is non power of 2\n", acl_transport_layers_size);
-				return nullptr;
-			}
-
-			auto* acl_transport_layers = hugepage_create_static_array<dataplane::globalBase::acl::transport_layer_t>(socket_id, acl_transport_layers_size);
-			if (!acl_transport_layers)
-			{
-				return nullptr;
-			}
-
-			const auto acl_values_size = getConfigValue(eConfigType::acl_values_size);
-			if (acl_values_size < 2)
-			{
-				YANET_LOG_ERROR("wrong acl_values_size: %lu\n", acl_values_size);
-				return nullptr;
-			}
-
-			auto* acl_values = hugepage_create_static_array<common::acl::value_t>(socket_id, getConfigValue(eConfigType::acl_values_size));
-			if (!acl_values)
-			{
-				return nullptr;
-			}
-
-			globalbase->acl.transport_layers_mask = acl_transport_layers_size - 1;
-			globalbase->acl.transport_layers = acl_transport_layers;
-			globalbase->acl.values = acl_values;
-		}
-
 		return globalbase;
 	};
 

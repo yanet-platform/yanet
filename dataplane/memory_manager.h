@@ -62,6 +62,38 @@ public:
 		return new (reinterpret_cast<type*>(pointer)) type(args...);
 	}
 
+	template<typename type,
+	         typename... args_t>
+	type* create_static_array(const char* name,
+	                          const uint64_t count,
+	                          const tSocketId socket_id,
+	                          const args_t&... args)
+	{
+		void* pointer = alloc(name, socket_id, count * sizeof(type), [count](void* pointer) {
+			for (uint64_t i = 0;
+			     i < count;
+			     i++)
+			{
+				type* object = (reinterpret_cast<type*>(pointer)) + i;
+				object->~type();
+			}
+		});
+
+		if (pointer == nullptr)
+		{
+			return nullptr;
+		}
+
+		for (uint64_t i = 0;
+		     i < count;
+		     i++)
+		{
+			new ((reinterpret_cast<type*>(pointer)) + i) type(args...);
+		}
+
+		return reinterpret_cast<type*>(pointer);
+	}
+
 	void destroy(void* pointer);
 	void debug(tSocketId socket_id);
 	bool check_memory_limit(const std::string& name, const uint64_t size);
