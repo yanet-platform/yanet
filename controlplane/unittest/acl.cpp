@@ -78,7 +78,7 @@ add deny ip from any to any
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 }
 
 TEST(ACL, 002_IPv4Only)
@@ -94,7 +94,7 @@ add deny ip from any to any
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 }
 
 TEST(ACL, 003_Over500)
@@ -103,7 +103,7 @@ TEST(ACL, 003_Over500)
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 }
 
 TEST(ACL, 004_Over1000)
@@ -112,7 +112,7 @@ TEST(ACL, 004_Over1000)
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 }
 
 TEST(ACL, 005_Over4000)
@@ -121,7 +121,7 @@ TEST(ACL, 005_Over4000)
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 }
 
 TEST(ACL, 006_Counters)
@@ -143,7 +143,7 @@ add 7 deny ip from any to any
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
 	auto& ids_map = result.ids_map;
 	ASSERT_EQ(ids_map.size(), 5);
@@ -172,7 +172,7 @@ add 2 allow ip from { 1.2.3.4 } to any in
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
 	auto& ids_map = result.ids_map;
 	ASSERT_EQ(result.acl_total_table.size(), 1);
@@ -198,7 +198,7 @@ add 2 deny ip from any to any in
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
 	auto& ids_map = result.ids_map;
 	ASSERT_EQ(result.acl_total_table.size(), 2);
@@ -219,7 +219,7 @@ add 2 deny ip from any to any in
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "port0"}, {true, "port1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "port0"}, {true, "port1"}}}}, result);
 
 	auto& ids_map = result.ids_map;
 	ASSERT_EQ(ids_map.size(), 3);
@@ -248,7 +248,7 @@ add deny ip from any to any out // id 3
 
 	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{false, "port0"}, {false, "port1"}, {false, "port2"}, {false, "port3"}}}}, result);
+	acl::compile(acls, {{1, {{false, "port0"}, {false, "port1"}, {false, "port2"}, {false, "port3"}}}}, result);
 
 	auto& ids_map = result.ids_map;
 	ASSERT_EQ(ids_map.size(), 4);
@@ -320,7 +320,7 @@ add 1 allow icmp from { 1.2.3.4 } to any in
 	EXPECT_THAT(stringify(ret[2]), ::testing::Eq("vlan1 |1|any|any|any|any|any|any|any|false|logicalPort_egress(0)||false|"));
 
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}, {false, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}, {false, "vlan1"}}}}, result);
 
 	auto& ids_map = result.ids_map;
 	ASSERT_EQ(result.acl_total_table.size(), 4);
@@ -351,7 +351,7 @@ add 300 deny ip from any to any
 	EXPECT_THAT(stringify(ret[2]), ::testing::Eq("port0 |0|any|any|any|any|any|any|any|false|drop(0)|2|true|"));
 
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "port0"}, {true, "port1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "port0"}, {true, "port1"}}}}, result);
 
 	ASSERT_EQ(result.acl_total_table.size(), 4);
 	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
@@ -396,7 +396,7 @@ add 300 allow proto tcp dst-addr 1234567@2abc:123:c00::/40
 	ASSERT_EQ(ret.size(), 4);
 
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 	// check that parser correctly expands gapped mask in rules -> compare with generated text
 	EXPECT_THAT(std::get<1>(result.rules[100].front()), ::testing::Eq("allow dst-addr 2abc:123:c00::4242:0:0/ffff:ffff:ff00:0:ffff:ffff:: proto 6"));
 	EXPECT_THAT(std::get<1>(result.rules[200].front()), ::testing::Eq("allow dst-addr 2abc:123:c00::fc00:0:0/ffff:ffff:ff00:0:ffff:fe00:: proto 6"));
@@ -421,7 +421,7 @@ add 500 allow tcp from any to any established
 	ASSERT_EQ(ret.size(), 7);
 
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 	// check that parser correctly expands tcpflags and then filter correctly formats them
 	EXPECT_THAT(std::get<1>(result.rules[100].front()), ::testing::Eq("deny proto 6 setup"));
 	EXPECT_THAT(std::get<1>(result.rules[150].front()), ::testing::Eq("deny proto 6 setup"));
@@ -448,7 +448,7 @@ add 300 allow ip from any to any icmp6types 133,134,135,136
 	ASSERT_EQ(ret.size(), 4);
 
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 	// check that parser correctly expands icmptypes and then filter correctly formats them
 	EXPECT_THAT(std::get<1>(result.rules[100].front()), ::testing::Eq("allow proto 1 icmptypes 0,3,8,11,12"));
 	EXPECT_THAT(std::get<1>(result.rules[200].front()), ::testing::Eq("deny proto 1 icmptypes 1,2,3,9,10,13"));
@@ -469,7 +469,7 @@ add 200 deny ip from any to any
 	ASSERT_EQ(ret.size(), 1);
 
 	acl::result_t result;
-	acl::compile(4, acls, {{1, {{true, "vlan1"}}}}, result);
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 	// we expect that after validation rule 100 will be omitted and only one rule will remain
 	EXPECT_THAT(std::get<1>(result.rules[200].front()), ::testing::Eq("deny"));
 }
