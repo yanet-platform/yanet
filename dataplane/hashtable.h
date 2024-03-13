@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <memory.h>
 #include <stdint.h>
 
@@ -8,6 +10,7 @@
 #include <rte_hash_crc.h>
 #include <rte_mbuf.h>
 #include <rte_spinlock.h>
+#include <vector>
 
 #include "common/generation.h"
 #include "common/result.h"
@@ -17,6 +20,9 @@
 
 #include "ext/murmurhash3.h"
 #include "ext/xxhash32.h"
+#include "ext/city.h"
+#include "ext/jhash.h"
+#include "ext/nmhash.h"
 
 namespace dataplane
 {
@@ -72,6 +78,34 @@ inline uint32_t calculate_hash_xxh32(const key_t& key)
 {
 	return XXHash32::hash(&key, sizeof(key), 19);
 }
+
+template<typename key_t>
+inline uint32_t calculate_hash_city(const key_t& key)
+{
+	char buf[sizeof(key) + 1];
+	memcpy(buf, &key, sizeof(key));
+	buf[sizeof(key)] = '\0';
+	return CityHash32((char *)buf, sizeof(key));
+}
+
+template<typename key_t>
+inline uint32_t calculate_hash_jhash(const key_t& key)
+{
+	uint8_t buf[sizeof(key)];
+	memcpy(buf, &key, sizeof(key));
+	return jenkins_hash(buf, sizeof(key));
+}
+
+template<typename key_t>
+inline uint32_t calculate_hash_nm(const key_t& key)
+{
+	return NMHASH32X((void *)&key, sizeof(key), 0);
+}
+
+template<typename key_t>
+uint32_t (*hash_func_by_name[])(const key_t&) \
+		__rte_aligned(RTE_CACHE_LINE_SIZE) = {calculate_hash_xxh32<key_t>, nullptr, calculate_hash_city<key_t>, \
+											  nullptr, calculate_hash_murmur3<key_t>, calculate_hash_crc<key_t>};
 
 class spinlock_t final
 {
@@ -2396,6 +2430,8 @@ public:
 	using hashtable_t = hashtable_mod_spinlock_dynamic<key_t, value_t, chunk_size, calculate_hash>;
 
 	constexpr static uint32_t valid_mask_full = 0xFFFFFFFFu >> (32 - chunk_size);
+	uint32_t max_chunk_id = 0;
+	uint32_t min_chunk_id = 4200000000;
 	constexpr static uint64_t keys_in_chunk_size = chunk_size;
 
 	static_assert(__builtin_popcount(chunk_size) == 1);
@@ -2429,6 +2465,7 @@ public:
 			this->socket_id = socket_id;
 			this->total_size = total_size;
 
+			YADECAP_LOG_INFO("TOTAL SIZE: %u\n", total_size);
 			hashtable->total_mask = (total_size / chunk_size) - 1;
 			hashtable->total_shift = __builtin_popcount(total_size / chunk_size - 1);
 		}
@@ -2540,7 +2577,7 @@ public:
 			YANET_LOG_ERROR("wrong total_size: %u is non power of 2\n", total_size);
 			return 0;
 		}
-
+		YADECAP_LOG_INFO("size of chunk_t: %ld\n", sizeof(chunk_t));
 		return sizeof(hashtable_t) + (size_t)(total_size / chunk_size) * sizeof(chunk_t);
 	}
 
@@ -2549,7 +2586,7 @@ public:
 	                       value_t*& value,
 	                       spinlock_nonrecursive_t*& locker)
 	{
-		uint32_t hash = calculate_hash(key);
+		uint32_t hash = calc_hash(key);
 		auto& chunk = chunks[hash & total_mask];
 
 		value = nullptr;
@@ -2588,6 +2625,14 @@ public:
 		return hash;
 	}
 
+	inline uint32_t fake_lookup(const key_t& key,
+	                       value_t*& value)
+	{
+		uint32_t hash = calc_hash(key);
+		value = nullptr;
+		return hash;
+	}
+
 	inline bool insert(const uint32_t hash,
 	                   const key_t& key,
 	                   const value_t& value)
@@ -2600,6 +2645,69 @@ public:
 			memcpy(&chunk.pairs[pair_index].key, &key, sizeof(key_t));
 			memcpy(&chunk.pairs[pair_index].value, &value, sizeof(value_t));
 			chunk.valid_mask |= 1u << pair_index;
+			max_chunk_id = max_chunk_id > (hash & total_mask) ? max_chunk_id : (hash & total_mask);
+			min_chunk_id = min_chunk_id < (hash & total_mask) ? min_chunk_id : (hash & total_mask);
+
+			return true;
+		}
+		/* else if (is_equal(chunk, pair_index, key))
+		{
+			/// hashtable is broken
+		} */
+
+		if (chunk_size == 1)
+		{
+			return false;
+		}
+
+		/// collision
+		if (chunk.valid_mask == valid_mask_full)
+		{
+			/// chunk is full
+			return false;
+		}
+
+		for (unsigned int try_i = 1;
+		     try_i < chunk_size;
+		     try_i++)
+		{
+			const uint32_t pair_index = ((hash >> total_shift) + try_i) & (chunk_size - 1);
+			if (!is_valid(chunk, pair_index))
+			{
+				memcpy(&chunk.pairs[pair_index].key, &key, sizeof(key_t));
+				memcpy(&chunk.pairs[pair_index].value, &value, sizeof(value_t));
+				chunk.valid_mask |= 1u << pair_index;
+				max_chunk_id = max_chunk_id > (hash & total_mask) ? max_chunk_id : (hash & total_mask);
+				min_chunk_id = min_chunk_id < (hash & total_mask) ? min_chunk_id : (hash & total_mask);
+
+				return true;
+			}
+			/* else if (is_equal(chunk, pair_index, key))
+			{
+				/// hashtable is broken
+			} */
+		}
+
+		/// chunk is full
+		return false;
+	}
+
+	inline uint32_t fake_insert(const uint32_t hash,
+	                   const key_t& key,
+	                   const value_t& value)
+	{
+
+		return  (hash & total_mask);
+		auto& chunk = chunks[hash & total_mask];
+
+		const uint32_t pair_index = (hash >> total_shift) & (chunk_size - 1);
+		if (!is_valid(chunk, pair_index))
+		{
+			memcpy(&chunk.pairs[pair_index].key, &key, sizeof(key_t));
+			memcpy(&chunk.pairs[pair_index].value, &value, sizeof(value_t));
+			chunk.valid_mask |= 1u << pair_index;
+			max_chunk_id = max_chunk_id > (hash & total_mask) ? max_chunk_id : (hash & total_mask);
+			min_chunk_id = min_chunk_id < (hash & total_mask) ? min_chunk_id : (hash & total_mask);
 
 			return true;
 		}
@@ -2630,6 +2738,8 @@ public:
 				memcpy(&chunk.pairs[pair_index].key, &key, sizeof(key_t));
 				memcpy(&chunk.pairs[pair_index].value, &value, sizeof(value_t));
 				chunk.valid_mask |= 1u << pair_index;
+				max_chunk_id = max_chunk_id > (hash & total_mask) ? max_chunk_id : (hash & total_mask);
+				min_chunk_id = min_chunk_id < (hash & total_mask) ? min_chunk_id : (hash & total_mask);
 
 				return true;
 			}
@@ -2641,6 +2751,22 @@ public:
 
 		/// chunk is full
 		return false;
+	}
+
+	inline std::vector<uint32_t> get_stats_from_ht() {
+		uint32_t longest_chain = 0;
+		std::vector<uint32_t> keys_in_chunks(17);
+		for (uint32_t chunk_id = min_chunk_id;
+			     chunk_id < max_chunk_id;
+			     chunk_id++) {
+			const auto& chunk = chunks[chunk_id];
+
+			uint32_t pairs_in_chunk = __builtin_popcount(chunk.valid_mask);
+			keys_in_chunks[pairs_in_chunk]++;
+			longest_chain = std::max(longest_chain, pairs_in_chunk);
+		}
+		keys_in_chunks.push_back(longest_chain);
+		return keys_in_chunks;
 	}
 
 	inline bool insert_or_update(const key_t& key,
@@ -2667,7 +2793,7 @@ public:
 
 	inline void remove(const key_t& key)
 	{
-		uint32_t hash = calculate_hash(key);
+		uint32_t hash = calc_hash(key);
 		auto& chunk = chunks[hash & total_mask];
 
 		auto& locker = chunk.locker;
@@ -2707,6 +2833,26 @@ public:
 		/// not found
 		locker.unlock();
 		return;
+	}
+
+	eResult set_hash_func_by_name(const std::string& func_name)
+	{
+		if (func_name == "crc") {
+			calc_hash = calculate_hash_crc<key_t>;
+		} else if (func_name == "murmur3") {
+			calc_hash = calculate_hash_murmur3<key_t>;
+		} else if (func_name == "city_hash") {
+			calc_hash = calculate_hash_city<key_t>;
+		} else if (func_name == "xxHash") {
+			calc_hash = calculate_hash_xxh32<key_t>;
+		} else if (func_name == "jhash") {
+			calc_hash = calculate_hash_jhash<key_t>;
+		} else if (func_name == "nmhash") {
+			calc_hash = calculate_hash_nm<key_t>;
+		} else {
+			return eResult::isEmpty;
+		}
+		return eResult::success;
 	}
 
 	void clear()
@@ -2841,8 +2987,11 @@ public:
 		return result;
 	}
 
-protected:
+public:
+	uint32_t (*calc_hash)(const key_t&) = calculate_hash_crc<key_t>;
 	uint32_t total_mask;
+
+public:
 	uint32_t total_shift;
 
 	struct chunk_t

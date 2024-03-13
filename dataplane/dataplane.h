@@ -54,6 +54,10 @@ struct tDataPlaneConfig
 	uint32_t rateLimitDivisor = 1;
 	unsigned int memory = 0;
 	std::map<std::string, std::tuple<unsigned int, unsigned int>> shared_memory;
+	std::string hash_func_name; // crc, murmur3 or xxHash
+	std::string session_name;
+	uint32_t chunk_size;
+	uint32_t hash_module;
 
 	std::vector<std::string> ealArgs;
 };

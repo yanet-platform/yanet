@@ -1,11 +1,14 @@
 #include <arpa/inet.h>
 #include <cstdint>
+#include <map>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include "common/type.h"
+#include "test_hash_table.h"
 
 #include <fstream>
 #include <thread>
@@ -589,9 +592,10 @@ eResult cDataPlane::initGlobalBases()
 					return eResult::errorAllocatingMemory;
 				}
 
-				auto* balancer_state = memory_manager.create<dataplane::globalBase::balancer::state_ht>("balancer.state.ht",
-				                                                                                        socket_id,
-				                                                                                        dataplane::globalBase::balancer::state_ht::calculate_sizeof(getConfigValues().balancer_state_ht_size));
+				auto* balancer_state = memory_manager.create<dataplane::globalBase::balancer::state_ht>("balancer.state.ht", \
+																										socket_id, \
+																										getConfigValues().balancer_state_ht_size / 1024);
+				globalbase_atomic->updater.balancer_state.update_pointer(balancer_state, socket_id, getConfigValues().balancer_state_ht_size);
 				if (!balancer_state)
 				{
 					return eResult::errorAllocatingMemory;
@@ -602,6 +606,11 @@ eResult cDataPlane::initGlobalBases()
 				globalbase_atomic->updater.nat64stateful_lan_state.update_pointer(nat64stateful_lan_state, socket_id, getConfigValues().nat64stateful_states_size);
 				globalbase_atomic->updater.nat64stateful_wan_state.update_pointer(nat64stateful_wan_state, socket_id, getConfigValues().nat64stateful_states_size);
 				globalbase_atomic->updater.balancer_state.update_pointer(balancer_state, socket_id, getConfigValues().balancer_state_ht_size);
+
+				auto result = balancer_state->set_hash_func_by_name(config.hash_func_name);
+				if (result != eResult::success) {
+					return result;
+				}
 
 				globalbase_atomic->fw4_state = ipv4_states_ht;
 				globalbase_atomic->fw6_state = ipv6_states_ht;
@@ -694,7 +703,8 @@ eResult cDataPlane::initGlobalBases()
 
 		socket_ids.emplace(socketId);
 	}
-
+	test_hash_table(config, globalBaseAtomics[0]->balancer_state, getConfigValues().balancer_state_ht_size);
+	exit(0);
 	return result;
 }
 
@@ -1571,6 +1581,10 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 		}
 	}
 
+	config.hash_func_name = rootJson.value("hashFuncName", "crc");
+	config.session_name = rootJson.value("sessionName", "vla.session");
+	config.chunk_size = rootJson.value("chunkSize", 16);
+	config.hash_module = rootJson.value("hashModule", 268435183);
 	config.memory = rootJson.value("memory", 0);
 
 	if (rootJson.find("sharedMemory") != rootJson.end())
