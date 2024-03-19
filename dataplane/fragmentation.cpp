@@ -36,7 +36,7 @@ common::fragmentation::stats_t fragmentation_t::getStats()
 
 void fragmentation_t::insert(rte_mbuf* mbuf)
 {
-	if (stats.current_count_packets > dataPlane->getConfigValue(eConfigType::fragmentation_size))
+	if (stats.current_count_packets > dataPlane->getConfigValues().fragmentation_size)
 	{
 		stats.total_overflow_packets++;
 		rte_pktmbuf_free(mbuf);
@@ -137,7 +137,7 @@ void fragmentation_t::insert(rte_mbuf* mbuf)
 	{
 		auto& value = fragments[key];
 
-		if (std::get<0>(value).size() > dataPlane->getConfigValue(eConfigType::fragmentation_packets_per_flow))
+		if (std::get<0>(value).size() > dataPlane->getConfigValues().fragmentation_packets_per_flow)
 		{
 			stats.flow_overflow_packets++;
 			rte_pktmbuf_free(mbuf);
@@ -246,12 +246,12 @@ bool fragmentation_t::isTimeout(const fragmentation::value_t& value)
 {
 	uint16_t currentTime = time(nullptr);
 
-	if ((uint16_t)(currentTime - std::get<1>(value)) >= dataPlane->getConfigValue(eConfigType::fragmentation_timeout_first))
+	if ((uint16_t)(currentTime - std::get<1>(value)) >= dataPlane->getConfigValues().fragmentation_timeout_first)
 	{
 		return true;
 	}
 
-	if ((uint16_t)(currentTime - std::get<2>(value)) >= dataPlane->getConfigValue(eConfigType::fragmentation_timeout_last))
+	if ((uint16_t)(currentTime - std::get<2>(value)) >= dataPlane->getConfigValues().fragmentation_timeout_last)
 	{
 		return true;
 	}

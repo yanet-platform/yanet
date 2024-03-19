@@ -47,41 +47,6 @@ cDataPlane::cDataPlane() :
         controlPlane(new cControlPlane(this)),
         bus(this)
 {
-	configValues = {
-	        {eConfigType::port_rx_queue_size, 4096},
-	        {eConfigType::port_tx_queue_size, 4096},
-	        {eConfigType::ring_highPriority_size, 64},
-	        {eConfigType::ring_normalPriority_size, 256},
-	        {eConfigType::ring_lowPriority_size, 64},
-	        {eConfigType::ring_toFreePackets_size, 64},
-	        {eConfigType::ring_log_size, 1024},
-	        {eConfigType::fragmentation_size, 1024},
-	        {eConfigType::fragmentation_timeout_first, 32},
-	        {eConfigType::fragmentation_timeout_last, 16},
-	        {eConfigType::fragmentation_packets_per_flow, 64},
-	        {eConfigType::stateful_firewall_tcp_timeout, 120},
-	        {eConfigType::stateful_firewall_tcp_syn_timeout, YANET_CONFIG_STATE_TIMEOUT_DEFAULT},
-	        {eConfigType::stateful_firewall_tcp_syn_ack_timeout, YANET_CONFIG_STATE_TIMEOUT_DEFAULT},
-	        {eConfigType::stateful_firewall_tcp_fin_timeout, YANET_CONFIG_STATE_TIMEOUT_DEFAULT},
-	        {eConfigType::stateful_firewall_udp_timeout, 30},
-	        {eConfigType::stateful_firewall_other_protocols_timeout, 16},
-	        {eConfigType::gc_step, 8},
-	        {eConfigType::sample_gc_step, 512},
-	        {eConfigType::acl_states4_ht_size, YANET_CONFIG_ACL_STATES4_HT_SIZE},
-	        {eConfigType::acl_states6_ht_size, YANET_CONFIG_ACL_STATES6_HT_SIZE},
-	        {eConfigType::master_mempool_size, 8192},
-	        {eConfigType::nat64stateful_states_size, YANET_CONFIG_NAT64STATEFUL_HT_SIZE},
-	        {eConfigType::kernel_interface_queue_size, YANET_CONFIG_KERNEL_INTERFACE_QUEUE_SIZE},
-	        {eConfigType::balancer_state_ht_size, YANET_CONFIG_BALANCER_STATE_HT_SIZE},
-	        {eConfigType::tsc_active_state, YANET_CONFIG_TSC_ACTIVE_STATE},
-	        {eConfigType::balancer_tcp_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
-	        {eConfigType::balancer_tcp_syn_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
-	        {eConfigType::balancer_tcp_syn_ack_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
-	        {eConfigType::balancer_tcp_fin_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
-	        {eConfigType::balancer_udp_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
-	        {eConfigType::balancer_other_protocols_timeout, YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT},
-	        {eConfigType::neighbor_ht_size, 64 * 1024},
-	};
 }
 
 cDataPlane::~cDataPlane()
@@ -594,7 +559,7 @@ eResult cDataPlane::initGlobalBases()
 
 				auto* ipv4_states_ht = memory_manager.create<acl::ipv4_states_ht>("acl.state.v4.ht",
 				                                                                  socket_id,
-				                                                                  acl::ipv4_states_ht::calculate_sizeof(getConfigValue(eConfigType::acl_states4_ht_size)));
+				                                                                  acl::ipv4_states_ht::calculate_sizeof(getConfigValues().acl_states4_ht_size));
 				if (!ipv4_states_ht)
 				{
 					return eResult::errorAllocatingMemory;
@@ -602,7 +567,7 @@ eResult cDataPlane::initGlobalBases()
 
 				auto* ipv6_states_ht = memory_manager.create<acl::ipv6_states_ht>("acl.state.v6.ht",
 				                                                                  socket_id,
-				                                                                  acl::ipv6_states_ht::calculate_sizeof(getConfigValue(eConfigType::acl_states6_ht_size)));
+				                                                                  acl::ipv6_states_ht::calculate_sizeof(getConfigValues().acl_states6_ht_size));
 				if (!ipv6_states_ht)
 				{
 					return eResult::errorAllocatingMemory;
@@ -610,7 +575,7 @@ eResult cDataPlane::initGlobalBases()
 
 				auto* nat64stateful_lan_state = memory_manager.create<nat64stateful::lan_ht>("nat64stateful.state.lan.ht",
 				                                                                             socket_id,
-				                                                                             nat64stateful::lan_ht::calculate_sizeof(getConfigValue(eConfigType::nat64stateful_states_size)));
+				                                                                             nat64stateful::lan_ht::calculate_sizeof(getConfigValues().nat64stateful_states_size));
 				if (!nat64stateful_lan_state)
 				{
 					return eResult::errorAllocatingMemory;
@@ -618,7 +583,7 @@ eResult cDataPlane::initGlobalBases()
 
 				auto* nat64stateful_wan_state = memory_manager.create<nat64stateful::wan_ht>("nat64stateful.state.wan.ht",
 				                                                                             socket_id,
-				                                                                             nat64stateful::wan_ht::calculate_sizeof(getConfigValue(eConfigType::nat64stateful_states_size)));
+				                                                                             nat64stateful::wan_ht::calculate_sizeof(getConfigValues().nat64stateful_states_size));
 				if (!nat64stateful_wan_state)
 				{
 					return eResult::errorAllocatingMemory;
@@ -626,17 +591,17 @@ eResult cDataPlane::initGlobalBases()
 
 				auto* balancer_state = memory_manager.create<dataplane::globalBase::balancer::state_ht>("balancer.state.ht",
 				                                                                                        socket_id,
-				                                                                                        dataplane::globalBase::balancer::state_ht::calculate_sizeof(getConfigValue(eConfigType::balancer_state_ht_size)));
+				                                                                                        dataplane::globalBase::balancer::state_ht::calculate_sizeof(getConfigValues().balancer_state_ht_size));
 				if (!balancer_state)
 				{
 					return eResult::errorAllocatingMemory;
 				}
 
-				globalbase_atomic->updater.fw4_state.update_pointer(ipv4_states_ht, socket_id, getConfigValue(eConfigType::acl_states4_ht_size));
-				globalbase_atomic->updater.fw6_state.update_pointer(ipv6_states_ht, socket_id, getConfigValue(eConfigType::acl_states6_ht_size));
-				globalbase_atomic->updater.nat64stateful_lan_state.update_pointer(nat64stateful_lan_state, socket_id, getConfigValue(eConfigType::nat64stateful_states_size));
-				globalbase_atomic->updater.nat64stateful_wan_state.update_pointer(nat64stateful_wan_state, socket_id, getConfigValue(eConfigType::nat64stateful_states_size));
-				globalbase_atomic->updater.balancer_state.update_pointer(balancer_state, socket_id, getConfigValue(eConfigType::balancer_state_ht_size));
+				globalbase_atomic->updater.fw4_state.update_pointer(ipv4_states_ht, socket_id, getConfigValues().acl_states4_ht_size);
+				globalbase_atomic->updater.fw6_state.update_pointer(ipv6_states_ht, socket_id, getConfigValues().acl_states6_ht_size);
+				globalbase_atomic->updater.nat64stateful_lan_state.update_pointer(nat64stateful_lan_state, socket_id, getConfigValues().nat64stateful_states_size);
+				globalbase_atomic->updater.nat64stateful_wan_state.update_pointer(nat64stateful_wan_state, socket_id, getConfigValues().nat64stateful_states_size);
+				globalbase_atomic->updater.balancer_state.update_pointer(balancer_state, socket_id, getConfigValues().balancer_state_ht_size);
 
 				globalbase_atomic->fw4_state = ipv4_states_ht;
 				globalbase_atomic->fw6_state = ipv6_states_ht;
@@ -1049,7 +1014,7 @@ eResult cDataPlane::initQueues()
 		{
 			int ret = rte_eth_tx_queue_setup(portId,
 			                                 queueId,
-			                                 getConfigValue(eConfigType::port_tx_queue_size),
+			                                 getConfigValues().port_tx_queue_size,
 			                                 rte_eth_dev_socket_id(portId),
 			                                 nullptr); ///< @todo
 			if (ret < 0)
@@ -1171,17 +1136,6 @@ void cDataPlane::run_on_worker_gc(const tSocketId socket_id,
                                   const std::function<bool()>& callback)
 {
 	socket_worker_gcs.find(socket_id)->second->run_on_this_thread(callback);
-}
-
-uint64_t cDataPlane::getConfigValue(const eConfigType& type) const
-{
-	if (configValues.find(type) == configValues.end())
-	{
-		YADECAP_LOG_ERROR("unknown variable\n");
-		return 0;
-	}
-
-	return configValues.find(type)->second;
 }
 
 eResult cDataPlane::allocateSharedMemory()
@@ -1714,178 +1668,7 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 
 eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 {
-	if (exist(json, "port_rx_queue_size"))
-	{
-		configValues[eConfigType::port_rx_queue_size] = json["port_rx_queue_size"];
-	}
-
-	if (exist(json, "port_tx_queue_size"))
-	{
-		configValues[eConfigType::port_tx_queue_size] = json["port_tx_queue_size"];
-	}
-
-	if (exist(json, "ring_highPriority_size"))
-	{
-		configValues[eConfigType::ring_highPriority_size] = json["ring_highPriority_size"];
-	}
-
-	if (exist(json, "ring_normalPriority_size"))
-	{
-		configValues[eConfigType::ring_normalPriority_size] = json["ring_normalPriority_size"];
-	}
-
-	if (exist(json, "ring_lowPriority_size"))
-	{
-		configValues[eConfigType::ring_lowPriority_size] = json["ring_lowPriority_size"];
-	}
-
-	if (exist(json, "fragmentation_size"))
-	{
-		configValues[eConfigType::fragmentation_size] = json["fragmentation_size"];
-	}
-
-	if (exist(json, "fragmentation_timeout_first"))
-	{
-		configValues[eConfigType::fragmentation_timeout_first] = json["fragmentation_timeout_first"];
-	}
-
-	if (exist(json, "fragmentation_timeout_last"))
-	{
-		configValues[eConfigType::fragmentation_timeout_last] = json["fragmentation_timeout_last"];
-	}
-
-	if (exist(json, "fragmentation_packets_per_flow"))
-	{
-		configValues[eConfigType::fragmentation_packets_per_flow] = json["fragmentation_packets_per_flow"];
-	}
-	/*
-	  The decoding order of four options bellow is important. The first one
-	  is more common and sets a timeout value for any tcp session whereas
-	  three following aloow one to set timeouts more precissely basing on
-	  the last processed tcp session packet flags. So if any of flag-based
-	  options is ommitted the more common option should be applied.
-	*/
-	if (exist(json, "stateful_firewall_tcp_timeout"))
-	{
-		configValues[eConfigType::stateful_firewall_tcp_timeout] = json["stateful_firewall_tcp_timeout"];
-		/* Set the same value as a default for all descendant options. */
-		configValues[eConfigType::stateful_firewall_tcp_syn_timeout] = configValues[eConfigType::stateful_firewall_tcp_timeout];
-		configValues[eConfigType::stateful_firewall_tcp_syn_ack_timeout] = configValues[eConfigType::stateful_firewall_tcp_timeout];
-		configValues[eConfigType::stateful_firewall_tcp_fin_timeout] = configValues[eConfigType::stateful_firewall_tcp_timeout];
-	}
-	/*
-	   Syn Ack is descendant of Syn state so as we do not have `is-set`
-	   flag for option we should preserve the decoding order.
-	*/
-	if (exist(json, "stateful_firewall_tcp_syn_timeout"))
-	{
-		configValues[eConfigType::stateful_firewall_tcp_syn_timeout] = json["stateful_firewall_tcp_syn_timeout"];
-		/* Set the value as default for Syn-Ack timeouts. */
-		configValues[eConfigType::stateful_firewall_tcp_syn_ack_timeout] = configValues[eConfigType::stateful_firewall_tcp_syn_timeout];
-	}
-	if (exist(json, "stateful_firewall_tcp_syn_ack_timeout"))
-	{
-		configValues[eConfigType::stateful_firewall_tcp_syn_ack_timeout] = json["stateful_firewall_tcp_syn_ack_timeout"];
-	}
-	if (exist(json, "stateful_firewall_tcp_fin_timeout"))
-	{
-		configValues[eConfigType::stateful_firewall_tcp_fin_timeout] = json["stateful_firewall_tcp_fin_timeout"];
-	}
-	if (exist(json, "stateful_firewall_udp_timeout"))
-	{
-		configValues[eConfigType::stateful_firewall_udp_timeout] = json["stateful_firewall_udp_timeout"];
-	}
-	if (exist(json, "stateful_firewall_other_protocols_timeout"))
-	{
-		configValues[eConfigType::stateful_firewall_other_protocols_timeout] = json["stateful_firewall_other_protocols_timeout"];
-	}
-	if (exist(json, "gc_step"))
-	{
-		configValues[eConfigType::gc_step] = json["gc_step"];
-	}
-	if (exist(json, "sample_gc_step"))
-	{
-		configValues[eConfigType::sample_gc_step] = json["sample_gc_step"];
-	}
-	if (exist(json, "acl_states4_ht_size"))
-	{
-		configValues[eConfigType::acl_states4_ht_size] = json["acl_states4_ht_size"];
-	}
-	if (exist(json, "acl_states6_ht_size"))
-	{
-		configValues[eConfigType::acl_states6_ht_size] = json["acl_states6_ht_size"];
-	}
-
-	if (exist(json, "master_mempool_size"))
-	{
-		configValues[eConfigType::master_mempool_size] = json["master_mempool_size"];
-	}
-
-	if (exist(json, "nat64stateful_states_size"))
-	{
-		configValues[eConfigType::nat64stateful_states_size] = json["nat64stateful_states_size"];
-	}
-
-	if (exist(json, "kernel_interface_queue_size"))
-	{
-		configValues[eConfigType::kernel_interface_queue_size] = json["kernel_interface_queue_size"];
-	}
-
-	if (exist(json, "balancer_state_ht_size"))
-	{
-		configValues[eConfigType::balancer_state_ht_size] = json["balancer_state_ht_size"];
-	}
-
-	if (exist(json, "tsc_active_state"))
-	{
-		configValues[eConfigType::tsc_active_state] = json["tsc_active_state"];
-	}
-	/*
-	  The decoding order of four options bellow is important. The first one
-	  is more common and sets a timeout value for any tcp session whereas
-	  three following aloow one to set timeouts more precissely basing on
-	  the last processed tcp session packet flags. So if any of flag-based
-	  options is ommitted the more common option should be applied.
-	*/
-	if (exist(json, "balancer_tcp_timeout"))
-	{
-		configValues[eConfigType::balancer_tcp_timeout] = json["balancer_tcp_timeout"];
-		/* Set the same value as a default for all descendant options. */
-		configValues[eConfigType::balancer_tcp_syn_timeout] = configValues[eConfigType::balancer_tcp_timeout];
-		configValues[eConfigType::balancer_tcp_syn_ack_timeout] = configValues[eConfigType::balancer_tcp_timeout];
-		configValues[eConfigType::balancer_tcp_fin_timeout] = configValues[eConfigType::balancer_tcp_timeout];
-	}
-	/*
-	   Syn Ack is descendant of Syn state so as we do not have `is-set`
-	   flag for option we should preserve the decoding order.
-	*/
-	if (exist(json, "balancer_tcp_syn_timeout"))
-	{
-		configValues[eConfigType::balancer_tcp_syn_timeout] = json["balancer_tcp_syn_timeout"];
-		/* Set the value as default for Syn-Ack timeouts. */
-		configValues[eConfigType::balancer_tcp_syn_ack_timeout] = configValues[eConfigType::balancer_tcp_syn_timeout];
-	}
-	if (exist(json, "balancer_tcp_syn_ack_timeout"))
-	{
-		configValues[eConfigType::balancer_tcp_syn_ack_timeout] = json["balancer_tcp_syn_ack_timeout"];
-	}
-	if (exist(json, "balancer_tcp_fin_timeout"))
-	{
-		configValues[eConfigType::balancer_tcp_fin_timeout] = json["balancer_tcp_fin_timeout"];
-	}
-	if (exist(json, "balancer_udp_timeout"))
-	{
-		configValues[eConfigType::balancer_udp_timeout] = json["balancer_udp_timeout"];
-	}
-	if (exist(json, "balancer_other_protocols_timeout"))
-	{
-		configValues[eConfigType::balancer_other_protocols_timeout] = json["balancer_other_protocols_timeout"];
-	}
-	if (exist(json, "neighbor_ht_size"))
-	{
-		configValues[eConfigType::neighbor_ht_size] = json["neighbor_ht_size"];
-	}
-
+	configValues = json;
 	return eResult::success;
 }
 

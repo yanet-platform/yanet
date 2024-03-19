@@ -95,11 +95,11 @@ eResult cWorker::init(const tCoreId& coreId,
 	this->bases[currentBaseId] = base;
 	this->bases[currentBaseId ^ 1] = base;
 
-	unsigned int elements_count = 2 * basePermanently.workerPortsCount * dataPlane->getConfigValue(eConfigType::port_rx_queue_size) +
-	                              2 * basePermanently.workerPortsCount * dataPlane->getConfigValue(eConfigType::port_tx_queue_size) +
-	                              2 * dataPlane->getConfigValue(eConfigType::ring_highPriority_size) +
-	                              2 * dataPlane->getConfigValue(eConfigType::ring_normalPriority_size) +
-	                              2 * dataPlane->getConfigValue(eConfigType::ring_lowPriority_size);
+	unsigned int elements_count = 2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_rx_queue_size +
+	                              2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_tx_queue_size +
+	                              2 * dataPlane->getConfigValues().ring_highPriority_size +
+	                              2 * dataPlane->getConfigValues().ring_normalPriority_size +
+	                              2 * dataPlane->getConfigValues().ring_lowPriority_size;
 
 	YADECAP_LOG_DEBUG("elements_count: %u\n", elements_count);
 
@@ -123,7 +123,7 @@ eResult cWorker::init(const tCoreId& coreId,
 
 	/// init rings
 	ring_highPriority = rte_ring_create(("r_hp_" + std::to_string(coreId)).c_str(),
-	                                    dataPlane->getConfigValue(eConfigType::ring_highPriority_size),
+	                                    dataPlane->getConfigValues().ring_highPriority_size,
 	                                    socketId,
 	                                    RING_F_SP_ENQ | RING_F_SC_DEQ);
 	if (!ring_highPriority)
@@ -132,7 +132,7 @@ eResult cWorker::init(const tCoreId& coreId,
 	}
 
 	ring_normalPriority = rte_ring_create(("r_np_" + std::to_string(coreId)).c_str(),
-	                                      dataPlane->getConfigValue(eConfigType::ring_normalPriority_size),
+	                                      dataPlane->getConfigValues().ring_normalPriority_size,
 	                                      socketId,
 	                                      RING_F_SP_ENQ | RING_F_SC_DEQ);
 	if (!ring_normalPriority)
@@ -141,7 +141,7 @@ eResult cWorker::init(const tCoreId& coreId,
 	}
 
 	ring_lowPriority = rte_ring_create(("r_lp_" + std::to_string(coreId)).c_str(),
-	                                   dataPlane->getConfigValue(eConfigType::ring_lowPriority_size),
+	                                   dataPlane->getConfigValues().ring_lowPriority_size,
 	                                   socketId,
 	                                   RING_F_SP_ENQ | RING_F_SC_DEQ);
 	if (!ring_lowPriority)
@@ -150,7 +150,7 @@ eResult cWorker::init(const tCoreId& coreId,
 	}
 
 	ring_toFreePackets = rte_ring_create(("r_tfp_" + std::to_string(coreId)).c_str(),
-	                                     dataPlane->getConfigValue(eConfigType::ring_toFreePackets_size),
+	                                     dataPlane->getConfigValues().ring_toFreePackets_size,
 	                                     socketId,
 	                                     RING_F_SP_ENQ | RING_F_SC_DEQ);
 	if (!ring_toFreePackets)
@@ -159,7 +159,7 @@ eResult cWorker::init(const tCoreId& coreId,
 	}
 
 	ring_log = rte_ring_create(("r_log_" + std::to_string(coreId)).c_str(),
-	                           dataPlane->getConfigValue(eConfigType::ring_log_size),
+	                           dataPlane->getConfigValues().ring_log_size,
 	                           socketId,
 	                           RING_F_SP_ENQ | RING_F_SC_DEQ);
 	if (!ring_log)
@@ -173,19 +173,19 @@ eResult cWorker::init(const tCoreId& coreId,
 		return eResult::invalidCoreId;
 	}
 
-	acl_state_config.tcp_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_timeout);
-	acl_state_config.tcp_syn_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_syn_timeout);
-	acl_state_config.tcp_syn_ack_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_syn_ack_timeout);
-	acl_state_config.tcp_fin_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_fin_timeout);
-	acl_state_config.udp_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_udp_timeout);
-	acl_state_config.default_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_other_protocols_timeout);
+	acl_state_config.tcp_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_timeout;
+	acl_state_config.tcp_syn_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_syn_timeout;
+	acl_state_config.tcp_syn_ack_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_syn_ack_timeout;
+	acl_state_config.tcp_fin_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_fin_timeout;
+	acl_state_config.udp_timeout = dataPlane->getConfigValues().stateful_firewall_udp_timeout;
+	acl_state_config.default_timeout = dataPlane->getConfigValues().stateful_firewall_other_protocols_timeout;
 
-	balancer_state_config.tcp_timeout = dataPlane->getConfigValue(eConfigType::balancer_tcp_timeout);
-	balancer_state_config.tcp_syn_timeout = dataPlane->getConfigValue(eConfigType::balancer_tcp_syn_timeout);
-	balancer_state_config.tcp_syn_ack_timeout = dataPlane->getConfigValue(eConfigType::balancer_tcp_syn_ack_timeout);
-	balancer_state_config.tcp_fin_timeout = dataPlane->getConfigValue(eConfigType::balancer_tcp_fin_timeout);
-	balancer_state_config.udp_timeout = dataPlane->getConfigValue(eConfigType::balancer_udp_timeout);
-	balancer_state_config.default_timeout = dataPlane->getConfigValue(eConfigType::balancer_other_protocols_timeout);
+	balancer_state_config.tcp_timeout = dataPlane->getConfigValues().balancer_tcp_timeout;
+	balancer_state_config.tcp_syn_timeout = dataPlane->getConfigValues().balancer_tcp_syn_timeout;
+	balancer_state_config.tcp_syn_ack_timeout = dataPlane->getConfigValues().balancer_tcp_syn_ack_timeout;
+	balancer_state_config.tcp_fin_timeout = dataPlane->getConfigValues().balancer_tcp_fin_timeout;
+	balancer_state_config.udp_timeout = dataPlane->getConfigValues().balancer_udp_timeout;
+	balancer_state_config.default_timeout = dataPlane->getConfigValues().balancer_other_protocols_timeout;
 	return eResult::success;
 }
 
@@ -199,11 +199,11 @@ void cWorker::start()
 
 	/// @todo: prepare()
 
-	unsigned int mbufs_count_expect = 2 * basePermanently.workerPortsCount * dataPlane->getConfigValue(eConfigType::port_rx_queue_size) +
-	                                  2 * basePermanently.workerPortsCount * dataPlane->getConfigValue(eConfigType::port_tx_queue_size) +
-	                                  2 * dataPlane->getConfigValue(eConfigType::ring_highPriority_size) +
-	                                  2 * dataPlane->getConfigValue(eConfigType::ring_normalPriority_size) +
-	                                  2 * dataPlane->getConfigValue(eConfigType::ring_lowPriority_size);
+	unsigned int mbufs_count_expect = 2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_rx_queue_size +
+	                                  2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_tx_queue_size +
+	                                  2 * dataPlane->getConfigValues().ring_highPriority_size +
+	                                  2 * dataPlane->getConfigValues().ring_normalPriority_size +
+	                                  2 * dataPlane->getConfigValues().ring_lowPriority_size;
 
 	unsigned int mbufs_count = rte_mempool_avail_count(mempool);
 	if (mbufs_count != mbufs_count_expect)
@@ -240,7 +240,7 @@ void cWorker::start()
 
 		rc = rte_eth_rx_queue_setup(portId,
 		                            queueId,
-		                            dataPlane->getConfigValue(eConfigType::port_rx_queue_size),
+		                            dataPlane->getConfigValues().port_rx_queue_size,
 		                            rte_eth_dev_socket_id(portId),
 		                            nullptr, ///< @todo
 		                            mempool);

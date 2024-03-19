@@ -80,7 +80,7 @@ eResult cControlPlane::init(bool use_kernel_interface)
 		return result;
 	}
 
-	gc_step = dataPlane->getConfigValue(eConfigType::gc_step);
+	gc_step = dataPlane->getConfigValues().gc_step;
 	dregress.gc_step = gc_step;
 
 	icmpOutRemainder = dataPlane->config.SWICMPOutRateLimit / dataPlane->config.rateLimitDivisor;
@@ -1415,7 +1415,7 @@ void cControlPlane::waitAllWorkers()
 eResult cControlPlane::initMempool()
 {
 	mempool = rte_mempool_create("cp",
-	                             CONFIG_YADECAP_MBUFS_COUNT + dataPlane->getConfigValue(eConfigType::fragmentation_size) + dataPlane->getConfigValue(eConfigType::master_mempool_size) + 4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE + 4 * dataPlane->ports.size() * dataPlane->getConfigValue(eConfigType::kernel_interface_queue_size),
+	                             CONFIG_YADECAP_MBUFS_COUNT + dataPlane->getConfigValues().fragmentation_size + dataPlane->getConfigValues().master_mempool_size + 4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE + 4 * dataPlane->ports.size() * dataPlane->getConfigValues().kernel_interface_queue_size,
 	                             CONFIG_YADECAP_MBUF_SIZE,
 	                             0,
 	                             sizeof(struct rte_pktmbuf_pool_private),
@@ -1515,7 +1515,7 @@ std::optional<tPortId> cControlPlane::add_kernel_interface(const tPortId port_id
 	snprintf(vdev_args,
 	         sizeof(vdev_args),
 	         "path=/dev/vhost-net,queues=1,queue_size=%lu,iface=%s,mac=%s",
-	         dataPlane->getConfigValue(eConfigType::kernel_interface_queue_size),
+	         dataPlane->getConfigValues().kernel_interface_queue_size,
 	         interface_name.data(),
 	         common::mac_address_t(ether_addr.addr_bytes).toString().data());
 
@@ -1557,7 +1557,7 @@ std::optional<tPortId> cControlPlane::add_kernel_interface(const tPortId port_id
 
 	int rc = rte_eth_rx_queue_setup(kernel_port_id,
 	                                0,
-	                                dataPlane->getConfigValue(eConfigType::kernel_interface_queue_size),
+	                                dataPlane->getConfigValues().kernel_interface_queue_size,
 	                                0, ///< @todo: socket
 	                                nullptr,
 	                                mempool);
@@ -1570,7 +1570,7 @@ std::optional<tPortId> cControlPlane::add_kernel_interface(const tPortId port_id
 
 	rc = rte_eth_tx_queue_setup(kernel_port_id,
 	                            0,
-	                            dataPlane->getConfigValue(eConfigType::kernel_interface_queue_size),
+	                            dataPlane->getConfigValues().kernel_interface_queue_size,
 	                            0, ///< @todo: socket
 	                            nullptr);
 	if (rc < 0)
@@ -2826,26 +2826,26 @@ bool cControlPlane::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 			value.packets_forward = 0;
 			value.tcp.unpack(payload->flags);
 
-			uint32_t state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_other_protocols_timeout);
+			uint32_t state_timeout = dataPlane->getConfigValues().stateful_firewall_other_protocols_timeout;
 			if (payload->proto == IPPROTO_UDP)
 			{
-				state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_udp_timeout);
+				state_timeout = dataPlane->getConfigValues().stateful_firewall_udp_timeout;
 			}
 			else if (payload->proto == IPPROTO_TCP)
 			{
-				state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_timeout);
+				state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_timeout;
 				uint8_t flags = value.tcp.src_flags | value.tcp.dst_flags;
 				if (flags & (uint8_t)common::fwstate::tcp_flags_e::ACK)
 				{
-					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_syn_ack_timeout);
+					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_syn_ack_timeout;
 				}
 				else if (flags & (uint8_t)common::fwstate::tcp_flags_e::SYN)
 				{
-					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_syn_timeout);
+					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_syn_timeout;
 				}
 				if (flags & (uint8_t)common::fwstate::tcp_flags_e::FIN)
 				{
-					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_fin_timeout);
+					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_fin_timeout;
 				}
 			}
 			value.state_timeout = state_timeout;
@@ -2906,26 +2906,26 @@ bool cControlPlane::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 			value.packets_forward = 0;
 			value.tcp.unpack(payload->flags);
 
-			uint32_t state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_other_protocols_timeout);
+			uint32_t state_timeout = dataPlane->getConfigValues().stateful_firewall_other_protocols_timeout;
 			if (payload->proto == IPPROTO_UDP)
 			{
-				state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_udp_timeout);
+				state_timeout = dataPlane->getConfigValues().stateful_firewall_udp_timeout;
 			}
 			else if (payload->proto == IPPROTO_TCP)
 			{
-				state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_timeout);
+				state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_timeout;
 				uint8_t flags = value.tcp.src_flags | value.tcp.dst_flags;
 				if (flags & (uint8_t)common::fwstate::tcp_flags_e::ACK)
 				{
-					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_syn_ack_timeout);
+					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_syn_ack_timeout;
 				}
 				else if (flags & (uint8_t)common::fwstate::tcp_flags_e::SYN)
 				{
-					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_syn_timeout);
+					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_syn_timeout;
 				}
 				if (flags & (uint8_t)common::fwstate::tcp_flags_e::FIN)
 				{
-					state_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_fin_timeout);
+					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_fin_timeout;
 				}
 			}
 			value.state_timeout = state_timeout;
