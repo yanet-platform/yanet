@@ -19,16 +19,16 @@ atomic::atomic(cDataPlane* dataPlane,
         dataPlane(dataPlane),
         socketId(socketId)
 {
-	fw_state_config.tcp_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_tcp_timeout);
-	fw_state_config.udp_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_udp_timeout);
-	fw_state_config.other_protocols_timeout = dataPlane->getConfigValue(eConfigType::stateful_firewall_other_protocols_timeout);
+	fw_state_config.tcp_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_timeout;
+	fw_state_config.udp_timeout = dataPlane->getConfigValues().stateful_firewall_udp_timeout;
+	fw_state_config.other_protocols_timeout = dataPlane->getConfigValues().stateful_firewall_other_protocols_timeout;
 	fw_state_config.sync_timeout = 8;
 
 	memset(physicalPort_flags, 0, sizeof(physicalPort_flags));
 	memset(counter_shifts, 0, sizeof(counter_shifts));
 	memset(gc_counter_shifts, 0, sizeof(gc_counter_shifts));
 
-	tsc_active_state = dataPlane->getConfigValue(eConfigType::tsc_active_state);
+	tsc_active_state = dataPlane->getConfigValues().tsc_active_state;
 }
 
 atomic::~atomic()

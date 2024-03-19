@@ -63,8 +63,8 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 		port_id_to_socket_id[port_id] = rte_eth_dev_socket_id(port_id);
 	}
 
-	gc_step = dataplane->getConfigValue(eConfigType::gc_step);
-	sample_gc_step = dataplane->getConfigValue(eConfigType::sample_gc_step);
+	gc_step = dataplane->getConfigValues().gc_step;
+	sample_gc_step = dataplane->getConfigValues().sample_gc_step;
 
 	mempool = rte_mempool_create(("wgc" + std::to_string(core_id)).data(),
 	                             CONFIG_YADECAP_MBUFS_COUNT + 3 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE,
@@ -84,7 +84,7 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 	}
 
 	ring_to_slowworker = rte_ring_create(("r_tsw_" + std::to_string(core_id)).c_str(),
-	                                     dataplane->getConfigValue(eConfigType::ring_normalPriority_size),
+	                                     dataplane->getConfigValues().ring_normalPriority_size,
 	                                     socket_id,
 	                                     RING_F_SP_ENQ | RING_F_SC_DEQ);
 	if (!ring_to_slowworker)
@@ -93,7 +93,7 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 	}
 
 	ring_to_free_mbuf = rte_ring_create(("r_tfmb_" + std::to_string(core_id)).c_str(),
-	                                    dataplane->getConfigValue(eConfigType::ring_toFreePackets_size),
+	                                    dataplane->getConfigValues().ring_toFreePackets_size,
 	                                    socket_id,
 	                                    RING_F_SP_ENQ | RING_F_SC_DEQ);
 	if (!ring_to_free_mbuf)

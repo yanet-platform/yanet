@@ -18,6 +18,7 @@
 #include "common/result.h"
 #include "common/type.h"
 
+#include "config_values.h"
 #include "bus.h"
 #include "controlplane.h"
 #include "globalbase.h"
@@ -25,43 +26,6 @@
 #include "report.h"
 #include "type.h"
 #include "worker_gc.h"
-
-enum class eConfigType
-{
-	port_rx_queue_size,
-	port_tx_queue_size,
-	ring_highPriority_size,
-	ring_normalPriority_size,
-	ring_lowPriority_size,
-	ring_toFreePackets_size,
-	ring_log_size,
-	fragmentation_size,
-	fragmentation_timeout_first,
-	fragmentation_timeout_last,
-	fragmentation_packets_per_flow,
-	stateful_firewall_udp_timeout,
-	stateful_firewall_tcp_timeout,
-	stateful_firewall_tcp_syn_timeout,
-	stateful_firewall_tcp_syn_ack_timeout,
-	stateful_firewall_tcp_fin_timeout,
-	stateful_firewall_other_protocols_timeout,
-	gc_step,
-	sample_gc_step,
-	acl_states4_ht_size,
-	acl_states6_ht_size,
-	master_mempool_size,
-	nat64stateful_states_size,
-	kernel_interface_queue_size,
-	balancer_state_ht_size,
-	tsc_active_state,
-	balancer_udp_timeout,
-	balancer_tcp_timeout,
-	balancer_tcp_syn_timeout,
-	balancer_tcp_syn_ack_timeout,
-	balancer_tcp_fin_timeout,
-	balancer_other_protocols_timeout,
-	neighbor_ht_size,
-};
 
 struct tDataPlaneConfig
 {
@@ -126,7 +90,7 @@ public:
 	void start();
 	void join();
 
-	uint64_t getConfigValue(const eConfigType& type) const;
+	const ConfigValues& getConfigValues() const { return configValues; }
 	std::map<std::string, common::uint64> getPortStats(const tPortId& portId) const;
 	std::optional<tPortId> interface_name_to_port_id(const std::string& interface_name);
 	const std::set<tSocketId>& get_socket_ids() const;
@@ -195,7 +159,7 @@ protected:
 	std::map<tSocketId, std::array<dataplane::globalBase::generation*, 2>> globalBases;
 	uint32_t globalBaseSerial;
 
-	std::map<eConfigType, uint64_t> configValues;
+	ConfigValues configValues;
 
 	std::map<std::string,
 	         std::tuple<int, ///< socket

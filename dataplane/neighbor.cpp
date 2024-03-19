@@ -203,7 +203,7 @@ eResult module::init(cDataPlane* dataplane)
 {
 	this->dataplane = dataplane;
 
-	auto ht_size = dataplane->getConfigValue(eConfigType::neighbor_ht_size);
+	auto ht_size = dataplane->getConfigValues().neighbor_ht_size;
 	generation_hashtable.fill([&](neighbor::generation_hashtable& hashtable) {
 		for (const auto socket_id : dataplane->get_socket_ids())
 		{
