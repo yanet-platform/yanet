@@ -1,11 +1,12 @@
 #pragma once
 
-#include<common/config.h>
+#include <cstdint>
 #include <nlohmann/json.hpp>
 
-#include <cstdint>
+#include "common/config.h"
 
-struct ConfigValues {
+struct ConfigValues
+{
 	uint64_t port_rx_queue_size = 4096;
 	uint64_t port_tx_queue_size = 4096;
 	uint64_t ring_highPriority_size = 64;
@@ -41,24 +42,19 @@ struct ConfigValues {
 	uint64_t neighbor_ht_size = 64 * 1024;
 };
 
-inline void from_json(const nlohmann::json& j, ConfigValues& cfg) {
-	#define from_json_if_exists(some_key) \
-	if (j.find(#some_key) != j.end()) {\
-		cfg.some_key = j[#some_key];\
-	};
-	#define from_json_dependent(specific_key, general_key) cfg.specific_key = j.value(#specific_key, cfg.general_key);
-
-	from_json_if_exists(port_rx_queue_size)
-	from_json_if_exists(port_tx_queue_size)
-	from_json_if_exists(ring_highPriority_size)
-	from_json_if_exists(ring_normalPriority_size)
-	from_json_if_exists(ring_lowPriority_size)
-	from_json_if_exists(ring_toFreePackets_size)
-	from_json_if_exists(ring_log_size)
-	from_json_if_exists(fragmentation_size)
-	from_json_if_exists(fragmentation_timeout_first)
-	from_json_if_exists(fragmentation_timeout_last)
-	from_json_if_exists(fragmentation_packets_per_flow)
+inline void from_json(const nlohmann::json& j, ConfigValues& cfg)
+{
+	cfg.port_rx_queue_size = j.value("port_rx_queue_size", cfg.port_rx_queue_size);
+	cfg.port_tx_queue_size = j.value("port_tx_queue_size", cfg.port_tx_queue_size);
+	cfg.ring_highPriority_size = j.value("ring_highPriority_size", cfg.ring_highPriority_size);
+	cfg.ring_normalPriority_size = j.value("ring_normalPriority_size", cfg.ring_normalPriority_size);
+	cfg.ring_lowPriority_size = j.value("ring_lowPriority_size", cfg.ring_lowPriority_size);
+	cfg.ring_toFreePackets_size = j.value("ring_toFreePackets_size", cfg.ring_toFreePackets_size);
+	cfg.ring_log_size = j.value("ring_log_size", cfg.ring_log_size);
+	cfg.fragmentation_size = j.value("fragmentation_size", cfg.fragmentation_size);
+	cfg.fragmentation_timeout_first = j.value("fragmentation_timeout_first", cfg.fragmentation_timeout_first);
+	cfg.fragmentation_timeout_last = j.value("fragmentation_timeout_last", cfg.fragmentation_timeout_last);
+	cfg.fragmentation_packets_per_flow = j.value("fragmentation_packets_per_flow", cfg.fragmentation_packets_per_flow);
 
 	{
 		/*
@@ -68,23 +64,23 @@ inline void from_json(const nlohmann::json& j, ConfigValues& cfg) {
 		  the last processed tcp session packet flags. So if any of flag-based
 		  options is ommitted the more common option should be applied.
 		*/
-		from_json_if_exists(stateful_firewall_tcp_timeout)
-		from_json_dependent(stateful_firewall_tcp_syn_timeout, stateful_firewall_tcp_timeout)
-		from_json_dependent(stateful_firewall_tcp_syn_ack_timeout, stateful_firewall_tcp_syn_timeout)
-		from_json_dependent(stateful_firewall_tcp_fin_timeout, stateful_firewall_tcp_timeout)
+		cfg.stateful_firewall_tcp_timeout = j.value("stateful_firewall_tcp_timeout", cfg.stateful_firewall_tcp_timeout);
+		cfg.stateful_firewall_tcp_syn_timeout = j.value("stateful_firewall_tcp_syn_timeout", cfg.stateful_firewall_tcp_timeout);
+		cfg.stateful_firewall_tcp_syn_ack_timeout = j.value("stateful_firewall_tcp_syn_ack_timeout", cfg.stateful_firewall_tcp_syn_timeout);
+		cfg.stateful_firewall_tcp_fin_timeout = j.value("stateful_firewall_tcp_fin_timeout", cfg.stateful_firewall_tcp_timeout);
 	}
 
-	from_json_if_exists(stateful_firewall_udp_timeout)
-	from_json_if_exists(stateful_firewall_other_protocols_timeout)
-	from_json_if_exists(gc_step)
-	from_json_if_exists(sample_gc_step)
-	from_json_if_exists(acl_states4_ht_size)
-	from_json_if_exists(acl_states6_ht_size)
-	from_json_if_exists(master_mempool_size)
-	from_json_if_exists(nat64stateful_states_size)
-	from_json_if_exists(kernel_interface_queue_size)
-	from_json_if_exists(balancer_state_ht_size)
-	from_json_if_exists(tsc_active_state)
+	cfg.stateful_firewall_udp_timeout = j.value("stateful_firewall_udp_timeout", cfg.stateful_firewall_udp_timeout);
+	cfg.stateful_firewall_other_protocols_timeout = j.value("stateful_firewall_other_protocols_timeout", cfg.stateful_firewall_other_protocols_timeout);
+	cfg.gc_step = j.value("gc_step", cfg.gc_step);
+	cfg.sample_gc_step = j.value("sample_gc_step", cfg.sample_gc_step);
+	cfg.acl_states4_ht_size = j.value("acl_states4_ht_size", cfg.acl_states4_ht_size);
+	cfg.acl_states6_ht_size = j.value("acl_states6_ht_size", cfg.acl_states6_ht_size);
+	cfg.master_mempool_size = j.value("master_mempool_size", cfg.master_mempool_size);
+	cfg.nat64stateful_states_size = j.value("nat64stateful_states_size", cfg.nat64stateful_states_size);
+	cfg.kernel_interface_queue_size = j.value("kernel_interface_queue_size", cfg.kernel_interface_queue_size);
+	cfg.balancer_state_ht_size = j.value("balancer_state_ht_size", cfg.balancer_state_ht_size);
+	cfg.tsc_active_state = j.value("tsc_active_state", cfg.tsc_active_state);
 
 	{
 		/*
@@ -94,17 +90,13 @@ inline void from_json(const nlohmann::json& j, ConfigValues& cfg) {
 		  the last processed tcp session packet flags. So if any of flag-based
 		  options is ommitted the more common option should be applied.
 		*/
-		from_json_if_exists(balancer_tcp_timeout)
-		from_json_dependent(balancer_tcp_syn_timeout, balancer_tcp_timeout)
-		from_json_dependent(balancer_tcp_syn_ack_timeout, balancer_tcp_syn_timeout)
-		from_json_dependent(balancer_tcp_fin_timeout, balancer_tcp_timeout)
+		cfg.balancer_tcp_timeout = j.value("balancer_tcp_timeout", cfg.balancer_tcp_timeout);
+		cfg.balancer_tcp_syn_timeout = j.value("balancer_tcp_syn_timeout", cfg.balancer_tcp_timeout);
+		cfg.balancer_tcp_syn_ack_timeout = j.value("balancer_tcp_syn_ack_timeout", cfg.balancer_tcp_syn_timeout);
+		cfg.balancer_tcp_fin_timeout = j.value("balancer_tcp_fin_timeout", cfg.balancer_tcp_timeout);
 	}
 
-	from_json_if_exists(balancer_udp_timeout)
-	from_json_if_exists(balancer_other_protocols_timeout)
-	from_json_if_exists(neighbor_ht_size)
-
-	#undef from_json_dependent
-	#undef from_json_if_exists
+	cfg.balancer_udp_timeout = j.value("balancer_udp_timeout", cfg.balancer_udp_timeout);
+	cfg.balancer_other_protocols_timeout = j.value("balancer_other_protocols_timeout", cfg.balancer_other_protocols_timeout);
+	cfg.neighbor_ht_size = j.value("neighbor_ht_size", cfg.neighbor_ht_size);
 }
-

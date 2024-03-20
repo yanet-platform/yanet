@@ -18,8 +18,8 @@
 #include "common/result.h"
 #include "common/type.h"
 
-#include "config_values.h"
 #include "bus.h"
+#include "config_values.h"
 #include "controlplane.h"
 #include "globalbase.h"
 #include "neighbor.h"
