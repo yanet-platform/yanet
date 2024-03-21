@@ -7,7 +7,6 @@ dependencies += dependency('gtest_main')
 
 sources = files('unittest.cpp',
                 'ip_address.cpp',
-                'lpm.cpp',
                 'hashtable.cpp')
 
 arch = 'corei7'
