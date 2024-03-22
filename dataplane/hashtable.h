@@ -15,6 +15,7 @@
 
 #include "common.h"
 
+#include "ext/city.h"
 #include "ext/murmurhash3.h"
 #include "ext/xxhash32.h"
 
@@ -71,6 +72,12 @@ template<typename key_t>
 inline uint32_t calculate_hash_xxh32(const key_t& key)
 {
 	return XXHash32::hash(&key, sizeof(key), 19);
+}
+
+template<typename key_t>
+inline uint32_t calculate_hash_city(const key_t& key)
+{
+	return CityHash32((char*)&key, sizeof(key));
 }
 
 class spinlock_t final

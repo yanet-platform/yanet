@@ -81,7 +81,7 @@ using wan_ht = hashtable_mod_spinlock_dynamic<nat64stateful_wan_key, nat64statef
 
 namespace balancer
 {
-using state_ht = hashtable_mod_spinlock_dynamic<balancer_state_key_t, balancer_state_value_t, 16>;
+using state_ht = hashtable_mod_spinlock_dynamic<balancer_state_key_t, balancer_state_value_t, 16, dataplane::calculate_hash_city<balancer_state_key_t>>;
 }
 
 class atomic
