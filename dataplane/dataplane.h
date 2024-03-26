@@ -52,7 +52,7 @@ struct tDataPlaneConfig
 	uint32_t SWNormalPriorityRateLimitPerWorker = 0;
 	uint32_t SWICMPOutRateLimit = 0;
 	uint32_t rateLimitDivisor = 1;
-	unsigned int memory = 0;
+	std::string memory;
 	std::map<std::string, std::tuple<unsigned int, unsigned int>> shared_memory;
 
 	std::vector<std::string> ealArgs;

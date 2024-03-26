@@ -1572,7 +1572,12 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 		}
 	}
 
-	config.memory = rootJson.value("memory", 0);
+	config.memory = std::to_string(rootJson.value("memory", 0));
+
+	if (rootJson.find("memory_numa") != rootJson.end())
+	{
+		config.memory = rootJson.find("memory_numa").value();
+	}
 
 	if (rootJson.find("sharedMemory") != rootJson.end())
 	{
@@ -1846,16 +1851,16 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 #endif
 	}
 
-	if (config.memory)
+	if (!config.memory.empty())
 	{
 		if (config.useHugeMem)
 		{
-			insert_eal_arg("--socket-mem=%u", config.memory);
-			insert_eal_arg("--socket-limit=%u", config.memory);
+			insert_eal_arg("--socket-mem=%s", config.memory.data());
+			insert_eal_arg("--socket-limit=%s", config.memory.data());
 		}
 		else
 		{
-			insert_eal_arg("-m %u", config.memory);
+			insert_eal_arg("-m %s", config.memory.data());
 		}
 	}
 
