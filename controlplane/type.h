@@ -44,6 +44,7 @@ namespace module
 class telegraf;
 class bus;
 class protoBus;
+class bird_t;
 }
 
 }
