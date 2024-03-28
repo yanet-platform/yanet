@@ -139,7 +139,9 @@ void unsafe()
 		       "fwsync_no_config_drops=%luu,"
 		       "repeat_ttl=%luu,"
 		       "acl_ingress_dropPackets=%luu,"
-		       "acl_egress_dropPackets=%luu\n",
+		       "acl_egress_dropPackets=%luu,"
+		       "log_drops=%luu,"
+		       "log_packets=%luu\n",
 		       coreId,
 		       iterations,
 		       stats.brokenPackets,
@@ -168,7 +170,9 @@ void unsafe()
 		       stats.fwsync_no_config_drops,
 		       stats.repeat_ttl,
 		       stats.acl_ingress_dropPackets,
-		       stats.acl_egress_dropPackets);
+		       stats.acl_egress_dropPackets,
+		       stats.logs_drops,
+		       stats.logs_packets);
 
 		for (const auto& [physicalPortName, stats] : ports_stats)
 		{
