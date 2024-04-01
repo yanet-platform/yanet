@@ -14,13 +14,48 @@
 namespace dataplane::base
 {
 
+class PortMapper
+{
+	static constexpr tPortId INVALID_PORT_ID = std::numeric_limits<tPortId>::max();
+	uint16_t ports_count_ = 0;
+	tPortId dpdk_ports_[std::numeric_limits<tPortId>::max() + 1] = {INVALID_PORT_ID}; // logical to dpdk
+	tPortId logical_ports_[std::numeric_limits<tPortId>::max() + 1] = {INVALID_PORT_ID}; // dpdk to logical
+public:
+	uint16_t size() const { return ports_count_; }
+	[[nodiscard]] std::optional<tPortId> Register(tPortId dpdk_port)
+	{
+		if (ports_count_ < CONFIG_YADECAP_PORTS_SIZE)
+		{
+			if (logical_ports_[dpdk_port] == INVALID_PORT_ID)
+			{
+				logical_ports_[dpdk_port] = ports_count_;
+				dpdk_ports_[ports_count_] = dpdk_port;
+				return std::optional<tPortId>{ports_count_++};
+			}
+			else
+			{
+				YANET_LOG_ERROR("Duplicate dpdk port id provided to PortMapper");
+				return {};
+			}
+		}
+		else
+		{
+			YANET_LOG_ERROR("CONFIG_YADECAP_PORTS_SIZE exceeded");
+			return {};
+		}
+	}
+	tPortId ToDpdk(tPortId logical) const { return dpdk_ports_[logical]; }
+	tPortId ToLogical(tPortId dpdk) const { return logical_ports_[dpdk]; }
+	bool ValidDpdk(tPortId dpdk) const { return logical_ports_[dpdk] != INVALID_PORT_ID; }
+	bool ValidLogical(tPortId logical) const { return logical < INVALID_PORT_ID; }
+};
+
 class permanently
 {
 public:
 	permanently() :
 	        globalBaseAtomic(nullptr),
 	        workerPortsCount(0),
-	        ports_count(0),
 	        nat64stateful_numa_mask(0xFFFFu),
 	        nat64stateful_numa_reverse_mask(0),
 	        nat64stateful_numa_id(0)
@@ -64,8 +99,7 @@ public:
 		tQueueId inQueueId;
 	} workerPorts[CONFIG_YADECAP_WORKER_PORTS_SIZE];
 
-	tPortId ports[CONFIG_YADECAP_PORTS_SIZE];
-	unsigned int ports_count;
+	PortMapper ports;
 	tQueueId outQueueId;
 
 	uint32_t SWNormalPriorityRateLimitPerWorker;
