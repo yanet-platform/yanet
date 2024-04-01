@@ -721,10 +721,10 @@ eResult cDataPlane::initWorkers()
 		dataplane::base::permanently basePermanently;
 		basePermanently.globalBaseAtomic = globalBaseAtomics[socket_id];
 		basePermanently.outQueueId = outQueueId; ///< 0
-		basePermanently.ports_count = 0;
 		for (const auto& portIter : ports)
 		{
-			basePermanently.ports[basePermanently.ports_count++] = portIter.first;
+			if (!basePermanently.ports.Register(portIter.first))
+				return eResult::invalidPortsCount;
 		}
 
 		basePermanently.SWNormalPriorityRateLimitPerWorker = config.SWNormalPriorityRateLimitPerWorker;
@@ -803,14 +803,14 @@ eResult cDataPlane::initWorkers()
 			basePermanently.nat64stateful_numa_id = rte_cpu_to_be_16(socket_id);
 		}
 
-		basePermanently.ports_count = 0;
 		for (const auto& [port_id, port] : ports)
 		{
 			const auto& [interface_name, rx_queues, tx_queues_count, mac_address, pci, symmetric_mode] = port;
 			(void)mac_address;
 			(void)pci;
 
-			basePermanently.ports[basePermanently.ports_count++] = port_id;
+			if (!basePermanently.ports.Register(port_id))
+				return eResult::invalidPortsCount;
 
 			if (exist(rx_queues, coreId))
 			{
