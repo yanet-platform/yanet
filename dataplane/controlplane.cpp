@@ -13,6 +13,7 @@
 #include "common/idp.h"
 #include "common/version.h"
 
+#include "burst.h"
 #include "checksum.h"
 #include "common.h"
 #include "controlplane.h"
@@ -37,28 +38,17 @@ cControlPlane::cControlPlane(cDataPlane* dataPlane) :
 
 cControlPlane::~cControlPlane()
 {
-	for (const auto& [port_id, kernel_interface] : kernel_interfaces)
+	if (use_kernel_interface)
 	{
-		const auto& interface_name = std::get<0>(kernel_interface);
-		remove_kernel_interface(port_id, interface_name);
-	}
-
-	for (const auto& [port_id, kernel_interface] : in_dump_kernel_interfaces)
-	{
-		const auto& interface_name = std::get<0>(kernel_interface);
-		remove_kernel_interface(port_id, interface_name);
-	}
-
-	for (const auto& [port_id, kernel_interface] : out_dump_kernel_interfaces)
-	{
-		const auto& interface_name = std::get<0>(kernel_interface);
-		remove_kernel_interface(port_id, interface_name);
-	}
-
-	for (const auto& [port_id, kernel_interface] : drop_dump_kernel_interfaces)
-	{
-		const auto& interface_name = std::get<0>(kernel_interface);
-		remove_kernel_interface(port_id, interface_name);
+		const auto& portmapper = slowWorker->basePermanently.ports;
+		for (tPortId i = 0; i < portmapper.size(); ++i)
+		{
+			const auto port_id = portmapper.ToDpdk(i);
+			remove_kernel_interface(port_id, kernel_interfaces[i].interface_name);
+			remove_kernel_interface(port_id, in_dump_kernel_interfaces[i].interface_name);
+			remove_kernel_interface(port_id, out_dump_kernel_interfaces[i].interface_name);
+			remove_kernel_interface(port_id, drop_dump_kernel_interfaces[i].interface_name);
+		}
 	}
 
 	if (mempool)
@@ -140,12 +130,12 @@ void cControlPlane::start()
 		return;
 	}
 
-	for (const auto& [port_id, kernel_interface] : kernel_interfaces)
+	if (use_kernel_interface)
 	{
-		(void)port_id;
-		const auto& interface_name = std::get<0>(kernel_interface);
-
-		set_kernel_interface_up(interface_name);
+		for (uint16_t i = 0; i < slowWorker->basePermanently.ports.size(); ++i)
+		{
+			set_kernel_interface_up(kernel_interfaces[i].interface_name);
+		}
 	}
 
 	mainThread();
@@ -478,21 +468,29 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 
 	common::idp::getControlPlanePortStats::response response;
 
+	const auto& portmapper = slowWorker->basePermanently.ports;
+
 	if (request.size())
 	{
 		for (const auto& portId : request)
 		{
-			/// @todo: check portId
-
-			const auto& port = kernel_interfaces.find(portId)->second;
-
-			const auto& stats = std::get<2>(port);
+			if ((!use_kernel_interface) || (!portmapper.ValidDpdk(portId)))
+			{
+				YANET_LOG_ERROR("Controlplane statistics requested for invalid port id ( %u )", portId);
+			}
+			const auto& stats = kernel_stats[portmapper.ToLogical(portId)];
 
 			uint64_t controlPlane_drops = 0;
 			for (const auto& [coreId, worker] : dataPlane->workers)
 			{
 				(void)coreId;
 
+				/* @todo This line assumes dpdk port id of a port is equal to logical id, and logical
+				 * ids of diferent workers are the same.
+				 * one can't just assume worker ports are enumerated identically.
+				 * Moreover indexing should be by logical id, inter worker communications
+				 * by dpdk portId's
+				 */
 				controlPlane_drops += worker->statsPorts[portId].controlPlane_drops;
 			}
 
@@ -509,27 +507,36 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 	else
 	{
 		/// all ports
-
-		for (const auto& [portId, port] : kernel_interfaces)
+		if (use_kernel_interface)
 		{
-			const auto& stats = std::get<2>(port);
-
-			uint64_t controlPlane_drops = 0;
-			for (const auto& [coreId, worker] : dataPlane->workers)
+			for (tPortId i = 0; i < portmapper.size(); ++i)
 			{
-				(void)coreId;
+				const auto& stats = kernel_stats[i];
+				const auto& portId = portmapper.ToDpdk(i);
 
-				controlPlane_drops += worker->statsPorts[portId].controlPlane_drops;
+				uint64_t controlPlane_drops = 0;
+				for (const auto& [coreId, worker] : dataPlane->workers)
+				{
+					(void)coreId;
+
+					/* @todo This line assumes dpdk port id of a port is equal to logical id, and logical
+					 * ids of diferent workers are the same.
+					 * one can't just assume worker ports are enumerated identically.
+					 * Moreover indexing should be by logical id, inter worker communications
+					 * by dpdk portId's
+					 */
+					controlPlane_drops += worker->statsPorts[portId].controlPlane_drops;
+				}
+
+				response[portId] = {stats.ipackets,
+				                    stats.ibytes,
+				                    0,
+				                    stats.idropped + controlPlane_drops,
+				                    stats.opackets,
+				                    stats.obytes,
+				                    0,
+				                    stats.odropped};
 			}
-
-			response[portId] = {stats.ipackets,
-			                    stats.ibytes,
-			                    0,
-			                    stats.idropped + controlPlane_drops,
-			                    stats.opackets,
-			                    stats.obytes,
-			                    0,
-			                    stats.odropped};
 		}
 	}
 
@@ -1399,9 +1406,11 @@ eResult cControlPlane::initMempool()
 
 eResult cControlPlane::init_kernel_interfaces()
 {
-	for (const auto& [port_id, port] : dataPlane->ports)
+	const auto& portmapper = slowWorker->basePermanently.ports;
+	for (tPortId i = 0; i < portmapper.size(); ++i)
 	{
-		const auto& interface_name = std::get<0>(port);
+		const auto port_id = portmapper.ToDpdk(i);
+		const auto& interface_name = std::get<0>(dataPlane->ports.at(port_id));
 
 		{
 			auto kernel_port_id = add_kernel_interface(port_id, interface_name);
@@ -1410,11 +1419,10 @@ eResult cControlPlane::init_kernel_interfaces()
 				return eResult::errorAllocatingKernelInterface;
 			}
 
-			kernel_interfaces[port_id] = {interface_name,
-			                              *kernel_port_id,
-			                              {},
-			                              {},
-			                              0};
+			kernel_interfaces[i] = {interface_name,
+			                        *kernel_port_id,
+			                        {},
+			                        {}};
 		}
 
 		{
@@ -1424,10 +1432,10 @@ eResult cControlPlane::init_kernel_interfaces()
 				return eResult::errorAllocatingKernelInterface;
 			}
 
-			in_dump_kernel_interfaces[port_id] = {"in." + interface_name,
-			                                      *kernel_port_id,
-			                                      {},
-			                                      0};
+			in_dump_kernel_interfaces[i] = {"in." + interface_name,
+			                                *kernel_port_id,
+			                                {},
+			                                {}};
 		}
 
 		{
@@ -1437,10 +1445,10 @@ eResult cControlPlane::init_kernel_interfaces()
 				return eResult::errorAllocatingKernelInterface;
 			}
 
-			out_dump_kernel_interfaces[port_id] = {"out." + interface_name,
-			                                       *kernel_port_id,
-			                                       {},
-			                                       0};
+			out_dump_kernel_interfaces[i] = {"out." + interface_name,
+			                                 *kernel_port_id,
+			                                 {},
+			                                 {}};
 		}
 
 		{
@@ -1450,10 +1458,10 @@ eResult cControlPlane::init_kernel_interfaces()
 				return eResult::errorAllocatingKernelInterface;
 			}
 
-			drop_dump_kernel_interfaces[port_id] = {"drop." + interface_name,
-			                                        *kernel_port_id,
-			                                        {},
-			                                        0};
+			drop_dump_kernel_interfaces[i] = {"drop." + interface_name,
+			                                  *kernel_port_id,
+			                                  {},
+			                                  {}};
 		}
 	}
 
@@ -1588,54 +1596,24 @@ void cControlPlane::set_kernel_interface_up(const std::string& interface_name)
 	ioctl(socket, SIOCSIFFLAGS, &request);
 }
 
-void cControlPlane::flush_kernel_interface(tPortId kernel_port_id,
-                                           sKniStats& stats,
-                                           rte_mbuf** mbufs,
-                                           uint32_t& count)
+void cControlPlane::flush_kernel_interface(KniPortData& port_data, sKniStats& stats)
 {
-	uint32_t packetsLength = 0;
 
-	for (uint16_t mbuf_i = 0; mbuf_i < count; mbuf_i++)
-	{
-		rte_mbuf* mbuf = mbufs[mbuf_i];
-		packetsLength += rte_pktmbuf_pkt_len(mbuf);
-	}
-
-	unsigned txSize = rte_eth_tx_burst(kernel_port_id, 0, mbufs, count);
-	for (uint16_t mbuf_i = txSize; mbuf_i < count; mbuf_i++)
-	{
-		rte_mbuf* mbuf = mbufs[mbuf_i];
-		packetsLength -= rte_pktmbuf_pkt_len(mbuf);
-		rte_pktmbuf_free(mbuf);
-	}
-
-	stats.idropped += count - txSize;
-	stats.ipackets += txSize;
-	stats.ibytes += packetsLength;
-	count = 0;
+	auto [packets, bytes] = port_data.burst
+	                                .TxTracked(port_data.kernel_port_id, 0);
+	stats.ipackets += packets;
+	stats.ibytes += bytes;
+	stats.idropped += port_data.burst.Free();
 }
 
-void cControlPlane::flush_kernel_interface(tPortId kernel_port_id,
-                                           rte_mbuf** mbufs,
-                                           uint32_t& count)
+void cControlPlane::flush_kernel_interface(KniPortData& port_data)
 {
-	if (!count)
-	{
-		return;
-	}
-
-	unsigned txSize = rte_eth_tx_burst(kernel_port_id, 0, mbufs, count);
-	for (uint16_t mbuf_i = txSize; mbuf_i < count; mbuf_i++)
-	{
-		rte_mbuf* mbuf = mbufs[mbuf_i];
-		rte_pktmbuf_free(mbuf);
-	}
-	count = 0;
+	port_data.burst.Tx(port_data.kernel_port_id, 0).Free();
 }
 
 void cControlPlane::mainThread()
 {
-	rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
+	dpdk::Burst operational;
 
 	for (;;)
 	{
@@ -1680,35 +1658,15 @@ void cControlPlane::mainThread()
 			ring_handle(worker->ring_toFreePackets, worker->ring_lowPriority);
 		}
 
-		for (auto& iter : kernel_interfaces)
+		if (use_kernel_interface)
 		{
-			auto& [interface_name, kernel_port_id, stats, mbufs, count] = iter.second;
-			(void)interface_name;
-			flush_kernel_interface(kernel_port_id, stats, mbufs.data(), count);
-		}
-		for (auto& [port_id, kernel_interface] : in_dump_kernel_interfaces)
-		{
-			auto& [interface_name, kernel_port_id, mbufs, count] = kernel_interface;
-			(void)port_id;
-			(void)interface_name;
-
-			flush_kernel_interface(kernel_port_id, mbufs.data(), count);
-		}
-		for (auto& [port_id, kernel_interface] : out_dump_kernel_interfaces)
-		{
-			auto& [interface_name, kernel_port_id, mbufs, count] = kernel_interface;
-			(void)port_id;
-			(void)interface_name;
-
-			flush_kernel_interface(kernel_port_id, mbufs.data(), count);
-		}
-		for (auto& [port_id, kernel_interface] : drop_dump_kernel_interfaces)
-		{
-			auto& [interface_name, kernel_port_id, mbufs, count] = kernel_interface;
-			(void)port_id;
-			(void)interface_name;
-
-			flush_kernel_interface(kernel_port_id, mbufs.data(), count);
+			for (int i = 0; i < slowWorker->basePermanently.ports.size(); ++i)
+			{
+				flush_kernel_interface(kernel_interfaces[i], kernel_stats[i]);
+				flush_kernel_interface(in_dump_kernel_interfaces[i]);
+				flush_kernel_interface(out_dump_kernel_interfaces[i]);
+				flush_kernel_interface(drop_dump_kernel_interfaces[i]);
+			}
 		}
 
 		/// dequeue packets from worker_gc's ring to slowworker
@@ -1740,68 +1698,30 @@ void cControlPlane::mainThread()
 		fragmentation.handle();
 		dregress.handle();
 
-		/// recv packets from kernel interface and send to physical port
-		for (auto& [port_id, kernel_interface] : kernel_interfaces)
+		if (use_kernel_interface)
 		{
-			auto kernel_port_id = std::get<1>(kernel_interface);
-
-			unsigned rxSize = rte_eth_rx_burst(kernel_port_id,
-			                                   0,
-			                                   mbufs,
-			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-			uint64_t bytes = 0;
-			for (uint16_t i = 0; i < rxSize; ++i)
+			/// recv packets from kernel interface and send to physical port
+			for (int i = 0; i < slowWorker->basePermanently.ports.size(); ++i)
 			{
-				bytes += rte_pktmbuf_pkt_len(mbufs[i]);
+				sKniStats& stats = kernel_stats[i];
+				auto [packets, bytes] = operational.Rx(kernel_interfaces[i].kernel_port_id, 0)
+				                                .TxTracked(slowWorker->basePermanently.ports.ToDpdk(i), 0);
+				stats.opackets += packets;
+				stats.obytes += bytes;
+				stats.odropped += operational.Free();
 			}
-			uint16_t txSize = rte_eth_tx_burst(port_id,
-			                                   0,
-			                                   mbufs,
-			                                   rxSize);
-			for (auto i = rxSize; i < txSize; ++i)
+
+			/// recv from in.X/out.X/drop.X interfaces and free packets
+			for (int i = 0; i < slowWorker->basePermanently.ports.size(); ++i)
 			{
-				bytes -= rte_pktmbuf_pkt_len(mbufs[i]);
+				auto recvfree = [&operational](KniPortData& pd) {
+					operational.Rx(pd.kernel_port_id, 0)
+					        .Free();
+				};
+				recvfree(in_dump_kernel_interfaces[i]);
+				recvfree(out_dump_kernel_interfaces[i]);
+				recvfree(drop_dump_kernel_interfaces[i]);
 			}
-			rte_pktmbuf_free_bulk(&mbufs[txSize], rxSize - txSize);
-			sKniStats& stats = std::get<2>(kernel_interfaces[port_id]);
-			stats.odropped += rxSize - txSize;
-			stats.opackets += txSize;
-			stats.obytes += bytes;
-		}
-
-		/// recv from in.X/out.X/drop.X interfaces and free packets
-		for (auto& [port_id, kernel_interface] : in_dump_kernel_interfaces)
-		{
-			auto kernel_port_id = std::get<1>(kernel_interface);
-			(void)port_id;
-
-			unsigned rxSize = rte_eth_rx_burst(kernel_port_id,
-			                                   0,
-			                                   mbufs,
-			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-			rte_pktmbuf_free_bulk(mbufs, rxSize);
-		}
-		for (auto& [port_id, kernel_interface] : out_dump_kernel_interfaces)
-		{
-			auto kernel_port_id = std::get<1>(kernel_interface);
-			(void)port_id;
-
-			unsigned rxSize = rte_eth_rx_burst(kernel_port_id,
-			                                   0,
-			                                   mbufs,
-			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-			rte_pktmbuf_free_bulk(mbufs, rxSize);
-		}
-		for (auto& [port_id, kernel_interface] : drop_dump_kernel_interfaces)
-		{
-			auto kernel_port_id = std::get<1>(kernel_interface);
-			(void)port_id;
-
-			unsigned rxSize = rte_eth_rx_burst(kernel_port_id,
-			                                   0,
-			                                   mbufs,
-			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-			rte_pktmbuf_free_bulk(mbufs, rxSize);
 		}
 
 		/// push packets to slow worker
@@ -1940,8 +1860,7 @@ void cControlPlane::handlePacketFromForwardingPlane(rte_mbuf* mbuf)
 
 #endif
 
-	auto iter = kernel_interfaces.find(metadata->fromPortId);
-	if (iter == kernel_interfaces.end())
+	if (!use_kernel_interface)
 	{
 		// TODO stats
 		unsigned txSize = rte_eth_tx_burst(metadata->fromPortId, 0, &mbuf, 1);
@@ -1951,13 +1870,16 @@ void cControlPlane::handlePacketFromForwardingPlane(rte_mbuf* mbuf)
 		}
 		return;
 	}
-
-	auto& [name, kernel_port_id, stats, mbufs, count] = iter->second;
-	(void)name;
-	mbufs[count++] = mbuf;
-	if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
+	else
 	{
-		flush_kernel_interface(kernel_port_id, stats, mbufs.data(), count);
+		const auto& portmapper = slowWorker->basePermanently.ports;
+
+		auto& iface = kernel_interfaces[portmapper.ToLogical(metadata->fromPortId)];
+		if (!iface.burst.Push(mbuf))
+		{
+			flush_kernel_interface(iface, kernel_stats[portmapper.ToLogical(metadata->fromPortId)]);
+			iface.burst.PushUnsafe(mbuf);
+		}
 	}
 }
 
@@ -3154,62 +3076,41 @@ void cControlPlane::handlePacket_dump(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
+	const auto& portmapper = slowWorker->basePermanently.ports;
+	if (!portmapper.ValidDpdk(metadata->flow.data.dump.id))
+	{
+		stats.unknown_dump_interface++;
+		rte_pktmbuf_free(mbuf);
+		return;
+	}
+	const auto local_port_id = portmapper.ToLogical(metadata->flow.data.dump.id);
+
 	if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_ingress)
 	{
-		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-		auto it = in_dump_kernel_interfaces.find(metadata->flow.data.dump.id);
-		if (it != in_dump_kernel_interfaces.end())
+		if (!in_dump_kernel_interfaces[local_port_id].burst.Push(mbuf))
 		{
-			auto& [interface_name, kernel_port_id, mbufs, count] = it->second;
-			(void)interface_name;
-
-			mbufs[count++] = mbuf;
-			if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
-			{
-				flush_kernel_interface(kernel_port_id, mbufs.data(), count);
-			}
-
-			return;
+			flush_kernel_interface(in_dump_kernel_interfaces[local_port_id]);
+			in_dump_kernel_interfaces[local_port_id].burst.PushUnsafe(mbuf);
 		}
+		return;
 	}
 	else if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_egress)
 	{
-		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-		auto it = out_dump_kernel_interfaces.find(metadata->flow.data.dump.id);
-		if (it != out_dump_kernel_interfaces.end())
+		if (!out_dump_kernel_interfaces[local_port_id].burst.Push(mbuf))
 		{
-			auto& [interface_name, kernel_port_id, mbufs, count] = it->second;
-			(void)interface_name;
-
-			mbufs[count++] = mbuf;
-			if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
-			{
-				flush_kernel_interface(kernel_port_id, mbufs.data(), count);
-			}
-
-			return;
+			flush_kernel_interface(out_dump_kernel_interfaces[local_port_id]);
+			out_dump_kernel_interfaces[local_port_id].burst.PushUnsafe(mbuf);
 		}
+		return;
 	}
 	else if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_drop)
 	{
-		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-		auto it = drop_dump_kernel_interfaces.find(metadata->flow.data.dump.id);
-		if (it != drop_dump_kernel_interfaces.end())
+		if (!drop_dump_kernel_interfaces[local_port_id].burst.Push(mbuf))
 		{
-			auto& [interface_name, kernel_port_id, mbufs, count] = it->second;
-			(void)interface_name;
-
-			mbufs[count++] = mbuf;
-			if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
-			{
-				flush_kernel_interface(kernel_port_id, mbufs.data(), count);
-			}
-
-			return;
+			flush_kernel_interface(drop_dump_kernel_interfaces[local_port_id]);
+			drop_dump_kernel_interfaces[local_port_id].burst.PushUnsafe(mbuf);
 		}
+		return;
 	}
 
 	stats.unknown_dump_interface++;
