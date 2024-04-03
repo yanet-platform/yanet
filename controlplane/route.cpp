@@ -949,6 +949,37 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 	compile(globalbase, generations.next());
 	compile_interface(globalbase, generations.next(), generations_neighbors.next());
+
+	/* makes sense to do this in reload(), as new vrf_name to vrf_id relation
+	   can be obtained only when config is updated */
+	common::idp::updateGlobalBase::logical_port_to_vrf_id_update::request logicalport_to_vrf_id_request;
+
+	for (const auto& [logicalPortName, logicalPort] : base_next.logicalPorts)
+	{
+		(void)logicalPortName;
+
+		uint32_t vrfId = 555;
+
+		if (logicalPort.vrf == "")
+		{
+			// evidently vrf name was absent in the config section - use default
+			vrfId = 0;
+		}
+		else if (vrf_map.count(logicalPort.vrf) != 0)
+		{
+			vrfId = vrf_map[logicalPort.vrf];
+		}
+		else
+		{
+			// creating new record in the map
+			vrfId = vrf_map.size();
+			vrf_map[logicalPort.vrf] = vrfId;
+		}
+
+		logicalport_to_vrf_id_request.emplace_back(std::tuple<uint32_t, uint32_t>(logicalPort.logicalPortId, vrfId));
+	}
+
+	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::logical_port_to_vrf_id_update, logicalport_to_vrf_id_request);
 }
 
 void route_t::reload_after()
@@ -966,7 +997,17 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 
 	for (auto& [vrf, priority_current_update] : prefixes)
 	{
-		(void)vrf; ///< @todo: VRF
+		uint32_t vrf_id;
+
+		if (vrf_map.count(vrf) == 0)
+		{
+			vrf_id = vrf_map.size();
+			vrf_map[vrf] = vrf_id;
+		}
+		else
+		{
+			vrf_id = vrf_map[vrf];
+		}
 
 		auto& [priority_current, update] = priority_current_update;
 
@@ -978,7 +1019,7 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 
 			for (const auto& update_prefix : update_prefixes)
 			{
-				lpm_remove.emplace_back(update_prefix);
+				lpm_remove.emplace_back(vrf_id, update_prefix);
 			}
 
 			if (lpm_remove.size())
@@ -997,8 +1038,8 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 				for (const auto& update_prefix : update_prefixes)
 				{
 					current.lookup_deep(update_prefix,
-					                    [&lpm_insert](const ip_prefix_t& prefix, const uint32_t& value_id) {
-						                    lpm_insert.emplace_back(prefix, value_id);
+					                    [&lpm_insert, vrf_id](const ip_prefix_t& prefix, const uint32_t& value_id) {
+						                    lpm_insert.emplace_back(vrf_id, prefix, value_id);
 					                    });
 				}
 			}
@@ -1032,7 +1073,16 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 
 	for (auto& [vrf, priority_current_update] : tunnel_prefixes)
 	{
-		(void)vrf; ///< @todo: VRF
+		uint32_t vrf_id;
+		if (vrf_map.count(vrf) == 0)
+		{
+			vrf_id = vrf_map.size();
+			vrf_map[vrf] = vrf_id;
+		}
+		else
+		{
+			vrf_id = vrf_map[vrf];
+		}
 
 		auto& [priority_current, update] = priority_current_update;
 
@@ -1044,7 +1094,7 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 
 			for (const auto& update_prefix : update_prefixes)
 			{
-				lpm_remove.emplace_back(update_prefix);
+				lpm_remove.emplace_back(vrf_id, update_prefix);
 			}
 
 			if (lpm_remove.size())
@@ -1063,8 +1113,8 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 				for (const auto& update_prefix : update_prefixes)
 				{
 					current.lookup_deep(update_prefix,
-					                    [&lpm_insert](const ip_prefix_t& prefix, const uint32_t& value_id) {
-						                    lpm_insert.emplace_back(prefix, value_id);
+					                    [&lpm_insert, vrf_id](const ip_prefix_t& prefix, const uint32_t& value_id) {
+						                    lpm_insert.emplace_back(vrf_id, prefix, value_id);
 					                    });
 				}
 			}

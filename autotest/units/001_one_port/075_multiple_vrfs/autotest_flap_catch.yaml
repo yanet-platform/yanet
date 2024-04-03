@@ -1,0 +1,39 @@
+steps:
+
+- cli: |
+    rib static insert default 0.0.0.0/0 200.0.2.1
+
+# add routes to vrf not used by any logical ports (yet)
+- echo: "9 add routes to vrf not used by any logical ports (yet)"
+- cli: |
+    rib static insert vrf4 7.7.7.7/32 200.0.2.2
+
+- cli: |
+    rib static insert vrf4 7.7.7.8/32 200.0.2.3
+
+- cli: |
+    rib static insert vrf4 7.7.7.0/24 200.0.2.1
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ----------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                  ::                 0                                 0    n/s          n/s
+    vrf4     10000     7.7.7.0/24  static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    vrf4     10000     7.7.7.7/32  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    vrf4     10000     7.7.7.8/32  static    ::                200.0.2.3         200.0.2.3          0                                 0    n/s          n/s
+
+
+# new config - new logical port 3 which uses already existing vrf4
+- echo: "10 new config - new logical port 3 which uses already existing vrf4"
+- reload: controlplane.3.conf
+
+# seems to solve flapping, apparently, neighbor_insert() is not done for 200.0.2.3 of the second table in time packet is received
+# only last packet might be missed (if sleep is removed), as neighbors  200.0.2.1 and 200.0.2.2 are present in the previous config
+#- sleep: 1 
+
+- sendPackets:
+  - port: kni0
+    send: 010-send.pcap
+    expect: 010-expect.pcap

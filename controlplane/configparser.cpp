@@ -228,6 +228,8 @@ void config_parser_t::loadConfig_logicalPort(controlplane::base_t& baseNext,
 		}
 	}
 
+	logicalPort.vrf = moduleJson.value("vrf", "");
+
 	logicalPort.nextModule = moduleJson.value("nextModule", "");
 
 	//

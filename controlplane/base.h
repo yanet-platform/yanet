@@ -35,6 +35,7 @@ public:
 	uint16_t vlanId;
 	mac_address_t macAddress;
 	uint8_t promiscuousMode;
+	std::string vrf;
 	std::string nextModule;
 	common::globalBase::tFlow flow;
 };

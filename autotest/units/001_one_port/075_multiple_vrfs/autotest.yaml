@@ -1,0 +1,378 @@
+steps:
+
+# for default vrf vlan 100
+- echo: "1 for default vrf vlan 100"
+- cli: |
+    rib static insert default 0.0.0.0/0 200.0.2.1
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix     protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ---------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0  static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     fe80::/64  static    ::                                  ::                 0                                 0    n/s          n/s
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+# for vrf1 vlan 101
+- echo: "2 for vrf1 vlan 101"
+- cli: |
+    rib static insert vrf1 0.0.0.0/0 200.0.2.2
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix     protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ---------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0  static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     fe80::/64  static    ::                                  ::                 0                                 0    n/s          n/s
+    vrf1     10000     0.0.0.0/0  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+
+# for vrf2 vlan 102
+- echo: "3 for vrf2 vlan 102"
+- cli: |
+    rib static insert vrf2 1.0.0.0/8 200.0.2.1
+
+- cli: |
+    rib static insert vrf2 1.1.0.0/16 200.0.2.2
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ----------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                  ::                 0                                 0    n/s          n/s
+    vrf1     10000     0.0.0.0/0   static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    vrf2     10000     1.0.0.0/8   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    vrf2     10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+
+# TODO: not quite interesting as vrf does not correpond to route module name (only records of default vrf are shown as of now)
+- cli_check: |
+    route lookup route0 1.0.0.0
+    ingress_physical_ports  prefix     nexthop    egress_interface  labels
+    ----------------------  ---------  ---------  ----------------  ------
+    kni0                    0.0.0.0/0  200.0.2.1  kni0.200          
+
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+
+# same vrf, more precise prefix with different nexthop (which correponds to another logical interface with different vlan and MAC)
+- echo: "4 same vrf, more precise prefix with different nexthop "
+- cli: |
+    rib static insert vrf2 1.0.0.0/16 200.0.2.2
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ----------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                  ::                 0                                 0    n/s          n/s
+    vrf1     10000     0.0.0.0/0   static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    vrf2     10000     1.0.0.0/8   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    vrf2     10000     1.0.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    vrf2     10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
+
+# another route in default vrf vlan 100
+- echo: "5 for vrf2 vlan 102"
+- cli: |
+    rib static insert default 1.1.0.0/16 200.0.2.2
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ----------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                  ::                 0                                 0    n/s          n/s
+    vrf1     10000     0.0.0.0/0   static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    vrf2     10000     1.0.0.0/8   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    vrf2     10000     1.0.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    vrf2     10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+
+- sendPackets:
+  - port: kni0
+    send: 005-send.pcap
+    expect: 005-expect.pcap
+
+# new config - logical port 2 is gone, logical port 3 now uses vrf1
+- echo: "6 new config - logical port 2 is gone, logical port 3 now uses vrf1"
+- reload: controlplane.2.conf
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ----------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                  ::                 0                                 0    n/s          n/s
+    vrf1     10000     0.0.0.0/0   static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    vrf2     10000     1.0.0.0/8   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    vrf2     10000     1.0.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    vrf2     10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+
+- sendPackets:
+  - port: kni0
+    send: 006-send.pcap
+    expect: 006-expect.pcap
+
+# clear some vrf2
+- cli: |
+    dontdoit podumoi controlplane rib clear static :: vrf2 10000
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ----------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                  ::                 0                                 0    n/s          n/s
+    vrf1     10000     0.0.0.0/0   static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+
+# remove route to nexthop 200.0.2.2 (through logical port with vlan 201 MAC 33) from vrf1
+- cli: |
+    dontdoit podumoi controlplane rib clear static :: vrf1 10000
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ----------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                  ::                 0                                 0    n/s          n/s
+
+# new nexthop 200.0.2.1 (through logical port with vlan 200 MAC 22) for vrf1 prefix 1.1.0.0/16
+- echo: "7 new nexthop 200.0.2.1 (through logical port with vlan 200 MAC 22) for vrf1 prefix 1.1.0.0/16"
+- cli: |
+    rib static insert vrf1 1.1.0.0/16 200.0.2.1
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ----------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                  ::                 0                                 0    n/s          n/s
+    vrf1     10000     1.1.0.0/16  static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+
+- sendPackets:
+  - port: kni0
+    send: 007-send.pcap
+    expect: 007-expect.pcap
+
+- echo: "8 vrf1 changed nexthop for 1.1.0.0/16 prefix"
+
+- cli: |
+    rib static remove vrf1 1.1.0.0/16 200.0.2.1
+
+- cli: |
+    rib static insert vrf1 1.1.0.0/16 200.0.2.2
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ----------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                  ::                 0                                 0    n/s          n/s
+    vrf1     10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+
+- sendPackets:
+  - port: kni0
+    send: 008-send.pcap
+    expect: 008-expect.pcap
+
+# add routes to vrf not used by any logical ports (yet)
+- echo: "9 add routes to vrf not used by any logical ports (yet)"
+- cli: |
+    rib static insert vrf4 7.7.7.7/32 200.0.2.2
+
+- cli: |
+    rib static insert vrf4 7.7.7.8/32 200.0.2.3
+
+- cli: |
+    rib static insert vrf4 7.7.7.0/24 200.0.2.1
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name  path_information  nexthop    labels  local_preference  aspath  origin  med  communities  large_communities
+    -------  --------  ----------  --------  ----  ----------  ----------------  ---------  ------  ----------------  ------  ------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    default  10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                  ::                 0                                 0    n/s          n/s
+    vrf1     10000     1.1.0.0/16  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    vrf4     10000     7.7.7.0/24  static    ::                200.0.2.1         200.0.2.1          0                                 0    n/s          n/s
+    vrf4     10000     7.7.7.7/32  static    ::                200.0.2.2         200.0.2.2          0                                 0    n/s          n/s
+    vrf4     10000     7.7.7.8/32  static    ::                200.0.2.3         200.0.2.3          0                                 0    n/s          n/s
+
+- sendPackets:
+  - port: kni0
+    send: 009-send.pcap
+    expect: 009-expect.pcap
+
+# new config - new logical port 3 which uses already existing vrf4
+- echo: "10 new config - new logical port 3 which uses already existing vrf4"
+- reload: controlplane.3.conf
+
+# seems to solve flapping, apparently, neighbor_insert() is not done for 200.0.2.3 of the second table in time packet is received
+# only last packet might be missed (if sleep is removed), as neighbors  200.0.2.1 and 200.0.2.2 are present in the previous config
+- sleep: 1 
+
+- sendPackets:
+  - port: kni0
+    send: 010-send.pcap
+    expect: 010-expect.pcap
+
+# introducing route tunnel
+- echo: "11 introducing route tunnel"
+- reload: controlplane.4.conf
+
+# this is neccessary for some reason as otherwise label 1100 will not get to route_tunnel_value_update()
+- cli: |
+    rib static insert vrf1 0.0.0.0/0 200.0.2.3
+# if default is used instead of vrf1, nexthop will be correctly chosen, but targetInterface (i.e. VLAN and MAC) might be wrong, even though it has no relation to found mexthop
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+      vrf: vrf1
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: "::"
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 200.0.2.3
+        prefix: 1.0.0.0/24
+        path_information: 200.0.2.3:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name     path_information  nexthop    labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----  -------------  ----------------  ---------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                   200.0.2.1         200.0.2.1          0                                     0    n/s          n/s
+    default  10000     1.1.0.0/16  static    ::                   200.0.2.2         200.0.2.2          0                                     0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                     ::                 0                                     0    n/s          n/s
+    vrf1     10000     0.0.0.0/0   static    ::                   200.0.2.3         200.0.2.3          0                                     0    n/s          n/s
+    vrf1     10000     1.0.0.0/24  autotest  ::    ipv4 mpls-vpn  200.0.2.3:10001   200.0.2.3  1100    0                         incomplete  0    n/s          13238:1:1
+    vrf1     10000     1.1.0.0/16  static    ::                   200.0.2.2         200.0.2.2          0                                     0    n/s          n/s
+    vrf4     10000     7.7.7.0/24  static    ::                   200.0.2.1         200.0.2.1          0                                     0    n/s          n/s
+    vrf4     10000     7.7.7.7/32  static    ::                   200.0.2.2         200.0.2.2          0                                     0    n/s          n/s
+    vrf4     10000     7.7.7.8/32  static    ::                   200.0.2.3         200.0.2.3          0                                     0    n/s          n/s
+
+# - cli_check: |
+#     route tunnel get route0 1.0.0.0/24
+#     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
+#     ----------------------  -----------  -----  ----------------  ----  ----------
+#     kni0                    200.0.2.3    1100   kni0.202                100.00
+
+- sendPackets:
+  - port: kni0
+    send: 011-send.pcap
+    expect: 011-expect.pcap
+
+# route tunnel for vrf4
+- cli: |
+    rib static insert vrf4 0.0.0.0/0 200.0.2.1
+# if default is used instead of vrf1, nexthop will be correctly chosen, but targetInterface (i.e. VLAN and MAC) might be wrong, even though it has no relation to found mexthop
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+      vrf: vrf4
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: "::"
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 200.0.2.1
+        prefix: 1.0.0.0/24
+        path_information: 200.0.2.1:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name     path_information  nexthop    labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----  -------------  ----------------  ---------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                   200.0.2.1         200.0.2.1          0                                     0    n/s          n/s
+    default  10000     1.1.0.0/16  static    ::                   200.0.2.2         200.0.2.2          0                                     0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                     ::                 0                                     0    n/s          n/s
+    vrf1     10000     0.0.0.0/0   static    ::                   200.0.2.3         200.0.2.3          0                                     0    n/s          n/s
+    vrf1     10000     1.0.0.0/24  autotest  ::    ipv4 mpls-vpn  200.0.2.3:10001   200.0.2.3  1100    0                         incomplete  0    n/s          13238:1:1
+    vrf1     10000     1.1.0.0/16  static    ::                   200.0.2.2         200.0.2.2          0                                     0    n/s          n/s
+    vrf4     10000     0.0.0.0/0   static    ::                   200.0.2.1         200.0.2.1          0                                     0    n/s          n/s
+    vrf4     10000     1.0.0.0/24  autotest  ::    ipv4 mpls-vpn  200.0.2.1:10001   200.0.2.1  1100    0                         incomplete  0    n/s          13238:1:1
+    vrf4     10000     7.7.7.0/24  static    ::                   200.0.2.1         200.0.2.1          0                                     0    n/s          n/s
+    vrf4     10000     7.7.7.7/32  static    ::                   200.0.2.2         200.0.2.2          0                                     0    n/s          n/s
+    vrf4     10000     7.7.7.8/32  static    ::                   200.0.2.3         200.0.2.3          0                                     0    n/s          n/s
+
+
+# restore logical port related to vrf4
+- reload: controlplane.5.conf
+
+- sendPackets:
+  - port: kni0
+    send: 012-send.pcap
+    expect: 012-expect.pcap
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+      vrf: vrf4
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: "::"
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 200.0.2.2
+        prefix: 1.0.0.1/32
+        path_information: 200.0.2.2:10001
+        labels:
+        - 1100
+
+- cli: |
+    rib static insert vrf4 0.0.0.0/0 200.0.2.2
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer  table_name     path_information  nexthop    labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----  -------------  ----------------  ---------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                   200.0.2.1         200.0.2.1          0                                     0    n/s          n/s
+    default  10000     1.1.0.0/16  static    ::                   200.0.2.2         200.0.2.2          0                                     0    n/s          n/s
+    default  10000     fe80::/64   static    ::                                     ::                 0                                     0    n/s          n/s
+    vrf1     10000     0.0.0.0/0   static    ::                   200.0.2.3         200.0.2.3          0                                     0    n/s          n/s
+    vrf1     10000     1.0.0.0/24  autotest  ::    ipv4 mpls-vpn  200.0.2.3:10001   200.0.2.3  1100    0                         incomplete  0    n/s          13238:1:1
+    vrf1     10000     1.1.0.0/16  static    ::                   200.0.2.2         200.0.2.2          0                                     0    n/s          n/s
+    vrf4     10000     0.0.0.0/0   static    ::                   200.0.2.1         200.0.2.1          0                                     0    n/s          n/s
+    vrf4     10000     0.0.0.0/0   static    ::                   200.0.2.2         200.0.2.2          0                                     0    n/s          n/s
+    vrf4     10000     1.0.0.0/24  autotest  ::    ipv4 mpls-vpn  200.0.2.1:10001   200.0.2.1  1100    0                         incomplete  0    n/s          13238:1:1
+    vrf4     10000     1.0.0.1/32  autotest  ::    ipv4 mpls-vpn  200.0.2.2:10001   200.0.2.2  1100    0                         incomplete  0    n/s          13238:1:1
+    vrf4     10000     7.7.7.0/24  static    ::                   200.0.2.1         200.0.2.1          0                                     0    n/s          n/s
+    vrf4     10000     7.7.7.7/32  static    ::                   200.0.2.2         200.0.2.2          0                                     0    n/s          n/s
+    vrf4     10000     7.7.7.8/32  static    ::                   200.0.2.3         200.0.2.3          0                                     0    n/s          n/s
+
+- sendPackets:
+  - port: kni0
+    send: 013-send.pcap
+    expect: 013-expect.pcap

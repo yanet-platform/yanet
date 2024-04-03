@@ -1156,6 +1156,8 @@ inline void cWorker::logicalPort_ingress_handle()
 		}
 
 		logicalPort_ingress_flow(mbuf, logicalPort.flow);
+
+		metadata->vrfId = logicalPort.vrfId;
 	}
 
 	logicalPort_ingress_stack.clear();
@@ -2222,9 +2224,9 @@ inline void cWorker::route_handle4()
 		route_ipv4_keys[mbuf_i] = ipv4Header->dst_addr;
 
 		calcHash(mbuf);
+		base.globalBase->route_lpm4[metadata->vrfId]->lookup(&route_ipv4_keys[mbuf_i], &route_ipv4_values[mbuf_i], 1);
 	}
 
-	base.globalBase->route_lpm4->lookup(route_ipv4_keys, route_ipv4_values, route_stack4.mbufsCount);
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_stack4.mbufsCount;
 	     mbuf_i++)
@@ -2342,9 +2344,9 @@ inline void cWorker::route_handle6()
 		rte_memcpy(route_ipv6_keys[mbuf_i].bytes, ipv6Header->dst_addr, 16);
 
 		calcHash(mbuf);
+		base.globalBase->route_lpm6[metadata->vrfId]->lookup(&route_ipv6_keys[mbuf_i], &route_ipv6_values[mbuf_i], 1);
 	}
 
-	base.globalBase->route_lpm6->lookup(route_ipv6_keys, route_ipv6_values, route_stack6.mbufsCount);
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_stack6.mbufsCount;
 	     mbuf_i++)
@@ -2548,9 +2550,9 @@ inline void cWorker::route_tunnel_handle4()
 
 		calcHash(mbuf);
 		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
+		base.globalBase->route_tunnel_lpm4[metadata->vrfId]->lookup(&route_ipv4_keys[mbuf_i], &route_ipv4_values[mbuf_i], 1);
 	}
 
-	base.globalBase->route_tunnel_lpm4->lookup(route_ipv4_keys, route_ipv4_values, route_tunnel_stack4.mbufsCount);
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_tunnel_stack4.mbufsCount;
 	     mbuf_i++)
@@ -2674,9 +2676,9 @@ inline void cWorker::route_tunnel_handle6()
 
 		calcHash(mbuf);
 		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
+		base.globalBase->route_tunnel_lpm6[metadata->vrfId]->lookup(&route_ipv6_keys[mbuf_i], &route_ipv6_values[mbuf_i], 1);
 	}
 
-	base.globalBase->route_tunnel_lpm6->lookup(route_ipv6_keys, route_ipv6_values, route_tunnel_stack6.mbufsCount);
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_tunnel_stack6.mbufsCount;
 	     mbuf_i++)
