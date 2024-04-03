@@ -89,7 +89,6 @@ protected:
 	unsigned ring_handle(rte_ring* ring_to_free_mbuf, rte_ring* ring);
 
 	void handlePacketFromForwardingPlane(rte_mbuf* mbuf); ///< @todo: rename
-	void handle_packet_from_kernel(rte_mbuf* mbuf);
 	void handlePacket_icmp_translate_v6_to_v4(rte_mbuf* mbuf);
 	void handlePacket_icmp_translate_v4_to_v6(rte_mbuf* mbuf);
 	void handlePacket_dregress(rte_mbuf* mbuf);
@@ -113,21 +112,13 @@ protected:
 
 	struct sKniStats
 	{
-		sKniStats()
-		{
-			memset(this, 0, sizeof(*this));
-		}
-
-		uint64_t ipackets;
-		uint64_t ibytes;
-		uint64_t idropped;
-		uint64_t opackets;
-		uint64_t obytes;
-		uint64_t odropped;
+		uint64_t ipackets = 0;
+		uint64_t ibytes = 0;
+		uint64_t idropped = 0;
+		uint64_t opackets = 0;
+		uint64_t obytes = 0;
+		uint64_t odropped = 0;
 	};
-
-	void flush_kernel_interface(tPortId kernel_port_id, sKniStats& stats, rte_mbuf** mbufs, uint32_t& count);
-	void flush_kernel_interface(tPortId kernel_port_id, rte_mbuf** mbufs, uint32_t& count);
 
 	cDataPlane* dataPlane;
 
@@ -142,34 +133,24 @@ protected:
 
 	rte_mempool* mempool;
 	bool use_kernel_interface;
-	std::map<tPortId,
-	         std::tuple<std::string, ///< interface_name
-	                    tPortId, ///< kernel_port_id
-	                    sKniStats,
-	                    std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>,
-	                    uint32_t>>
-	        kernel_interfaces;
 
-	std::map<tPortId,
-	         std::tuple<std::string, ///< interface_name
-	                    tPortId, ///< kernel_port_id
-	                    std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>,
-	                    uint32_t>>
-	        in_dump_kernel_interfaces;
+	struct KniPortData
+	{
+		std::string interface_name;
+		tPortId kernel_port_id;
+		sKniStats stats;
+		rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
+		uint16_t mbufs_count = 0;
+	};
 
-	std::map<tPortId,
-	         std::tuple<std::string, ///< interface_name
-	                    tPortId, ///< kernel_port_id
-	                    std::array<rte_mbuf*, CONFIG_YADECAP_MBUFS_BURST_SIZE>,
-	                    uint32_t>>
-	        out_dump_kernel_interfaces;
+	void flush_kernel_interface(KniPortData& port_data, sKniStats& stats);
+	void flush_kernel_interface(KniPortData& port_data);
 
-	std::map<tPortId,
-	         std::tuple<std::string, ///< interface_name
-	                    tPortId, ///< kernel_port_id
-	                    std::array<rte_mbuf*, 64 * CONFIG_YADECAP_MBUFS_BURST_SIZE>,
-	                    uint32_t>>
-	        drop_dump_kernel_interfaces;
+	std::array<sKniStats, CONFIG_YADECAP_PORTS_SIZE> kernel_stats;
+	std::array<KniPortData, CONFIG_YADECAP_PORTS_SIZE> kernel_interfaces;
+	std::array<KniPortData, CONFIG_YADECAP_PORTS_SIZE> in_dump_kernel_interfaces;
+	std::array<KniPortData, CONFIG_YADECAP_PORTS_SIZE> out_dump_kernel_interfaces;
+	std::array<KniPortData, CONFIG_YADECAP_PORTS_SIZE> drop_dump_kernel_interfaces;
 
 	common::slowworker::stats_t stats;
 	common::idp::getErrors::response errors; ///< @todo: class errorsManager

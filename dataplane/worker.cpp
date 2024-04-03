@@ -1078,6 +1078,7 @@ inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port
 
 					YADECAP_METADATA(mbuf_clone)->flow.type = common::globalBase::eFlowType::slowWorker_dump;
 					YADECAP_METADATA(mbuf_clone)->flow.data.dump.type = common::globalBase::dump_type_e::physicalPort_ingress;
+					// @todo check sanity, id is uint32_t and fromPortId is uint16_t
 					YADECAP_METADATA(mbuf_clone)->flow.data.dump.id = metadata->fromPortId;
 					slowWorker_entry_lowPriority(mbuf_clone);
 				}
