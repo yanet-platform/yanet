@@ -358,16 +358,16 @@ nlohmann::json cReport::convertControlPlane(const cControlPlane* controlPlane)
 
 	json["mempool"] = convertMempool(controlPlane->mempool);
 
-	for (const auto& iter : controlPlane->kernel_interfaces)
+	auto& portmapper = controlPlane->slowWorker->basePermanently.ports;
+	for (int i = 0; i < portmapper.size(); ++i)
 	{
 		nlohmann::json jsonKni;
 
-		const tPortId& portId = iter.first;
-		const std::string& name = std::get<0>(iter.second);
-		const cControlPlane::sKniStats& stats = std::get<2>(iter.second);
+		const auto& port = controlPlane->kernel_interfaces[i];
+		const auto& stats = port.stats;
 
-		jsonKni["portId"] = portId;
-		jsonKni["interfaceName"] = name;
+		jsonKni["portId"] = portmapper.ToDpdk(i);
+		jsonKni["interfaceName"] = port.interface_name;
 		jsonKni["stats"]["ipackets"] = stats.ipackets;
 		jsonKni["stats"]["ibytes"] = stats.ibytes;
 		jsonKni["stats"]["idropped"] = stats.idropped;
