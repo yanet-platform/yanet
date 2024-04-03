@@ -248,8 +248,6 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 							continue;
 						}
 
-						peer_id -= 10000;
-
 						if (override_length)
 						{
 							destination_interface_next[*override_length].emplace(nexthop, labels[0], peer_id, origin_as, weight);
@@ -636,7 +634,9 @@ common::icp::route_tunnel_lookup::response route_t::route_tunnel_lookup(const co
 							if (label != 3) ///< @todo: DEFINE
 							{
 								result_label = label;
-								result_peer = peers[peer_id];
+								/* raw number replaced string peers[peer_id]
+								   as peer_id has 10000 addend (unlike that from peers.conf) */
+								result_peer = std::to_string(peer_id);
 							}
 
 							result.emplace(ingress_physical_ports,
