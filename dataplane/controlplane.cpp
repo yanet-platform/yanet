@@ -1749,15 +1749,24 @@ void cControlPlane::mainThread()
 			                                   0,
 			                                   mbufs,
 			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
+			uint64_t bytes = 0;
+			for (uint16_t i = 0; i < rxSize; ++i)
 			{
-				rte_mbuf* mbuf = mbufs[mbuf_i];
-
-				dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-				metadata->fromPortId = port_id;
-
-				handle_packet_from_kernel(mbuf);
+				bytes += rte_pktmbuf_pkt_len(mbufs[i]);
 			}
+			uint16_t txSize = rte_eth_tx_burst(port_id,
+			                                   0,
+			                                   mbufs,
+			                                   rxSize);
+			for (auto i = rxSize; i < txSize; ++i)
+			{
+				bytes -= rte_pktmbuf_pkt_len(mbufs[i]);
+			}
+			rte_pktmbuf_free_bulk(&mbufs[txSize], rxSize - txSize);
+			sKniStats& stats = std::get<2>(kernel_interfaces[port_id]);
+			stats.odropped += rxSize - txSize;
+			stats.opackets += txSize;
+			stats.obytes += bytes;
 		}
 
 		/// recv from in.X/out.X/drop.X interfaces and free packets
@@ -1770,11 +1779,7 @@ void cControlPlane::mainThread()
 			                                   0,
 			                                   mbufs,
 			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
-			{
-				rte_mbuf* mbuf = mbufs[mbuf_i];
-				rte_pktmbuf_free(mbuf);
-			}
+			rte_pktmbuf_free_bulk(mbufs, rxSize);
 		}
 		for (auto& [port_id, kernel_interface] : out_dump_kernel_interfaces)
 		{
@@ -1785,11 +1790,7 @@ void cControlPlane::mainThread()
 			                                   0,
 			                                   mbufs,
 			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
-			{
-				rte_mbuf* mbuf = mbufs[mbuf_i];
-				rte_pktmbuf_free(mbuf);
-			}
+			rte_pktmbuf_free_bulk(mbufs, rxSize);
 		}
 		for (auto& [port_id, kernel_interface] : drop_dump_kernel_interfaces)
 		{
@@ -1800,11 +1801,7 @@ void cControlPlane::mainThread()
 			                                   0,
 			                                   mbufs,
 			                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
-			{
-				rte_mbuf* mbuf = mbufs[mbuf_i];
-				rte_pktmbuf_free(mbuf);
-			}
+			rte_pktmbuf_free_bulk(mbufs, rxSize);
 		}
 
 		/// push packets to slow worker
@@ -1961,30 +1958,6 @@ void cControlPlane::handlePacketFromForwardingPlane(rte_mbuf* mbuf)
 	if (count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
 	{
 		flush_kernel_interface(kernel_port_id, stats, mbufs.data(), count);
-	}
-}
-
-void cControlPlane::handle_packet_from_kernel(rte_mbuf* mbuf)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	sKniStats& stats = std::get<2>(kernel_interfaces[metadata->fromPortId]);
-
-	uint32_t packetLength = rte_pktmbuf_pkt_len(mbuf);
-
-	uint16_t txSize = rte_eth_tx_burst(metadata->fromPortId,
-	                                   0,
-	                                   &mbuf,
-	                                   1);
-	if (!txSize)
-	{
-		stats.odropped++;
-		rte_pktmbuf_free(mbuf);
-	}
-	else
-	{
-		stats.opackets++;
-		stats.obytes += packetLength;
 	}
 }
 
