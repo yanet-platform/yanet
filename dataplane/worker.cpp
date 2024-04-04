@@ -40,7 +40,6 @@ cWorker::cWorker(cDataPlane* dataPlane) :
         translation_packet_id(0),
         ring_highPriority(nullptr),
         ring_normalPriority(nullptr),
-        ring_lowPriority(nullptr),
         ring_toFreePackets(nullptr),
         ring_log(nullptr),
         packetsToSWNPRemainder(dataPlane->config.SWNormalPriorityRateLimitPerWorker)
@@ -64,11 +63,6 @@ cWorker::~cWorker()
 	if (ring_normalPriority)
 	{
 		rte_ring_free(ring_normalPriority);
-	}
-
-	if (ring_lowPriority)
-	{
-		rte_ring_free(ring_lowPriority);
 	}
 
 	if (ring_toFreePackets)
@@ -136,15 +130,6 @@ eResult cWorker::init(const tCoreId& coreId,
 	                                      socketId,
 	                                      RING_F_SP_ENQ | RING_F_SC_DEQ);
 	if (!ring_normalPriority)
-	{
-		return eResult::errorInitRing;
-	}
-
-	ring_lowPriority = rte_ring_create(("r_lp_" + std::to_string(coreId)).c_str(),
-	                                   dataPlane->getConfigValues().ring_lowPriority_size,
-	                                   socketId,
-	                                   RING_F_SP_ENQ | RING_F_SC_DEQ);
-	if (!ring_lowPriority)
 	{
 		return eResult::errorInitRing;
 	}
@@ -1062,26 +1047,11 @@ inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port
 
 		if (basePermanently.globalBaseAtomic->physicalPort_flags[metadata->fromPortId] & YANET_PHYSICALPORT_FLAG_IN_DUMP)
 		{
-			if (!rte_ring_full(ring_lowPriority))
-			{
-				rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
-				if (mbuf_clone)
-				{
-					*YADECAP_METADATA(mbuf_clone) = *YADECAP_METADATA(mbuf);
-
-					rte_memcpy(rte_pktmbuf_mtod(mbuf_clone, char*),
-					           rte_pktmbuf_mtod(mbuf, char*),
-					           mbuf->data_len);
-
-					mbuf_clone->data_len = mbuf->data_len;
-					mbuf_clone->pkt_len = mbuf->pkt_len;
-
-					YADECAP_METADATA(mbuf_clone)->flow.type = common::globalBase::eFlowType::slowWorker_dump;
-					YADECAP_METADATA(mbuf_clone)->flow.data.dump.type = common::globalBase::dump_type_e::physicalPort_ingress;
-					YADECAP_METADATA(mbuf_clone)->flow.data.dump.id = metadata->fromPortId;
-					slowWorker_entry_lowPriority(mbuf_clone);
-				}
-			}
+			YADECAP_METADATA(mbuf)->flow.type = common::globalBase::eFlowType::slowWorker_dump;
+			YADECAP_METADATA(mbuf)->flow.data.dump.type = common::globalBase::dump_type_e::physicalPort_ingress;
+			YADECAP_METADATA(mbuf)->flow.data.dump.id = metadata->fromPortId;
+			auto& ring = lowPriorityRing;
+			ring.write(mbuf, common::globalBase::eFlowType::slowWorker_dump);
 		}
 	}
 
@@ -1327,26 +1297,12 @@ inline void cWorker::logicalPort_egress_handle()
 
 		if (basePermanently.globalBaseAtomic->physicalPort_flags[logicalPort.portId] & YANET_PHYSICALPORT_FLAG_OUT_DUMP)
 		{
-			if (!rte_ring_full(ring_lowPriority))
-			{
-				rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
-				if (mbuf_clone)
-				{
-					*YADECAP_METADATA(mbuf_clone) = *YADECAP_METADATA(mbuf);
 
-					rte_memcpy(rte_pktmbuf_mtod(mbuf_clone, char*),
-					           rte_pktmbuf_mtod(mbuf, char*),
-					           mbuf->data_len);
-
-					mbuf_clone->data_len = mbuf->data_len;
-					mbuf_clone->pkt_len = mbuf->pkt_len;
-
-					YADECAP_METADATA(mbuf_clone)->flow.type = common::globalBase::eFlowType::slowWorker_dump;
-					YADECAP_METADATA(mbuf_clone)->flow.data.dump.type = common::globalBase::dump_type_e::physicalPort_egress;
-					YADECAP_METADATA(mbuf_clone)->flow.data.dump.id = logicalPort.portId;
-					slowWorker_entry_lowPriority(mbuf_clone);
-				}
-			}
+			YADECAP_METADATA(mbuf)->flow.type = common::globalBase::eFlowType::slowWorker_dump;
+			YADECAP_METADATA(mbuf)->flow.data.dump.type = common::globalBase::dump_type_e::physicalPort_egress;
+			YADECAP_METADATA(mbuf)->flow.data.dump.id = logicalPort.portId;
+			auto& ring = lowPriorityRing;
+			ring.write(mbuf, common::globalBase::eFlowType::slowWorker_dump);
 		}
 		if (rte_mbuf_refcnt_read(mbuf) < 1)
 		{
@@ -5798,26 +5754,11 @@ inline void cWorker::drop(rte_mbuf* mbuf)
 
 	if (basePermanently.globalBaseAtomic->physicalPort_flags[metadata->fromPortId] & YANET_PHYSICALPORT_FLAG_DROP_DUMP)
 	{
-		if (!rte_ring_full(ring_lowPriority))
-		{
-			rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
-			if (mbuf_clone)
-			{
-				*YADECAP_METADATA(mbuf_clone) = *YADECAP_METADATA(mbuf);
-
-				rte_memcpy(rte_pktmbuf_mtod(mbuf_clone, char*),
-				           rte_pktmbuf_mtod(mbuf, char*),
-				           mbuf->data_len);
-
-				mbuf_clone->data_len = mbuf->data_len;
-				mbuf_clone->pkt_len = mbuf->pkt_len;
-
-				YADECAP_METADATA(mbuf_clone)->flow.type = common::globalBase::eFlowType::slowWorker_dump;
-				YADECAP_METADATA(mbuf_clone)->flow.data.dump.type = common::globalBase::dump_type_e::physicalPort_drop;
-				YADECAP_METADATA(mbuf_clone)->flow.data.dump.id = metadata->fromPortId;
-				slowWorker_entry_lowPriority(mbuf_clone);
-			}
-		}
+		YADECAP_METADATA(mbuf)->flow.type = common::globalBase::eFlowType::slowWorker_dump;
+		YADECAP_METADATA(mbuf)->flow.data.dump.type = common::globalBase::dump_type_e::physicalPort_drop;
+		YADECAP_METADATA(mbuf)->flow.data.dump.id = metadata->fromPortId;;
+		auto& ring = lowPriorityRing;
+		ring.write(mbuf, common::globalBase::eFlowType::slowWorker_dump);
 	}
 
 	rte_pktmbuf_free(mbuf);
@@ -5881,21 +5822,6 @@ inline void cWorker::slowWorker_entry_normalPriority(rte_mbuf* mbuf,
 	else
 	{
 		stats.ring_normalPriority_packets++;
-	}
-}
-
-inline void cWorker::slowWorker_entry_lowPriority(rte_mbuf* mbuf)
-{
-	/// @todo: worker::tStack
-
-	if (rte_ring_sp_enqueue(ring_lowPriority, (void*)mbuf))
-	{
-		stats.ring_lowPriority_drops++;
-		rte_pktmbuf_free(mbuf);
-	}
-	else
-	{
-		stats.ring_lowPriority_packets++;
 	}
 }
 

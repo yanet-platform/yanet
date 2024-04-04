@@ -205,7 +205,6 @@ protected:
 
 	inline void slowWorker_entry_highPriority(rte_mbuf* mbuf, const common::globalBase::eFlowType& flowType); ///< @todo: DELETE and OPT
 	inline void slowWorker_entry_normalPriority(rte_mbuf* mbuf, const common::globalBase::eFlowType& flowType); ///< @todo: DELETE and OPT
-	inline void slowWorker_entry_lowPriority(rte_mbuf* mbuf); ///< @todo: DELETE and OPT
 
 	inline uint32_t get_tcp_state_timeout(uint8_t flags, const dataplane::globalBase::state_timeout_config_t& state_timeout_config);
 	inline uint32_t get_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, const dataplane::globalBase::state_timeout_config_t& state_timeout_config);
@@ -321,7 +320,6 @@ protected:
 
 	rte_ring* ring_highPriority;
 	rte_ring* ring_normalPriority;
-	rte_ring* ring_lowPriority;
 	dataplane::perf::tsc_deltas* tsc_deltas;
 	rte_ring* ring_toFreePackets;
 
@@ -337,6 +335,7 @@ protected:
 	int32_t packetsToSWNPRemainder;
 
 	sharedmemory::cSharedMemory dumpRings[YANET_CONFIG_SHARED_RINGS_NUMBER];
+	sharedmemory::cSharedMemory lowPriorityRing;
 
 	samples::Sampler sampler;
 

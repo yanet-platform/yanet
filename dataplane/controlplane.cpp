@@ -1674,11 +1674,6 @@ void cControlPlane::mainThread()
 				break;
 			}
 		}
-		for (const auto& iter : dataPlane->workers)
-		{
-			cWorker* worker = iter.second;
-			ring_handle(worker->ring_toFreePackets, worker->ring_lowPriority);
-		}
 
 		for (auto& iter : kernel_interfaces)
 		{
@@ -1892,10 +1887,6 @@ unsigned cControlPlane::ring_handle(rte_ring* ring_to_free_mbuf,
 		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_nat64stateless_egress_farm)
 		{
 			handlePacket_farm(mbuf);
-		}
-		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_dump)
-		{
-			handlePacket_dump(mbuf);
 		}
 		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_repeat)
 		{
