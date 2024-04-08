@@ -99,7 +99,7 @@ extern "C"
 //#define	YANET_DEBUG
 
 #ifdef YANET_DEBUG
-#include <stdio.h>
+#include <cstdio>
 
 extern int yanet_logfd;
 #define BP(fmt, ...)                                              \

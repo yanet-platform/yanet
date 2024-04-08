@@ -1,6 +1,6 @@
 #pragma once
 
-#include <inttypes.h>
+#include <cinttypes>
 
 #include <rte_icmp.h>
 #include <rte_ip.h>

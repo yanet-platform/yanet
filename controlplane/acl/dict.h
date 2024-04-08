@@ -7,7 +7,7 @@
 #include "rule.h"
 
 #ifdef ACL_DEBUG
-#include <stdio.h>
+#include <cstdio>
 #define debug(format...) printf(format)
 #else
 #define debug(format...)

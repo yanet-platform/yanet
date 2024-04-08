@@ -5,7 +5,7 @@
 //
 
 #pragma once
-#include <stdint.h> // for uint32_t and uint64_t
+#include <cstdint> // for uint32_t and uint64_t
 
 /// XXHash (32 bit), based on Yann Collet's descriptions, see http://cyan4973.github.io/xxHash/
 /** How to use:
