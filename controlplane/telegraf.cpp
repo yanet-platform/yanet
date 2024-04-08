@@ -1,5 +1,4 @@
 #include "telegraf.h"
-#include "common.h"
 #include "controlplane.h"
 
 using common::int64;
