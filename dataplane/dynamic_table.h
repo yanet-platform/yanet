@@ -1,6 +1,6 @@
 #pragma once
 
-#include <inttypes.h>
+#include <cinttypes>
 
 #include "common/config.h"
 #include "common/define.h"

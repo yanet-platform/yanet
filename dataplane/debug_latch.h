@@ -4,7 +4,7 @@
 
 #ifdef CONFIG_YADECAP_AUTOTEST
 
-#include <stdint.h>
+#include <cstdint>
 #include <unistd.h>
 
 #define LATCH_USLEEP_CYCLE 50

@@ -1,7 +1,7 @@
 #pragma once
 
+#include <cstdint>
 #include <memory.h>
-#include <stdint.h>
 
 #include <rte_byteorder.h>
 #include <rte_common.h>

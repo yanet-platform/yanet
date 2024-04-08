@@ -4,7 +4,7 @@
 #include <set>
 #include <unordered_map>
 
-#include <inttypes.h>
+#include <cinttypes>
 
 using tAclGroupId = uint32_t;
 

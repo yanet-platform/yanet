@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdint.h>
+#include <cstdint>
 
 #define SOCK_DEV_PREFIX "sock_dev:"
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <arpa/inet.h>
-#include <stdio.h>
+#include <cstdio>
 
 #include <rte_ether.h>
 #include <rte_hash_crc.h>
