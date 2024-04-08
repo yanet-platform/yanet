@@ -15,7 +15,6 @@
 #include "common/stream.h"
 
 #include "bus.h"
-#include "common.h"
 #include "controlplane.h"
 
 using controlplane::module::bus;

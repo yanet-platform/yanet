@@ -2,7 +2,6 @@
 
 #include "common/icp.h"
 
-#include "common.h"
 #include "module.h"
 
 namespace controlplane

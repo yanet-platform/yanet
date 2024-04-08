@@ -12,7 +12,6 @@
 #include "common/icp_proto.h"
 #include "libprotobuf/meta.pb.h"
 
-#include "common.h"
 #include "controlplane.h"
 #include "protobus.h"
 

@@ -4,8 +4,6 @@
 
 #include "common/type.h"
 
-#include "common.h"
-
 class cControlPlane;
 
 //

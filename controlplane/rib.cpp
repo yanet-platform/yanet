@@ -1,5 +1,4 @@
 #include "rib.h"
-#include "common.h"
 #include "controlplane.h"
 
 using namespace controlplane::module;
