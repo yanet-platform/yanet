@@ -1093,31 +1093,31 @@ inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port
 
 inline void cWorker::physicalPort_egress_handle()
 {
-	for (uint32_t portId_i = 0;
-	     portId_i < basePermanently.ports.size();
-	     portId_i++)
+	for (uint32_t i = 0;
+	     i < basePermanently.ports.size();
+	     i++)
 	{
-		const auto portId = basePermanently.ports.ToDpdk(portId_i);
-		if (unlikely(physicalPort_stack[portId].mbufsCount == 0))
+		const auto portId = basePermanently.ports.ToDpdk(i);
+		if (unlikely(physicalPort_stack[i].mbufsCount == 0))
 		{
 			continue;
 		}
 
 		uint16_t txSize = rte_eth_tx_burst(portId,
 		                                   basePermanently.outQueueId,
-		                                   physicalPort_stack[portId].mbufs,
-		                                   physicalPort_stack[portId].mbufsCount);
+		                                   physicalPort_stack[i].mbufs,
+		                                   physicalPort_stack[i].mbufsCount);
 
-		statsPorts[portId].physicalPort_egress_drops += physicalPort_stack[portId].mbufsCount - txSize;
+		statsPorts[i].physicalPort_egress_drops += physicalPort_stack[i].mbufsCount - txSize;
 
 		for (;
-		     txSize < physicalPort_stack[portId].mbufsCount;
+		     txSize < physicalPort_stack[i].mbufsCount;
 		     txSize++)
 		{
-			rte_pktmbuf_free(physicalPort_stack[portId].mbufs[txSize]);
+			rte_pktmbuf_free(physicalPort_stack[i].mbufs[txSize]);
 		}
 
-		physicalPort_stack[portId].clear();
+		physicalPort_stack[i].clear();
 	}
 }
 
@@ -1358,6 +1358,7 @@ inline void cWorker::logicalPort_egress_handle()
 #endif
 		}
 
+		// check sanity, logicalPort.portId seems not constant
 		physicalPort_stack[logicalPort.portId].insert(mbuf);
 	}
 
