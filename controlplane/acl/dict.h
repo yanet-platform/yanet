@@ -87,7 +87,7 @@ uint8_t mask_len(common::ipv6_address_t mask)
  * Each bit corresponds to rule
  * Size of all rulesets is the same and equals to number of rules in current config
  */
-typedef bitset_t ruleset_t;
+using ruleset_t = bitset_t;
 
 /*
  * mapping of prefix to ruleset

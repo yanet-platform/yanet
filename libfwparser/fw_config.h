@@ -28,18 +28,18 @@ namespace ipfw
 using string_ptr_t = std::unique_ptr<std::string>;
 
 // we keep list of config files that were opened and nesting level
-typedef struct fw_config_history
+using fw_config_history_t = struct fw_config_history
 {
 	string_ptr_t name;
 	size_t level;
-} fw_config_history_t;
+};
 
 // we keep track for various definitions
-typedef struct location_history
+using location_history_t = struct location_history
 {
 	size_t lineno; // line number in the config file
 	size_t fileno; // file number in the history
-} location_history_t;
+};
 
 using label_info_t = std::tuple<unsigned int, // ruleno
                                 location_history_t>;

@@ -2823,7 +2823,7 @@ using path_info_to_nexthop_stuff_ptr_t = std::unordered_map<std::string, ///< pa
 
 namespace acl
 {
-typedef std::map<tAclId, std::set<std::tuple<bool, std::string>>> iface_map_t; // true -> ingress
+using iface_map_t = std::map<tAclId, std::set<std::tuple<bool, std::string>>>; // true -> ingress
 }
 
 }

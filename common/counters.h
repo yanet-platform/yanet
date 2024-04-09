@@ -23,7 +23,7 @@ enum class real_counter : tCounterId
 	size
 };
 
-typedef real_counter gc_real_counter;
+using gc_real_counter = real_counter;
 
 }
 
