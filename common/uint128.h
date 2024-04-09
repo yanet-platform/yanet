@@ -5,7 +5,7 @@
 namespace common
 {
 
-typedef unsigned int uint128_t __attribute__((mode(TI)));
+using uint128_t = unsigned __int128 __attribute__((mode(TI)));
 
 inline namespace literals
 {

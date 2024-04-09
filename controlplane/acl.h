@@ -12,7 +12,7 @@ const uint32_t FW_GENRULES_START_ID = 0x3FFFFF;
 const uint32_t FW_STATES_START_ID = 0x0FFFFFF;
 const uint32_t FW_DISPATCHER_START_ID = 0x1FFFFFFF;
 
-typedef std::vector<uint32_t> ids_t;
+using ids_t = std::vector<uint32_t>;
 
 struct result_t
 {
