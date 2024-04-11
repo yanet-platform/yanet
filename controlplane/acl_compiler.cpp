@@ -1,5 +1,6 @@
 #include "acl_compiler.h"
 #include "acl_filter.h"
+#include <cstddef>
 
 using namespace acl;
 
@@ -101,7 +102,11 @@ void compiler_t::compile(const std::vector<rule_t>& unwind_rules,
 		result.acl_total_table.emplace_back(key, value);
 	}
 
-	result.acl_values.swap(value.vector);
+	result.acl_values.swap(value.values);
+	for (size_t i = 0; i < value.actions.size(); i++)
+	{
+		result.acl_value_actions[i].swap(value.actions[i]);
+	}
 
 	YANET_LOG_INFO("acl::compile: done\n");
 }
@@ -461,6 +466,16 @@ void compiler_t::total_table_compile()
 void compiler_t::value_compile()
 {
 	value.compile();
-	YANET_LOG_INFO("acl::compile: size: %lu\n",
-	               value.vector.size());
+
+	std::string actions_sizes;
+	for (size_t i = 0; i < value.actions.size(); i++)
+	{
+		if (!actions_sizes.empty())
+			actions_sizes += ", ";
+		actions_sizes += std::to_string(value.actions[i].size());
+	}
+
+	YANET_LOG_INFO("acl::compile: values size: %lu; actions size: [%s]\n",
+	               value.values.size(),
+	               actions_sizes.c_str());
 }

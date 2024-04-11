@@ -190,6 +190,22 @@ eResult generation::init()
 	}
 
 	{
+		for (size_t i = 0; i < YANET_CONFIG_ACL_VALUE_ACTIONS_SIZE; i++)
+		{
+			updater.acl.value_actions[i] = std::make_unique<acl::value_actions>("acl.value_actions",
+			                                                                    &dataPlane->memory_manager,
+			                                                                    socketId);
+			result = updater.acl.value_actions[i]->init();
+			if (result != eResult::success)
+			{
+				return result;
+			}
+
+			acl.value_actions[i] = updater.acl.value_actions[i]->pointer;
+		}
+	}
+
+	{
 		updater.route_lpm4 = std::make_unique<updater_lpm4_24bit_8bit>("route.v4.lpm",
 		                                                               &dataPlane->memory_manager,
 		                                                               socketId);
@@ -375,9 +391,13 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		{
 			result = acl_values(std::get<common::idp::updateGlobalBase::acl_values::request>(data));
 		}
-		else if (type == common::idp::updateGlobalBase::requestType::dump_tags_ids)
+		else if (type == common::idp::updateGlobalBase::requestType::acl_value_actions)
 		{
-			result = dump_tags_ids(std::get<common::idp::updateGlobalBase::dump_tags_ids::request>(data));
+			result = acl_value_actions(std::get<common::idp::updateGlobalBase::acl_value_actions::request>(data));
+		}
+		else if (type == common::idp::updateGlobalBase::requestType::action_tags_ids)
+		{
+			result = action_tags_ids(std::get<common::idp::updateGlobalBase::action_tags_ids::request>(data));
 		}
 		else if (type == common::idp::updateGlobalBase::requestType::dregress_prefix_update)
 		{
@@ -2319,16 +2339,42 @@ eResult generation::acl_values(const common::idp::updateGlobalBase::acl_values::
 	return eResult::success;
 }
 
-eResult generation::dump_tags_ids(const common::idp::updateGlobalBase::dump_tags_ids::request& request)
+eResult generation::acl_value_actions(const common::idp::updateGlobalBase::acl_value_actions::request& request)
 {
-	memset(dump_id_to_tag, -1, sizeof(dump_id_to_tag));
+	using namespace common::globalBase;
 
-	for (size_t i = 0; i < request.size(); i++)
+	eResult result = eResult::success;
+
+	for (size_t i = 0; i < YANET_CONFIG_ACL_VALUE_ACTIONS_SIZE; i++)
 	{
-		auto it = dataPlane->tag_to_id.find(request[i]);
+		result = updater.acl.value_actions[i]->create(request[i].size());
+		if (result != eResult::success)
+		{
+			YANET_LOG_ERROR("acl.value_actions[%s].create(): %s\n", eActionType_to_str(eActionType(i)), result_to_c_str(result));
+			return result;
+		}
+
+		acl.value_actions[i] = updater.acl.value_actions[i]->pointer;
+
+		std::copy(request[i].begin(), request[i].end(), acl.value_actions[i]);
+	}
+	return eResult::success;
+}
+
+eResult generation::action_tags_ids(const common::idp::updateGlobalBase::action_tags_ids::request& request)
+{
+	// NOTE: so far, only 'dump' is being processed here,
+	// the processing of the rest actions will be added later
+	memset(dump_id_to_ring_id, -1, sizeof(dump_id_to_ring_id));
+
+	auto dump_request = request[int(common::globalBase::eActionType::dump)];
+
+	for (size_t i = 0; i < dump_request.size(); i++)
+	{
+		auto it = dataPlane->tag_to_id.find(dump_request[i]);
 		if (it != dataPlane->tag_to_id.end())
 		{
-			dump_id_to_tag[i + 1] = it->second;
+			dump_id_to_ring_id[i + 1] = it->second;
 		}
 	}
 

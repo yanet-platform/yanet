@@ -2138,6 +2138,46 @@ enum class eNexthopType : unsigned int
 	repeat,
 };
 
+enum class eActionType : uint8_t
+{
+	dump,
+	count,
+	// size should always be at the bottom of the list,
+	// this enum allows us to find out the size of the enum list
+	size
+};
+
+inline constexpr size_t eActionType_max_size(eActionType t)
+{
+	switch (t)
+	{
+		case eActionType::dump:
+			return 8;
+		case eActionType::count:
+			return 16;
+		case eActionType::size:
+			// keep the maximum value of the above values here
+			return 16;
+	};
+
+	return 0;
+}
+
+inline const char* eActionType_to_str(eActionType t)
+{
+	switch (t)
+	{
+		case eActionType::dump:
+			return "dump";
+		case eActionType::count:
+			return "count";
+		case eActionType::size:
+			return "unknown";
+	};
+
+	return "unknown";
+}
+
 enum class eFlowType : uint8_t
 {
 	drop,
@@ -2403,6 +2443,58 @@ public:
 	};
 
 	flow_data_t data;
+};
+
+template<typename type_t>
+class tActions
+{
+public:
+	tActions()
+	{
+	}
+
+	inline bool operator==(const tActions& second) const
+	{
+		return item == second.item;
+	}
+
+	inline bool operator!=(const tActions& second) const
+	{
+		return !operator==(second);
+	}
+
+	inline bool operator<(const tActions& second) const
+	{
+		return item < second.item;
+	}
+
+	inline type_t& operator[](const int i)
+	{
+		return item[i];
+	}
+
+	inline const type_t& operator[](const int i) const
+	{
+		return item[i];
+	}
+
+	constexpr size_t size()
+	{
+		return item.size();
+	}
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(item);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(item);
+	}
+
+private:
+	std::array<type_t, YANET_CONFIG_ACL_VALUE_ACTIONS_SIZE> item;
 };
 
 static_assert(YANET_CONFIG_ACL_COUNTERS_SIZE < (1 << 22));
@@ -2824,6 +2916,7 @@ using path_info_to_nexthop_stuff_ptr_t = std::unordered_map<std::string, ///< pa
 namespace acl
 {
 typedef std::map<tAclId, std::set<std::tuple<bool, std::string>>> iface_map_t; // true -> ingress
+typedef std::array<uint32_t, eActionType_max_size(globalBase::eActionType::size)> action_array_t;
 }
 
 }

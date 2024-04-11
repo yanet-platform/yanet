@@ -92,6 +92,7 @@
 
 %token <std::string>            LABEL MACRO MACRODEF TOKEN ALGO_NAME FQDN
                                 SOCKADDR4 IP6SCOPIED REDPARAM COMMENT TABLENAME
+								DUMP_LABEL COUNT_LABEL
 
 %token <int64_t>                HEXMASK MASKLEN BWBS BWBTS BWKBS BWKBTS BWMBS
                                 BWMBTS SIZEK NUMBER
@@ -129,7 +130,7 @@
 		NOTCHAR LOOKUP UID RULENUM OBRACE EBRACE LBRACE RBRACE
 		SRCPRJID DSTPRJID RED ALL LMAX DSTIP6 SRCIP6 TCPSETMSS
 		NAT64CLAT NAT64LSN NAT64STL NPTV6 SRCADDR QM DSTADDR
-		SRCPORT DSTPORT SRCIP DSTIP EQUAL COMMA MINUS EOL M4LQ M4RQ DUMP
+		SRCPORT DSTPORT SRCIP DSTIP EQUAL COMMA MINUS EOL M4LQ M4RQ
 
 // QUEUE could be an argument to *MASK
 %precedence	QUEUE
@@ -499,9 +500,16 @@ action:
 		cfg.set_rule_action(rule_action_t::DENY);
 	}
 	|
-	DUMP dump_tag
+	DUMP_LABEL
 	{
 		cfg.set_rule_action(rule_action_t::DUMP);
+		cfg.set_rule_action_arg($1);
+	}
+	|
+	COUNT_LABEL
+	{
+		cfg.set_rule_action(rule_action_t::COUNT);
+		cfg.set_rule_action_arg($1);
 	}
 	|
 	T_REJECT
@@ -2028,17 +2036,6 @@ nptv6config:
 	nptv6token
 	|
 	nptv6config nptv6token
-	;
-dump_tag:
-	TOKEN
-	{
-	cfg.set_dump_action_arg($1);
-	}
-	|
-	NUMBER
-	{
-	cfg.set_dump_action_arg($1);
-	}
 	;
 nptv6token:
 	INT_PREFIX NETWORK6

@@ -10,19 +10,30 @@ value_t::value_t()
 
 void value_t::clear()
 {
-	vector.clear();
+	values.clear();
 	filters.clear();
 	filter_ids.clear();
+
+	for (size_t i = 0; i < actions.size(); i++)
+	{
+		actions[i].clear();
+		action_ids[i].clear();
+	}
 
 	{
 		/// @todo: find default_flow
 		common::globalBase::flow_t default_flow;
 		default_flow.type = common::globalBase::eFlowType::drop;
 		collect({default_flow});
+
+		for (size_t i = 0; i < actions.size(); i++)
+		{
+			collect(action_ids_array(action_t(i)));
+		}
 	}
 }
 
-unsigned int value_t::collect(const filter& filter)
+unsigned int value_t::collect(const value_filter& filter)
 {
 	auto it = filter_ids.find(filter);
 	if (it == filter_ids.end())
@@ -54,30 +65,52 @@ unsigned int value_t::collect(const tAclGroupId prev_id, const tAclGroupId id)
 	return ret;
 }
 
+uint32_t value_t::collect(const action_ids_array& ids)
+{
+	const auto action = uint8_t(ids.action);
+
+	auto it = action_ids[action].find(ids.values);
+	if (it == action_ids[action].end())
+	{
+		actions[action].emplace_back(ids.values);
+		it = action_ids[action].emplace_hint(it, ids.values, action_ids[action].size());
+	}
+
+	return it->second;
+}
+
 void value_t::compile()
 {
 	for (const auto& filter : filters)
 	{
-		int dumps_counter = 0;
 		common::acl::value_t value;
+		common::globalBase::tActions<action_ids_array> value_actions;
+		for (size_t i = 0; i < value_actions.size(); i++)
+		{
+			value_actions[i] = action_ids_array(action_t(i));
+		}
+
 		for (const auto& it : filter)
 		{
 			if (auto action = std::get_if<common::acl::action_t>(&it))
 			{
-				if (dumps_counter >= YANET_CONFIG_DUMP_ID_SIZE ||
-				    action->dump_id >= YANET_CONFIG_DUMP_ID_TO_TAG_SIZE)
+				if (action->type < action_t::size)
 				{
-					continue;
+					value_actions[int(action->type)].add(action->id);
 				}
-				value.dump_ids[dumps_counter] = action->dump_id;
-				dumps_counter++;
 			}
 			else
 			{
 				value.flow = std::get<common::globalBase::tFlow>(it);
+				break;
 			}
 		}
 
-		vector.emplace_back(std::move(value));
+		for (size_t i = 0; i < value.actions.size(); i++)
+		{
+			value.actions[i] = collect(value_actions[i]);
+		}
+
+		values.emplace_back(std::move(value));
 	}
 }

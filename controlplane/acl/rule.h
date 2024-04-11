@@ -1099,8 +1099,17 @@ struct rule_t
 				action = DISPATCHER;
 				break;
 			case ipfw::rule_action_t::DUMP:
-				action = common::acl::action_t(std::get<std::string>(rulep->action_arg));
+				action = common::acl::action_t(common::globalBase::eActionType::dump, std::get<std::string>(rulep->action_arg));
 				break;
+			case ipfw::rule_action_t::COUNT:
+				if (std::holds_alternative<std::string>(rulep->action_arg))
+				{
+					action = common::acl::action_t(common::globalBase::eActionType::count, std::get<std::string>(rulep->action_arg));
+					break;
+				}
+				// the classic IPFW rules 'add count from <src> to <dst>' are not supported
+				// in YANET, so we treat them as unsupported
+				[[fallthrough]];
 			default:
 				YANET_LOG_WARNING("unexpected rule action in rule '%s'\n", rulep->text.data());
 				return;
@@ -1169,9 +1178,9 @@ struct rule_t
 		else if (std::holds_alternative<common::acl::action_t>(action))
 		{
 			auto rule_action = std::get<common::acl::action_t>(action);
-			if (!rule_action.dump_tag.empty())
+			if (!rule_action.tag.empty())
 			{
-				text = "dump(" + rule_action.dump_tag + ")";
+				text = rule_action.to_string();
 			}
 		}
 		else
@@ -1344,7 +1353,8 @@ struct hash<acl::rule_t>
 		else
 		{
 			auto action = std::get<common::acl::action_t>(r.action);
-			hash_combine(h, action.dump_id);
+			// кажется тут бага
+			hash_combine(h, 2, (uint64_t(action.type) << 32) & action.id);
 		}
 		if (r.filter)
 		{

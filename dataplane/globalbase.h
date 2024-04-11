@@ -71,6 +71,7 @@ using transport_layers = dataplane::updater_array<transport_layer_t>;
 using transport_table = dataplane::updater_hashtable_mod_id32<common::acl::transport_key_t, 16>;
 using total_table = dataplane::updater_hashtable_mod_id32<common::acl::total_key_t, 16>;
 using values = dataplane::updater_array<common::acl::value_t>;
+using value_actions = dataplane::updater_array<common::acl::action_array_t>;
 }
 
 namespace nat64stateful
@@ -174,7 +175,8 @@ protected:
 	eResult acl_transport_table(const common::idp::updateGlobalBase::acl_transport_table::request& request);
 	eResult acl_total_table(const common::idp::updateGlobalBase::acl_total_table::request& request);
 	eResult acl_values(const common::idp::updateGlobalBase::acl_values::request& request);
-	eResult dump_tags_ids(const common::idp::updateGlobalBase::dump_tags_ids::request& request);
+	eResult acl_value_actions(const common::idp::updateGlobalBase::acl_value_actions::request& request);
+	eResult action_tags_ids(const common::idp::updateGlobalBase::action_tags_ids::request& request);
 	eResult dregress_prefix_update(const common::idp::updateGlobalBase::dregress_prefix_update::request& request);
 	eResult dregress_prefix_remove(const common::idp::updateGlobalBase::dregress_prefix_remove::request& request);
 	eResult dregress_prefix_clear();
@@ -207,6 +209,7 @@ public: ///< @todo
 			std::unique_ptr<acl::transport_table> transport_table;
 			std::unique_ptr<acl::total_table> total_table;
 			std::unique_ptr<acl::values> values;
+			std::unique_ptr<acl::value_actions> value_actions[YANET_CONFIG_ACL_VALUE_ACTIONS_SIZE];
 		} acl;
 
 		std::unique_ptr<updater_lpm4_24bit_8bit> route_lpm4;
@@ -288,6 +291,7 @@ public: ///< @todo
 		acl::transport_table::object_type* transport_table;
 		acl::total_table::object_type* total_table;
 		acl::values::object_type* values;
+		acl::value_actions::object_type* value_actions[YANET_CONFIG_ACL_VALUE_ACTIONS_SIZE];
 	} acl;
 
 	YADECAP_CACHE_ALIGNED(align5);
@@ -311,7 +315,9 @@ public: ///< @todo
 	uint32_t balancer_service_ring_id;
 	balancer_service_ring_t balancer_service_rings[2];
 
-	int64_t dump_id_to_tag[YANET_CONFIG_DUMP_ID_TO_TAG_SIZE];
+	int64_t dump_id_to_ring_id[YANET_CONFIG_ACTION_ID_TO_TAG_SIZE];
+
+	// int32_t action_id_to_tag[YANET_CONFIG_ACL_VALUE_ACTIONS_SIZE][YANET_CONFIG_ACTION_ID_TO_TAG_SIZE];
 
 	bool tscs_active;
 	dataplane::perf::tsc_base_values tsc_base_values;

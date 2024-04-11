@@ -27,6 +27,7 @@ struct result_t
 	std::vector<common::idp::updateGlobalBase::acl_transport_table::request> acl_transport_tables;
 	common::idp::updateGlobalBase::acl_total_table::request acl_total_table;
 	common::idp::updateGlobalBase::acl_values::request acl_values;
+	common::idp::updateGlobalBase::acl_value_actions::request acl_value_actions;
 
 	std::vector<ids_t> ids_map;
 	std::vector<acl::rule_info_t> dispatcher;
@@ -35,8 +36,8 @@ struct result_t
 	std::map<std::string, tAclId> out_iface_map;
 	std::map<tAclId, std::set<tAclId>> acl_map;
 
-	std::vector<std::string> dump_id_to_tag;
-	std::map<std::string, uint32_t> tag_to_dump_id;
+	common::globalBase::tActions<std::vector<std::string>> action_id_to_tag;
+	common::globalBase::tActions<std::map<std::string, uint32_t>> tag_to_action_id;
 };
 
 iface_map_t ifaceMapping(std::map<std::string, controlplane::base::logical_port_t> logicalPorts,

@@ -468,7 +468,7 @@ public:
 	std::vector<acl::rule_info_t> dispatcher;
 	acl::iface_map_t iface_map;
 	acl::iface_map_t result_iface_map;
-	std::vector<std::string> dump_id_to_tag;
+	common::idp::updateGlobalBase::action_tags_ids::request action_id_to_tag;
 	std::map<unsigned int, std::string> logicalport_id_to_name;
 	bool storeSamples;
 	uint32_t serial;

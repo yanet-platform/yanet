@@ -764,19 +764,6 @@ void fw_config_t::set_rule_action_arg(const rule_t::action_arg_t& a)
 	}
 }
 
-void fw_config_t::set_dump_action_arg(const rule_t::action_arg_t& a)
-{
-	FW_CONF_DEBUG("index() = " << a.index());
-	if (std::holds_alternative<int64_t>(a))
-	{
-		m_curr_rule->action_arg = std::to_string(std::get<int64_t>(a));
-	}
-	else
-	{
-		m_curr_rule->action_arg = a;
-	}
-}
-
 void fw_config_t::add_rule_ports(const rule_t::ports_arg_t& ports)
 {
 	FW_CONF_DEBUG("index() = " << ports.index());

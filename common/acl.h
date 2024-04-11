@@ -118,21 +118,25 @@ struct transport_key_t
 // shouldn't be stored in common::globalBase::tFlow
 class action_t
 {
+	using action = globalBase::eActionType;
+
 public:
 	action_t() :
-	        dump_id(0),
-	        dump_tag("")
+	        type(action::size),
+	        id(0),
+	        tag("")
 	{}
 
-	action_t(std::string dump_tag) :
-	        dump_id(0),
-	        dump_tag(dump_tag)
+	action_t(action type, std::string tag) :
+	        type(type),
+	        id(0),
+	        tag(tag)
 	{}
 
 	inline bool operator==(const action_t& o) const
 	{
-		return std::tie(dump_id, dump_tag) ==
-		       std::tie(o.dump_id, o.dump_tag);
+		return std::tie(type, id, tag) ==
+		       std::tie(o.type, o.id, o.tag);
 	}
 
 	inline bool operator!=(const action_t& o) const
@@ -142,24 +146,18 @@ public:
 
 	constexpr bool operator<(const action_t& o) const
 	{
-		return std::tie(dump_id, dump_tag) <
-		       std::tie(o.dump_id, o.dump_tag);
+		return std::tie(type, id, tag) <
+		       std::tie(o.type, o.id, o.tag);
 	}
 
-	void pop(stream_in_t& stream)
+	std::string to_string()
 	{
-		stream.pop(dump_id);
-		stream.pop(dump_tag);
+		return std::string(eActionType_to_str(type)) + ":" + tag;
 	}
 
-	void push(stream_out_t& stream) const
-	{
-		stream.push(dump_id);
-		stream.push(dump_tag);
-	}
-
-	uint64_t dump_id;
-	std::string dump_tag;
+	action type;
+	uint32_t id;
+	std::string tag;
 };
 
 struct total_key_t
@@ -186,30 +184,25 @@ struct total_key_t
 
 struct value_t
 {
-	value_t()
-	{
-		memset(dump_ids, 0, sizeof(dump_ids));
-	}
-
 	constexpr bool operator<(const value_t& second) const
 	{
-		return flow < second.flow;
+		return std::tie(flow, actions) < std::tie(second.flow, second.actions);
 	}
 
 	void pop(stream_in_t& stream)
 	{
 		stream.pop(flow);
-		stream.pop(dump_ids);
+		stream.pop(actions);
 	}
 
 	void push(stream_out_t& stream) const
 	{
 		stream.push(flow);
-		stream.push(dump_ids);
+		stream.push(actions);
 	}
 
 	common::globalBase::tFlow flow;
-	uint32_t dump_ids[YANET_CONFIG_DUMP_ID_SIZE];
+	common::globalBase::tActions<uint32_t> actions;
 };
 
 template<typename type_t>

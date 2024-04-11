@@ -154,6 +154,7 @@ enum class requestType : uint32_t
 	acl_transport_table,
 	acl_total_table,
 	acl_values,
+	acl_value_actions,
 	dregress_prefix_update,
 	dregress_prefix_remove,
 	dregress_prefix_clear,
@@ -166,7 +167,7 @@ enum class requestType : uint32_t
 	tun64mappings_update,
 	serial_update,
 	nat46clat_update,
-	dump_tags_ids,
+	action_tags_ids,
 	tsc_state_update,
 	tscs_base_value_update
 };
@@ -371,9 +372,14 @@ namespace acl_values
 using request = std::vector<acl::value_t>;
 }
 
-namespace dump_tags_ids
+namespace acl_value_actions
 {
-using request = std::vector<std::string>;
+using request = common::globalBase::tActions<std::vector<common::acl::action_array_t>>;
+}
+
+namespace action_tags_ids
+{
+using request = common::globalBase::tActions<std::vector<std::string>>;
 }
 
 namespace route_lpm_update
@@ -527,7 +533,8 @@ using requestVariant = std::variant<std::tuple<>,
                                     acl_transport_table::request,
                                     acl_total_table::request,
                                     acl_values::request,
-                                    dump_tags_ids::request,
+                                    action_tags_ids::request,
+                                    acl_value_actions::request,
                                     lpm::request,
                                     route_value_update::request,
                                     route_tunnel_value_update::request,

@@ -2,7 +2,7 @@
 add skipto :IN ip from any to any in
 
 :IN
-add dump ring1 tcp from 10.0.0.0/24 to 1.2.3.4 53
+add dump:ring1 tcp from 10.0.0.0/24 to 1.2.3.4 53
 add allow tcp from 10.0.0.0/24 to 1.2.3.4 53
 add deny ip from any to any
 

@@ -10,7 +10,7 @@
 #include <unordered_set>
 #include <vector>
 
-//#define ACL_DEBUG
+// #define ACL_DEBUG
 
 #ifdef ACL_DEBUG
 #define ACL_DEBUGLEVEL (1)
@@ -25,9 +25,7 @@
 	}
 
 #include "acl.h"
-#include "acl/bitset.h"
 #include "acl/dict.h"
-#include "acl/network.h"
 #include "acl/rule.h"
 #include "acl_compiler.h"
 
@@ -325,6 +323,7 @@ struct firewall_rules_t
 						[[fallthrough]];
 					case ipfw::rule_action_t::ALLOW:
 					case ipfw::rule_action_t::DUMP:
+					case ipfw::rule_action_t::COUNT:
 					case ipfw::rule_action_t::DENY:
 					{
 						// handle only meaning rules
@@ -925,16 +924,28 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 				else if (std::holds_alternative<common::acl::action_t>(rule.action))
 				{
 					auto& action = std::get<common::acl::action_t>(rule.action);
-					if (!action.dump_tag.empty())
+					auto action_id = int(action.type);
+
+					auto& tag_to_id = result.tag_to_action_id[action_id];
+					auto& id_to_tag = result.action_id_to_tag[action_id];
+
+					if (id_to_tag.size() >= YANET_CONFIG_ACTION_ID_TO_TAG_SIZE)
 					{
-						auto it = result.tag_to_dump_id.find(action.dump_tag);
-						if (it == result.tag_to_dump_id.end())
-						{
-							result.dump_id_to_tag.emplace_back(action.dump_tag);
-							it = result.tag_to_dump_id.emplace_hint(it, action.dump_tag, result.dump_id_to_tag.size());
-						}
-						action.dump_id = it->second;
+						YANET_LOG_WARNING("%s: rule %ld ignored: exceeding the maximum amount of '%s' rules : %s\n",
+						                  __func__,
+						                  rule.ruleno,
+						                  eActionType_to_str(action.type),
+						                  rule.text.data());
+						continue;
 					}
+
+					auto it = tag_to_id.find(action.tag);
+					if (it == tag_to_id.end())
+					{
+						id_to_tag.emplace_back(action.tag);
+						it = tag_to_id.emplace_hint(it, action.tag, id_to_tag.size());
+					}
+					action.id = it->second;
 				}
 			}
 
