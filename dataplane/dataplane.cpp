@@ -718,6 +718,8 @@ eResult cDataPlane::initWorkers()
 			return eResult::errorAllocatingMemory;
 		}
 
+		worker->SetBufferForCounters(processes_data.common_data.BufferWorker(coreId), processes_data.metadata_workers);
+
 		dataplane::base::permanently basePermanently;
 		basePermanently.globalBaseAtomic = globalBaseAtomics[socket_id];
 		basePermanently.outQueueId = outQueueId; ///< 0
@@ -740,8 +742,6 @@ eResult cDataPlane::initWorkers()
 			return result;
 		}
 
-		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[coreId]);
-
 		workers[coreId] = worker;
 		controlPlane->slowWorker = worker;
 		workers_vector.emplace_back(worker);
@@ -763,6 +763,8 @@ eResult cDataPlane::initWorkers()
 		{
 			return eResult::errorAllocatingMemory;
 		}
+
+		worker->SetBufferForCounters(processes_data.common_data.BufferWorker(coreId), processes_data.metadata_workers);
 
 		dataplane::base::permanently basePermanently;
 		{
@@ -896,7 +898,6 @@ eResult cDataPlane::initWorkers()
 			return result;
 		}
 
-		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[coreId]);
 		workers[coreId] = worker;
 		workers_vector.emplace_back(worker);
 
@@ -917,6 +918,8 @@ eResult cDataPlane::initWorkers()
 		{
 			return eResult::errorAllocatingMemory;
 		}
+
+		worker->SetBufferForCounters(processes_data.common_data.BufferWorkerGc(core_id), processes_data.metadata_workers_gc);
 
 		dataplane::base::permanently basePermanently;
 		{
@@ -977,30 +980,11 @@ eResult cDataPlane::initWorkers()
 			return result;
 		}
 
-		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[core_id]);
 		worker_gcs[core_id] = worker;
 		socket_worker_gcs[socket_id] = worker;
 	}
 
 	return eResult::success;
-}
-
-std::optional<uint64_t> cDataPlane::getCounterValueByName(const std::string& counter_name, uint32_t coreId)
-{
-	if (coreId_to_stats_tables.count(coreId) == 0)
-	{
-		return std::optional<uint64_t>();
-	}
-
-	const auto& specific_core_table = coreId_to_stats_tables[coreId];
-
-	if (specific_core_table.count(counter_name) == 0)
-	{
-		return std::optional<uint64_t>();
-	}
-
-	uint64_t counter_value = *(specific_core_table.at(counter_name));
-	return std::optional<uint64_t>(counter_value);
 }
 
 eResult cDataPlane::initQueues()
@@ -1143,6 +1127,7 @@ eResult cDataPlane::allocateSharedMemory()
 {
 	/// precalculation of shared memory size for each numa
 	std::map<tSocketId, uint64_t> number_of_workers_per_socket;
+	std::map<tCoreId, tSocketId> workers_to_sockets;
 	for (const auto& worker : config.workers)
 	{
 		const int coreId = worker.first;
@@ -1162,6 +1147,7 @@ eResult cDataPlane::allocateSharedMemory()
 		{
 			number_of_workers_per_socket[socket_id]++;
 		}
+		workers_to_sockets[coreId] = socket_id;
 	}
 
 	/// slow worker
@@ -1183,6 +1169,41 @@ eResult cDataPlane::allocateSharedMemory()
 		{
 			number_of_workers_per_socket[socket_id]++;
 		}
+		workers_to_sockets[coreId] = socket_id;
+	}
+
+	/// worker gc
+	std::map<tCoreId, tSocketId> workers_gc_to_sockets;
+	{
+		for (const auto coreId : config.workerGCs)
+		{
+			auto socket_id = numa_node_of_cpu(coreId);
+			if (socket_id == -1)
+			{
+				YADECAP_LOG_ERROR("numa_node_of_cpu err: %s\n", strerror(errno));
+				socket_id = 0;
+			}
+			workers_gc_to_sockets[coreId] = socket_id;
+		}
+	}
+
+	/// Prepare data for processes data exchange
+	{
+		// Fill metadata memory for proccesses data exchange: worker and worker_gc
+		cWorker::FillMetadataWorkerCounters(&processes_data.metadata_workers);
+		worker_gc_t::FillMetadataWorkerCounters(&processes_data.metadata_workers_gc);
+
+		// Save main info to shared memory and get all buffers
+		eResult result = processes_data.BuildFromDataPlane(workers_to_sockets, workers_gc_to_sockets, config.useHugeMem);
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		// Set buffers for bus
+		bus.SetBuffers(processes_data.BufferCommonCounters(processes_data.common_counters.start_bus_requests),
+		               processes_data.BufferCommonCounters(processes_data.common_counters.start_bus_errors),
+		               processes_data.BufferCommonCounters(processes_data.common_counters.start_bus_durations));
 	}
 
 	std::map<tSocketId, uint64_t> shm_size_per_socket;

@@ -9,6 +9,7 @@
 
 #include "common/generation.h"
 #include "common/idp.h"
+#include "common/pde.h"
 #include "hashtable.h"
 
 class worker_gc_t
@@ -26,7 +27,8 @@ public:
 
 	void limits(common::idp::limits::response& response) const;
 
-	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
+	static uint64_t FillMetadataWorkerCounters(common::pde::MetadataWorkerGc* metadata);
+	void SetBufferForCounters(void* buffer, const common::pde::MetadataWorkerGc& metadata);
 
 protected:
 	YANET_INLINE_NEVER void thread();
@@ -59,7 +61,7 @@ public:
 	uint32_t current_base_id;
 	uint32_t local_base_id;
 	dataplane::base::permanently base_permanently;
-	common::worker_gc::stats_t stats;
+	common::worker_gc::stats_t* stats;
 	dataplane::base::generation bases[2];
 
 	YADECAP_CACHE_ALIGNED(align1);
@@ -94,7 +96,7 @@ public:
 	generation_manager<common::idp::balancer_real_connections::connections> balancer_real_connections;
 	generation_manager<dataplane::hashtable_mod_spinlock_stats> balancer_state_stats;
 
-	uint64_t counters[YANET_CONFIG_COUNTERS_SIZE];
+	uint64_t* counters; // YANET_CONFIG_COUNTERS_SIZE
 
 	uint32_t current_time;
 	dataplane::hashtable_gc_t nat64stateful_lan_state_gc;

@@ -6,6 +6,7 @@
 
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
+#include "common/pde.h"
 #include "common/tsc_deltas.h"
 #include "common/version.h"
 
@@ -800,9 +801,9 @@ inline void version()
 inline void counter_by_name(std::string counter_name,
                             const std::optional<tCoreId>& core_id)
 {
-	interface::dataPlane dataplane;
-
-	const auto response = dataplane.get_counter_by_name({counter_name, core_id});
+	common::pde::MainFileData processed_data;
+	processed_data.ReadFromDataplane(false, true);
+	auto response = processed_data.GetCounterByName(counter_name, core_id);
 
 	if (response.empty())
 	{
@@ -823,6 +824,102 @@ inline void counter_by_name(std::string counter_name,
 	for (const auto& [core_id, counter_value] : response)
 	{
 		table.insert(core_id, counter_value);
+	}
+
+	table.print();
+}
+
+inline void bus_requests()
+{
+	common::pde::MainFileData processed_data;
+	processed_data.ReadFromDataplane(false, false);
+	uint64_t* requests = processed_data.BufferCommonCounters(processed_data.common_counters.start_bus_requests);
+	uint64_t* durations = processed_data.BufferCommonCounters(processed_data.common_counters.start_bus_durations);
+
+	table_t table;
+	table.insert("request",
+	             "count",
+	             "duration");
+
+	std::map<common::idp::requestType, std::string> names = {
+	        {common::idp::requestType::updateGlobalBase, "updateGlobalBase"},
+	        {common::idp::requestType::updateGlobalBaseBalancer, "updateGlobalBaseBalancer"},
+	        {common::idp::requestType::getGlobalBase, "getGlobalBase"},
+	        {common::idp::requestType::getWorkerStats, "getWorkerStats"},
+	        {common::idp::requestType::getSlowWorkerStats, "getSlowWorkerStats"},
+	        {common::idp::requestType::get_worker_gc_stats, "get_worker_gc_stats"},
+	        {common::idp::requestType::get_dregress_counters, "get_dregress_counters"},
+	        {common::idp::requestType::get_ports_stats, "get_ports_stats"},
+	        {common::idp::requestType::get_ports_stats_extended, "get_ports_stats_extended"},
+	        {common::idp::requestType::getControlPlanePortStats, "getControlPlanePortStats"},
+	        {common::idp::requestType::getPortStatsEx, "getPortStatsEx"},
+	        {common::idp::requestType::getFragmentationStats, "getFragmentationStats"},
+	        {common::idp::requestType::getFWState, "getFWState"},
+	        {common::idp::requestType::getFWStateStats, "getFWStateStats"},
+	        {common::idp::requestType::clearFWState, "clearFWState"},
+	        {common::idp::requestType::getOtherStats, "getOtherStats"},
+	        {common::idp::requestType::getConfig, "getConfig"},
+	        {common::idp::requestType::getErrors, "getErrors"},
+	        {common::idp::requestType::getReport, "getReport"},
+	        {common::idp::requestType::lpm4LookupAddress, "lpm4LookupAddress"},
+	        {common::idp::requestType::lpm6LookupAddress, "lpm6LookupAddress"},
+	        {common::idp::requestType::nat64stateful_state, "nat64stateful_state"},
+	        {common::idp::requestType::balancer_connection, "balancer_connection"},
+	        {common::idp::requestType::balancer_service_connections, "balancer_service_connections"},
+	        {common::idp::requestType::balancer_real_connections, "balancer_real_connections"},
+	        {common::idp::requestType::limits, "limits"},
+	        {common::idp::requestType::samples, "samples"},
+	        {common::idp::requestType::debug_latch_update, "debug_latch_update"},
+	        {common::idp::requestType::unrdup_vip_to_balancers, "unrdup_vip_to_balancers"},
+	        {common::idp::requestType::update_vip_vport_proto, "update_vip_vport_proto"},
+	        {common::idp::requestType::version, "version"},
+	        {common::idp::requestType::get_shm_info, "get_shm_info"},
+	        {common::idp::requestType::get_shm_tsc_info, "get_shm_tsc_info"},
+	        {common::idp::requestType::set_shm_tsc_state, "set_shm_tsc_state"},
+	        {common::idp::requestType::dump_physical_port, "dump_physical_port"},
+	        {common::idp::requestType::balancer_state_clear, "balancer_state_clear"},
+	        {common::idp::requestType::neighbor_show, "neighbor_show"},
+	        {common::idp::requestType::neighbor_insert, "neighbor_insert"},
+	        {common::idp::requestType::neighbor_remove, "neighbor_remove"},
+	        {common::idp::requestType::neighbor_clear, "neighbor_clear"},
+	        {common::idp::requestType::neighbor_flush, "neighbor_flush"},
+	        {common::idp::requestType::neighbor_update_interfaces, "neighbor_update_interfaces"},
+	        {common::idp::requestType::neighbor_stats, "neighbor_stats"},
+	        {common::idp::requestType::memory_manager_update, "memory_manager_update"},
+	        {common::idp::requestType::memory_manager_stats, "memory_manager_stats"}};
+
+	for (uint32_t index = 0; index < (uint32_t)common::idp::requestType::size; ++index)
+	{
+		if ((requests[index] != 0) || (durations[index] != 0))
+		{
+			const auto& iter = names.find(static_cast<common::idp::requestType>(index));
+			table.insert((iter != names.end() ? iter->second : "unknown"), requests[index], durations[index]);
+		}
+	}
+
+	table.print();
+}
+
+inline void bus_errors()
+{
+	common::pde::MainFileData processed_data;
+	processed_data.ReadFromDataplane(false, false);
+	uint64_t* buffer = processed_data.BufferCommonCounters(processed_data.common_counters.start_bus_errors);
+
+	table_t table;
+	table.insert("error",
+	             "count");
+
+	std::map<common::idp::errorType, std::string> names = {
+	        {common::idp::errorType::busRead, "busRead"},
+	        {common::idp::errorType::busWrite, "busWrite"},
+	        {common::idp::errorType::busParse, "busParse"},
+	};
+
+	for (uint32_t index = 0; index < (uint32_t)common::idp::errorType::size; ++index)
+	{
+		const auto& iter = names.find(static_cast<common::idp::errorType>(index));
+		table.insert((iter != names.end() ? iter->second : "unknown"), buffer[index]);
 	}
 
 	table.print();
