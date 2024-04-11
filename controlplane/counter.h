@@ -5,6 +5,7 @@
 #include "type.h"
 
 #include "common/idataplane.h"
+#include "common/pde.h"
 #include "common/refarray.h"
 
 class counter_manager_t
@@ -22,6 +23,11 @@ public:
 		}
 		counter_unused_ids_size = counter_unused_ids.size();
 		counter_shifts.resize(YANET_CONFIG_COUNTERS_SIZE, 0);
+	}
+
+	void init(const common::pde::MainFileData* processes_data)
+	{
+		this->processes_data = processes_data;
 	}
 
 	std::tuple<uint64_t, uint64_t> stats() const
@@ -109,7 +115,7 @@ protected:
 	{
 		/// @todo: check counter_ids are reserved
 
-		const auto getCountersResponse = counter_dataplane.getCounters(counter_ids);
+		const auto getCountersResponse = processes_data->GetCounters(counter_ids);
 
 		std::lock_guard<std::mutex> guard(counter_mutex);
 		for (unsigned int i = 0;
@@ -126,7 +132,7 @@ protected:
 	{
 		std::vector<uint64_t> result(counter_ids.size());
 
-		const auto getCountersResponse = counter_dataplane.getCounters(counter_ids);
+		const auto getCountersResponse = processes_data->GetCounters(counter_ids);
 
 		std::lock_guard<std::mutex> guard(counter_mutex);
 		for (unsigned int i = 0;
@@ -157,6 +163,7 @@ protected:
 	std::set<tCounterId> counter_unused_ids;
 	std::atomic<uint64_t> counter_unused_ids_size;
 	std::vector<uint64_t> counter_shifts;
+	const common::pde::MainFileData* processes_data;
 };
 
 template<typename key_T,

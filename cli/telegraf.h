@@ -3,6 +3,7 @@
 #include "common/counters.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
+#include "common/pde.h"
 
 #include "helper.h"
 #include "influxdb_format.h"
@@ -100,7 +101,10 @@ void unsafe()
 	const auto [responseWorkers, responseWorkerGCs, responseSlowWorkerHashtableGC, responseFragmentation, responseFWState, responseTun64, response_nat64stateful, responseControlplane] = controlplane.telegraf_unsafe();
 	const auto& [responseSlowWorker, hashtable_gc] = responseSlowWorkerHashtableGC;
 
-	const auto static_counters = dataplane.getCounters(vector_range(0, (tCounterId)common::globalBase::static_counter_type::size));
+	common::pde::MainFileData processes_data;
+	processes_data.ReadFromDataplane(false, true);
+	const auto static_counters = processes_data.GetCounters(vector_range(0, (tCounterId)common::globalBase::static_counter_type::size));
+
 	const auto neighbor_stats = dataplane.neighbor_stats();
 	const auto memory_stats = dataplane.memory_manager_stats();
 	const auto& [memory_groups, memory_objects] = memory_stats;
@@ -691,6 +695,34 @@ void service()
 	}
 }
 
+}
+
+void main_counters()
+{
+	common::pde::MainFileData processed_data;
+	processed_data.ReadFromDataplane(false, true);
+
+	for (const auto& [coreId, worker_info] : processed_data.common_data.workers)
+	{
+		std::vector<influxdb_format::value_t> values;
+		uint64_t* buffer = common::pde::PtrAdd64(worker_info.buffer, processed_data.metadata_workers.start_counters);
+		for (const auto& [name, index] : processed_data.metadata_workers.counter_positions)
+		{
+			values.emplace_back(name.data(), buffer[index]);
+		}
+		influxdb_format::print("worker", {{"coreId", coreId}}, values);
+	}
+
+	for (const auto& [coreId, worker_info] : processed_data.common_data.workers_gc)
+	{
+		std::vector<influxdb_format::value_t> values;
+		uint64_t* buffer = common::pde::PtrAdd64(worker_info.buffer, processed_data.metadata_workers_gc.start_counters);
+		for (const auto& [name, index] : processed_data.metadata_workers_gc.counter_positions)
+		{
+			values.emplace_back(name.data(), buffer[index]);
+		}
+		influxdb_format::print("worker_gc", {{"coreId", coreId}}, values);
+	}
 }
 
 }

@@ -103,24 +103,9 @@ public:
 		return get<common::idp::requestType::clearFWState, eResult>();
 	}
 
-	common::idp::getAclCounters::response getAclCounters() const
-	{
-		return get<common::idp::requestType::getAclCounters, common::idp::getAclCounters::response>();
-	}
-
 	common::idp::getPortStatsEx::response getPortStatsEx() const
 	{
 		return get<common::idp::requestType::getPortStatsEx, common::idp::getPortStatsEx::response>();
-	}
-
-	common::idp::getCounters::response getCounters(const common::idp::getCounters::request& request) const
-	{
-		return get<common::idp::requestType::getCounters, common::idp::getCounters::response>(request);
-	}
-
-	common::idp::getOtherStats::response getOtherStats() const
-	{
-		return get<common::idp::requestType::getOtherStats, common::idp::getOtherStats::response>();
 	}
 
 	common::idp::getConfig::response getConfig() const
@@ -191,11 +176,6 @@ public:
 	auto version() const
 	{
 		return get<common::idp::requestType::version, common::idp::version::response>();
-	}
-
-	auto get_counter_by_name(const common::idp::get_counter_by_name::request& request) const
-	{
-		return get<common::idp::requestType::get_counter_by_name, common::idp::get_counter_by_name::response>(request);
 	}
 
 	auto get_shm_info() const
@@ -287,6 +267,7 @@ protected:
 		int ret = connect(clientSocket, (struct sockaddr*)&address, sizeof(address));
 		if (ret == -1)
 		{
+			YANET_LOG_ERROR("Error connect to socket %s, error: %d - %s\n", common::idp::socketPath, errno, strerror(errno));
 			throw std::string("connect(): ") + strerror(errno);
 		}
 	}

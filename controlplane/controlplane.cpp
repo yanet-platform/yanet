@@ -42,6 +42,9 @@ eResult cControlPlane::init(const std::string& jsonFilePath)
 		sockets.emplace(std::get<1>(iter.second)); ///< @todo
 	}
 
+	processes_data.ReadFromDataplane(false, true);
+	counter_manager.init(&processes_data);
+
 	modules.emplace_back(new telegraf_t); ///< @todo
 	modules.emplace_back(new rib_t); ///< @todo
 	modules.emplace_back(new controlplane::module::bus); ///< @todo
@@ -609,7 +612,7 @@ common::icp::getFwList::response cControlPlane::command_getFwList(const common::
 	if (rules_type == common::icp::getFwList::requestType::static_rules_original ||
 	    rules_type == common::icp::getFwList::requestType::static_rules_generated)
 	{
-		auto counters = dataPlane.getAclCounters();
+		auto counters = getAclCounters();
 		auto current_guard = generations.current_lock_guard();
 		const auto& current = generations.current();
 		const auto need_orig = (rules_type == common::icp::getFwList::requestType::static_rules_original);
@@ -868,7 +871,7 @@ eResult cControlPlane::loadConfig(const std::string& rootFilePath,
 		{
 			{
 				std::unique_lock aclCountersDelta_lock(aclCountersDelta_mutex);
-				aclCountersDelta = dataPlane.getAclCounters();
+				aclCountersDelta = getAclCounters();
 			}
 
 			generations.next_lock();
@@ -978,4 +981,22 @@ void cControlPlane::main_thread()
 void cControlPlane::register_service(google::protobuf::Service* service)
 {
 	services[service->GetDescriptor()->name()] = service;
+}
+
+std::vector<uint64_t> cControlPlane::getAclCounters()
+{
+	std::vector<uint64_t> response;
+	response.resize(YANET_CONFIG_ACL_COUNTERS_SIZE);
+
+	uint64_t index_acl_counters = processes_data.metadata_workers.index_acl_counters;
+	for (const auto& iter : processes_data.common_data.workers)
+	{
+		uint64_t* aclCounters = (uint64_t*)iter.second.buffer + index_acl_counters;
+		for (size_t i = 0; i < YANET_CONFIG_ACL_COUNTERS_SIZE; i++)
+		{
+			response[i] += aclCounters[i];
+		}
+	}
+
+	return response;
 }

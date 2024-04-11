@@ -285,28 +285,6 @@ common::idp::getGlobalBase::response cControlPlane::getGlobalBase(const common::
 	return response;
 }
 
-common::idp::getOtherStats::response cControlPlane::getOtherStats()
-{
-	common::idp::getOtherStats::response response;
-	auto& [response_workers] = response;
-
-	/// workers
-	{
-		for (const auto& iter : dataPlane->workers)
-		{
-			const tCoreId& coreId = iter.first;
-			const cWorker* worker = iter.second;
-
-			std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1> bursts;
-			memcpy(&bursts[0], worker->bursts, sizeof(worker->bursts));
-
-			response_workers[coreId] = {bursts};
-		}
-	}
-
-	return response;
-}
-
 common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common::idp::getWorkerStats::request& request)
 {
 	/// unsafe
@@ -328,7 +306,7 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 			}
 
 			response[coreId] = {worker->iteration,
-			                    worker->stats,
+			                    *worker->stats,
 			                    portsStats};
 		}
 	}
@@ -345,7 +323,7 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 			}
 
 			response[coreId] = {worker->iteration,
-			                    worker->stats,
+			                    *worker->stats,
 			                    portsStats};
 		}
 	}
@@ -409,7 +387,7 @@ common::idp::get_worker_gc_stats::response cControlPlane::get_worker_gc_stats()
 	for (const auto& [core_id, worker] : dataPlane->worker_gcs)
 	{
 		response[core_id] = {worker->iteration,
-		                     worker->stats};
+		                     *worker->stats};
 	}
 
 	return response;
@@ -613,26 +591,6 @@ eResult cControlPlane::clearFWState()
 	return common::result_e::success;
 }
 
-common::idp::getAclCounters::response cControlPlane::getAclCounters()
-{
-	std::lock_guard<std::mutex> guard(mutex);
-
-	common::idp::getAclCounters::response response;
-
-	response.resize(YANET_CONFIG_ACL_COUNTERS_SIZE);
-	for (const auto& [coreId, worker] : dataPlane->workers)
-	{
-		(void)coreId;
-
-		for (size_t i = 0; i < YANET_CONFIG_ACL_COUNTERS_SIZE; i++)
-		{
-			response[i] += worker->aclCounters[i];
-		}
-	}
-
-	return response;
-}
-
 common::idp::getPortStatsEx::response cControlPlane::getPortStatsEx()
 {
 	common::idp::getPortStatsEx::response response;
@@ -663,37 +621,6 @@ common::idp::getPortStatsEx::response cControlPlane::getPortStatsEx()
 		std::get<2>(countersOut) = portStats["tx_port_multicast_packets"];
 		std::get<3>(countersOut) = portStats["tx_port_broadcast_packets"];
 		std::get<5>(countersOut) = portStats["tx_errors"];
-	}
-
-	return response;
-}
-
-common::idp::getCounters::response cControlPlane::getCounters(const common::idp::getCounters::request& request)
-{
-	common::idp::getCounters::response response;
-	response.resize(request.size());
-
-	for (size_t i = 0;
-	     i < request.size();
-	     i++)
-	{
-		const auto& counter_id = request[i];
-
-		if (counter_id >= YANET_CONFIG_COUNTERS_SIZE)
-		{
-			std::lock_guard<std::mutex> guard(mutex);
-			++errors["getCounters: invalid counterId"];
-			continue;
-		}
-
-		uint64_t counter = 0;
-		for (const auto& [core_id, worker] : dataPlane->workers)
-		{
-			(void)core_id;
-			counter += worker->counters[counter_id];
-		}
-
-		response[i] = counter;
 	}
 
 	return response;
@@ -1135,48 +1062,6 @@ common::idp::version::response cControlPlane::version()
 	        version_revision(),
 	        version_hash(),
 	        version_custom()};
-}
-
-common::idp::get_counter_by_name::response cControlPlane::get_counter_by_name(const common::idp::get_counter_by_name::request& request)
-{
-	common::idp::get_counter_by_name::response response;
-
-	const auto& [counter_name, optional_core_id] = request;
-
-	if (optional_core_id.has_value())
-	{
-		std::optional<uint64_t> counter_val = dataPlane->getCounterValueByName(counter_name, optional_core_id.value());
-		if (counter_val.has_value())
-		{
-			response[optional_core_id.value()] = counter_val.value();
-		}
-
-		// if counter with provided name does not exist, empty map will be returned, and its emptiness should be checked on another end
-		return response;
-	}
-
-	// core_id was not specified, return counter for each core_id
-	for (const auto& [core_id, worker] : dataPlane->workers)
-	{
-		(void)worker;
-		std::optional<uint64_t> counter_val = dataPlane->getCounterValueByName(counter_name, core_id);
-		if (counter_val.has_value())
-		{
-			response[core_id] = counter_val.value();
-		}
-	}
-
-	for (const auto& [core_id, worker_gc] : dataPlane->worker_gcs)
-	{
-		(void)worker_gc;
-		std::optional<uint64_t> counter_val = dataPlane->getCounterValueByName(counter_name, core_id);
-		if (counter_val.has_value())
-		{
-			response[core_id] = counter_val.value();
-		}
-	}
-
-	return response;
 }
 
 common::idp::get_shm_info::response cControlPlane::get_shm_info()
@@ -2257,12 +2142,12 @@ void cControlPlane::handlePacket_icmp_translate_v6_to_v4(rte_mbuf* mbuf)
 
 	if (do_icmp_translate_v6_to_v4(mbuf, translation))
 	{
-		slowWorker->stats.nat64stateless_ingressPackets++;
+		slowWorker->stats->nat64stateless_ingressPackets++;
 		sendPacketToSlowWorker(mbuf, nat64stateless.flow);
 	}
 	else
 	{
-		slowWorker->stats.nat64stateless_ingressUnknownICMP++;
+		slowWorker->stats->nat64stateless_ingressUnknownICMP++;
 		rte_pktmbuf_free(mbuf);
 	}
 }
@@ -2532,12 +2417,12 @@ void cControlPlane::handlePacket_icmp_translate_v4_to_v6(rte_mbuf* mbuf)
 
 	if (do_icmp_translate_v4_to_v6(mbuf, translation))
 	{
-		slowWorker->stats.nat64stateless_egressPackets++;
+		slowWorker->stats->nat64stateless_egressPackets++;
 		sendPacketToSlowWorker(mbuf, nat64stateless.flow);
 	}
 	else
 	{
-		slowWorker->stats.nat64stateless_egressUnknownICMP++;
+		slowWorker->stats->nat64stateless_egressUnknownICMP++;
 		rte_pktmbuf_free(mbuf);
 	}
 }
@@ -2637,7 +2522,7 @@ void cControlPlane::handlePacket_fw_state_sync(rte_mbuf* mbuf)
 		rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
 		if (mbuf_clone == nullptr)
 		{
-			slowWorker->stats.fwsync_multicast_egress_drops++;
+			slowWorker->stats->fwsync_multicast_egress_drops++;
 			continue;
 		}
 
@@ -2650,7 +2535,7 @@ void cControlPlane::handlePacket_fw_state_sync(rte_mbuf* mbuf)
 		mbuf_clone->pkt_len = mbuf->pkt_len;
 
 		const auto& flow = fw_state_config.flows[port_id];
-		slowWorker->stats.fwsync_multicast_egress_packets++;
+		slowWorker->stats->fwsync_multicast_egress_packets++;
 		sendPacketToSlowWorker(mbuf_clone, flow);
 	}
 
@@ -2666,7 +2551,7 @@ void cControlPlane::handlePacket_fw_state_sync(rte_mbuf* mbuf)
 		rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
 		if (mbuf_clone == nullptr)
 		{
-			slowWorker->stats.fwsync_unicast_egress_drops++;
+			slowWorker->stats->fwsync_unicast_egress_drops++;
 		}
 		else
 		{
@@ -2678,7 +2563,7 @@ void cControlPlane::handlePacket_fw_state_sync(rte_mbuf* mbuf)
 			mbuf_clone->data_len = mbuf->data_len;
 			mbuf_clone->pkt_len = mbuf->pkt_len;
 
-			slowWorker->stats.fwsync_unicast_egress_packets++;
+			slowWorker->stats->fwsync_unicast_egress_packets++;
 			sendPacketToSlowWorker(mbuf_clone, fw_state_config.ingress_flow);
 		}
 	}

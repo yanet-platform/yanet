@@ -15,6 +15,7 @@
 #include "common/icp.h"
 #include "common/idataplane.h"
 #include "common/idp.h"
+#include "common/pde.h"
 #include "common/result.h"
 #include "libprotobuf/controlplane.pb.h"
 
@@ -126,6 +127,8 @@ protected: /** commands */
 
 	common::icp::convert::response convert_logical_module();
 
+	std::vector<uint64_t> getAclCounters();
+
 protected:
 	/// @todo: config_t::load()
 	eResult loadConfig(const std::string& rootFilePath, const nlohmann::json& rootJson, const std::map<std::string, nlohmann::json>& jsons = {});
@@ -192,6 +195,8 @@ protected:
 	uint64_t loadConfig_done = 0;
 	uint64_t loadConfig_failed = 0;
 	bool loadConfigStatus = false; // true - last load was ok
+
+	common::pde::MainFileData processes_data;
 
 private:
 	/// used only in loadConfig()

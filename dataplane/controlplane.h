@@ -47,9 +47,6 @@ public:
 	common::idp::getFWState::response getFWState();
 	common::idp::getFWStateStats::response getFWStateStats();
 	eResult clearFWState();
-	common::idp::getAclCounters::response getAclCounters();
-	common::idp::getCounters::response getCounters(const common::idp::getCounters::request& request);
-	common::idp::getOtherStats::response getOtherStats();
 	common::idp::getConfig::response getConfig() const;
 	common::idp::getErrors::response getErrors();
 	common::idp::getReport::response getReport();
@@ -64,7 +61,6 @@ public:
 	eResult unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request);
 	eResult update_vip_vport_proto(const common::idp::update_vip_vport_proto::request& request);
 	common::idp::version::response version();
-	common::idp::get_counter_by_name::response get_counter_by_name(const common::idp::get_counter_by_name::request& request);
 	common::idp::nat64stateful_state::response nat64stateful_state(const common::idp::nat64stateful_state::request& request);
 	common::idp::get_shm_info::response get_shm_info();
 	common::idp::get_shm_tsc_info::response get_shm_tsc_info();

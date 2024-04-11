@@ -254,14 +254,6 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::clearFWState, request);
 		}
-		else if (type == common::idp::requestType::getCounters)
-		{
-			response = callWithResponse(&cControlPlane::getCounters, request);
-		}
-		else if (type == common::idp::requestType::getOtherStats)
-		{
-			response = callWithResponse(&cControlPlane::getOtherStats, request);
-		}
 		else if (type == common::idp::requestType::getConfig)
 		{
 			response = callWithResponse(&cControlPlane::getConfig, request);
@@ -285,10 +277,6 @@ void cBus::clientThread(int clientSocket)
 		else if (type == common::idp::requestType::limits)
 		{
 			response = callWithResponse(&cControlPlane::limits, request);
-		}
-		else if (type == common::idp::requestType::getAclCounters)
-		{
-			response = callWithResponse(&cControlPlane::getAclCounters, request);
 		}
 		else if (type == common::idp::requestType::balancer_connection)
 		{
@@ -321,10 +309,6 @@ void cBus::clientThread(int clientSocket)
 		else if (type == common::idp::requestType::version)
 		{
 			response = callWithResponse(&cControlPlane::version, request);
-		}
-		else if (type == common::idp::requestType::get_counter_by_name)
-		{
-			response = callWithResponse(&cControlPlane::get_counter_by_name, request);
 		}
 		else if (type == common::idp::requestType::nat64stateful_state)
 		{
@@ -409,7 +393,15 @@ void cBus::clientThread(int clientSocket)
 		YANET_LOG_DEBUG("request type %d processed - %.3f sec\n",
 		                (int)type,
 		                duration.count());
+		stats.durations[(uint32_t)type] += static_cast<int>(1000 * duration.count());
 	}
 
 	close(clientSocket);
+}
+
+void cBus::SetBuffers(uint64_t* buf_requests, uint64_t* buf_errors, uint64_t* buf_durations)
+{
+	stats.requests = buf_requests;
+	stats.errors = buf_errors;
+	stats.durations = buf_durations;
 }
