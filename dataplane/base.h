@@ -18,9 +18,14 @@ class PortMapper
 {
 	static constexpr tPortId INVALID_PORT_ID = std::numeric_limits<tPortId>::max();
 	uint16_t ports_count_ = 0;
-	tPortId dpdk_ports_[std::numeric_limits<tPortId>::max() + 1] = {INVALID_PORT_ID}; // logical to dpdk
-	tPortId logical_ports_[std::numeric_limits<tPortId>::max() + 1] = {INVALID_PORT_ID}; // dpdk to logical
+	tPortId dpdk_ports_[std::numeric_limits<tPortId>::max() + 1]; // logical to dpdk
+	tPortId logical_ports_[std::numeric_limits<tPortId>::max() + 1]; // dpdk to logical
 public:
+	PortMapper()
+	{
+		std::fill(std::begin(dpdk_ports_), std::end(dpdk_ports_), INVALID_PORT_ID);
+		std::fill(std::begin(logical_ports_), std::end(logical_ports_), INVALID_PORT_ID);
+	}
 	uint16_t size() const { return ports_count_; }
 	[[nodiscard]] std::optional<tPortId> Register(tPortId dpdk_port)
 	{
