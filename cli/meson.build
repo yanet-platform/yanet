@@ -1,4 +1,5 @@
 dependencies = []
+dependencies += libdpdk.get_variable('dpdk_dep')
 dependencies += libyanet_protobuf_dep
 dependencies += dependency('threads')
 
