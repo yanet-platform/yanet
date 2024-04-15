@@ -3,47 +3,16 @@ FROM ubuntu:22.04 AS base
 RUN apt-get update && apt-get upgrade -y
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    meson \
-    ninja-build \
+    curl \
     git \
-    libnuma-dev \
-    libibverbs-dev \
-    libpcap-dev \
-    python3-pyelftools \
-    pkg-config \
     autoconf \
     automake \
     libtool \
-    curl \
+    build-essential \
     ca-certificates
 
 RUN mkdir -p /project
 WORKDIR /project
-
-
-# DPDK
-ENV DPDK_VERSION 22.11.2
-
-WORKDIR /project
-RUN curl https://fast.dpdk.org/rel/dpdk-${DPDK_VERSION}.tar.xz -o dpdk.tar.xz
-RUN mkdir dpdk && \
-    tar -xf dpdk.tar.xz -C dpdk --strip-components=1
-
-# DPDK config
-COPY rte_config_append.h rte_config_append.h
-RUN cat rte_config_append.h >> dpdk/config/rte_config.h
-
-# fix multiple definition
-RUN curl -L https://github.com/DPDK/dpdk/commit/cf095b1e65e63e3bbc9e285a66bc369758c39fc7.patch -o bpf_validate.patch
-RUN cd dpdk && \
-    patch -p1 < ../bpf_validate.patch
-
-WORKDIR /project/dpdk
-RUN mkdir build
-RUN meson setup --prefix=/target -D platform=generic -D cpu_instruction_set=corei7 -D disable_libs=flow_classify -D enable_driver_sdk=true -D disable_drivers=net/mlx4 -D tests=false build
-RUN meson compile -C build
-RUN meson install -C build
 
 
 # JSON
@@ -93,7 +62,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     vim \
     devscripts \
     debhelper \
-    dupload
+    dupload \
+    python3-pyelftools
 
 COPY --from=base /target/ /usr/
 
