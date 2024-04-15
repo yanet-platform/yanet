@@ -19,6 +19,12 @@ add_global_arguments('-DYANET_VERSION_REVISION=' + get_option('version_revision'
 add_global_arguments('-DYANET_VERSION_HASH=' + get_option('version_hash'), language: 'cpp')
 add_global_arguments('-DYANET_VERSION_CUSTOM=' + get_option('version_custom'), language: 'cpp')
 
+libdpdk = subproject('dpdk', default_options: [
+    'platform=generic',
+    'cpu_instruction_set=corei7',
+    'disable_apps=dumpcap,graph,pdump,proc-info,test-acl,test-bbdev,test-cmdline,test-compress-perf,test-crypto-perf,test-dma-perf,test-eventdev,test-fib,test-flow-perf,test-gpudev,test-mldev,test-pipeline,test-pmd,test-regex,test-sad,test-security-perf',
+    'enable_driver_sdk=true', 'disable_drivers=net/mlx4',
+    'default_library=static', 'tests=false' ] )
 
 if get_option('target').contains('buildenv')
     subdir('libprotobuf')
