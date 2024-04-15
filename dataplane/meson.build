@@ -1,5 +1,5 @@
 dependencies = []
-dependencies += dependency('libdpdk', static: true)
+dependencies += libdpdk.get_variable('dpdk_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
 
