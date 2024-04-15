@@ -10,9 +10,11 @@ jobs:
     name: build (Ubuntu 22.04)
     runs-on: builder
     container:
-      image: yanetplatform/builder
+      image: yanetplatform/builder-lite
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - run: |
           export YANET_VERSION=${{github.ref_name}}
           export YANET_VERSION=${YANET_VERSION#v}
@@ -51,9 +53,11 @@ jobs:
     name: build (Ubuntu 18.04)
     runs-on: builder
     container:
-      image: yanetplatform/builder_ubuntu18.04
+      image: yanetplatform/builder_ubuntu18.04-lite
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v1
+        with:
+          submodules: recursive
       - run: |
           export YANET_VERSION=${{github.ref_name}}
           export YANET_VERSION=${YANET_VERSION#v}
