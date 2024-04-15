@@ -34,9 +34,11 @@ jobs:
     needs: build-image-builder
     runs-on: ubuntu-latest
     container:
-      image: yanetplatform/builder
+      image: yanetplatform/builder-lite
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - run: |
           meson setup -Dtarget=unittest build_unittest
           meson compile -C build_unittest
@@ -52,9 +54,11 @@ jobs:
     needs: build-image-builder
     runs-on: builder
     container:
-      image: yanetplatform/builder
+      image: yanetplatform/builder-lite
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - run: |
           meson setup --prefix=/target_autotest -Dtarget=autotest -Dstrip=true build_autotest
           meson compile -C build_autotest
@@ -71,9 +75,11 @@ jobs:
     needs: build-image-builder
     runs-on: ubuntu-latest
     container:
-      image: yanetplatform/builder
+      image: yanetplatform/builder-lite
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - run: |
           meson setup --prefix=/target -Dstrip=true build
           meson compile -C build
@@ -84,9 +90,11 @@ jobs:
     needs: build-image-builder
     runs-on: ubuntu-latest
     container:
-      image: yanetplatform/builder_ubuntu18.04
+      image: yanetplatform/builder_ubuntu18.04-lite
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v1
+        with:
+          submodules: recursive
       - run: |
           meson setup --prefix=/target -Dstrip=true build
           meson compile -C build
@@ -97,7 +105,7 @@ jobs:
     needs: build-unittest
     runs-on: ubuntu-latest
     container:
-      image: yanetplatform/builder
+      image: yanetplatform/builder-lite
     steps:
       - uses: actions/download-artifact@v3
         with:
@@ -111,9 +119,11 @@ jobs:
     needs: build-autotest
     runs-on: autotest
     container:
-      image: yanetplatform/builder
+      image: yanetplatform/builder-lite
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - uses: actions/download-artifact@v3
         with:
           name: target_autotest
