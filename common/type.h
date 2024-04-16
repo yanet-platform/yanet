@@ -21,6 +21,7 @@
 using tCoreId = uint32_t;
 using tSocketId = uint32_t;
 using tPortId = uint16_t;
+constexpr tPortId INVALID_PORT_ID = std::numeric_limits<tPortId>::max();
 using tQueueId = uint8_t;
 using tCounterId = uint32_t;
 using tLogicalPortId = uint32_t;
