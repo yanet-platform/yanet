@@ -108,12 +108,47 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		return result;
 	}
 
+	if (config.use_kernel_interface)
+	{
+		result = init_kernel_interfaces();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+	}
+
 	mempool_log = rte_mempool_create("log", YANET_CONFIG_SAMPLES_SIZE, sizeof(samples::sample_t), 0, 0, NULL, NULL, NULL, NULL, SOCKET_ID_ANY, MEMPOOL_F_NO_IOVA_CONTIG);
 
 	result = initGlobalBases();
 	if (result != eResult::success)
 	{
 		return result;
+	}
+
+	for (auto socket : socket_ids)
+	{
+		auto pool = rte_mempool_create(("cp-" + std::to_string(socket)).c_str(),
+		                               CONFIG_YADECAP_MBUFS_COUNT +
+		                                       configValues.fragmentation_size +
+		                                       configValues.master_mempool_size +
+		                                       4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE +
+		                                       4 * ports.size() * configValues.kernel_interface_queue_size,
+		                               CONFIG_YADECAP_MBUF_SIZE,
+		                               0,
+		                               sizeof(struct rte_pktmbuf_pool_private),
+		                               rte_pktmbuf_pool_init,
+		                               nullptr,
+		                               rte_pktmbuf_init,
+		                               nullptr,
+		                               socket,
+		                               0); ///< multi-producers, multi-consumers
+		if (!pool)
+		{
+			YADECAP_LOG_ERROR("rte_mempool_create(): %s [%u]\n", rte_strerror(rte_errno), rte_errno);
+			return eResult::errorAllocatingMemory;
+		}
+		socket_cplane_mempools.emplace(socket, pool);
+		YANET_LOG_ERROR("created mempool cp-%s\n", std::to_string(socket).c_str());
 	}
 
 	result = initWorkers();
@@ -539,6 +574,112 @@ eResult cDataPlane::initPorts()
 	}
 
 	return eResult::success;
+}
+
+void cDataPlane::StartInterfaces()
+{
+	/// start devices
+	for (const auto& portIter : ports)
+	{
+		const tPortId& portId = portIter.first;
+
+		int rc = rte_eth_dev_start(portId);
+		if (rc)
+		{
+			YADECAP_LOG_ERROR("can't start eth dev(%d, %d): %s\n",
+			                  rc,
+			                  rte_errno,
+			                  rte_strerror(rte_errno));
+			std::abort();
+		}
+
+		rte_eth_promiscuous_enable(portId);
+	}
+
+	if (config.use_kernel_interface)
+	{
+		for (auto& [portid, handles] : kni_interface_handles)
+		{
+			if (!handles.forward.SetUp())
+			{
+				YANET_LOG_ERROR("Failed to set kni interface belonging to %s up", std::get<0>(ports.at(portid)).c_str());
+				std::abort();
+			}
+		}
+	}
+}
+
+void cDataPlane::InitPortsBarrier()
+{
+	int rc = pthread_barrier_wait(&initPortBarrier);
+	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
+	{
+		pthread_barrier_destroy(&initPortBarrier);
+	}
+	else if (rc)
+	{
+		YANET_LOG_ERROR("init_ports_barrier pthread_barrier_wait() = %d\n", rc);
+		std::abort();
+	}
+
+	if (rte_get_main_lcore() == rte_lcore_id())
+	{
+		StartInterfaces();
+	}
+}
+
+eResult cDataPlane::init_kernel_interfaces()
+{
+	const uint16_t queue_size = getConfigValues().kernel_interface_queue_size;
+	for (const auto& [port_id, info] : ports)
+	{
+		const auto& interface_name = std::get<0>(info);
+
+		auto forward = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle(interface_name, port_id, queue_size);
+		auto in = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle(interface_name, port_id, queue_size);
+		auto out = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle(interface_name, port_id, queue_size);
+		auto drop = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle(interface_name, port_id, queue_size);
+
+		if (!forward || !in || !out || !drop)
+		{
+			return eResult::errorAllocatingKernelInterface;
+		}
+
+		kni_interface_handles.emplace(port_id, KniHandleBundle{std::move(forward.value()), std::move(in.value()), std::move(out.value()), std::move(drop.value())});
+	}
+
+	return eResult::success;
+}
+
+bool cDataPlane::KNIAddTxQueue(tQueueId queue, tSocketId socket)
+{
+	for (auto& bundle : kni_interface_handles)
+	{
+		auto& [fwd, in, out, drop] = bundle.second;
+		if (!fwd.SetupTxQueue(queue, socket) ||
+		    !in.SetupTxQueue(queue, socket) ||
+		    !out.SetupTxQueue(queue, socket) ||
+		    !drop.SetupTxQueue(queue, socket))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+bool cDataPlane::KNIAddRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool)
+{
+	for (auto& bundle : kni_interface_handles)
+	{
+		auto& [fwd, in, out, drop] = bundle.second;
+		if (!fwd.SetupRxQueue(queue, socket, mempool) ||
+		    !in.SetupRxQueue(queue, socket, mempool) ||
+		    !out.SetupRxQueue(queue, socket, mempool) ||
+		    !drop.SetupRxQueue(queue, socket, mempool))
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 eResult cDataPlane::initGlobalBases()
@@ -1028,6 +1169,26 @@ eResult cDataPlane::initQueues()
 		}
 	}
 
+	return eResult::success;
+}
+
+eResult cDataPlane::initKniQueues()
+{
+	for (auto& it : kni_interface_handles)
+	{
+		uint16_t port_id = it.first;
+		for (std::size_t i = 0, max = 1; i < max; ++i)
+		{
+			const auto& socket_id = rte_eth_dev_socket_id(port_id);
+			KNIAddTxQueue(i, socket_id);
+		}
+
+		for (std::size_t i = 0, max = 1; i < max; ++i)
+		{
+			const auto& socket_id = rte_eth_dev_socket_id(port_id);
+			KNIAddRxQueue(i, socket_id, socket_cplane_mempools.at(socket_id));
+		}
+	}
 	return eResult::success;
 }
 
