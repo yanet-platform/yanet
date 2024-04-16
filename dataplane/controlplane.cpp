@@ -37,19 +37,6 @@ cControlPlane::cControlPlane(cDataPlane* dataPlane) :
 
 cControlPlane::~cControlPlane()
 {
-	if (use_kernel_interface)
-	{
-		const auto& portmapper = slowWorker->basePermanently.ports;
-		for (tPortId i = 0; i < portmapper.size(); ++i)
-		{
-			const auto port_id = portmapper.ToDpdk(i);
-			remove_kernel_interface(port_id, kernel_interfaces[i].interface_name);
-			remove_kernel_interface(port_id, in_dump_kernel_interfaces[i].interface_name);
-			remove_kernel_interface(port_id, out_dump_kernel_interfaces[i].interface_name);
-			remove_kernel_interface(port_id, drop_dump_kernel_interfaces[i].interface_name);
-		}
-	}
-
 	if (mempool)
 	{
 		rte_mempool_free(mempool);
@@ -109,14 +96,6 @@ void cControlPlane::start()
 		rte_eth_promiscuous_enable(portId);
 	}
 
-	if (use_kernel_interface)
-	{
-		if (init_kernel_interfaces() != eResult::success)
-		{
-			abort();
-		}
-	}
-
 	rc = pthread_barrier_wait(&dataPlane->runBarrier);
 	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
 	{
@@ -127,14 +106,6 @@ void cControlPlane::start()
 		YADECAP_LOG_ERROR("pthread_barrier_wait() = %d\n", rc);
 		/// @todo: stop
 		return;
-	}
-
-	if (use_kernel_interface)
-	{
-		for (uint16_t i = 0; i < slowWorker->basePermanently.ports.size(); ++i)
-		{
-			set_kernel_interface_up(kernel_interfaces[i].interface_name);
-		}
 	}
 
 	mainThread();
@@ -1383,216 +1354,8 @@ void cControlPlane::waitAllWorkers()
 
 eResult cControlPlane::initMempool()
 {
-	mempool = rte_mempool_create("cp",
-	                             CONFIG_YADECAP_MBUFS_COUNT + dataPlane->getConfigValues().fragmentation_size + dataPlane->getConfigValues().master_mempool_size + 4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE + 4 * dataPlane->ports.size() * dataPlane->getConfigValues().kernel_interface_queue_size,
-	                             CONFIG_YADECAP_MBUF_SIZE,
-	                             0,
-	                             sizeof(struct rte_pktmbuf_pool_private),
-	                             rte_pktmbuf_pool_init,
-	                             nullptr,
-	                             rte_pktmbuf_init,
-	                             nullptr,
-	                             rte_socket_id(),
-	                             0); ///< multi-producers, multi-consumers
-	if (!mempool)
-	{
-		YADECAP_LOG_ERROR("rte_mempool_create(): %s [%u]\n", rte_strerror(rte_errno), rte_errno);
-		return eResult::errorInitMempool;
-	}
-
+	mempool = dataPlane->socket_cplane_mempools[rte_lcore_to_socket_id(dataPlane->config.controlPlaneCoreId)];
 	return eResult::success;
-}
-
-eResult cControlPlane::init_kernel_interfaces()
-{
-	const auto& portmapper = slowWorker->basePermanently.ports;
-	for (tPortId i = 0; i < portmapper.size(); ++i)
-	{
-		const auto port_id = portmapper.ToDpdk(i);
-		const auto& interface_name = std::get<0>(dataPlane->ports.at(port_id));
-
-		{
-			auto kernel_port_id = add_kernel_interface(port_id, interface_name);
-			if (!kernel_port_id)
-			{
-				return eResult::errorAllocatingKernelInterface;
-			}
-
-			kernel_interfaces[i] = {interface_name,
-			                        *kernel_port_id,
-			                        {},
-			                        {}};
-		}
-
-		{
-			auto kernel_port_id = add_kernel_interface(port_id, "in." + interface_name);
-			if (!kernel_port_id)
-			{
-				return eResult::errorAllocatingKernelInterface;
-			}
-
-			in_dump_kernel_interfaces[i] = {"in." + interface_name,
-			                                *kernel_port_id,
-			                                {},
-			                                {}};
-		}
-
-		{
-			auto kernel_port_id = add_kernel_interface(port_id, "out." + interface_name);
-			if (!kernel_port_id)
-			{
-				return eResult::errorAllocatingKernelInterface;
-			}
-
-			out_dump_kernel_interfaces[i] = {"out." + interface_name,
-			                                 *kernel_port_id,
-			                                 {},
-			                                 {}};
-		}
-
-		{
-			auto kernel_port_id = add_kernel_interface(port_id, "drop." + interface_name);
-			if (!kernel_port_id)
-			{
-				return eResult::errorAllocatingKernelInterface;
-			}
-
-			drop_dump_kernel_interfaces[i] = {"drop." + interface_name,
-			                                  *kernel_port_id,
-			                                  {},
-			                                  {}};
-		}
-	}
-
-	return eResult::success;
-}
-
-std::optional<tPortId> cControlPlane::add_kernel_interface(const tPortId port_id,
-                                                           const std::string& interface_name)
-{
-	rte_ether_addr ether_addr;
-	rte_eth_macaddr_get(port_id, &ether_addr);
-
-	char vdev_name[RTE_DEV_NAME_MAX_LEN];
-	char vdev_args[256];
-
-	snprintf(vdev_name,
-	         sizeof(vdev_name),
-	         "virtio_user_%s_%u",
-	         interface_name.data(),
-	         port_id);
-
-	snprintf(vdev_args,
-	         sizeof(vdev_args),
-	         "path=/dev/vhost-net,queues=1,queue_size=%lu,iface=%s,mac=%s",
-	         dataPlane->getConfigValues().kernel_interface_queue_size,
-	         interface_name.data(),
-	         common::mac_address_t(ether_addr.addr_bytes).toString().data());
-
-	if (rte_eal_hotplug_add("vdev", vdev_name, vdev_args) != 0)
-	{
-		YADECAP_LOG_ERROR("failed to hotplug vdev interface '%s' with '%s'\n",
-		                  vdev_name,
-		                  vdev_args);
-		return std::nullopt;
-	}
-
-	uint16_t kernel_port_id;
-	if (rte_eth_dev_get_port_by_name(vdev_name, &kernel_port_id) != 0)
-	{
-		YADECAP_LOG_ERROR("vdev interface '%s' not found\n", vdev_name);
-		rte_eal_hotplug_remove("vdev", vdev_name);
-		return std::nullopt;
-	}
-
-	rte_eth_conf eth_conf;
-	memset(&eth_conf, 0, sizeof(eth_conf));
-
-	int ret = rte_eth_dev_configure(kernel_port_id,
-	                                1,
-	                                1,
-	                                &eth_conf);
-	if (ret < 0)
-	{
-		YADECAP_LOG_ERROR("rte_eth_dev_configure() = %d\n", ret);
-		rte_eal_hotplug_remove("vdev", vdev_name);
-		return std::nullopt;
-	}
-
-	uint16_t mtu;
-	if (rte_eth_dev_get_mtu(port_id, &mtu) == 0)
-	{
-		rte_eth_dev_set_mtu(kernel_port_id, mtu);
-	}
-
-	int rc = rte_eth_rx_queue_setup(kernel_port_id,
-	                                0,
-	                                dataPlane->getConfigValues().kernel_interface_queue_size,
-	                                0, ///< @todo: socket
-	                                nullptr,
-	                                mempool);
-	if (rc < 0)
-	{
-		YADECAP_LOG_ERROR("rte_eth_rx_queue_setup() = %d\n", rc);
-		rte_eal_hotplug_remove("vdev", vdev_name);
-		return std::nullopt;
-	}
-
-	rc = rte_eth_tx_queue_setup(kernel_port_id,
-	                            0,
-	                            dataPlane->getConfigValues().kernel_interface_queue_size,
-	                            0, ///< @todo: socket
-	                            nullptr);
-	if (rc < 0)
-	{
-		YADECAP_LOG_ERROR("rte_eth_tx_queue_setup(%u, %u) = %d\n", kernel_port_id, 0, ret);
-		rte_eal_hotplug_remove("vdev", vdev_name);
-		return std::nullopt;
-	}
-
-	rc = rte_eth_dev_start(kernel_port_id);
-	if (rc)
-	{
-		YADECAP_LOG_ERROR("can't start eth dev(%d, %d): %s\n",
-		                  rc,
-		                  rte_errno,
-		                  rte_strerror(rte_errno));
-		rte_eal_hotplug_remove("vdev", vdev_name);
-		return std::nullopt;
-	}
-
-	return kernel_port_id;
-}
-
-void cControlPlane::remove_kernel_interface(const tPortId port_id,
-                                            const std::string& interface_name)
-{
-	char vdev_name[RTE_DEV_NAME_MAX_LEN];
-
-	snprintf(vdev_name,
-	         sizeof(vdev_name),
-	         "virtio_user_%s_%u",
-	         interface_name.data(),
-	         port_id);
-
-	rte_eal_hotplug_remove("vdev", vdev_name);
-}
-
-void cControlPlane::set_kernel_interface_up(const std::string& interface_name)
-{
-	int socket = ::socket(AF_INET, SOCK_DGRAM, 0);
-	if (socket < 0)
-	{
-		return;
-	}
-
-	struct ifreq request;
-	memset(&request, 0, sizeof request);
-
-	strncpy(request.ifr_name, interface_name.data(), IFNAMSIZ);
-
-	request.ifr_flags |= IFF_UP;
-	ioctl(socket, SIOCSIFFLAGS, &request);
 }
 
 void cControlPlane::flush_kernel_interface(KniPortData& port_data, sKniStats& stats)

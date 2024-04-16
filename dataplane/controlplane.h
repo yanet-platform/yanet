@@ -19,6 +19,7 @@
 
 #include "dregress.h"
 #include "fragmentation.h"
+#include "kernel_interface_handle.h"
 #include "type.h"
 
 class cControlPlane ///< @todo: move to cDataPlane
@@ -80,10 +81,6 @@ public:
 
 protected:
 	eResult initMempool();
-	eResult init_kernel_interfaces();
-	std::optional<tPortId> add_kernel_interface(const tPortId port_id, const std::string& interface_name);
-	void remove_kernel_interface(const tPortId port_id, const std::string& interface_name);
-	void set_kernel_interface_up(const std::string& interface_name);
 
 	void mainThread();
 	unsigned ring_handle(rte_ring* ring_to_free_mbuf, rte_ring* ring);
@@ -133,6 +130,14 @@ protected:
 
 	rte_mempool* mempool;
 	bool use_kernel_interface;
+
+	struct KniHandleBundle
+	{
+		dataplane::KernelInterfaceHandle forward;
+		dataplane::KernelInterfaceHandle in_dump;
+		dataplane::KernelInterfaceHandle out_dump;
+		dataplane::KernelInterfaceHandle drop_dump;
+	};
 
 	struct KniPortData
 	{
