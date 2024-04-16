@@ -105,6 +105,7 @@ public:
 	{
 		return current_time;
 	}
+	std::string InterfaceNameFromPort(tPortId id) { return std::get<0>(ports[id]); };
 
 protected:
 	eResult parseConfig(const std::string& configFilePath);
@@ -116,9 +117,18 @@ protected:
 
 	eResult initEal(const std::string& binaryPath, const std::string& filePrefix);
 	eResult initPorts();
-	eResult initRingPorts();
+
+public:
+	void StartInterfaces();
+	void InitPortsBarrier();
+
+protected:
+	eResult init_kernel_interfaces();
+	bool KNIAddTxQueue(tQueueId queue, tSocketId socket);
+	bool KNIAddRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool);
 	eResult initGlobalBases();
 	eResult initWorkers();
+	eResult initKniQueues();
 	eResult initQueues();
 	void init_worker_base();
 
@@ -141,6 +151,15 @@ protected:
 	friend class worker_gc_t;
 
 	tDataPlaneConfig config;
+
+	struct KniHandleBundle
+	{
+		dataplane::KernelInterfaceHandle forward;
+		dataplane::KernelInterfaceHandle in_dump;
+		dataplane::KernelInterfaceHandle out_dump;
+		dataplane::KernelInterfaceHandle drop_dump;
+	};
+	std::map<tPortId, KniHandleBundle> kni_interface_handles;
 
 	std::map<tPortId,
 	         std::tuple<std::string, ///< interface_name
@@ -186,6 +205,8 @@ protected:
 
 	std::set<tSocketId> socket_ids;
 	std::map<tSocketId, worker_gc_t*> socket_worker_gcs;
+	std::map<tSocketId, rte_mempool*> socket_cplane_mempools;
+
 	std::vector<cWorker*> workers_vector;
 
 	std::mutex switch_worker_base_mutex;
