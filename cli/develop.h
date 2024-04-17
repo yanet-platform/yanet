@@ -9,6 +9,7 @@
 
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
+#include "common/pde.h"
 #include "common/tsc_deltas.h"
 
 #include "helper.h"
@@ -151,7 +152,9 @@ void counter(const uint32_t& counter_id,
 		}
 	}
 
-	const auto response = dataplane.getCounters(counter_ids);
+	common::pde::MainFileData processes_data;
+	processes_data.ReadFromDataplane(false, true);
+	const auto response = processes_data.GetCounters(counter_ids);
 
 	table_t table;
 	table.insert("counter_id",

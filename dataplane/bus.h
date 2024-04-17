@@ -24,6 +24,8 @@ public:
 	void stop();
 	void join();
 
+	void SetBuffers(uint64_t* buf_requests, uint64_t* buf_errors, uint64_t* buf_durations);
+
 protected:
 	void mainLoop();
 	void clientThread(int clientSocket);
@@ -67,13 +69,9 @@ protected:
 
 	struct sStats
 	{
-		sStats()
-		{
-			memset(this, 0, sizeof(*this));
-		}
-
-		uint64_t requests[(uint32_t)common::idp::requestType::size];
-		uint64_t errors[(uint32_t)common::idp::errorType::size];
+		uint64_t* requests; // common::idp::requestType::size
+		uint64_t* errors; // common::idp::errorType::size
+		uint64_t* durations; // common::idp::requestType::size
 	} stats;
 
 	cDataPlane* dataPlane;

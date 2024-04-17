@@ -10,6 +10,7 @@
 #include "common/bufferring.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
+#include "common/pde.h"
 #include "common/result.h"
 
 using ipv4_address_t = common::ipv4_address_t;
@@ -89,6 +90,7 @@ protected:
 
 	interface::dataPlane dataPlane;
 	interface::controlPlane controlPlane;
+	common::pde::MainFileData processes_data;
 
 	common::idp::getConfig::response dataPlaneConfig;
 	common::idp::get_shm_info::response dataPlaneSharedMemory;

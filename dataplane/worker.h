@@ -8,6 +8,7 @@
 #include <rte_mempool.h>
 #include <rte_ring.h>
 
+#include "common/pde.h"
 #include "common/result.h"
 #include "common/tsc_deltas.h"
 #include "common/type.h"
@@ -67,7 +68,8 @@ public:
 
 	void start();
 
-	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
+	static uint64_t FillMetadataWorkerCounters(common::pde::MetadataWorker* metadata);
+	void SetBufferForCounters(void* buffer, const common::pde::MetadataWorker& metadata);
 
 protected:
 	eResult sanityCheck();
@@ -224,7 +226,6 @@ public:
 	friend class cDataPlane;
 	friend class cReport;
 	friend class cControlPlane;
-	friend class mControlPlane;
 	friend class dregress_t;
 	friend class worker_gc_t;
 	friend class dataplane::globalBase::generation;
@@ -327,11 +328,11 @@ protected:
 
 	rte_ring* ring_log;
 
-	common::worker::stats::common stats;
-	common::worker::stats::port statsPorts[CONFIG_YADECAP_PORTS_SIZE];
-	uint64_t bursts[CONFIG_YADECAP_MBUFS_BURST_SIZE + 1];
-	uint64_t counters[YANET_CONFIG_COUNTERS_SIZE];
-	uint64_t aclCounters[YANET_CONFIG_ACL_COUNTERS_SIZE];
+	common::worker::stats::common* stats;
+	common::worker::stats::port* statsPorts; // CONFIG_YADECAP_PORTS_SIZE
+	uint64_t* bursts; // CONFIG_YADECAP_MBUFS_BURST_SIZE + 1
+	uint64_t* counters; // YANET_CONFIG_COUNTERS_SIZE
+	uint64_t* aclCounters; // YANET_CONFIG_ACL_COUNTERS_SIZE
 
 	// will decrease with each new packet sent to slow worker, replenishes each N mseconds
 	int32_t packetsToSWNPRemainder;
