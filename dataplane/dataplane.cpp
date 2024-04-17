@@ -39,6 +39,8 @@
 #include "sock_dev.h"
 #include "worker.h"
 
+#define MAX_PACK_SIZE 16384
+
 common::log::LogPriority common::log::logPriority = common::log::TLOG_INFO;
 
 cDataPlane::cDataPlane() :
@@ -1209,6 +1211,25 @@ eResult cDataPlane::allocateSharedMemory()
 		}
 	}
 
+	// init size for in/out/drop lowPriority ring
+	for (const auto& [socket_id, num] : number_of_workers_per_socket)
+	{
+		auto unit_size = sizeof(sharedmemory::item_header_t) + MAX_PACK_SIZE;
+		if (unit_size % RTE_CACHE_LINE_SIZE != 0)
+		{
+			unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
+		}
+
+		auto size = sizeof(sharedmemory::ring_header_t) + unit_size * getConfigValues().ring_lowPriority_size;
+
+		auto it = shm_size_per_socket.find(socket_id);
+		if (it == shm_size_per_socket.end())
+		{
+			it = shm_size_per_socket.emplace_hint(it, socket_id, 0);
+		}
+		it->second += size * num;
+	}
+
 	for (const auto& [socket_id, num] : number_of_workers_per_socket)
 	{
 		auto it = shm_size_per_socket.find(socket_id);
@@ -1326,6 +1347,28 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 			tag_to_id[tag] = ring_id;
 
 			ring_id++;
+		}
+		// init lowPriority ring
+		{
+			auto name = "r_lp_" + std::to_string(core_id);
+			auto offset = offsets[shm];
+			auto memaddr = (void*)((intptr_t)shm + offset);
+			sharedmemory::cSharedMemory ring;
+
+			auto unit_size = sizeof(sharedmemory::item_header_t) + MAX_PACK_SIZE;
+			if (unit_size % RTE_CACHE_LINE_SIZE != 0)
+			{
+				unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
+			}
+			const auto units_number = getConfigValues().ring_lowPriority_size;
+			const auto size = sizeof(sharedmemory::ring_header_t) + unit_size * units_number;
+			ring.init(memaddr, unit_size, units_number);
+			offsets[shm] += size;
+
+			worker->lowPriorityRing = ring;
+
+			auto meta = common::idp::get_shm_info::dump_meta(name, "lp", unit_size, units_number, core_id, socket_id, key, offset);
+			dumps_meta.emplace_back(meta);
 		}
 	}
 
