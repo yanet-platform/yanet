@@ -27,6 +27,8 @@
 #include "type.h"
 #include "worker_gc.h"
 
+using InterfaceName = std::string;
+
 struct tDataPlaneConfig
 {
 	/*
@@ -35,7 +37,7 @@ struct tDataPlaneConfig
 	   and an identifier (typically pci id) used to lookup the port within
 	   DPDK.
 	*/
-	std::map<std::string, ///< interfaceName
+	std::map<InterfaceName,
 	         std::tuple<std::string, ///< pci
 	                    std::string, ///< name
 	                    bool, ///< symmetric_mode
@@ -45,7 +47,8 @@ struct tDataPlaneConfig
 
 	std::set<tCoreId> workerGCs;
 	tCoreId controlPlaneCoreId;
-	std::map<tCoreId, std::vector<std::string>> workers;
+	std::map<tCoreId, std::set<InterfaceName>> controlplane_workers;
+	std::map<tCoreId, std::vector<InterfaceName>> workers;
 	bool useHugeMem = true;
 	bool use_kernel_interface = true;
 	uint64_t rssFlags = RTE_ETH_RSS_IP;
@@ -107,10 +110,16 @@ public:
 protected:
 	eResult parseConfig(const std::string& configFilePath);
 	eResult parseJsonPorts(const nlohmann::json& json);
+	std::optional<std::map<tCoreId, std::set<InterfaceName>>> parseControlPlaneWorkers(const nlohmann::json& config);
+	std::optional<std::pair<tCoreId, std::set<InterfaceName>>> parseControlPlaneWorker(const nlohmann::json& cpwj);
+	nlohmann::json makeLegacyControlPlaneWorkerConfig();
+	std::set<InterfaceName> workerInterfacesToService();
 	eResult parseConfigValues(const nlohmann::json& json);
 	eResult parseRateLimits(const nlohmann::json& json);
 	eResult parseSharedMemory(const nlohmann::json& json);
 	eResult checkConfig();
+	bool checkControlPlaneWorkersConfig();
+	bool checkValidCoreId(const nlohmann::json& j);
 
 	eResult initEal(const std::string& binaryPath, const std::string& filePrefix);
 	eResult initPorts();
@@ -141,7 +150,7 @@ protected:
 	tDataPlaneConfig config;
 
 	std::map<tPortId,
-	         std::tuple<std::string, ///< interface_name
+	         std::tuple<InterfaceName,
 	                    std::map<tCoreId, tQueueId>, ///< rx_queues
 	                    unsigned int, ///< tx_queues_count
 	                    common::mac_address_t, ///< mac_address
