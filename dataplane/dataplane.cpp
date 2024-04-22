@@ -1759,6 +1759,13 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 		}
 	}
 
+	auto cp_workers = parseControlPlaneWorkers(rootJson);
+	if (!cp_workers)
+	{
+		return eResult::invalidConfigurationFile;
+	}
+	config.controlplane_workers = std::move(cp_workers.value());
+
 	if (rootJson.find("hugeMem") != rootJson.end())
 	{
 		config.useHugeMem = rootJson.find("hugeMem").value();
@@ -1884,6 +1891,124 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 	return eResult::success;
 }
 
+std::optional<std::map<tCoreId, std::set<InterfaceName>>> cDataPlane::parseControlPlaneWorkers(const nlohmann::json& root)
+{
+	nlohmann::json dflt;
+	auto cpw = root.find("controlPlaneWorkers");
+	if (cpw == root.end())
+	{
+		dflt = makeLegacyControlPlaneWorkerConfig();
+		YADECAP_LOG_WARNING("no config for control plane workers provided, using default legacy config\"%s\"\n",
+		                    dflt.dump().c_str());
+		cpw = dflt.find("controlPlaneWorkers");
+	}
+
+	std::map<tCoreId, std::set<InterfaceName>> result;
+
+	auto add_worker = [&](const nlohmann::json& j) {
+		auto worker = parseControlPlaneWorker(j);
+		if (!worker)
+		{
+			YADECAP_LOG_ERROR("invalid control plane worker config \"%s\"\n", j.dump().c_str());
+			return false;
+		}
+		result[worker->first] = worker->second;
+		return true;
+	};
+
+	if (!cpw->is_array())
+	{
+		if (!add_worker(cpw.value()))
+		{
+			return std::nullopt;
+		}
+	}
+	else
+	{
+		for (auto j : cpw.value())
+		{
+			if (!add_worker(j))
+			{
+				return std::nullopt;
+			}
+		}
+	}
+	return std::optional{std::move(result)};
+}
+
+nlohmann::json cDataPlane::makeLegacyControlPlaneWorkerConfig()
+{
+	nlohmann::json j;
+	j["core"] = config.controlPlaneCoreId;
+	j["interfaces"] = workerInterfacesToService();
+	return nlohmann::json{{"controlPlaneWorkers", j}};
+}
+
+std::set<InterfaceName> cDataPlane::workerInterfacesToService()
+{
+	std::set<InterfaceName> res;
+	for (const auto& p : config.workers)
+	{
+		const auto& ifaces = p.second;
+		for (const auto& i : ifaces)
+		{
+			res.emplace(i);
+		}
+	}
+	return res;
+}
+
+std::optional<std::pair<tCoreId, std::set<InterfaceName>>> cDataPlane::parseControlPlaneWorker(const nlohmann::json& cpwj)
+{
+	auto jcore = cpwj.find("core");
+	if (jcore == cpwj.end())
+	{
+		YADECAP_LOG_ERROR("controlPlaneWorker entry has no \"core\" field\n");
+		return std::nullopt;
+	}
+	if (!jcore.value().is_number_unsigned())
+	{
+		YADECAP_LOG_ERROR("controlPlaneWorker entry \"core\" field is not an unsigned integer\n");
+		return std::nullopt;
+	}
+	tCoreId core = jcore.value();
+
+	auto jports = cpwj.find("interfaces");
+	if (jports == cpwj.end())
+	{
+		YADECAP_LOG_ERROR("controlPlaneWorker entry has no \"interfaces\" field\n");
+		return std::nullopt;
+	}
+	if (jports.value().is_number_unsigned())
+	{
+		const std::set<InterfaceName> ifaces = jports.value();
+		return std::optional{
+		        std::pair<tCoreId, std::set<InterfaceName>>{
+		                core,
+		                std::set<InterfaceName>{InterfaceName{jports.value()}}}};
+	}
+	if (!jports.value().is_array())
+	{
+		YADECAP_LOG_ERROR("controlPlaneWorker entry \"interfaces\" has invalid type.\n");
+		return std::nullopt;
+	}
+
+	std::set<InterfaceName> worker_ports;
+	for (auto j : jports.value())
+	{
+		if (!j.is_string())
+		{
+			YADECAP_LOG_ERROR("controlPlaneWorker entry \"interfaces\" contains invalid type.");
+			return std::nullopt;
+		}
+		worker_ports.insert(InterfaceName{j});
+	}
+	return std::optional{
+	        std::pair<tCoreId, std::set<InterfaceName>>{
+	                core,
+	                std::move(worker_ports)}};
+}
+
 eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 {
 	config_values_ = json;
@@ -1985,7 +2110,53 @@ eResult cDataPlane::checkConfig()
 		}
 	}
 
+	if (!checkControlPlaneWorkersConfig())
+	{
+		return eResult::invalidConfigurationFile;
+	}
+
 	return eResult::success;
+}
+
+bool cDataPlane::checkControlPlaneWorkersConfig()
+{
+	std::set<InterfaceName> assigned;
+	std::set<InterfaceName> to_assign = workerInterfacesToService();
+	bool result = true;
+	for (const auto& [core, worker_ports] : config.controlplane_workers)
+	{
+		for (const auto& p : worker_ports)
+		{
+
+			if (assigned.find(p) != assigned.end())
+			{
+				YADECAP_LOG_ERROR("Duplicate port in control plane worker config: core: %d, port: %s\n", core, p.c_str());
+				result = false;
+				continue;
+			}
+
+			if (to_assign.find(p) == to_assign.end())
+			{
+				YADECAP_LOG_ERROR("Control plane worker config contains port not assigned to fast worker: core: %d, port: %s\n", core, p.c_str());
+				result = false;
+				continue;
+			}
+
+			assigned.emplace(p);
+			to_assign.erase(p);
+		}
+	}
+	if (!to_assign.empty())
+	{
+		std::stringstream ss;
+		for (const auto& p : to_assign)
+		{
+			ss << p << ' ';
+		}
+		YADECAP_LOG_ERROR("Ports { %s } are not assigned a control plane worker\n", ss.str().c_str());
+		result = false;
+	}
+	return result;
 }
 
 eResult cDataPlane::initEal(const std::string& binaryPath,
