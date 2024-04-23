@@ -1,5 +1,7 @@
 #include <arpa/inet.h>
+#include <bitset>
 #include <cstdint>
+#include <limits>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -1986,18 +1988,18 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 
 	insert_eal_arg("-c");
 
-	uint64_t coresMask = 0;
-	coresMask |= (((uint64_t)1) << (uint64_t)config.controlPlaneCoreId);
+	std::bitset<std::numeric_limits<uint_least64_t>::digits> cores_mask;
+	cores_mask[config.controlPlaneCoreId] = true;
 	for (const auto& coreId : config.workerGCs)
 	{
-		coresMask |= (((uint64_t)1) << (uint64_t)coreId);
+		cores_mask[coreId] = true;
 	}
 	for (const auto& iter : config.workers)
 	{
 		const tCoreId& coreId = iter.first;
-		coresMask |= (((uint64_t)1) << (uint64_t)coreId);
+		cores_mask[coreId] = true;
 	}
-	insert_eal_arg("0x%" PRIx64, coresMask);
+	insert_eal_arg("0x%" PRIx64, static_cast<uint_least64_t>(cores_mask.to_ullong()));
 
 #if RTE_VERSION >= RTE_VERSION_NUM(20, 11, 0, 0)
 	insert_eal_arg("--main-lcore");
