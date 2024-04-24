@@ -364,7 +364,7 @@ nlohmann::json cReport::convertControlPlane(const cControlPlane* controlPlane)
 		nlohmann::json jsonKni;
 
 		const auto& port = controlPlane->kernel_interfaces[i];
-		const auto& stats = port.stats;
+		const auto& stats = controlPlane->kernel_stats[i];
 
 		jsonKni["portId"] = portmapper.ToDpdk(i);
 		jsonKni["interfaceName"] = port.interface_name;

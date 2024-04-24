@@ -138,7 +138,6 @@ protected:
 	{
 		std::string interface_name;
 		tPortId kernel_port_id;
-		sKniStats stats;
 		rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 		uint16_t mbufs_count = 0;
 	};
