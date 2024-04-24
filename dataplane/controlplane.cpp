@@ -1747,7 +1747,7 @@ void cControlPlane::mainThread()
 				}
 				auto to_drop = rxSize - txSize;
 				rte_pktmbuf_free_bulk(operational + txSize, to_drop);
-				sKniStats& stats = kernel_interfaces[i].stats;
+				sKniStats& stats = kernel_stats[i];
 				stats.odropped += to_drop;
 				stats.opackets += txSize;
 				stats.obytes += bytes;
