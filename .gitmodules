@@ -1,3 +1,6 @@
 [submodule "subprojects/dpdk"]
 	path = subprojects/dpdk
 	url = https://github.com/yanet-platform/dpdk
+[submodule "subprojects/json"]
+	path = subprojects/json
+	url = https://github.com/nlohmann/json.git

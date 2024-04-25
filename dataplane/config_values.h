@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cstdint>
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 
 #include "common/config.h"
 

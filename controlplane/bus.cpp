@@ -9,7 +9,7 @@
 
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 
 #include "common/icp.h"
 #include "common/stream.h"
