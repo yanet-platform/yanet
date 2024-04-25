@@ -136,13 +136,14 @@ inline void setip(common::icp_proto::IPAddr* pAddr, const common::ip_address_t& 
 
 inline common::ip_address_t convert_to_ip_address(const common::icp_proto::IPAddr& proto_ipaddr)
 {
-	if (proto_ipaddr.has_ipv4())
+	switch (proto_ipaddr.addr_case())
 	{
-		return common::ipv4_address_t(proto_ipaddr.ipv4());
-	}
-	else
-	{
-		return common::ipv6_address_t((uint8_t*)proto_ipaddr.ipv6().data());
+		case common::icp_proto::IPAddr::AddrCase::kIpv4:
+			return common::ipv4_address_t(proto_ipaddr.ipv4());
+		case common::icp_proto::IPAddr::AddrCase::kIpv6:
+			return common::ipv6_address_t((uint8_t*)proto_ipaddr.ipv6().data());
+		default:
+			throw std::string("internal error: address type is not set");
 	}
 }
 
@@ -250,16 +251,16 @@ void real_find(std::string module_string,
 				table.insert(balancer.module(),
 				             virtual_ip,
 				             proto_string,
-				             service.key().has_port() ? std::make_optional(service.key().port()) : std::nullopt,
+				             service.key().port_opt_case() == common::icp_proto::BalancerRealFindResponse_ServiceKey::PortOptCase::kPort ? std::make_optional(service.key().port()) : std::nullopt,
 				             service.scheduler(),
 				             real_ip,
-				             real.has_port() ? std::make_optional(real.port()) : std::nullopt,
+				             real.port_opt_case() == common::icp_proto::BalancerRealFindResponse_Real::PortOptCase::kPort ? std::make_optional(real.port()) : std::nullopt,
 				             real.enabled(),
 				             real.weight(),
 				             connections,
 				             real.packets(),
 				             real.bytes(),
-				             service.has_version() ? std::make_optional(service.version()) : std::nullopt);
+				             service.version_opt_case() == common::icp_proto::BalancerRealFindResponse_Service::VersionOptCase::kVersion ? std::make_optional(service.version()) : std::nullopt);
 			}
 		}
 	}
