@@ -28,15 +28,21 @@ message BalancerRealFindRequest {
   string module = 1;
   IPAddr virtual_ip = 2;
   NetProto proto = 3;
-  optional uint32 virtual_port = 4;
+  oneof virtual_port_opt {
+    uint32 virtual_port = 4;
+  }
   IPAddr real_ip = 5;
-  optional uint32 real_port = 6;
+  oneof real_port_opt {
+    uint32 real_port = 6;
+  }
 }
 
 message BalancerRealFindResponse {
   message Real {
     IPAddr ip = 1;
-    optional uint32 port = 2;
+    oneof port_opt {
+      uint32 port = 2;
+    }
     bool enabled = 3;
     uint32 weight = 4;
     uint64 connections = 5;
@@ -46,13 +52,17 @@ message BalancerRealFindResponse {
   message ServiceKey{
     IPAddr ip = 1;
     NetProto proto = 2;
-    optional uint32 port = 3;
+    oneof port_opt {
+      uint32 port = 3;
+    }
   }
   message Service {
     ServiceKey key = 1;
     string scheduler = 2;
     repeated Real reals = 3;
-    optional string version = 4;
+    oneof version_opt {
+      string version = 4;
+    }
   }
   message BalancerData {
     uint32 balancer_id = 1;
@@ -68,11 +78,17 @@ message BalancerRealRequest {
     string module = 1;
     IPAddr virtual_ip = 2;
     NetProto proto = 3;
-    optional uint32 virtual_port = 4;
+    oneof virtual_port_opt {
+       uint32 virtual_port = 4;
+    }
     IPAddr real_ip = 5;
-    optional uint32 real_port = 6;
+    oneof real_port_opt {
+      uint32 real_port = 6;
+    }
     bool enable = 7;
-    optional uint32 weight = 8;
+    oneof weight_opt {
+      uint32 weight = 8;
+    }
   }
   repeated Real reals = 1;
 }
