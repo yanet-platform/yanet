@@ -35,6 +35,10 @@ endif
 # Add all global arguments at once
 add_global_arguments(compiler_args, language: 'cpp')
 
+add_global_arguments('-DGOOGLE_PROTOBUF_NO_RTTI', language: 'cpp')
+
+add_global_arguments('-Wno-unused-parameter', language: 'cpp')
+
 libdpdk = subproject('dpdk', default_options: [
     'platform=generic',
     'cpu_instruction_set=corei7',
