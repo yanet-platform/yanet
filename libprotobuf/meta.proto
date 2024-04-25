@@ -3,6 +3,10 @@ syntax = "proto3";
 package common.proto;
 
 message RpcMeta {
-  optional string service_name = 1;
-  optional string method_name = 2;
+  oneof service_name_ {
+    string service_name = 1;
+  }
+  oneof method_name_ {
+    string method_name = 2;
+  }
 }
