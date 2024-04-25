@@ -60,7 +60,11 @@ static int send(int clientSocket, const Req& request)
 {
 	if constexpr (std::is_convertible_v<Req&, ::google::protobuf::Message&>)
 	{
-		auto size = request.ByteSizeLong();
+#if GOOGLE_PROTOBUF_VERSION < 3001000
+		uint64_t size = request.ByteSize();
+#else
+		uint64_t size = request.ByteSizeLong();
+#endif
 		std::vector<char> buf(size);
 
 		if (!request.SerializeToArray(buf.data(), size))
@@ -87,7 +91,11 @@ static int send(int clientSocket, Req&& request)
 {
 	if constexpr (std::is_convertible_v<Req&, ::google::protobuf::Message&>)
 	{
+#if GOOGLE_PROTOBUF_VERSION < 3001000
+		uint64_t size = request.ByteSize();
+#else
 		uint64_t size = request.ByteSizeLong();
+#endif
 		std::vector<char> buf(size);
 
 		if (!request.SerializeToArray(buf.data(), size))

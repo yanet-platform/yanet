@@ -70,13 +70,14 @@ inline void setip(common::icp_proto::IPAddr* pAddr, const ip_address_t& value)
 
 inline common::ip_address_t convert_to_ip_address(const common::icp_proto::IPAddr& proto_ipaddr)
 {
-	if (proto_ipaddr.has_ipv4())
+	switch (proto_ipaddr.addr_case())
 	{
-		return common::ipv4_address_t(proto_ipaddr.ipv4());
-	}
-	else
-	{
-		return common::ipv6_address_t((uint8_t*)proto_ipaddr.ipv6().data());
+		case common::icp_proto::IPAddr::AddrCase::kIpv4:
+			return common::ipv4_address_t(proto_ipaddr.ipv4());
+		case common::icp_proto::IPAddr::AddrCase::kIpv6:
+			return common::ipv6_address_t((uint8_t*)proto_ipaddr.ipv6().data());
+		default:
+			throw std::string("internal error: address type is not set");
 	}
 }
 
@@ -89,9 +90,9 @@ void balancer_t::RealFind(
 	auto response = balancer_real_find({!req->module().empty() ? std::optional<std::string>{req->module()} : std::nullopt,
 	                                    req->has_virtual_ip() ? std::optional<common::ip_address_t>{convert_to_ip_address(req->virtual_ip())} : std::nullopt,
 	                                    req->proto() != common::icp_proto::NetProto::undefined ? std::optional<uint8_t>{req->proto() == common::icp_proto::NetProto::tcp ? IPPROTO_TCP : IPPROTO_UDP} : std::nullopt,
-	                                    req->has_virtual_port() ? std::optional<uint16_t>{req->virtual_port()} : std::nullopt,
+	                                    req->virtual_port_opt_case() == common::icp_proto::BalancerRealFindRequest::VirtualPortOptCase::kVirtualPort ? std::optional<uint16_t>{req->virtual_port()} : std::nullopt,
 	                                    req->has_real_ip() ? std::optional<common::ip_address_t>{convert_to_ip_address(req->real_ip())} : std::nullopt,
-	                                    req->has_real_port() ? std::optional<uint16_t>{req->real_port()} : std::nullopt});
+	                                    req->real_port_opt_case() == common::icp_proto::BalancerRealFindRequest::RealPortOptCase::kRealPort ? std::optional<uint16_t>{req->real_port()} : std::nullopt});
 
 	for (const auto& [key, value] : response)
 	{
@@ -161,11 +162,11 @@ void balancer_t::Real(
 		request.push_back({real.module(),
 		                   convert_to_ip_address(real.virtual_ip()),
 		                   real.proto() == common::icp_proto::NetProto::tcp ? IPPROTO_TCP : IPPROTO_UDP,
-		                   real.has_virtual_port() ? std::make_optional(real.virtual_port()) : std::nullopt,
+		                   real.virtual_port_opt_case() == common::icp_proto::BalancerRealRequest_Real::VirtualPortOptCase::kVirtualPort ? std::make_optional(real.virtual_port()) : std::nullopt,
 		                   convert_to_ip_address(real.real_ip()),
-		                   real.has_real_port() ? std::make_optional(real.real_port()) : std::nullopt,
+		                   real.real_port_opt_case() == common::icp_proto::BalancerRealRequest_Real::RealPortOptCase::kRealPort ? std::make_optional(real.real_port()) : std::nullopt,
 		                   real.enable(),
-		                   real.has_weight() ? std::make_optional(real.weight()) : std::nullopt});
+		                   real.weight_opt_case() == common::icp_proto::BalancerRealRequest_Real::WeightOptCase::kWeight ? std::make_optional(real.weight()) : std::nullopt});
 	}
 
 	balancer_real(request);
