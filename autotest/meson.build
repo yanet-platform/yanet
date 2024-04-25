@@ -12,6 +12,7 @@ executable('yanet-autotest',
            sources,
            include_directories: yanet_rootdir,
            dependencies: dependencies,
+           link_args : ['-lstdc++fs'],
            install: true)
 
 install_data('yanet-autotest-run.py', install_dir: get_option('bindir'))
