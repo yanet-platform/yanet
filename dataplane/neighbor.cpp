@@ -32,12 +32,12 @@ static void parse_rt_attributes(rtattr* rt_attributes[],
 	}
 }
 
-static std::string iface_id_to_name(unsigned int iface_id)
+static std::string iface_id_to_name(int32_t iface_id)
 {
 	char buffer[IFNAMSIZ];
 	if (if_indextoname(iface_id, buffer) == nullptr)
 	{
-		snprintf(buffer, IFNAMSIZ, "unknown_%u", iface_id);
+		snprintf(buffer, IFNAMSIZ, "unknown_%i", iface_id);
 	}
 	return buffer;
 }
