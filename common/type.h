@@ -9,8 +9,8 @@
 
 #include <arpa/inet.h>
 #include <inttypes.h>
-#include <memory.h>
 #include <nlohmann/json.hpp>
+#include <memory.h>
 
 #include "config.h"
 #include "ctree.h"

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <mutex>
 #include <nlohmann/json.hpp>
+#include <mutex>
 #include <rte_malloc.h>
 
 #include "common.h"

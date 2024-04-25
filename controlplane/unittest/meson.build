@@ -1,4 +1,5 @@
 dependencies = []
+dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
 dependencies += dependency('gtest')
