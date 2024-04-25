@@ -5,7 +5,7 @@
 #include <thread>
 #include <unordered_map>
 
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 
 #include "common/generation.h"
 #include "common/idp.h"

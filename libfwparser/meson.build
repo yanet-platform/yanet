@@ -1,3 +1,6 @@
+dependencies = []
+dependencies += libjson.get_variable('nlohmann_json_dep')
+
 flex_token = custom_target('flex_token.l',
                            input: 'token.l',
                            output: ['@BASENAME@.cpp', '@BASENAME@.h'],
@@ -21,6 +24,7 @@ sources = files('fw_config.cpp',
 
 libyanet_fwparser = static_library('yanet-fwparser',
                                    [sources, flex_token, bison_fw_parser],
+                                   dependencies: dependencies,
                                    include_directories: yanet_rootdir)
 
 libyanet_fwparser_dep = declare_dependency(sources: [flex_token, bison_fw_parser],

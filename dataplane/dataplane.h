@@ -12,7 +12,7 @@
 #include <rte_mbuf.h>
 #include <rte_mempool.h>
 
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 
 #include "common/idp.h"
 #include "common/result.h"

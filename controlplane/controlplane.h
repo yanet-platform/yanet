@@ -9,7 +9,7 @@
 #include <type_traits>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include <json.hpp>
 
 #include "common/generation.h"
 #include "common/icp.h"

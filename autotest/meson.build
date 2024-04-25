@@ -2,6 +2,7 @@ sources = files('autotest.cpp',
                 'main.cpp')
 
 dependencies = []
+dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('yaml-cpp', static: true)
 dependencies += dependency('libpcap', static: true)
