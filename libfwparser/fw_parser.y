@@ -1,5 +1,5 @@
-// require bison version 3.3+
-%require "3.3"
+// require bison version 3.0+
+%require "3.0"
 
 // generate C++ source code
 %language "C++"
@@ -8,7 +8,8 @@
 %define api.namespace {ipfw}
 
 // define custom parser class name
-%define api.parser.class {fw_parser_t}
+//%define api.parser.class {fw_parser_t} // bison 3.3
+%define parser_class_name {fw_parser_t}
 
 // define type of semantic values
 %define api.value.type variant
