@@ -43,6 +43,8 @@ libdpdk = subproject('dpdk', default_options: [
     'enable_driver_sdk=true', 'disable_drivers=net/mlx4',
     'default_library=static', 'tests=false' ] )
 
+libjson = subproject('json')
+
 if target_option.contains('buildenv')
     subdir('libprotobuf')
     subdir('libfwparser')
