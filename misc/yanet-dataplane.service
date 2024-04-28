@@ -1,0 +1,29 @@
+[Unit]
+Description=yanet dataplane
+After=network.target
+StartLimitBurst=3600000
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+User=root
+Group=yanet
+
+OOMScoreAdjust=-1000
+CapabilityBoundingSet=cap_net_admin cap_net_raw cap_ipc_lock cap_sys_admin cap_sys_rawio
+
+RuntimeDirectory=yanet
+RuntimeDirectoryMode=0775
+
+ExecStart=/usr/bin/yanet-dataplane -c /etc/yanet/dataplane.conf
+TimeoutSec=300
+
+# wait interfaces up
+ExecStartPost=/bin/sleep 8
+
+Restart=always
+RestartSec=1
+LimitCORE=infinity
+
+[Install]
+WantedBy=multi-user.target

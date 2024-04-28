@@ -52,7 +52,7 @@ jobs:
 
   build-autotest:
     needs: build-image-builder
-    runs-on: builder
+    runs-on: ubuntu-latest
     container:
       image: yanetplatform/builder-lite
     steps:

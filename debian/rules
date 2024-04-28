@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+
+DESTDIR = ${CURDIR}/debian/tmp
+
+YANET_VERSION_MAJOR ?= 0
+YANET_VERSION_MINOR ?= 0
+
+%:
+	dh $@ --builddirectory=build
+
+
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-Dtarget=release \
+		-Dversion_major=${YANET_VERSION_MAJOR} -Dversion_minor=${YANET_VERSION_MINOR} \
+		-Dversion_revision=${YANET_VERSION_REVISION} -Dversion_hash=${YANET_VERSION_HASH} \
+		-Dversion_custom=${YANET_VERSION_CUSTOM}
+
+override_dh_auto_install:
+	install -pD -m0755 build/controlplane/yanet-controlplane -t debian/tmp/usr/bin
+	install -pD -m0755 build/cli/yanet-cli -t debian/tmp/usr/bin
+	install -pD -m0755 yanet-cli.bash_completion debian/tmp/etc/bash_completion.d/yanet-cli
+	install -pD -m0755 yanet-cli.zsh_completion debian/tmp/usr/share/zsh/vendor-completions/_yanet-cli
+	install -pD -m0755 build/dataplane/yanet-dataplane -t debian/tmp/usr/bin
+	install -pD -m0755 misc/yanet-dataplane.service -t debian/tmp/lib/systemd/system
+	install -pD -m0755 misc/yanet-controlplane.service -t debian/tmp/lib/systemd/system
+	install -pD -m0775 libprotobuf/meta.proto -t debian/tmp/usr/include/yanet/
+	install -pD -m0775 libprotobuf/controlplane.proto -t debian/tmp/usr/include/yanet/
+	install -pD -m0775 build/librib/libyanet-rib.so -t debian/tmp/usr/lib
+	install -pDT -m0775 librib/libyabird.h -t debian/tmp/usr/include/libyanet-rib.h
+	install -pD -m0775 yanet-announcer.py -t debian/tmp/usr/bin
+	install -pD -m0775 yanet-init.sh -t debian/tmp/usr/bin
+	install -pD -m0775 yanet-rebind.sh -t debian/tmp/usr/bin

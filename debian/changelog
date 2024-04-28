@@ -1,0 +1,5 @@
+yanet (64.0-0) UNRELEASED; urgency=medium
+
+  * Initial support for deb packages build
+
+ -- Georgy Kirichenko <kirichenkoga@gmail.com>  Sat, 04 May 2024 10:56:55 +0000

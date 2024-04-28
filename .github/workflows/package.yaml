@@ -1,14 +1,13 @@
-name: Release
+name: Packages
 
 on:
   push:
-    tags:
-      - 'v[0-9]+.[0-9]+'
+    branches: ["*", "deb-package"]
 
 jobs:
   build-debian-package-jammy:
     name: build (Ubuntu 22.04)
-    runs-on: builder
+    runs-on: ubuntu-latest
     container:
       image: yanetplatform/builder-lite
     steps:
@@ -16,7 +15,7 @@ jobs:
         with:
           submodules: recursive
       - run: |
-          export YANET_VERSION=${{github.ref_name}}
+          export YANET_VERSION=v0.1
           export YANET_VERSION=${YANET_VERSION#v}
           export YANET_VERSION_MAJOR=${YANET_VERSION%.*}
           export YANET_VERSION_MINOR=${YANET_VERSION#*.}
@@ -26,12 +25,12 @@ jobs:
           dpkg-buildpackage -b
       - uses: actions/upload-artifact@v3
         with:
-          name: target_debian
-          path: ../yanet*.deb
+          name: target_debian-22.04
+          path: /__w/yanet/yanet*.deb
 
   build-debian-package-bionic:
     name: build (Ubuntu 18.04)
-    runs-on: builder
+    runs-on: ubuntu-latest
     container:
       image: yanetplatform/builder_ubuntu18.04-lite
     steps:
@@ -39,7 +38,7 @@ jobs:
         with:
           submodules: recursive
       - run: |
-          export YANET_VERSION=${{github.ref_name}}
+          export YANET_VERSION=v0.1
           export YANET_VERSION=${YANET_VERSION#v}
           export YANET_VERSION_MAJOR=${YANET_VERSION%.*}
           export YANET_VERSION_MINOR=${YANET_VERSION#*.}
@@ -49,5 +48,5 @@ jobs:
           dpkg-buildpackage -b
       - uses: actions/upload-artifact@v3
         with:
-          name: target_debian
-          path: ../yanet*.deb
+          name: target_debian-18.04
+          path: /__w/yanet/yanet*.deb
