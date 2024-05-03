@@ -31,7 +31,7 @@
 #define YANET_MEMORY_BARRIER_COMPILE __asm__ __volatile__("" :: \
 	                                                          : "memory")
 
-#define YADECAP_METADATA(mbuf) ((dataplane::metadata*)((char*)(mbuf)->buf_addr))
+#define YADECAP_METADATA(mbuf) ((dataplane::metadata*)((mbuf)->buf_addr))
 
 #define YADECAP_ETHER_TYPE_MPLS (0x8847)
 #define YADECAP_MPLS_HEADER_SIZE 4
