@@ -5,8 +5,6 @@ import os
 import time
 import subprocess
 import sys
-import string
-import random
 import signal
 import atexit
 import optparse
@@ -33,6 +31,7 @@ class Autotest:
                 return
             time.sleep(1)
 
+        print("ERROR: Failed to start application:", application)
         self.kill_processes()
         sys.exit(2)
 
@@ -48,24 +47,27 @@ class Autotest:
                 pass
 
     def run_dataplane(self, dataplane_conf_path):
-        command = "yanet-dataplane"
+        command = "yanet-dataplane -c " + dataplane_conf_path
         if self.debug:
             command += " -d"
-        command += f" -c {dataplane_conf_path}"
+            print("DEBUG: Executing command:", command)
 
-        self.p_dataplane = subprocess.Popen(command, shell=True, preexec_fn = os.setsid)
+        self.p_dataplane = subprocess.Popen(command, shell=True, preexec_fn=os.setsid)
         self.wait_application("dataplane")
 
     def run_controlplane(self):
         command = "yanet-controlplane"
         if self.debug:
             command += " -d"
+            print("DEBUG: Executing command:", command)
 
-        self.p_controlplane = subprocess.Popen(command, shell=True, preexec_fn = os.setsid)
+        self.p_controlplane = subprocess.Popen(command, shell=True, preexec_fn=os.setsid)
         self.wait_application("controlplane")
 
     def run_autotest(self, units):
         command = "yanet-autotest " + " ".join(units)
+        if self.debug:
+            print("DEBUG: Executing command:", command)
 
         self.p_autotest = subprocess.Popen(command, shell=True)
 
@@ -116,23 +118,14 @@ def main():
 
     atexit.register(autotest.kill_processes)
 
-    dataplane_conf_path = args[0] + "/dataplane.conf"
-    units = []
-    if len(args) == 1:
-        for name in os.listdir("%s" % (args[0])):
-            if name == "disabled":
-                continue
-
-            full_path = os.path.join("%s" % (args[0]), name)
-            if os.path.isdir(full_path):
-                units.append(full_path)
-
-        units.sort()
-    else:
-        units = args[1:]
+    dataplane_conf_path = os.path.join(args[0], "dataplane.conf")
+    units = args[1:] if len(args) > 1 else sorted([
+        os.path.join(args[0], name) for name in os.listdir(args[0])
+        if os.path.isdir(os.path.join(args[0], name)) and name != "disabled"
+    ])
 
     autotest.start(dataplane_conf_path, units)
     return 0
 
-if __name__ =="__main__":
+if __name__ == "__main__":
     sys.exit(main())
