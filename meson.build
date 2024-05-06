@@ -6,49 +6,59 @@ project('yanet', 'cpp',
                           'werror=true',
                           'b_lto=true'])
 
-
 yanet_rootdir = include_directories('.')
 
+target_option = get_option('target')
+arch_option = get_option('arch')
+yanet_config_option = get_option('yanet_config')
+bindir_option = get_option('bindir')
+datadir_option = get_option('datadir')
+
+compiler_args = []
+
 if get_option('buildtype').contains('release')
-    add_global_arguments('-Ofast', language: 'cpp')
+    compiler_args += '-Ofast'
 endif
 
-add_global_arguments('-DYANET_VERSION_MAJOR=' + get_option('version_major').to_string(), language: 'cpp')
-add_global_arguments('-DYANET_VERSION_MINOR=' + get_option('version_minor').to_string(), language: 'cpp')
-add_global_arguments('-DYANET_VERSION_REVISION=' + get_option('version_revision'), language: 'cpp')
-add_global_arguments('-DYANET_VERSION_HASH=' + get_option('version_hash'), language: 'cpp')
-add_global_arguments('-DYANET_VERSION_CUSTOM=' + get_option('version_custom'), language: 'cpp')
+compiler_args += [
+    '-DYANET_VERSION_MAJOR=' + get_option('version_major').to_string(),
+    '-DYANET_VERSION_MINOR=' + get_option('version_minor').to_string(),
+    '-DYANET_VERSION_REVISION=' + get_option('version_revision'),
+    '-DYANET_VERSION_HASH=' + get_option('version_hash'),
+    '-DYANET_VERSION_CUSTOM=' + get_option('version_custom'),
+]
 
 
-if get_option('target').contains('buildenv')
+# Add all global arguments at once
+add_global_arguments(compiler_args, language: 'cpp')
+
+if target_option.contains('buildenv')
     subdir('libprotobuf')
     subdir('libfwparser')
     subdir('parser')
     subdir_done()
-elif get_option('target').contains('unittest')
+elif target_option.contains('unittest')
     subdir('libfwparser')
     subdir('dataplane/unittest')
     subdir('controlplane/unittest')
     subdir_done()
 endif
 
-
 archs = ['corei7']
 yanet_configs = ['release']
 
-if get_option('target').contains('autotest')
+if target_option.contains('autotest')
     archs = ['corei7']
     yanet_configs = ['autotest']
 endif
 
-if get_option('arch').length() > 0
-    archs = get_option('arch')
+if arch_option.length() > 0
+    archs = arch_option
 endif
 
-if get_option('yanet_config').length() > 0
-    yanet_configs = get_option('yanet_config')
+if yanet_config_option.length() > 0
+    yanet_configs = yanet_config_option
 endif
-
 
 subdir('libprotobuf')
 subdir('libfwparser')
@@ -56,31 +66,31 @@ subdir('dataplane')
 subdir('controlplane')
 subdir('cli')
 
-if get_option('target').contains('release')
+if target_option.contains('release')
     subdir('logger')
     subdir('librib')
 
     install_data('yanet-init.sh',
                  rename: 'yanet-init',
-                 install_dir: get_option('bindir'))
+                 install_dir: bindir_option)
 
     install_data('yanet-announcer.py',
                  rename: 'yanet-announcer',
-                 install_dir: get_option('bindir'))
+                 install_dir: bindir_option)
 
     install_data('yanet-cli.bash_completion',
                  rename: 'yanet-cli',
-                 install_dir: get_option('datadir') / 'bash-completion' / 'completions')
+                 install_dir: datadir_option / 'bash-completion' / 'completions')
 
     install_data('yanet-cli.zsh_completion',
                  rename: '_yanet-cli',
-                 install_dir: get_option('datadir') / 'zsh' / 'functions' / 'Completion' / 'Unix')
+                 install_dir: datadir_option / 'zsh' / 'functions' / 'Completion' / 'Unix')
 
-    install_data('yanet-wrapper', install_dir: get_option('bindir'))
+    install_data('yanet-wrapper', install_dir: bindir_option)
 
     install_data('yanet-rebind.sh',
                  rename: 'yanet-rebind',
-                 install_dir: get_option('bindir'))
-elif get_option('target').contains('autotest')
+                 install_dir: bindir_option)
+elif target_option.contains('autotest')
     subdir('autotest')
 endif
