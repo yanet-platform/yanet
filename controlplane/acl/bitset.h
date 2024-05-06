@@ -4,6 +4,10 @@
 #include <tuple>
 #include <vector>
 
+#ifdef ACL_DEBUG
+#include <string>
+#endif
+
 namespace acl
 {
 

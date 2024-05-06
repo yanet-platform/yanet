@@ -41,3 +41,8 @@ option('version_custom',
        value: 'develop',
        description: 'Set the custom string version.',
        yield: true)
+
+option('enable_acl_debug',
+       type: 'boolean',
+       value: false,
+       description: 'Enable ACL debug flags.')

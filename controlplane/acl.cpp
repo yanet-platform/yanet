@@ -10,8 +10,6 @@
 #include <unordered_set>
 #include <vector>
 
-//#define ACL_DEBUG
-
 #ifdef ACL_DEBUG
 #define ACL_DEBUGLEVEL (1)
 #else
