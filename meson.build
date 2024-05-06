@@ -28,6 +28,9 @@ compiler_args += [
     '-DYANET_VERSION_CUSTOM=' + get_option('version_custom'),
 ]
 
+if get_option('enable_acl_debug')
+    compiler_args += '-DACL_DEBUG'
+endif
 
 # Add all global arguments at once
 add_global_arguments(compiler_args, language: 'cpp')
