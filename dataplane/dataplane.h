@@ -22,6 +22,7 @@
 #include "config_values.h"
 #include "controlplane.h"
 #include "globalbase.h"
+#include "memory_manager.h"
 #include "neighbor.h"
 #include "report.h"
 #include "type.h"

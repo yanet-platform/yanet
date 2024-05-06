@@ -24,15 +24,9 @@ memory_pointer::~memory_pointer()
 	destructor(pointer);
 }
 
-memory_manager::memory_manager() :
-        dataplane(nullptr)
+memory_manager::memory_manager(cDataPlane* dplane) :
+        dataplane(dplane)
 {
-}
-
-eResult memory_manager::init(cDataPlane* dataplane)
-{
-	this->dataplane = dataplane;
-	return eResult::success;
 }
 
 inline std::string to_hex(const void* pointer)

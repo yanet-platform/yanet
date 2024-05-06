@@ -29,9 +29,8 @@ public:
 class memory_manager
 {
 public:
-	memory_manager();
+	memory_manager(cDataPlane*);
 
-	eResult init(cDataPlane* dataplane);
 	void report(nlohmann::json& json);
 	void limits(common::idp::limits::response& response);
 	eResult memory_manager_update(const common::idp::memory_manager_update::request& request);
