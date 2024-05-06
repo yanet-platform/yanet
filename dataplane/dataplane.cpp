@@ -46,7 +46,8 @@ cDataPlane::cDataPlane() :
         globalBaseSerial(0),
         report(this),
         controlPlane(new cControlPlane(this)),
-        bus(this)
+        bus(this),
+        memory_manager(this)
 {
 }
 
@@ -168,12 +169,6 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	numaNodesInUse = worker_gcs.size();
 
 	result = initQueues();
-	if (result != eResult::success)
-	{
-		return result;
-	}
-
-	result = memory_manager.init(this);
 	if (result != eResult::success)
 	{
 		return result;
