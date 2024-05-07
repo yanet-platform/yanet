@@ -10,10 +10,12 @@ import atexit
 import optparse
 
 class Autotest:
-    def __init__(self, debug, keep, prefix):
+    def __init__(self, debug, keep, prefix, gdb_dataplane, gdb_controlplane):
         self.debug = debug
         self.keep = keep
         self.prefix = prefix
+        self.gdb_dataplane = gdb_dataplane
+        self.gdb_controlplane = gdb_controlplane
 
         self.p_dataplane = None
         self.p_controlplane = None
@@ -48,6 +50,9 @@ class Autotest:
 
     def run_dataplane(self, dataplane_conf_path):
         command = "yanet-dataplane -c " + dataplane_conf_path
+
+        if self.gdb_dataplane:
+            command = "gdb --args " + command
         if self.debug:
             command += " -d"
             print("DEBUG: Executing command:", command)
@@ -57,6 +62,9 @@ class Autotest:
 
     def run_controlplane(self):
         command = "yanet-controlplane"
+
+        if self.gdb_controlplane:
+            command = "gdb --args " + command
         if self.debug:
             command += " -d"
             print("DEBUG: Executing command:", command)
@@ -106,6 +114,8 @@ def main():
     usage = "usage: %prog [options] units_group [units ...]"
     parser = optparse.OptionParser(usage=usage)
     parser.add_option("-d", "--debug", action="store_true", default=False, dest="debug", help="enable debug mode")
+    parser.add_option("--gdb-dataplane", action="store_true", default=False, dest="gdb_dataplane", help="run dataplane with gdb")
+    parser.add_option("--gdb-controlplane", action="store_true", default=False, dest="gdb_controlplane", help="run controlplane with gdb")
     parser.add_option("-k", "--keep", action="store_true", default=False, dest="keep", help="keep processes running after autotest")
     parser.add_option("--prefix", default="", dest="prefix", help="add prefix for bin path")
     opt, args = parser.parse_args()
@@ -114,7 +124,7 @@ def main():
         parser.print_help()
         return 1
 
-    autotest = Autotest(opt.debug, opt.keep, opt.prefix)
+    autotest = Autotest(opt.debug, opt.keep, opt.prefix, opt.gdb_dataplane, opt.gdb_controlplane)
 
     atexit.register(autotest.kill_processes)
 
