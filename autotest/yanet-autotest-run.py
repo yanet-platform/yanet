@@ -27,15 +27,17 @@ class Autotest:
             for application in applications:
                 os.environ["PATH"] += f":{self.prefix}/{application}"
 
-    def wait_application(self, application):
-        for tries in range(1, 30):
+    def wait_application(self, application, is_gdb_enabled):
+        attempts = 0
+        while True:
             if os.system(f"yanet-cli version | grep --silent {application}") == 0:
                 return
             time.sleep(1)
-
-        print("ERROR: Failed to start application:", application)
-        self.kill_processes()
-        sys.exit(2)
+            attempts += 1
+            if not is_gdb_enabled and attempts == 30:
+                print(f"ERROR: Timed out waiting for application: {application}")
+                self.kill_processes()
+                sys.exit(2)
 
     def kill_processes(self):
         for process in [self.p_autotest, self.p_controlplane, self.p_dataplane]:
@@ -58,7 +60,7 @@ class Autotest:
             print("DEBUG: Executing command:", command)
 
         self.p_dataplane = subprocess.Popen(command, shell=True, preexec_fn=os.setsid)
-        self.wait_application("dataplane")
+        self.wait_application("dataplane", self.gdb_dataplane)
 
     def run_controlplane(self):
         command = "yanet-controlplane"
@@ -70,7 +72,7 @@ class Autotest:
             print("DEBUG: Executing command:", command)
 
         self.p_controlplane = subprocess.Popen(command, shell=True, preexec_fn=os.setsid)
-        self.wait_application("controlplane")
+        self.wait_application("controlplane", self.gdb_controlplane)
 
     def run_autotest(self, units):
         command = "yanet-autotest " + " ".join(units)
