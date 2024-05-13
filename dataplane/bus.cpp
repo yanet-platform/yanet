@@ -152,7 +152,7 @@ void cBus::clientThread(int clientSocket)
 			break;
 		}
 
-		auto startTime = std::chrono::system_clock::now();
+		/* auto startTime = std::chrono::system_clock::now(); */
 
 		if (messageSize > BigMessage)
 		{
@@ -193,7 +193,7 @@ void cBus::clientThread(int clientSocket)
 		}
 
 		const common::idp::requestType& type = std::get<0>(request);
-		YANET_LOG_DEBUG("request type %d\n", (int)type);
+		/* YANET_LOG_DEBUG("request type %d\n", (int)type); */
 		if (type == common::idp::requestType::updateGlobalBase)
 		{
 			response = callWithResponse(&cControlPlane::updateGlobalBase, request);
@@ -404,11 +404,11 @@ void cBus::clientThread(int clientSocket)
 			break;
 		}
 
-		std::chrono::duration<double> duration = std::chrono::system_clock::now() - startTime;
+		/* std::chrono::duration<double> duration = std::chrono::system_clock::now() - startTime; */
 
-		YANET_LOG_DEBUG("request type %d processed - %.3f sec\n",
-		                (int)type,
-		                duration.count());
+		/* YANET_LOG_DEBUG("request type %d processed - %.3f sec\n", */
+		/*                 (int)type, */
+		/*                 duration.count()); */
 	}
 
 	close(clientSocket);
