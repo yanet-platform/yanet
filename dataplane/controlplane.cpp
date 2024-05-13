@@ -450,24 +450,10 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 			}
 			const auto& stats = kernel_stats[portmapper.ToLogical(portId)];
 
-			uint64_t controlPlane_drops = 0;
-			for (const auto& [coreId, worker] : dataPlane->workers)
-			{
-				(void)coreId;
-
-				/* @todo This line assumes dpdk port id of a port is equal to logical id, and logical
-				 * ids of diferent workers are the same.
-				 * one can't just assume worker ports are enumerated identically.
-				 * Moreover indexing should be by logical id, inter worker communications
-				 * by dpdk portId's
-				 */
-				controlPlane_drops += worker->statsPorts[portId].controlPlane_drops;
-			}
-
 			response[portId] = {stats.ipackets,
 			                    stats.ibytes,
 			                    0,
-			                    stats.idropped + controlPlane_drops,
+			                    stats.idropped,
 			                    stats.opackets,
 			                    stats.obytes,
 			                    0,
@@ -484,24 +470,10 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 				const auto& stats = kernel_stats[i];
 				const auto& portId = portmapper.ToDpdk(i);
 
-				uint64_t controlPlane_drops = 0;
-				for (const auto& [coreId, worker] : dataPlane->workers)
-				{
-					(void)coreId;
-
-					/* @todo This line assumes dpdk port id of a port is equal to logical id, and logical
-					 * ids of diferent workers are the same.
-					 * one can't just assume worker ports are enumerated identically.
-					 * Moreover indexing should be by logical id, inter worker communications
-					 * by dpdk portId's
-					 */
-					controlPlane_drops += worker->statsPorts[portId].controlPlane_drops;
-				}
-
 				response[portId] = {stats.ipackets,
 				                    stats.ibytes,
 				                    0,
-				                    stats.idropped + controlPlane_drops,
+				                    stats.idropped,
 				                    stats.opackets,
 				                    stats.obytes,
 				                    0,
