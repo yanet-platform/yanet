@@ -169,7 +169,7 @@ nlohmann::json cReport::convertWorker(const cWorker* worker)
 
 		jsonPort["portId"] = portId;
 		jsonPort["physicalPort_egress_drops"] = worker->statsPorts[portId].physicalPort_egress_drops;
-		jsonPort["controlPlane_drops"] = worker->statsPorts[portId].controlPlane_drops;
+		jsonPort["controlPlane_drops"] = 0; // @todo: DELETE
 
 		json["statsPorts"].emplace_back(jsonPort);
 	}
