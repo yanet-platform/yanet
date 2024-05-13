@@ -1467,8 +1467,8 @@ void tAutotest::mainThread()
 			fflush(stdout);
 			fflush(stderr);
 
-			std::ofstream out("/tmp/yanet-dp.report");
-			out << dataPlane.getReport();
+			/* std::ofstream out("/tmp/yanet-dp.report"); */
+			/* out << dataPlane.getReport(); */
 
 			std::abort();
 		}
@@ -1478,8 +1478,8 @@ void tAutotest::mainThread()
 		fflush(stderr);
 	}
 
-	std::ofstream out("/tmp/yanet-dp.report");
-	out << dataPlane.getReport();
+	/* std::ofstream out("/tmp/yanet-dp.report"); */
+	/* out << dataPlane.getReport(); */
 }
 
 void tAutotest::convert_ipv4Update(const std::string& string)
