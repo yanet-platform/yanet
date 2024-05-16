@@ -12,8 +12,8 @@
 #include <unistd.h>
 
 #include "common/type.h"
-#include "controlplane/src/acl.h"
-#include "controlplane/src/acl/rule.h"
+#include "controlplane/acl.h"
+#include "controlplane/acl/rule.h"
 
 auto make_default_acl(tAclId aclId = 1)
 {
