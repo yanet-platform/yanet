@@ -109,10 +109,12 @@ using port_stats_t = std::map<tPortId,
 
 namespace lpm
 {
-using insert = std::vector<std::tuple<ip_prefix_t,
+using insert = std::vector<std::tuple<uint32_t, ///< vrf_id
+                                      ip_prefix_t,
                                       uint32_t>>; ///< value_id
 
-using remove = std::vector<ip_prefix_t>;
+using remove = std::vector<std::tuple<uint32_t, ///< vrf_id
+                                      ip_prefix_t>>;
 
 using clear = std::tuple<>;
 
@@ -168,7 +170,8 @@ enum class requestType : uint32_t
 	nat46clat_update,
 	dump_tags_ids,
 	tsc_state_update,
-	tscs_base_value_update
+	tscs_base_value_update,
+	logical_port_to_vrf_id_update
 };
 
 namespace updateLogicalPort
@@ -504,6 +507,12 @@ namespace tscs_base_value_update
 using request = std::tuple<uint32_t, uint32_t>;
 }
 
+namespace logical_port_to_vrf_id_update
+{
+using request = std::vector<std::tuple<uint32_t, ///< logicalPortId
+                                       uint32_t>>; ///< vrfId
+}
+
 using requestVariant = std::variant<std::tuple<>,
                                     updateLogicalPort::request,
                                     updateDecap::request,
@@ -539,7 +548,8 @@ using requestVariant = std::variant<std::tuple<>,
                                     sampler_update::request, /// + update_early_decap_flags::request, tsc_state_update::request
                                     serial_update::request,
                                     nat46clat_update::request,
-                                    tscs_base_value_update::request>;
+                                    tscs_base_value_update::request,
+                                    logical_port_to_vrf_id_update::request>;
 
 using request = std::vector<std::tuple<requestType,
                                        requestVariant>>;

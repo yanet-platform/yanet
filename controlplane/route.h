@@ -23,7 +23,7 @@ using destination_t = std::variant<std::set<std::tuple<ip_address_t,
                                    directly_connected_destination_t, ///< via interface
                                    uint32_t>; ///< virtual_port_id
 
-using value_key_t = std::tuple<std::tuple<std::string, ///< vrf
+using value_key_t = std::tuple<std::tuple<std::string, ///< vrf // TODO: strong desire to get rid of vrf here, but it is used in value_compile()
                                           uint32_t>, ///< priority
                                route::destination_t,
                                ip_prefix_t>; ///< fallback
@@ -56,7 +56,7 @@ using tunnel_destination_t = std::variant<
         tunnel_destination_default_t,
         uint32_t>; ///< virtual_port_id
 
-using tunnel_value_key_t = std::tuple<std::tuple<std::string, ///< vrf
+using tunnel_value_key_t = std::tuple<std::tuple<std::string, ///< vrf // TODO: strong desire to get rid of vrf here, but it is used in value_compile()
                                                  uint32_t>, ///< priority
                                       route::tunnel_destination_t,
                                       ip_prefix_t>; ///< fallback
@@ -272,6 +272,9 @@ protected:
 	                    common::btree<ip_address_t,
 	                                  std::tuple<>>>>
 	        tunnel_prefixes;
+
+	// relation between vrf_name from config or bird and vrf_id used as index in lpm arrays
+	std::unordered_map<std::string, uint32_t> vrf_map;
 
 	common::refarray_t<route::value_key_t, YANET_CONFIG_ROUTE_VALUES_SIZE> values;
 	common::refarray_t<route::tunnel_value_key_t, YANET_CONFIG_ROUTE_TUNNEL_VALUES_SIZE> tunnel_values;

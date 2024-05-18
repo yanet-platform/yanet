@@ -144,6 +144,13 @@ public:
 
 protected:
 	eResult clear();
+
+	eResult route_lpm4_create(uint32_t vrf_id);
+	eResult route_lpm6_create(uint32_t vrf_id);
+
+	eResult route_tunnel_lpm4_create(uint32_t vrf_id);
+	eResult route_tunnel_lpm6_create(uint32_t vrf_id);
+
 	eResult updateLogicalPort(const common::idp::updateGlobalBase::updateLogicalPort::request& request);
 	eResult updateDecap(const common::idp::updateGlobalBase::updateDecap::request& request);
 	eResult updateDregress(const common::idp::updateGlobalBase::updateDregress::request& request);
@@ -186,6 +193,8 @@ protected:
 	eResult tsc_state_update(const common::idp::updateGlobalBase::tsc_state_update::request& request);
 	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 
+	eResult logical_port_to_vrf_id_update(const common::idp::updateGlobalBase::logical_port_to_vrf_id_update::request& request);
+
 	void evaluate_service_ring(uint32_t next_balancer_reals_id);
 	inline uint64_t count_real_connections(uint32_t counter_id);
 
@@ -209,10 +218,10 @@ public: ///< @todo
 			std::unique_ptr<acl::values> values;
 		} acl;
 
-		std::unique_ptr<updater_lpm4_24bit_8bit> route_lpm4;
-		std::unique_ptr<updater_lpm6_8x16bit> route_lpm6;
-		std::unique_ptr<updater_lpm4_24bit_8bit> route_tunnel_lpm4;
-		std::unique_ptr<updater_lpm6_8x16bit> route_tunnel_lpm6;
+		std::unique_ptr<updater_lpm4_24bit_8bit> route_lpm4[YANET_CONFIG_VRFS_SIZE];
+		std::unique_ptr<updater_lpm6_8x16bit> route_lpm6[YANET_CONFIG_VRFS_SIZE];
+		std::unique_ptr<updater_lpm4_24bit_8bit> route_tunnel_lpm4[YANET_CONFIG_VRFS_SIZE];
+		std::unique_ptr<updater_lpm6_8x16bit> route_tunnel_lpm6[YANET_CONFIG_VRFS_SIZE];
 	} updater;
 
 	/// variables above are not needed for cWorker::mainThread()
@@ -246,14 +255,19 @@ public: ///< @todo
 
 	YADECAP_CACHE_ALIGNED(align2);
 
-	lpm4_24bit_8bit_atomic* route_lpm4;
-	lpm6_8x16bit_atomic* route_lpm6;
+	lpm4_24bit_8bit_atomic* route_lpm4[YANET_CONFIG_VRFS_SIZE];
+	uint32_t route_lpm4s_amount;
+	lpm6_8x16bit_atomic* route_lpm6[YANET_CONFIG_VRFS_SIZE];
+	uint32_t route_lpm6s_amount;
 	route_value_t route_values[YANET_CONFIG_ROUTE_VALUES_SIZE];
 
 	YADECAP_CACHE_ALIGNED(align3);
 
-	lpm4_24bit_8bit_atomic* route_tunnel_lpm4;
-	lpm6_8x16bit_atomic* route_tunnel_lpm6;
+	lpm4_24bit_8bit_atomic* route_tunnel_lpm4[YANET_CONFIG_VRFS_SIZE];
+	uint32_t route_tunnel_lpm4s_amount;
+	lpm6_8x16bit_atomic* route_tunnel_lpm6[YANET_CONFIG_VRFS_SIZE];
+	uint32_t route_tunnel_lpm6s_amount;
+
 	uint8_t route_tunnel_weights[YANET_CONFIG_ROUTE_TUNNEL_WEIGHTS_SIZE];
 	route_tunnel_value_t route_tunnel_values[YANET_CONFIG_ROUTE_TUNNEL_VALUES_SIZE];
 	ipv4_address_t nat64stateful_pool[YANET_CONFIG_NAT64STATEFUL_POOL_SIZE];

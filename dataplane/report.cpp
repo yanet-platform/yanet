@@ -653,10 +653,25 @@ nlohmann::json cReport::convertGlobalBase(const dataplane::globalBase::generatio
 		json["interfaces"].emplace_back(jsonInterface);
 	}
 
-	globalBase->updater.route_lpm4->report(json);
-	globalBase->updater.route_lpm6->report(json);
-	globalBase->updater.route_tunnel_lpm4->report(json);
-	globalBase->updater.route_tunnel_lpm6->report(json);
+	for (uint32_t vrf_id = 0; vrf_id < globalBase->route_lpm4s_amount; ++vrf_id)
+	{
+		globalBase->updater.route_lpm4[vrf_id]->report(json);
+	}
+
+	for (uint32_t vrf_id = 0; vrf_id < globalBase->route_lpm6s_amount; ++vrf_id)
+	{
+		globalBase->updater.route_lpm6[vrf_id]->report(json);
+	}
+
+	for (uint32_t vrf_id = 0; vrf_id < globalBase->route_tunnel_lpm4s_amount; ++vrf_id)
+	{
+		globalBase->updater.route_tunnel_lpm4[vrf_id]->report(json);
+	}
+
+	for (uint32_t vrf_id = 0; vrf_id < globalBase->route_tunnel_lpm6s_amount; ++vrf_id)
+	{
+		globalBase->updater.route_tunnel_lpm6[vrf_id]->report(json);
+	}
 
 	globalBase->updater.acl.network_table->report(json["acl"]["network_table"]);
 	globalBase->updater.acl.transport_table->report(json["acl"]["transport_table"]);

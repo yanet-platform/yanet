@@ -836,7 +836,7 @@ common::idp::lpm4LookupAddress::response cControlPlane::lpm4LookupAddress(const 
 		const auto* globalBase = iter.second[dataPlane->currentGlobalBaseId];
 
 		uint32_t valueId;
-		if (globalBase->route_lpm4->lookup(ipAddress, &valueId))
+		if (globalBase->route_lpm4[0]->lookup(ipAddress, &valueId)) // TODO: add vrf_id in request
 		{
 			response[socketId] = {true,
 			                      valueId,
@@ -868,7 +868,7 @@ common::idp::lpm6LookupAddress::response cControlPlane::lpm6LookupAddress(const 
 		const auto* globalBase = iter.second[dataPlane->currentGlobalBaseId];
 
 		uint32_t valueId;
-		if (globalBase->route_lpm6->lookup(request, &valueId))
+		if (globalBase->route_lpm6[0]->lookup(request, &valueId)) // TODO: add vrf_id in request
 		{
 			response[socketId] = {true,
 			                      valueId,
@@ -936,10 +936,25 @@ common::idp::limits::response cControlPlane::limits()
 		{
 			const auto* globalBase = generations[dataPlane->currentGlobalBaseId];
 
-			globalBase->updater.route_lpm4->limits(response);
-			globalBase->updater.route_lpm6->limits(response);
-			globalBase->updater.route_tunnel_lpm4->limits(response);
-			globalBase->updater.route_tunnel_lpm6->limits(response);
+			for (uint32_t vrf_id = 0; vrf_id < globalBase->route_lpm4s_amount; ++vrf_id)
+			{
+				globalBase->updater.route_lpm4[vrf_id]->limits(response);
+			}
+
+			for (uint32_t vrf_id = 0; vrf_id < globalBase->route_lpm6s_amount; ++vrf_id)
+			{
+				globalBase->updater.route_lpm6[vrf_id]->limits(response);
+			}
+
+			for (uint32_t vrf_id = 0; vrf_id < globalBase->route_tunnel_lpm4s_amount; ++vrf_id)
+			{
+				globalBase->updater.route_tunnel_lpm4[vrf_id]->limits(response);
+			}
+
+			for (uint32_t vrf_id = 0; vrf_id < globalBase->route_tunnel_lpm6s_amount; ++vrf_id)
+			{
+				globalBase->updater.route_tunnel_lpm6[vrf_id]->limits(response);
+			}
 
 			globalBase->updater.acl.network_table->limits(response);
 			globalBase->updater.acl.transport_table->limits(response);

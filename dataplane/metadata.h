@@ -27,6 +27,7 @@ struct metadata
 	uint8_t repeat_ttl;
 	uint8_t already_early_decapped;
 	tAclId aclId : 16;
+	uint32_t vrfId;
 	uint32_t in_logicalport_id;
 	uint32_t out_logicalport_id;
 	common::globalBase::flow_t flow;

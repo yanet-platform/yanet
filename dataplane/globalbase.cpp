@@ -189,57 +189,96 @@ eResult generation::init()
 		acl.values = updater.acl.values->pointer;
 	}
 
-	{
-		updater.route_lpm4 = std::make_unique<updater_lpm4_24bit_8bit>("route.v4.lpm",
-		                                                               &dataPlane->memory_manager,
-		                                                               socketId);
-		result = updater.route_lpm4->init();
-		if (result != eResult::success)
-		{
-			return result;
-		}
+	// creating lpms for default vrf
+	route_lpm4_create(0);
+	route_lpm4s_amount = 1;
+	route_lpm6_create(0);
+	route_lpm6s_amount = 1;
+	route_tunnel_lpm4_create(0);
+	route_tunnel_lpm4s_amount = 1;
+	route_tunnel_lpm6_create(0);
+	route_tunnel_lpm6s_amount = 1;
 
-		route_lpm4 = updater.route_lpm4->pointer;
+	return result;
+}
+
+eResult generation::route_lpm4_create(uint32_t vrf_id)
+{
+	eResult result = eResult::success;
+
+	char name[20];
+	sprintf(name, "route.v4.lpm_%d", vrf_id);
+	updater.route_lpm4[vrf_id] = std::make_unique<updater_lpm4_24bit_8bit>(name,
+	                                                                       &dataPlane->memory_manager,
+	                                                                       socketId);
+	result = updater.route_lpm4[vrf_id]->init();
+	if (result != eResult::success)
+	{
+		return result;
 	}
 
-	{
-		updater.route_lpm6 = std::make_unique<updater_lpm6_8x16bit>("route.v6.lpm",
-		                                                            &dataPlane->memory_manager,
-		                                                            socketId);
-		result = updater.route_lpm6->init();
-		if (result != eResult::success)
-		{
-			return result;
-		}
+	route_lpm4[vrf_id] = updater.route_lpm4[vrf_id]->pointer;
 
-		route_lpm6 = updater.route_lpm6->pointer;
+	return result;
+}
+
+eResult generation::route_lpm6_create(uint32_t vrf_id)
+{
+	eResult result = eResult::success;
+
+	char name[20];
+	sprintf(name, "route.v6.lpm_%d", vrf_id);
+	updater.route_lpm6[vrf_id] = std::make_unique<updater_lpm6_8x16bit>(name,
+	                                                                    &dataPlane->memory_manager,
+	                                                                    socketId);
+	result = updater.route_lpm6[vrf_id]->init();
+	if (result != eResult::success)
+	{
+		return result;
 	}
 
-	{
-		updater.route_tunnel_lpm4 = std::make_unique<updater_lpm4_24bit_8bit>("route.tunnel.v4.lpm",
-		                                                                      &dataPlane->memory_manager,
-		                                                                      socketId);
-		result = updater.route_tunnel_lpm4->init();
-		if (result != eResult::success)
-		{
-			return result;
-		}
+	route_lpm6[vrf_id] = updater.route_lpm6[vrf_id]->pointer;
 
-		route_tunnel_lpm4 = updater.route_tunnel_lpm4->pointer;
+	return result;
+}
+
+eResult generation::route_tunnel_lpm4_create(uint32_t vrf_id)
+{
+	eResult result = eResult::success;
+
+	char name[30];
+	sprintf(name, "route.tunnel.v4.lpm_%d", vrf_id);
+
+	updater.route_tunnel_lpm4[vrf_id] = std::make_unique<updater_lpm4_24bit_8bit>(name,
+	                                                                              &dataPlane->memory_manager,
+	                                                                              socketId);
+	result = updater.route_tunnel_lpm4[vrf_id]->init();
+	if (result != eResult::success)
+	{
+		return result;
 	}
 
-	{
-		updater.route_tunnel_lpm6 = std::make_unique<updater_lpm6_8x16bit>("route.tunnel.v6.lpm",
-		                                                                   &dataPlane->memory_manager,
-		                                                                   socketId);
-		result = updater.route_tunnel_lpm6->init();
-		if (result != eResult::success)
-		{
-			return result;
-		}
+	route_tunnel_lpm4[vrf_id] = updater.route_tunnel_lpm4[vrf_id]->pointer;
 
-		route_tunnel_lpm6 = updater.route_tunnel_lpm6->pointer;
+	return result;
+}
+
+eResult generation::route_tunnel_lpm6_create(uint32_t vrf_id)
+{
+	eResult result = eResult::success;
+
+	char name[30];
+	sprintf(name, "route.tunnel.v6.lpm_%d", vrf_id);
+	updater.route_tunnel_lpm6[vrf_id] = std::make_unique<updater_lpm6_8x16bit>(name,
+	                                                                           &dataPlane->memory_manager,
+	                                                                           socketId);
+	result = updater.route_tunnel_lpm6[vrf_id]->init();
+	if (result != eResult::success)
+	{
+		return result;
 	}
+
+	route_tunnel_lpm6[vrf_id] = updater.route_tunnel_lpm6[vrf_id]->pointer;
 
 	return result;
 }
@@ -433,6 +472,10 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		{
 			result = tscs_base_value_update(std::get<common::idp::updateGlobalBase::tscs_base_value_update::request>(data));
 		}
+		else if (type == common::idp::updateGlobalBase::requestType::logical_port_to_vrf_id_update)
+		{
+			result = logical_port_to_vrf_id_update(std::get<common::idp::updateGlobalBase::logical_port_to_vrf_id_update::request>(data));
+		}
 		else
 		{
 			YADECAP_LOG_ERROR("invalid request type\n");
@@ -529,16 +572,16 @@ eResult generation::get(const common::idp::getGlobalBase::request& request,
 	/** @todo
 	for (const auto& interfaceId : std::get<2>(request))
 	{
-		if (interfaceId >= CONFIG_YADECAP_INTERFACES_SIZE)
-		{
-			YADECAP_LOG_ERROR("invalid interfaceId: '%u'\n", interfaceId);
-			return eResult::invalidInterfaceId;
-		}
+	        if (interfaceId >= CONFIG_YADECAP_INTERFACES_SIZE)
+	        {
+	                YADECAP_LOG_ERROR("invalid interfaceId: '%u'\n", interfaceId);
+	                return eResult::invalidInterfaceId;
+	        }
 
-		const auto& interface = interfaces[interfaceId];
+	        const auto& interface = interfaces[interfaceId];
 
-		std::get<2>(globalBaseResponse)[interfaceId] = {convert(interface.neighborEtherAddress),
-		                                                interface.flow};
+	        std::get<2>(globalBaseResponse)[interfaceId] = {convert(interface.neighborEtherAddress),
+	                                                        interface.flow};
 	}
 	*/
 
@@ -947,6 +990,22 @@ eResult generation::tscs_base_value_update(const common::idp::updateGlobalBase::
 {
 	const auto& [offset, value] = request;
 	*(uint32_t*)((uintptr_t)(&tsc_base_values) + offset) = value;
+
+	return eResult::success;
+}
+
+eResult generation::logical_port_to_vrf_id_update(const common::idp::updateGlobalBase::logical_port_to_vrf_id_update::request& request)
+{
+
+	for (const auto& [logicalPortId, vrfId] : request)
+	{
+		// const auto& logicalPortId = std::get<0>(request);
+		// const auto& vrfId = std::get<1>(request);
+
+		auto& logicalPort = logicalPorts[logicalPortId];
+
+		logicalPort.vrfId = vrfId;
+	}
 
 	return eResult::success;
 }
@@ -1710,23 +1769,62 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 {
 	eResult result = eResult::success;
 
+	std::unordered_set<uint32_t> changed_route_lpm4s;
+	std::unordered_set<uint32_t> changed_route_lpm6s;
+
 	for (const auto& action : request)
 	{
 		if (const auto update = std::get_if<common::idp::lpm::insert>(&action))
 		{
-			for (const auto& [prefix, value_id] : *update)
+			for (const auto& [vrf_id, prefix, value_id] : *update)
 			{
 				if (prefix.is_ipv4())
 				{
-					result = updater.route_lpm4->insert(prefix.get_ipv4().address(),
-					                                    prefix.get_ipv4().mask(),
-					                                    value_id);
+					// this is a new vrf_id - create all new lpms if necessary
+					if (vrf_id >= route_lpm4s_amount)
+					{
+
+						for (uint32_t i = route_lpm4s_amount; i <= vrf_id; ++i)
+						{
+							result = route_lpm4_create(i);
+							if (result != eResult::success)
+							{
+								return result;
+							}
+						}
+
+						route_lpm4s_amount = vrf_id + 1;
+					}
+
+					result = updater.route_lpm4[vrf_id]->insert(prefix.get_ipv4().address(),
+					                                            prefix.get_ipv4().mask(),
+					                                            value_id);
+
+					changed_route_lpm4s.insert(vrf_id);
 				}
 				else
 				{
-					result = updater.route_lpm6->insert(prefix.get_ipv6().address(),
-					                                    prefix.get_ipv6().mask(),
-					                                    value_id);
+					// this is a new vrf_id - create all new lpms if necessary
+					if (vrf_id >= route_lpm6s_amount)
+					{
+
+						for (uint32_t i = route_lpm6s_amount; i <= vrf_id; ++i)
+						{
+							result = route_lpm6_create(i);
+							if (result != eResult::success)
+							{
+								return result;
+							}
+						}
+
+						route_lpm6s_amount = vrf_id + 1;
+					}
+
+					result = updater.route_lpm6[vrf_id]->insert(prefix.get_ipv6().address(),
+					                                            prefix.get_ipv6().mask(),
+					                                            value_id);
+
+					changed_route_lpm6s.insert(vrf_id);
 				}
 
 				if (result != eResult::success)
@@ -1737,17 +1835,33 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 		}
 		else if (const auto remove = std::get_if<common::idp::lpm::remove>(&action))
 		{
-			for (const auto& prefix : *remove)
+			for (const auto& [vrf_id, prefix] : *remove)
 			{
 				if (prefix.is_ipv4())
 				{
-					result = updater.route_lpm4->remove(prefix.get_ipv4().address(),
-					                                    prefix.get_ipv4().mask());
+					if (vrf_id >= route_lpm4s_amount)
+					{
+						// vrf does not exist (yet?), nothing to remove
+						continue;
+					}
+
+					result = updater.route_lpm4[vrf_id]->remove(prefix.get_ipv4().address(),
+					                                            prefix.get_ipv4().mask());
+
+					changed_route_lpm4s.insert(vrf_id);
 				}
 				else
 				{
-					result = updater.route_lpm6->remove(prefix.get_ipv6().address(),
-					                                    prefix.get_ipv6().mask());
+					if (vrf_id >= route_lpm6s_amount)
+					{
+						// vrf does not exist (yet?), nothing to remove
+						continue;
+					}
+
+					result = updater.route_lpm6[vrf_id]->remove(prefix.get_ipv6().address(),
+					                                            prefix.get_ipv6().mask());
+
+					changed_route_lpm6s.insert(vrf_id);
 				}
 
 				if (result != eResult::success)
@@ -1760,22 +1874,40 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 		{
 			YADECAP_LOG_DEBUG("route lpm clear\n");
 
-			result = updater.route_lpm4->clear();
-			if (result != eResult::success)
+			for (uint32_t vrf_id = 0; vrf_id < route_lpm4s_amount; ++vrf_id)
 			{
-				return result;
+				result = updater.route_lpm4[vrf_id]->clear();
+				if (result != eResult::success)
+				{
+					return result;
+				}
+
+				changed_route_lpm4s.insert(vrf_id);
 			}
 
-			result = updater.route_lpm6->clear();
-			if (result != eResult::success)
+			for (uint32_t vrf_id = 0; vrf_id < route_lpm6s_amount; ++vrf_id)
 			{
-				return result;
+				result = updater.route_lpm6[vrf_id]->clear();
+				if (result != eResult::success)
+				{
+					return result;
+				}
+
+				changed_route_lpm6s.insert(vrf_id);
 			}
 		}
 	}
 
-	route_lpm4 = updater.route_lpm4->pointer;
-	route_lpm6 = updater.route_lpm6->pointer;
+	for (auto vrf_id : changed_route_lpm4s)
+	{
+
+		route_lpm4[vrf_id] = updater.route_lpm4[vrf_id]->pointer;
+	}
+
+	for (auto vrf_id : changed_route_lpm6s)
+	{
+		route_lpm6[vrf_id] = updater.route_lpm6[vrf_id]->pointer;
+	}
 
 	return result;
 }
@@ -1881,23 +2013,62 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 {
 	eResult result = eResult::success;
 
+	std::unordered_set<uint32_t> changed_route_tunnel_lpm4s;
+	std::unordered_set<uint32_t> changed_route_tunnel_lpm6s;
+
 	for (const auto& action : request)
 	{
 		if (const auto update = std::get_if<common::idp::lpm::insert>(&action))
 		{
-			for (const auto& [prefix, value_id] : *update)
+			for (const auto& [vrf_id, prefix, value_id] : *update)
 			{
 				if (prefix.is_ipv4())
 				{
-					result = updater.route_tunnel_lpm4->insert(prefix.get_ipv4().address(),
-					                                           prefix.get_ipv4().mask(),
-					                                           value_id);
+					// this is a new vrf_id - create all new lpms if necessary
+					if (vrf_id >= route_tunnel_lpm4s_amount)
+					{
+
+						for (uint32_t i = route_tunnel_lpm4s_amount; i <= vrf_id; ++i)
+						{
+							result = route_tunnel_lpm4_create(i);
+							if (result != eResult::success)
+							{
+								return result;
+							}
+						}
+
+						route_tunnel_lpm4s_amount = vrf_id + 1;
+					}
+
+					result = updater.route_tunnel_lpm4[vrf_id]->insert(prefix.get_ipv4().address(),
+					                                                   prefix.get_ipv4().mask(),
+					                                                   value_id);
+
+					changed_route_tunnel_lpm4s.insert(vrf_id);
 				}
 				else
 				{
-					result = updater.route_tunnel_lpm6->insert(prefix.get_ipv6().address(),
-					                                           prefix.get_ipv6().mask(),
-					                                           value_id);
+					// this is a new vrf_id - create all new lpms if necessary
+					if (vrf_id >= route_tunnel_lpm6s_amount)
+					{
+
+						for (uint32_t i = route_tunnel_lpm6s_amount; i <= vrf_id; ++i)
+						{
+							result = route_tunnel_lpm6_create(i);
+							if (result != eResult::success)
+							{
+								return result;
+							}
+						}
+
+						route_tunnel_lpm6s_amount = vrf_id + 1;
+					}
+
+					result = updater.route_tunnel_lpm6[vrf_id]->insert(prefix.get_ipv6().address(),
+					                                                   prefix.get_ipv6().mask(),
+					                                                   value_id);
+
+					changed_route_tunnel_lpm6s.insert(vrf_id);
 				}
 
 				if (result != eResult::success)
@@ -1908,17 +2079,33 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 		}
 		else if (const auto remove = std::get_if<common::idp::lpm::remove>(&action))
 		{
-			for (const auto& prefix : *remove)
+			for (const auto& [vrf_id, prefix] : *remove)
 			{
 				if (prefix.is_ipv4())
 				{
-					result = updater.route_tunnel_lpm4->remove(prefix.get_ipv4().address(),
-					                                           prefix.get_ipv4().mask());
+					if (vrf_id >= route_tunnel_lpm4s_amount)
+					{
+						// vrf does not exist (yet?), nothing to remove
+						continue;
+					}
+
+					result = updater.route_tunnel_lpm4[vrf_id]->remove(prefix.get_ipv4().address(),
+					                                                   prefix.get_ipv4().mask());
+
+					changed_route_tunnel_lpm4s.insert(vrf_id);
 				}
 				else
 				{
-					result = updater.route_tunnel_lpm6->remove(prefix.get_ipv6().address(),
-					                                           prefix.get_ipv6().mask());
+					if (vrf_id >= route_tunnel_lpm6s_amount)
+					{
+						// vrf does not exist (yet?), nothing to remove
+						continue;
+					}
+
+					result = updater.route_tunnel_lpm6[vrf_id]->remove(prefix.get_ipv6().address(),
+					                                                   prefix.get_ipv6().mask());
+
+					changed_route_tunnel_lpm6s.insert(vrf_id);
 				}
 
 				if (result != eResult::success)
@@ -1931,22 +2118,40 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 		{
 			YADECAP_LOG_DEBUG("route_tunnel lpm clear\n");
 
-			result = updater.route_tunnel_lpm4->clear();
-			if (result != eResult::success)
+			for (uint32_t vrf_id = 0; vrf_id < route_tunnel_lpm4s_amount; ++vrf_id)
 			{
-				return result;
+				result = updater.route_tunnel_lpm4[vrf_id]->clear();
+				if (result != eResult::success)
+				{
+					return result;
+				}
+
+				changed_route_tunnel_lpm4s.insert(vrf_id);
 			}
 
-			result = updater.route_tunnel_lpm6->clear();
-			if (result != eResult::success)
+			for (uint32_t vrf_id = 0; vrf_id < route_tunnel_lpm6s_amount; ++vrf_id)
 			{
-				return result;
+				result = updater.route_tunnel_lpm6[vrf_id]->clear();
+				if (result != eResult::success)
+				{
+					return result;
+				}
+
+				changed_route_tunnel_lpm6s.insert(vrf_id);
 			}
 		}
 	}
 
-	route_tunnel_lpm4 = updater.route_tunnel_lpm4->pointer;
-	route_tunnel_lpm6 = updater.route_tunnel_lpm6->pointer;
+	for (auto vrf_id : changed_route_tunnel_lpm4s)
+	{
+
+		route_tunnel_lpm4[vrf_id] = updater.route_tunnel_lpm4[vrf_id]->pointer;
+	}
+
+	for (auto vrf_id : changed_route_tunnel_lpm6s)
+	{
+		route_tunnel_lpm4[vrf_id] = updater.route_tunnel_lpm4[vrf_id]->pointer;
+	}
 
 	return result;
 }
@@ -2023,6 +2228,7 @@ eResult generation::route_tunnel_value_update(const common::idp::updateGlobalBas
 			route_tunnel_value.interface.nexthops[ecmp_i].interface_id = interface_id;
 			route_tunnel_value.interface.nexthops[ecmp_i].flags = nexthop_flags;
 			route_tunnel_value.interface.nexthops[ecmp_i].counter_id = counter_id;
+
 			route_tunnel_value.interface.nexthops[ecmp_i].label = label;
 			route_tunnel_value.interface.nexthops[ecmp_i].nexthop_address = ipv6_address_t::convert(nexthop_address);
 			route_tunnel_value.interface.nexthops[ecmp_i].neighbor_address = ipv6_address_t::convert(neighbor_address);
