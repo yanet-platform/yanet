@@ -286,7 +286,7 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 
 		/// terminating
 		{
-			rule.terminating = std::holds_alternative<common::globalBase::tFlow>(unwind_rule.action);
+			rule.terminating = unwind_rule.is_term();
 		}
 
 		YANET_LOG_DEBUG("acl::compile: rule: %s\n", unwind_rule.to_string().data());
