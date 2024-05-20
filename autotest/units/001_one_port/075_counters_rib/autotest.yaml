@@ -1,0 +1,105 @@
+steps:
+
+# default (see neighbor in controlplane.conf)
+- cli: |
+    rib static insert default 0.0.0.0/0 200.0.2.1
+
+#################################################################################################################
+# 1 prepare rib
+#################################################################################################################
+- echo: "3 rib_insert() test: new nexthop_stuff, new prefix, new \"peer-proto-table_name\" - START"
+
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.1
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 200.0.2.1
+        prefix: 1.0.0.0/24
+        path_information: 200.0.2.1:10001
+        labels:
+        - 1100
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.2
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 200.0.3.1
+        prefix: 2.0.0.0/24
+        path_information: 200.0.3.1:10001
+        labels:
+        - 1100
+    - table_name: ipv4 mpls-vpn
+      peer: 10.10.10.2
+      med: 0
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 200.0.3.1
+        prefix: 3.0.0.0/24
+        path_information: 200.0.3.1:10001
+        labels:
+        - 1100
+
+- cli_check: |
+    rib
+    vrf      priority  protocol  peer        table_name     prefixes  paths  eor
+    -------  --------  --------  ----------  -------------  --------  -----  -----
+    default  10000     autotest  10.10.10.1  ipv4 mpls-vpn  1         1      false
+    default  10000     autotest  10.10.10.2  ipv4 mpls-vpn  2         2      false
+    default  10000     static    ::                         2         2      true
+
+- cli_check: |
+    rib prefixes
+    vrf      priority  prefix      protocol  peer        table_name     path_information  nexthop    labels  local_preference  aspath  origin      med  communities  large_communities
+    -------  --------  ----------  --------  ----------  -------------  ----------------  ---------  ------  ----------------  ------  ----------  ---  -----------  -----------------
+    default  10000     0.0.0.0/0   static    ::                         200.0.2.1         200.0.2.1          0                                     0    n/s          n/s
+    default  10000     1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  200.0.2.1:10001   200.0.2.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     2.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  200.0.3.1:10001   200.0.3.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     3.0.0.0/24  autotest  10.10.10.2  ipv4 mpls-vpn  200.0.3.1:10001   200.0.3.1  1100    0                         incomplete  0    n/s          13238:1:1
+    default  10000     fe80::/64   static    ::                                           ::                 0                                     0    n/s          n/s
+
+- cli_check: |
+    route tunnel get route0 1.0.0.0/24
+    ingress_physical_ports  nexthop    label  egress_interface  peer  weight (%)
+    ----------------------  ---------  -----  ----------------  ----  ----------
+    kni0                    200.0.2.1  1100   kni0.200                100.00
+
+- echo: "3 rib_insert() test: new nexthop_stuff, new prefix, new \"peer-proto-table_name\" - DONE"
+
+#################################################################################################################
+# 2 send packets and check route counters
+#################################################################################################################
+
+- sendPackets:
+    - port: kni0
+      send: send.pcap
+      expect: expect.pcap
+
+- cli: |
+    route counters
+
+# We should get the following table:
+#
+# peer  nexthop    prefix      counts  size
+# ----  ---------  ----------  ------  ----
+# 0     200.0.2.1  0.0.0.0/0   1       58
+# 1     200.0.2.1  1.0.0.0/24  3       174
+# 2     200.0.3.1  2.0.0.0/24  2       116
+# 2     200.0.3.1  3.0.0.0/24  1       58
+
+- cli: |
+    route counters influxdb
+    
+# We should get the following table:
+#
+# route_counters,peer=0,nexthop=200.0.2.1,prefix=0.0.0.0/0 counts=1u,size=58u
+# route_counters,peer=1,nexthop=200.0.2.1,prefix=1.0.0.0/24 counts=3u,size=174u
+# route_counters,peer=2,nexthop=200.0.3.1,prefix=2.0.0.0/24 counts=2u,size=116u
+# route_counters,peer=2,nexthop=200.0.3.1,prefix=3.0.0.0/24 counts=1u,size=58u

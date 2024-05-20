@@ -2286,6 +2286,9 @@ inline void cWorker::route_handle4()
 				continue;
 			}
 
+			counters[nexthop.counter_id]++;
+			counters[nexthop.counter_id + 1] += mbuf->pkt_len;
+
 			route_nexthop(mbuf, nexthop);
 
 			ipv4Header->time_to_live--;
@@ -2406,6 +2409,9 @@ inline void cWorker::route_handle6()
 
 				continue;
 			}
+
+			counters[nexthop.counter_id]++;
+			counters[nexthop.counter_id + 1] += mbuf->pkt_len;
 
 			route_nexthop(mbuf, nexthop);
 

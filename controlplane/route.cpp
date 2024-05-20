@@ -14,6 +14,8 @@ eResult route_t::init()
 	tunnel_counter.insert({true, 0, ip_address_t(), 0}); ///< fallback v4
 	tunnel_counter.insert({false, 0, ip_address_t(), 0}); ///< fallback v6
 
+	route_counter.init(&controlPlane->counter_manager);
+
 	controlPlane->register_command(common::icp::requestType::route_config, [this]() {
 		return route_config();
 	});
@@ -28,6 +30,10 @@ eResult route_t::init()
 
 	controlPlane->register_command(common::icp::requestType::route_get, [this](const common::icp::request& request) {
 		return route_get(std::get<common::icp::route_get::request>(std::get<1>(request)));
+	});
+
+	controlPlane->register_command(common::icp::requestType::route_counters, [this]() {
+		return route_counters();
 	});
 
 	controlPlane->register_command(common::icp::requestType::route_interface, [this]() {
@@ -60,8 +66,7 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 		                    std::size_t,
 		                    std::string,
 		                    uint32_t>,
-		         std::set<std::tuple<ip_address_t,
-		                             std::vector<uint32_t>>>>
+		         route::destination_interface_t>
 		        interface_destination_next;
 		for (const auto& [pptn_index, path_info_to_nh_ptr] : *nexthops)
 		{
@@ -99,7 +104,7 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 				                            aspath.size(),
 				                            origin,
 				                            med}]
-				        .emplace(nexthop, labels);
+				        .emplace(nexthop, pptn_index, prefix, labels);
 			}
 		}
 
@@ -385,11 +390,13 @@ void route_t::prefix_flush()
 	generations_neighbors.next_lock();
 
 	tunnel_counter.allocate();
+	route_counter.allocate();
 
 	compile(globalbase, generations.current());
 	dataplane.updateGlobalBase(globalbase); ///< может вызвать исключение, которое никто не поймает, и это приведёт к abort()
 
 	tunnel_counter.release();
+	route_counter.release();
 
 	generations_neighbors.next_unlock();
 	generations.next_unlock();
@@ -530,6 +537,25 @@ common::icp::route_get::response route_t::route_get(const common::icp::route_get
 					return result;
 				}
 			}
+		}
+	}
+
+	return result;
+}
+
+common::icp::route_counters::response route_t::route_counters()
+{
+	common::icp::route_counters::response result;
+
+	auto current_guard = generations.current_lock_guard();
+	auto counter_values = route_counter.get_counters();
+
+	for (const auto& [key, counts] : counter_values)
+	{
+		const auto [peer_id, nexthop, prefix] = key;
+		if (counts[0] != 0 || counts[1] != 0)
+		{
+			result.emplace_back(peer_id, nexthop, prefix, counts[0], counts[1]);
 		}
 	}
 
@@ -946,6 +972,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 #endif // CONFIG_YADECAP_AUTOTEST
 
 	tunnel_counter.allocate();
+	route_counter.allocate();
 
 	compile(globalbase, generations.next());
 	compile_interface(globalbase, generations.next(), generations_neighbors.next());
@@ -954,6 +981,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 void route_t::reload_after()
 {
 	tunnel_counter.release();
+	route_counter.release();
 	generations_neighbors.switch_generation();
 	generations.switch_generation();
 	generations_neighbors.next_unlock();
@@ -1099,12 +1127,56 @@ void route_t::tunnel_prefix_flush_values(common::idp::updateGlobalBase::request&
 
 std::optional<uint32_t> route_t::value_insert(const route::value_key_t& value_key)
 {
-	return values.update_or_insert(value_key);
+	if (values.exist_value(value_key))
+	{
+		values.update(value_key);
+		return values.get_id(value_key);
+	}
+
+	auto value_id = values.insert(value_key);
+	if (!value_id)
+	{
+		return std::nullopt;
+	}
+
+	const auto& [vrf_priority, destination, fallback] = value_key;
+	(void)vrf_priority;
+	(void)fallback;
+
+	/// counters
+	if (const auto nexthops = std::get_if<route::destination_interface_t>(&destination))
+	{
+		for (const auto& [nexthop, peer_id, prefix, labels] : *nexthops)
+		{
+			(void)labels;
+
+			route_counter.insert({peer_id, nexthop, prefix});
+		}
+	}
+
+	return value_id;
 }
 
 void route_t::value_remove(const uint32_t& value_id)
 {
-	values.remove_id(value_id);
+	auto value_key = values.remove_id(value_id);
+	if (value_key)
+	{
+		const auto& [vrf_priority, destination, fallback] = *value_key;
+		(void)vrf_priority;
+		(void)fallback;
+
+		/// counters
+		if (const auto nexthops = std::get_if<route::destination_interface_t>(&destination))
+		{
+			for (const auto& [nexthop, peer_id, prefix, labels] : *nexthops)
+			{
+				(void)labels;
+
+				route_counter.remove({peer_id, nexthop, prefix}, 20);
+			}
+		}
+	}
 }
 
 void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
@@ -1143,13 +1215,15 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 		                               interface_id,
 		                               interface_name,
 		                               std::vector<uint32_t>(),
-		                               ipv4_address_t()); ///< default
+		                               ipv4_address_t(), ///< default
+		                               0,
+		                               fallback);
 	}
 	else
 	{
 		for (const auto& destination_iter : std::get<0>(destination)) ///< interface
 		{
-			const auto& [nexthop, labels] = destination_iter;
+			const auto& [nexthop, peer_id, prefix, labels] = destination_iter;
 
 			if (nexthop.is_default())
 			{
@@ -1184,7 +1258,9 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 				                               interface_id,
 				                               interface_name,
 				                               labels,
-				                               nexthop);
+				                               nexthop,
+				                               peer_id,
+				                               prefix);
 
 				continue;
 			}
@@ -1280,17 +1356,19 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 		/// same numa
 		for (const auto& item : request_interface)
 		{
-			const auto& [nexthop, egress_interface_id, egress_interface_name, labels, neighbor_address] = item;
+			const auto& [nexthop, egress_interface_id, egress_interface_name, labels, neighbor_address, peer, prefix] = item;
 
 			if (exist(interfaces, egress_interface_id))
 			{
+				const auto counter_id = route_counter.get_id({peer, nexthop, prefix});
+
 				uint16_t flags = 0;
 				if (neighbor_address.is_default())
 				{
 					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
 				}
 
-				update_interface.emplace_back(egress_interface_id, labels, neighbor_address, flags);
+				update_interface.emplace_back(egress_interface_id, counter_id, labels, neighbor_address, flags);
 
 				value_lookup[value_id][socket_id].emplace_back(nexthop,
 				                                               egress_interface_name,
@@ -1303,7 +1381,9 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 		{
 			for (const auto& item : request_interface)
 			{
-				const auto& [nexthop, egress_interface_id, egress_interface_name, labels, neighbor_address] = item;
+				const auto& [nexthop, egress_interface_id, egress_interface_name, labels, neighbor_address, peer, prefix] = item;
+
+				const auto counter_id = route_counter.get_id({peer, nexthop, prefix});
 
 				uint16_t flags = 0;
 				if (neighbor_address.is_default())
@@ -1311,7 +1391,7 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
 				}
 
-				update_interface.emplace_back(egress_interface_id, labels, neighbor_address, flags);
+				update_interface.emplace_back(egress_interface_id, counter_id, labels, neighbor_address, flags);
 
 				value_lookup[value_id][socket_id].emplace_back(nexthop,
 				                                               egress_interface_name,
@@ -1348,7 +1428,7 @@ void route_t::value_compile_label(common::idp::updateGlobalBase::request& global
 
 	for (const auto& destination_iter : std::get<0>(destination)) ///< interface
 	{
-		auto [nexthop, labels] = destination_iter;
+		auto [nexthop, peer_id, prefix, labels] = destination_iter;
 
 		if (labels.size() != 1)
 		{
@@ -1370,7 +1450,9 @@ void route_t::value_compile_label(common::idp::updateGlobalBase::request& global
 			                               interface_id,
 			                               interface_name,
 			                               labels,
-			                               nexthop);
+			                               nexthop,
+			                               peer_id,
+			                               prefix);
 		}
 		else
 		{
@@ -1399,7 +1481,7 @@ void route_t::value_compile_fallback(common::idp::updateGlobalBase::request& glo
 
 	for (const auto& destination_iter : std::get<0>(destination)) ///< interface
 	{
-		const auto& [nexthop, labels] = destination_iter;
+		const auto& [nexthop, peer_id, prefix, labels] = destination_iter;
 
 		auto interface = generation.get_interface_by_neighbor(nexthop);
 		if (interface)
@@ -1417,7 +1499,9 @@ void route_t::value_compile_fallback(common::idp::updateGlobalBase::request& glo
 			                               interface_id,
 			                               interface_name,
 			                               labels,
-			                               nexthop);
+			                               nexthop,
+			                               peer_id,
+			                               prefix);
 		}
 	}
 }
@@ -1819,6 +1903,7 @@ void route_t::tunnel_gc_thread()
 	while (!flagStop)
 	{
 		tunnel_counter.gc();
+		route_counter.gc();
 		std::this_thread::sleep_for(std::chrono::seconds(3));
 	}
 }

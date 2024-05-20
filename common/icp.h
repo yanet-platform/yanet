@@ -87,6 +87,7 @@ enum class requestType : uint32_t
 	nat46clat_announce,
 	nat46clat_stats,
 	convert,
+	route_counters,
 	size // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -222,6 +223,8 @@ inline const char* requestType_toString(requestType t)
 			return "convert";
 		case requestType::size:
 			return "unknown";
+		case requestType::route_counters:
+			return "route_counters";
 	}
 
 	return "unknown";
@@ -777,6 +780,15 @@ using request = std::tuple<std::string, ///< module_name
 using response = route_lookup::response;
 }
 
+namespace route_counters
+{
+using response = std::vector<std::tuple<uint32, ///< peer
+                                        ip_address_t, ///< nexthop
+                                        ip_prefix_t, ///< prefix
+                                        uint64_t, ///< peer
+                                        uint64_t>>; ///< peer
+}
+
 namespace route_tunnel_lookup
 {
 using request = std::tuple<std::string, ///< module_name
@@ -954,6 +966,7 @@ using response = std::variant<std::tuple<>,
                               acl_unwind::response,
                               acl_lookup::response,
                               route_lookup::response, ///< + route_get::response
+                              route_counters::response,
                               route_tunnel_lookup::response, ///< + route_tunnel_get::response
                               getRibStats::response,
                               getDefenders::response,
