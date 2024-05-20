@@ -1226,6 +1226,16 @@ struct rule_t
 	{
 		return action == o.action && filter == o.filter && log == o.log;
 	}
+
+	bool is_term() const
+	{
+		return std::holds_alternative<common::globalBase::tFlow>(action);
+	}
+
+	bool is_skipto() const
+	{
+		return std::holds_alternative<int64_t>(action);
+	}
 };
 
 } //namespace acl
