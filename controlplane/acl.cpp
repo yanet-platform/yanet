@@ -381,15 +381,6 @@ static inline auto is_term_filter(const ref_t<filter_t>& filter)
 	return (!filter || (!filter->src && !filter->dst && !filter->flags && !filter->proto));
 }
 
-static inline auto is_nonterm_action(const std::variant<int64_t, common::globalBase::tFlow, common::acl::action_t>& action)
-{
-	if (std::holds_alternative<common::acl::action_t>(action))
-	{
-		return true;
-	}
-	return false;
-}
-
 // gather matching rules from dispatcher
 static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher,
                               const ref_t<filter_t>& filter,
@@ -421,7 +412,7 @@ static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher,
 		ids.resize(idSize);
 
 		ACL_DBGMSG("gathered...");
-		if (is_term_filter(rule.filter) && !is_nonterm_action(rule.action))
+		if (is_term_filter(rule.filter) && (rule.is_term() || rule.is_skipto()))
 		{
 			ACL_DBGMSG("terminating filter...");
 			break;
@@ -507,7 +498,7 @@ static bool unwind(int64_t start_from, firewall_rules_t& fw, const dispatcher_ru
 			}
 
 			ids.resize(idSize);
-			if (is_term_filter(rule.filter) && !is_nonterm_action(rule.action))
+			if (is_term_filter(rule.filter) && (rule.is_term() || rule.is_skipto()))
 			{
 				ACL_DBGMSG("terminating filter...");
 				return true;
