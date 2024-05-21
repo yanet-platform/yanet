@@ -2187,6 +2187,11 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 
 	std::bitset<std::numeric_limits<uint_least64_t>::digits> cores_mask;
 	cores_mask[config.controlPlaneCoreId] = true;
+	for (const auto& iter : config.controlplane_workers)
+	{
+		const tCoreId& coreId = iter.first;
+		cores_mask[coreId] = true;
+	}
 	for (const auto& coreId : config.workerGCs)
 	{
 		cores_mask[coreId] = true;
