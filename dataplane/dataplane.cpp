@@ -450,7 +450,7 @@ eResult cDataPlane::initPorts()
 		tPortId portId;
 		if (strncmp(name.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
 		{
-			portId = sock_dev_create(name.data(), 0);
+			portId = sock_dev_create(name.data() + strlen(SOCK_DEV_PREFIX), interfaceName.c_str(), 0);
 		}
 		else if (rte_eth_dev_get_port_by_name(name.data(), &portId))
 		{
