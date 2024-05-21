@@ -314,7 +314,7 @@ public:
 		}
 	}
 
-	std::array<tCounterId, size_T> get_ids(const key_T& key)
+	tCounterId get_id(const key_T& key)
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 
@@ -322,26 +322,13 @@ public:
 		if (iter == counters.end())
 		{
 			/// fallback
-			std::array<tCounterId, size_T> result;
-			for (size_t i = 0;
-			     i < size_T;
-			     i++)
-			{
-				result[i] = i;
-			}
-
-			return result;
+			return 0;
 		}
 
 		const auto& [counter_ids, refcount] = iter->second;
 		(void)refcount;
 
-		return counter_ids;
-	}
-
-	tCounterId get_id(const key_T& key)
-	{
-		return get_ids(key)[0];
+		return counter_ids[0];
 	}
 
 	std::map<key_T, std::array<uint64_t, size_T>> get_counters() const ///< get_values
@@ -382,6 +369,12 @@ public:
 		}
 
 		return result;
+	}
+
+	size_t size() const
+	{
+		std::lock_guard<std::mutex> guard(mutex);
+		return counters_allocated.size();
 	}
 
 	void gc()
