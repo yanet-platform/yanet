@@ -1700,7 +1700,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 
 			if (exist(interfaces, egress_interface_id))
 			{
-				const auto counter_ids = tunnel_counter.get_ids({fallback.is_ipv4(), peer_id, nexthop, origin_as});
+				const auto counter_id = tunnel_counter.get_id({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 
 				uint16_t flags = 0;
 				if (neighbor_address.is_default())
@@ -1708,7 +1708,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
 				}
 
-				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop, neighbor_address, flags);
+				update_nexthops.emplace_back(egress_interface_id, counter_id, label, nexthop, neighbor_address, flags);
 				weights.emplace_back(weight);
 
 				tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
@@ -1730,7 +1730,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 				const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
 				(void)egress_interface_name;
 
-				const auto counter_ids = tunnel_counter.get_ids({fallback.is_ipv4(), peer_id, nexthop, origin_as});
+				const auto counter_id = tunnel_counter.get_id({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 
 				uint16_t flags = 0;
 				if (neighbor_address.is_default())
@@ -1738,7 +1738,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
 				}
 
-				update_nexthops.emplace_back(egress_interface_id, counter_ids[0], label, nexthop, neighbor_address, flags);
+				update_nexthops.emplace_back(egress_interface_id, counter_id, label, nexthop, neighbor_address, flags);
 				weights.emplace_back(weight);
 
 				tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
