@@ -103,7 +103,10 @@ sock_dev_close(struct rte_eth_dev* dev)
 
 	close(internals->fd);
 	unlink(internals->sockaddr.sun_path);
-	rte_free(internals);
+	if (internals)
+	{
+		rte_free(internals);
+	}
 	return 0;
 }
 #else
@@ -408,10 +411,8 @@ int sock_dev_stats_get(struct rte_eth_dev* dev,
 	return 0;
 }
 
-int sock_dev_create(const char* name, uint8_t numa_node)
+int sock_dev_create(const char* path, const char* name, uint8_t numa_node)
 {
-	const char* path = name + strlen(SOCK_DEV_PREFIX);
-
 	struct sock_internals* internals = (struct sock_internals*)
 	        rte_zmalloc_socket(path, sizeof(struct sock_internals), 0, numa_node);
 	if (internals == NULL)
@@ -452,7 +453,7 @@ int sock_dev_create(const char* name, uint8_t numa_node)
 	internals->conFd = -1;
 
 	struct rte_eth_dev* eth_dev = NULL;
-	eth_dev = rte_eth_dev_allocate(path);
+	eth_dev = rte_eth_dev_allocate(name);
 	if (eth_dev == NULL)
 	{
 		close(internals->fd);
