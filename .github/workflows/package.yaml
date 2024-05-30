@@ -5,11 +5,11 @@ on:
     branches: ["*", "deb-package"]
 
 jobs:
-  build-debian-package-jammy:
+  build-ubuntu-22-04:
     name: build (Ubuntu 22.04)
     runs-on: ubuntu-latest
     container:
-      image: yanetplatform/builder-lite
+      image: ubuntu:22.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -28,16 +28,42 @@ jobs:
           name: target_debian-22.04
           path: /__w/yanet/yanet*.deb
 
-  build-debian-package-bionic:
+  build-ubuntu-18-04:
     name: build (Ubuntu 18.04)
     runs-on: ubuntu-latest
     container:
-      image: yanetplatform/builder_ubuntu18.04-lite
+      image: ubuntu:18.04
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: recursive
       - run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+          build-essential \
+          meson \
+          ninja-build \
+          pkg-config \
+          git \
+          libnuma-dev \
+          libibverbs-dev \
+          libpcap-dev \
+          libsystemd-dev \
+          libyaml-cpp-dev \
+          libgtest-dev \
+          flex \
+          libfl-dev \
+          netbase \
+          devscripts \
+          debhelper \
+          dupload \
+          python3-pyelftools \
+          python3-pip \
+          protobuf-compiler \
+          libprotobuf-dev \
+          bison \
+          debhelper-compat
+          python3 -m pip install meson
           export YANET_VERSION=v0.1
           export YANET_VERSION=${YANET_VERSION#v}
           export YANET_VERSION_MAJOR=${YANET_VERSION%.*}

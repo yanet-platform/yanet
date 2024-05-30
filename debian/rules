@@ -28,7 +28,7 @@ override_dh_auto_install:
 	install -pD -m0775 libprotobuf/meta.proto -t debian/tmp/usr/include/yanet/
 	install -pD -m0775 libprotobuf/controlplane.proto -t debian/tmp/usr/include/yanet/
 	install -pD -m0775 build/librib/libyanet-rib.so -t debian/tmp/usr/lib
-	install -pDT -m0775 librib/libyabird.h -t debian/tmp/usr/include/libyanet-rib.h
+	install -pDT -m0775 librib/libyabird.h debian/tmp/usr/include/libyanet-rib.h
 	install -pD -m0775 yanet-announcer.py -t debian/tmp/usr/bin
 	install -pD -m0775 yanet-init.sh -t debian/tmp/usr/bin
 	install -pD -m0775 yanet-rebind.sh -t debian/tmp/usr/bin
