@@ -11,7 +11,7 @@ jobs:
     container:
       image: ubuntu:22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v1
         with:
           submodules: recursive
       - run: |
@@ -40,6 +40,7 @@ jobs:
           libprotobuf-dev \
           bison \
           debhelper-compat
+          gcc --version
           export YANET_VERSION=v0.1
           export YANET_VERSION=${YANET_VERSION#v}
           export YANET_VERSION_MAJOR=${YANET_VERSION%.*}
@@ -88,6 +89,7 @@ jobs:
           bison \
           debhelper-compat
           python3 -m pip install meson
+          gcc --version
           export YANET_VERSION=v0.1
           export YANET_VERSION=${YANET_VERSION#v}
           export YANET_VERSION_MAJOR=${YANET_VERSION%.*}
