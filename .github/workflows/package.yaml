@@ -15,6 +15,31 @@ jobs:
         with:
           submodules: recursive
       - run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+          build-essential \
+          meson \
+          ninja-build \
+          pkg-config \
+          git \
+          libnuma-dev \
+          libibverbs-dev \
+          libpcap-dev \
+          libsystemd-dev \
+          libyaml-cpp-dev \
+          libgtest-dev \
+          flex \
+          libfl-dev \
+          netbase \
+          devscripts \
+          debhelper \
+          dupload \
+          python3-pyelftools \
+          python3-pip \
+          protobuf-compiler \
+          libprotobuf-dev \
+          bison \
+          debhelper-compat
           export YANET_VERSION=v0.1
           export YANET_VERSION=${YANET_VERSION#v}
           export YANET_VERSION_MAJOR=${YANET_VERSION%.*}
@@ -41,7 +66,6 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
           build-essential \
-          meson \
           ninja-build \
           pkg-config \
           git \
