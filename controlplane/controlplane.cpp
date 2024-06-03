@@ -149,6 +149,10 @@ eResult cControlPlane::init(const std::string& jsonFilePath)
 		return command_convert(std::get<common::icp::convert::request>(std::get<1>(request)));
 	});
 
+	register_command(common::icp::requestType::counters_stat, [this]() {
+		return command_counters_stat();
+	});
+
 	if (!jsonFilePath.empty())
 	{
 		std::ifstream fromFileStream(jsonFilePath);
@@ -816,6 +820,11 @@ common::icp::convert::response cControlPlane::command_convert(const common::icp:
 	}
 
 	return response;
+}
+
+common::icp::counters_stat::response cControlPlane::command_counters_stat()
+{
+	return counter_manager.full_stat();
 }
 
 common::icp::convert::response cControlPlane::convert_logical_module()
