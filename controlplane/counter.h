@@ -3,92 +3,12 @@
 #include <mutex>
 #include <set>
 
+#include "segment_allocator.h"
 #include "type.h"
 
+#include "common/icp.h"
 #include "common/idataplane.h"
 #include "common/refarray.h"
-
-class SegmentAllocator
-{
-public:
-	SegmentAllocator(size_t start, size_t size, size_t error_result) :
-	        size_(size), error_result_(error_result)
-	{
-		Insert(start, size);
-	}
-
-	size_t Allocate(size_t size)
-	{
-		auto iter = segments_size_.lower_bound({size, 0});
-		if (iter == segments_size_.end())
-		{
-			return error_result_;
-		}
-		size_t index = iter->second;
-
-		if (size < iter->first)
-		{
-			Insert(index + size, iter->first - size);
-		}
-
-		segments_start_.erase({index, iter->first});
-		segments_size_.erase(iter);
-		size_ -= size;
-
-		return index;
-	}
-
-	bool Free(size_t start, size_t size)
-	{
-		auto iter_right = segments_start_.upper_bound({start, 0});
-		auto iter_left = (iter_right == segments_start_.begin() ? segments_start_.end() : std::prev(iter_right)); // если тот что справа самый первый, то левее уже никого
-
-		if ((iter_left != segments_start_.end()) && (iter_left->first + iter_left->second > start))
-		{
-			return false; // Освобождаем в отрезке который и так свободен
-		}
-		else if ((iter_right != segments_start_.end()) && (start + size > iter_right->first))
-		{
-			return false; // Освобождаем в отрезке который и так свободен
-		}
-
-		if ((iter_left != segments_start_.end()) && (iter_left->first + iter_left->second == start))
-		{ // Объединяем с левым сегментом
-			start = iter_left->first;
-			size += iter_left->second;
-			segments_size_.erase({iter_left->second, iter_left->first});
-			segments_start_.erase(iter_left);
-		}
-
-		if ((iter_right != segments_start_.end()) && (start + size == iter_right->first))
-		{ // Объединяем с правым сегментом
-			size += iter_right->second;
-			segments_size_.erase({iter_right->second, iter_right->first});
-			segments_start_.erase(iter_right);
-		}
-
-		Insert(start, size);
-		size_ += size;
-		return true;
-	}
-
-	size_t Size() const
-	{
-		return size_;
-	}
-
-private:
-	std::set<std::pair<size_t, size_t>> segments_start_;
-	std::set<std::pair<size_t, size_t>> segments_size_;
-	size_t size_;
-	size_t error_result_;
-
-	void Insert(size_t start, size_t size)
-	{
-		segments_start_.insert({start, size});
-		segments_size_.insert({size, start});
-	}
-};
 
 class counter_manager_t
 {
@@ -96,8 +16,7 @@ public:
 	static_assert((uint32_t)common::globalBase::static_counter_type::size <= YANET_CONFIG_COUNTERS_SIZE);
 
 	counter_manager_t() :
-	        counter_shifts(YANET_CONFIG_COUNTERS_SIZE, 0),
-	        allocator((uint32_t)common::globalBase::static_counter_type::size, YANET_CONFIG_COUNTERS_SIZE - (uint32_t)common::globalBase::static_counter_type::size, 0)
+	        counter_shifts(YANET_CONFIG_COUNTERS_SIZE, 0)
 	{
 	}
 
@@ -105,6 +24,30 @@ public:
 	{
 		std::lock_guard<std::mutex> guard(counter_mutex);
 		return {YANET_CONFIG_COUNTERS_SIZE - allocator.Size(), YANET_CONFIG_COUNTERS_SIZE};
+	}
+
+	common::icp::counters_stat::response full_stat() const
+	{
+		std::lock_guard<std::mutex> guard(counter_mutex);
+
+		const auto* blocks_stat = allocator.GetBlocksStat();
+		std::vector<common::icp::counters_stat::one_size_info> sizes_info;
+		for (uint16_t size = 1; size <= max_buffer_size; size++)
+		{
+			const auto& block = blocks_stat[size];
+			if ((block.used_blocks != 0) || (block.busy_blocks != 0) || (block.used_segments != 0))
+			{
+				sizes_info.emplace_back(size, block.used_blocks, block.busy_blocks, block.used_segments);
+			}
+		}
+
+		auto [errors_external, errors_internal] = allocator.GetErrors();
+		common::icp::counters_stat::common_info common_info(blocks_stat[0].used_blocks, ///< free_blocks
+		                                                    allocator.Size(), ///< free_cells_
+		                                                    errors_external, ///< errors_external_
+		                                                    errors_internal); ///< errors_internal_
+
+		return {common_info, sizes_info};
 	}
 
 protected:
@@ -161,10 +104,13 @@ protected:
 	}
 
 protected:
+	static constexpr uint32_t counter_index_begin = (((uint32_t)common::globalBase::static_counter_type::size + 63) / 64) * 64;
+	static constexpr uint32_t max_buffer_size = 64;
+
 	mutable std::mutex counter_mutex;
 	interface::dataPlane counter_dataplane;
 	std::vector<uint64_t> counter_shifts;
-	SegmentAllocator allocator;
+	SegmentAllocator<counter_index_begin, YANET_CONFIG_COUNTERS_SIZE, 64 * 64, max_buffer_size, 0> allocator;
 };
 
 template<typename key_T,
