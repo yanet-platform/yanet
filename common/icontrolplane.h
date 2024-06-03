@@ -347,6 +347,11 @@ public:
 		return get<common::icp::requestType::convert, common::icp::convert::response>(request);
 	}
 
+	auto counters_stat() const
+	{
+		return get<common::icp::requestType::counters_stat, common::icp::counters_stat::response>();
+	}
+
 protected:
 	void connectToControlPlane() const
 	{

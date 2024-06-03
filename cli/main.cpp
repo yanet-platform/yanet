@@ -132,6 +132,7 @@ std::vector<std::tuple<std::string,
                     {"version", "", [](const auto& args) { call(show::version, args); }},
                     {"latch update dataplane", "<latch name> <state>", [](const auto& args) { call(latch::dataplane_update, args); }},
                     {"counter", "[counter_name] <core_id>", [](const auto& args) { call(show::counter_by_name, args); }},
+                    {"counters stat", "", [](const auto& args) { call(show::counters_stat, args); }},
                     {"latch update dataplane", "<latch name> <state>", [](const auto& args) { call(latch::dataplane_update, args); }},
                     {},
                     {"convert logical_module", "", [](const auto& args) { call(convert::logical_module, args); }}};

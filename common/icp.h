@@ -89,6 +89,7 @@ enum class requestType : uint32_t
 	convert,
 	route_counters,
 	route_tunnel_counters,
+	counters_stat,
 	size // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -226,6 +227,8 @@ inline const char* requestType_toString(requestType t)
 			return "route_counters";
 		case requestType::route_tunnel_counters:
 			return "route_tunnel_counters";
+		case requestType::counters_stat:
+			return "counters_stat";
 		case requestType::size:
 			return "unknown";
 	}
@@ -930,6 +933,22 @@ using response = std::vector<std::tuple<unsigned int, ///< id
                                         std::string>>; ///< name
 }
 
+namespace counters_stat
+{
+using one_size_info = std::tuple<uint16_t, ///< size of segments
+                                 uint32_t, ///< used_blocks
+                                 uint32_t, ///< busy_blocks
+                                 uint32_t>; ///< used_segments
+
+using common_info = std::tuple<uint32_t, ///< free_blocks
+                               uint32_t, ///< free_cells_
+                               uint64_t, ///< errors_external_
+                               uint64_t>; ///< errors_internal_
+
+using response = std::tuple<common_info,
+                            std::vector<one_size_info>>;
+}
+
 using request = std::tuple<requestType,
                            std::variant<std::tuple<>,
                                         acl_unwind::request,
@@ -999,7 +1018,7 @@ using response = std::variant<std::tuple<>,
                               nat46clat_config::response,
                               nat46clat_announce::response,
                               nat46clat_stats::response,
-                              convert::response>;
+                              convert::response,
+                              counters_stat::response>;
 }
-
 }
