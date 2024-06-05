@@ -259,6 +259,16 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 			                                                                  rule.network_flags_filter_id,
 			                                                                  rule.transport_filter_id));
 		}
+		/* YANET_LOG_INFO("transport_table holds the following mapping: filter_id -> set<rule_ids>:\n"); */
+		/* for (size_t i = 0; i < transport_table.filter_id_rule_ids.size(); i++) */
+		/* { */
+		/* 	printf("\t %zu -> [ ", i); */
+		/* 	for (auto rule : transport_table.filter_id_rule_ids[i]) */
+		/* 	{ */
+		/* 		printf("%u ", rule); */
+		/* 	} */
+		/* 	printf("]\n"); */
+		/* } */
 
 		/// via
 		{
@@ -327,7 +337,7 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 	               total_table.filters.size());
 
 	YANET_LOG_INFO("acl::compile: value.filters: %lu\n",
-	               value.filters.size());
+	               value.vector.size());
 }
 
 void compiler_t::network_compile()
@@ -443,6 +453,20 @@ void compiler_t::transport_table_compile()
 		size += thread.acl_transport_table.size();
 		group_ids += thread.group_id_filter_ids.size();
 	}
+	/* for (const auto& thread : transport_table.threads) */
+	/* { */
+	/* 	YANET_LOG_INFO("acl::compile: thread_id [%u] holds the following mapping: group_id -> set<filter_id>:\n", */
+	/* 	               thread.thread_id); */
+	/* 	for (auto& elem : thread.group_id_filter_ids) */
+	/* 	{ */
+	/* 		printf("\t %u -> [ ", elem.first); */
+	/* 		for (auto filter : elem.second) */
+	/* 		{ */
+	/* 			printf("%u ", filter); */
+	/* 		} */
+	/* 		printf("]\n"); */
+	/* 	} */
+	/* } */
 	YANET_LOG_INFO("acl::compile: size: %lu\n",
 	               size);
 	YANET_LOG_INFO("acl::compile: group_ids: %lu\n",
