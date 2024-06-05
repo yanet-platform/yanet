@@ -981,6 +981,11 @@ void compile(const std::map<std::string, controlplane::base::acl_t>& acls,
 
 		YANET_LOG_INFO("acl::compile: unwind\n");
 		auto rules_used = unwind_used_rules(acls, iface_map, nullptr, result);
+
+		// FIXME: remove, this is temporary ouput of unwinded rules for debug purposes
+		for (auto const& rule : rules_used)
+			YANET_LOG_DEBUG("\033[31m%s\033[0m\n", rule.to_string().c_str());
+
 		compiler.compile(rules_used, result);
 	}
 	catch (const std::exception& ex)

@@ -1514,6 +1514,8 @@ inline void cWorker::acl_ingress_handle4()
 
 		total_key.acl_id = metadata->flow.data.aclId;
 		total_key.transport_id = transport_value;
+		/* std::cout << "Processing packet that matched {group_id, acl_id} =  " */
+		/*           << transport_value << ", " << total_key.acl_id << std::endl; */
 	}
 
 	acl.total_table->lookup(hashes,
@@ -1705,6 +1707,8 @@ inline void cWorker::acl_ingress_handle6()
 
 		total_key.acl_id = metadata->flow.data.aclId;
 		total_key.transport_id = transport_value;
+		/* std::cout << "Processing packet that matched {group_id, acl_id} =  " */
+		/*           << transport_value << ", " << total_key.acl_id << std::endl; */
 	}
 
 	acl.total_table->lookup(hashes,
@@ -5257,6 +5261,8 @@ inline void cWorker::acl_egress_handle4()
 
 		total_key.acl_id = metadata->aclId;
 		total_key.transport_id = transport_value;
+		/* std::cout << "Processing packet that matched {group_id, acl_id} =  " */
+		/*           << transport_value << ", " << total_key.acl_id << std::endl; */
 	}
 
 	acl.total_table->lookup(hashes,
@@ -5441,6 +5447,8 @@ inline void cWorker::acl_egress_handle6()
 
 		total_key.acl_id = metadata->aclId;
 		total_key.transport_id = transport_value;
+		/* std::cout << "Processing packet that matched {group_id, acl_id} =  " */
+		/*           << transport_value << ", " << total_key.acl_id << std::endl; */
 	}
 
 	acl.total_table->lookup(hashes,
