@@ -1,5 +1,5 @@
 #include <signal.h>
-#include <systemd/sd-daemon.h>
+//#include <systemd/sd-daemon.h>
 
 #include <iostream>
 
@@ -67,7 +67,7 @@ int main(int argc,
 		return 3;
 	}
 
-	sd_notify(0, "READY=1");
+//	sd_notify(0, "READY=1");
 
 	dataPlane.start();
 	dataPlane.join();

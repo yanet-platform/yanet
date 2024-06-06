@@ -2,9 +2,7 @@ project('yanet', 'cpp',
         meson_version: '>= 0.61',
         default_options: ['cpp_std=c++17',
                           'buildtype=release',
-                          'warning_level=2',
-                          'werror=true',
-                          'b_lto=true'])
+                          'warning_level=2'])
 
 
 yanet_rootdir = include_directories('.')
