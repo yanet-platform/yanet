@@ -664,7 +664,9 @@ using eor = std::tuple<std::string, ///< protocol
                        ip_address_t, ///< peer
                        std::string>; ///< table_name
 
-using request = std::vector<std::variant<insert, remove, clear, eor>>;
+using action = std::variant<insert, remove, clear, eor>;
+
+using request = std::vector<action>;
 }
 
 namespace rib_summary

@@ -318,7 +318,7 @@ int main(int argc,
 		return ret;
 	}
 
-	sd_notify(0, "READY=1");
+	//sd_notify(0, "READY=1");
 
 	return runLogger();
 }

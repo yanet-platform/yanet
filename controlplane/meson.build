@@ -1,6 +1,6 @@
 dependencies = []
 dependencies += libjson.get_variable('nlohmann_json_dep')
-dependencies += dependency('libsystemd')
+#dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
 dependencies += libyanet_fwparser_dep
 dependencies += libyanet_protobuf_dep
@@ -31,7 +31,8 @@ sources = files('acl_compiler.cpp',
                 'rib.cpp',
                 'route.cpp',
                 'telegraf.cpp',
-                'tun64.cpp')
+                'tun64.cpp',
+                'libbird.cpp')
 
 foreach arch : archs
     bin = 'yanet-controlplane'

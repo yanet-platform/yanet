@@ -62,6 +62,7 @@ private:
 	void rib_eor(const common::icp::rib_update::eor& request);
 
 	void rib_thread();
+	void bird_thread();
 
 protected:
 	mutable std::mutex rib_update_mutex;
