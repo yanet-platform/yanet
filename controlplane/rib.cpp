@@ -1,5 +1,8 @@
 #include "rib.h"
+#include "libbird.h"
 #include "controlplane.h"
+
+#include <fcntl.h>
 
 using namespace controlplane::module;
 
@@ -873,4 +876,22 @@ void rib_t::rib_thread()
 
 		std::this_thread::sleep_for(std::chrono::milliseconds{200});
 	}
+
+}
+
+void rib_t::bird_thread()
+{
+	while (!flagStop) {
+		read_bird_feed("/tmp/export.sock", "default", this);
+
+		common::icp::rib_update::clear request = {"bgp", std::nullopt};
+/*                std::get<1>(request) = {peer_address,
+                                        {"default", ///< @todo: vrf
+                                         YANET_RIB_PRIORITY_DEFAULT}};
+*/
+		rib_clear(request);
+
+		std::this_thread::sleep_for(std::chrono::milliseconds{200});
+	}
+
 }
