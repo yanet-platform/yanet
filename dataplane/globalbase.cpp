@@ -1697,12 +1697,24 @@ void generation::evaluate_service_ring(uint32_t balancer_service_ring_id)
 				weight = (int)(weight * wlc_ratio(state->weight, real_connections, weight_sum, connection_sum, service->wlc_power));
 				// todo check weight change
 			}
+
+			// clamp weight to a maximum possible value
+			if (weight > YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX)
+			{
+				// TODO: think about accounting the clamping
+				weight = YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX;
+			}
+
 			while (weight-- > 0)
 			{
 				ring->reals[weight_pos++] = real_id;
 			}
 		}
+
+		YADECAP_MEMORY_BARRIER_COMPILE;
+
 		range->size = weight_pos - range->start;
+		weight_pos = range->start + service->real_size * YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX;
 	}
 }
 
