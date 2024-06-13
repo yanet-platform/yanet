@@ -874,9 +874,12 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 			start_filter = start_filter & filter;
 
 			auto rules = unwind_rules(fw, dispatcher, start_filter, iface);
-
-			for (auto& rule : rules)
+			auto rules_iter = rules.begin();
+			while (rules_iter != rules.end())
 			{
+				auto& rule = *rules_iter;
+				bool remove_rule = false;
+
 				if (std::holds_alternative<common::globalBase::tFlow>(rule.action))
 				{
 					auto& flow = std::get<common::globalBase::tFlow>(rule.action);
@@ -916,15 +919,28 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 					auto& action = std::get<common::acl::action_t>(rule.action);
 					if (!action.dump_tag.empty())
 					{
-						auto it = result.tag_to_dump_id.find(action.dump_tag);
-						if (it == result.tag_to_dump_id.end())
+						if (result.dump_id_to_tag.size() >= YANET_CONFIG_DUMP_ID_TO_TAG_SIZE)
 						{
-							result.dump_id_to_tag.emplace_back(action.dump_tag);
-							it = result.tag_to_dump_id.emplace_hint(it, action.dump_tag, result.dump_id_to_tag.size());
+							// We should remove this rule because the dump_id would exceed the limit
+							remove_rule = true;
 						}
-						action.dump_id = it->second;
+						else
+						{
+							auto it = result.tag_to_dump_id.find(action.dump_tag);
+							if (it == result.tag_to_dump_id.end())
+							{
+								result.dump_id_to_tag.emplace_back(action.dump_tag);
+								it = result.tag_to_dump_id.emplace_hint(it, action.dump_tag, result.dump_id_to_tag.size());
+							}
+							action.dump_id = it->second;
+						}
 					}
 				}
+
+				if (remove_rule)
+					rules_iter = rules.erase(rules_iter);
+				else
+					++rules_iter;
 			}
 
 			auto [it, inserted] = rules_map.try_emplace(std::move(rules), aclId);
