@@ -40,9 +40,9 @@ generation::generation(cDataPlane* dataPlane,
         dataPlane(dataPlane),
         socketId(socketId)
 {
-	std::fill(balancer_service_rings[0].ranges,
-	          balancer_service_rings[0].ranges + YANET_CONFIG_BALANCER_SERVICES_SIZE,
-	          balancer_service_range_t());
+	std::fill(balancer_service_ring.ranges,
+		balancer_service_ring.ranges + YANET_CONFIG_BALANCER_SERVICES_SIZE,
+		balancer_service_range_t());
 
 	std::fill(balancer_real_states,
 	          balancer_real_states + YANET_CONFIG_BALANCER_REALS_SIZE,
@@ -1582,7 +1582,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 
 	std::copy(binding.begin(), binding.end(), balancer_service_reals);
 
-	evaluate_service_ring(balancer_service_ring_id);
+	evaluate_service_ring();
 
 	return eResult::success;
 }
@@ -1605,10 +1605,8 @@ eResult generation::update_balancer_unordered_real(const common::idp::updateGlob
 		real_state = new_state;
 	}
 
-	uint32_t next_balancer_service_ring_id = balancer_service_ring_id ^ 1;
-	evaluate_service_ring(next_balancer_service_ring_id);
-	YADECAP_MEMORY_BARRIER_COMPILE;
-	this->balancer_service_ring_id = next_balancer_service_ring_id;
+	evaluate_service_ring();
+	
 	return eResult::success;
 }
 
@@ -1648,9 +1646,9 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 	return (sessions_created - sessions_destroyed + sessions_created_gc - sessions_destroyed_gc) / dataPlane->numaNodesInUse;
 }
 
-void generation::evaluate_service_ring(uint32_t balancer_service_ring_id)
+void generation::evaluate_service_ring()
 {
-	balancer_service_ring_t* ring = balancer_service_rings + balancer_service_ring_id;
+	balancer_service_ring_t* ring = &balancer_service_ring;
 	uint32_t weight_pos = 0;
 	for (uint32_t service_idx = 0; service_idx < balancer_services_count; ++service_idx)
 	{
@@ -1676,7 +1674,9 @@ void generation::evaluate_service_ring(uint32_t balancer_service_ring_id)
 				connection_sum += count_real_connections(real.counter_id);
 			}
 		}
+
 		balancer_service_range_t* range = ring->ranges + balancer_active_services[service_idx];
+
 		range->start = weight_pos;
 		for (uint32_t real_idx = service->real_start;
 		     real_idx < service->real_start + service->real_size;
@@ -1685,11 +1685,14 @@ void generation::evaluate_service_ring(uint32_t balancer_service_ring_id)
 			uint32_t real_id = balancer_service_reals[real_idx];
 			const balancer_real_t& real = balancer_reals[real_id];
 			balancer_real_state_t* state = balancer_real_states + real_id;
+
 			if (state->weight == 0)
 			{
 				continue;
 			}
+
 			auto weight = state->weight;
+
 			if (service->scheduler == ::balancer::scheduler::wlc)
 			{
 				uint64_t real_connections = count_real_connections(real.counter_id);

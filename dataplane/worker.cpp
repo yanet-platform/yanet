@@ -3991,7 +3991,7 @@ inline void cWorker::balancer_handle()
 {
 	const auto& base = bases[localBaseId & 1];
 	const auto* ring =
-	        base.globalBase->balancer_service_rings + base.globalBase->balancer_service_ring_id;
+	        &base.globalBase->balancer_service_ring;
 
 	if (unlikely(balancer_stack.mbufsCount == 0))
 	{
