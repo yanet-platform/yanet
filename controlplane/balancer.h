@@ -23,12 +23,16 @@ using service_key_t = std::tuple<common::ip_address_t,
                                  uint8_t, ///< proto
                                  std::optional<uint16_t>>; ///< port
 
-using service_counter_key_t = std::tuple<std::string, ///< module_name
+using module_name = std::string;
+
+using service_counter_key_t = std::tuple<module_name,
                                          service_key_t>;
 
-using real_counter_key_t = std::tuple<std::string, ///< module_name
-                                      service_key_t,
-                                      real_key_t>;
+using real_key_global_t = std::tuple<module_name,
+                                    service_key_t,
+                                    real_key_t>;
+
+using real_counter_key_t = real_key_global_t;
 
 class generation_config_t
 {
@@ -116,15 +120,20 @@ protected:
 	generation_manager<balancer::generation_services_t> generations_services;
 
 	mutable std::mutex reals_enabled_mutex;
-	std::map<std::tuple<std::string, ///< module
-	                    balancer::service_key_t,
-	                    balancer::real_key_t>,
-	         std::optional<uint32_t>>
-	        reals_enabled;
+
+	std::map<balancer::real_key_global_t, std::optional<uint32_t>> reals_enabled;
+
+	// The set contains all reals touched after the last one flush operation
+	std::set<balancer::real_key_global_t> real_updates;
+	
+	// The set contains all reals touched while the last one reload was fired
+	std::set<balancer::real_key_global_t> real_reload_updates;
+	// The flag is true when a pending reload is there
+	bool in_reload;
 
 	mutable std::mutex reals_unordered_mutex;
 	mutable std::mutex config_switch_mutex;
-	std::map<std::tuple<std::string, ///< module
+	std::map<std::tuple<balancer::module_name,
 	                    balancer::service_key_t,
 	                    balancer::real_key_t>,
 	         uint32_t>
