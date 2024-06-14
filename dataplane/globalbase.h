@@ -186,7 +186,7 @@ protected:
 	eResult tsc_state_update(const common::idp::updateGlobalBase::tsc_state_update::request& request);
 	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 
-	void evaluate_service_ring(uint32_t next_balancer_reals_id);
+	void evaluate_service_ring();
 	inline uint64_t count_real_connections(uint32_t counter_id);
 
 public: ///< @todo
@@ -308,8 +308,7 @@ public: ///< @todo
 	balancer_real_id_t balancer_service_reals[YANET_CONFIG_BALANCER_REALS_SIZE];
 
 	balancer_real_state_t balancer_real_states[YANET_CONFIG_BALANCER_REALS_SIZE];
-	uint32_t balancer_service_ring_id;
-	balancer_service_ring_t balancer_service_rings[2];
+	balancer_service_ring_t balancer_service_ring;
 
 	int64_t dump_id_to_tag[YANET_CONFIG_DUMP_ID_TO_TAG_SIZE];
 
