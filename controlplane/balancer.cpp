@@ -354,6 +354,21 @@ void balancer_t::reload_after()
 		std::lock_guard<std::mutex> guard(config_switch_mutex);
 
 		common::idp::updateGlobalBaseBalancer::request balancer;
+
+		{
+			std::lock_guard<std::mutex> guard(reals_enabled_mutex);
+			/* 
+			At some point, real_updates and real_reload_updates may contain different sets of real updates, 
+			depending on the interaction of update, flush and reload operations. In addition to the possibility 
+			that real_reload_updates is smaller than its counterpart, it should be enough to reset only 
+			the first of them, and then reset both, since the initial state of real_reload_updates, which already 
+			contains all the changes, was made immediately before the restart operation began.
+			*/
+			real_updates = real_reload_updates;
+			real_reload_updates.clear();
+			in_reload = false;
+		}
+
 		flush_reals(balancer, generations_config.next());
 		dataplane.updateGlobalBaseBalancer(balancer);
 
@@ -587,7 +602,7 @@ void balancer_t::balancer_real(const common::icp::balancer_real::request& reques
 	std::lock_guard<std::mutex> guard(reals_enabled_mutex);
 	for (const auto& [module_name, virtual_ip, proto, virtual_port, real_ip, real_port, enable, weight] : request)
 	{
-		std::tuple<std::string, balancer::service_key_t, balancer::real_key_t> key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
+		balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
 
 		if (enable)
 		{
@@ -596,6 +611,13 @@ void balancer_t::balancer_real(const common::icp::balancer_real::request& reques
 		else
 		{
 			reals_enabled.erase(key);
+		}
+
+		real_updates.insert(key);
+
+		if (in_reload)
+		{
+			real_reload_updates.insert(key);
 		}
 	}
 }
@@ -624,6 +646,9 @@ common::icp::balancer_announce::response balancer_t::balancer_announce() const
 void balancer_t::update_service(const balancer::generation_config_t& generation_config,
                                 balancer::generation_services_t& generation_services)
 {
+	std::lock_guard<std::mutex> guard(reals_enabled_mutex);
+	in_reload = true;
+
 	for (const auto& [module_name, balancer] : generation_config.config_balancers)
 	{
 		uint64_t services_reals_enabled_count = 0;
@@ -668,14 +693,13 @@ void balancer_t::update_service(const balancer::generation_config_t& generation_
 
 			for (const auto& [real_ip, real_port, weight] : reals)
 			{
-				std::tuple<std::string, balancer::service_key_t, balancer::real_key_t> key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
+		    	balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
 
 				services_reals_count++;
 
 				bool enabled = false;
 				uint32_t effective_weight = weight;
 				{
-					std::lock_guard<std::mutex> guard(reals_enabled_mutex);
 					auto it = reals_enabled.find(key);
 					if (it != reals_enabled.end())
 					{
@@ -753,7 +777,7 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 			{
 				(void)weight;
 
-				std::tuple<std::string, balancer::service_key_t, balancer::real_key_t> key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
+				balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
 
 				const auto counter_ids = real_counters.get_ids(key);
 
@@ -805,6 +829,8 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
                              const balancer::generation_config_t& generation_config)
 {
 	common::idp::updateGlobalBaseBalancer::update_balancer_unordered_real::request balancer_unordered_real_request;
+					
+	std::lock_guard<std::mutex> guard(reals_enabled_mutex);
 
 	for (const auto& [module_name, balancer] : generation_config.config_balancers)
 	{
@@ -837,12 +863,18 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 
 			for (const auto& [real_ip, real_port, weight] : reals)
 			{
-				std::tuple<std::string, balancer::service_key_t, balancer::real_key_t> key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
+				balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
+				
+				if (real_updates.find(key) == real_updates.end())
+				{
+					// There is nothing to update as real
+					// was not touched after the last one flush
+					continue;
+				}
 
 				bool enabled = false;
 				uint32_t effective_weight = weight;
 				{
-					std::lock_guard<std::mutex> guard(reals_enabled_mutex);
 					auto it = reals_enabled.find(key);
 					if (it != reals_enabled.end())
 					{
@@ -872,6 +904,8 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 				balancer_unordered_real_request.emplace_back(real_unordered_id,
 				                                             enabled,
 				                                             effective_weight);
+
+				real_updates.erase(key);
 			}
 		}
 	}
