@@ -41,8 +41,8 @@ generation::generation(cDataPlane* dataPlane,
         socketId(socketId)
 {
 	std::fill(balancer_service_ring.ranges,
-		balancer_service_ring.ranges + YANET_CONFIG_BALANCER_SERVICES_SIZE,
-		balancer_service_range_t());
+	          balancer_service_ring.ranges + YANET_CONFIG_BALANCER_SERVICES_SIZE,
+	          balancer_service_range_t());
 
 	std::fill(balancer_real_states,
 	          balancer_real_states + YANET_CONFIG_BALANCER_REALS_SIZE,
@@ -529,16 +529,16 @@ eResult generation::get(const common::idp::getGlobalBase::request& request,
 	/** @todo
 	for (const auto& interfaceId : std::get<2>(request))
 	{
-		if (interfaceId >= CONFIG_YADECAP_INTERFACES_SIZE)
-		{
-			YADECAP_LOG_ERROR("invalid interfaceId: '%u'\n", interfaceId);
-			return eResult::invalidInterfaceId;
-		}
+	        if (interfaceId >= CONFIG_YADECAP_INTERFACES_SIZE)
+	        {
+	                YADECAP_LOG_ERROR("invalid interfaceId: '%u'\n", interfaceId);
+	                return eResult::invalidInterfaceId;
+	        }
 
-		const auto& interface = interfaces[interfaceId];
+	        const auto& interface = interfaces[interfaceId];
 
-		std::get<2>(globalBaseResponse)[interfaceId] = {convert(interface.neighborEtherAddress),
-		                                                interface.flow};
+	        std::get<2>(globalBaseResponse)[interfaceId] = {convert(interface.neighborEtherAddress),
+	                                                        interface.flow};
 	}
 	*/
 
@@ -1606,7 +1606,7 @@ eResult generation::update_balancer_unordered_real(const common::idp::updateGlob
 	}
 
 	evaluate_service_ring();
-	
+
 	return eResult::success;
 }
 
