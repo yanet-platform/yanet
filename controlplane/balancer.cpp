@@ -357,11 +357,11 @@ void balancer_t::reload_after()
 
 		{
 			std::lock_guard<std::mutex> guard(reals_enabled_mutex);
-			/* 
-			At some point, real_updates and real_reload_updates may contain different sets of real updates, 
-			depending on the interaction of update, flush and reload operations. In addition to the possibility 
-			that real_reload_updates is smaller than its counterpart, it should be enough to reset only 
-			the first of them, and then reset both, since the initial state of real_reload_updates, which already 
+			/*
+			At some point, real_updates and real_reload_updates may contain different sets of real updates,
+			depending on the interaction of update, flush and reload operations. In addition to the possibility
+			that real_reload_updates is smaller than its counterpart, it should be enough to reset only
+			the first of them, and then reset both, since the initial state of real_reload_updates, which already
 			contains all the changes, was made immediately before the restart operation began.
 			*/
 			real_updates = real_reload_updates;
@@ -693,7 +693,7 @@ void balancer_t::update_service(const balancer::generation_config_t& generation_
 
 			for (const auto& [real_ip, real_port, weight] : reals)
 			{
-		    	balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
+				balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
 
 				services_reals_count++;
 
@@ -829,7 +829,7 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
                              const balancer::generation_config_t& generation_config)
 {
 	common::idp::updateGlobalBaseBalancer::update_balancer_unordered_real::request balancer_unordered_real_request;
-					
+
 	std::lock_guard<std::mutex> guard(reals_enabled_mutex);
 
 	for (const auto& [module_name, balancer] : generation_config.config_balancers)
@@ -864,7 +864,7 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 			for (const auto& [real_ip, real_port, weight] : reals)
 			{
 				balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
-				
+
 				if (real_updates.find(key) == real_updates.end())
 				{
 					// There is nothing to update as real

@@ -29,8 +29,8 @@ using service_counter_key_t = std::tuple<module_name,
                                          service_key_t>;
 
 using real_key_global_t = std::tuple<module_name,
-                                    service_key_t,
-                                    real_key_t>;
+                                     service_key_t,
+                                     real_key_t>;
 
 using real_counter_key_t = real_key_global_t;
 
@@ -125,7 +125,7 @@ protected:
 
 	// The set contains all reals touched after the last one flush operation
 	std::set<balancer::real_key_global_t> real_updates;
-	
+
 	// The set contains all reals touched while the last one reload was fired
 	std::set<balancer::real_key_global_t> real_reload_updates;
 	// The flag is true when a pending reload is there
