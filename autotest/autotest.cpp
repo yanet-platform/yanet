@@ -38,7 +38,8 @@ struct __attribute__((__packed__)) packHeader
 	uint32_t data_length;
 };
 
-using namespace nAutotest;
+namespace nAutotest
+{
 
 static const std::tuple<ip_address_t,
                         std::string,
@@ -277,20 +278,42 @@ void tAutotest::sendThread(std::string interfaceName,
 	pcap_close(pcap);
 }
 
-static bool readPacket(int fd, pcap_pkthdr* header, u_char* data)
+bool readTimeLimited(int fd, u_char* buf, ssize_t len, std::chrono::system_clock::time_point time_to_give_up)
 {
 	ssize_t ret = 0;
-	int i;
+	while (len > 0 && std::chrono::system_clock::now() < time_to_give_up)
+	{
+		ret = read(fd, buf, len);
+		switch (ret)
+		{
+			case 0:
+				return false;
+			case -1:
+				if ((errno == EAGAIN) || (errno = EWOULDBLOCK))
+				{
+					std::this_thread::sleep_for(READ_WAIT_UNTIL_RETRY);
+				}
+				else
+				{
+					return false;
+				}
+				break;
+			default:
+				len -= ret;
+				buf += ret;
+				break;
+		}
+	}
+
+	return len == 0;
+}
+
+static bool readPacket(int fd, pcap_pkthdr* header, u_char* data, Duration timelimit)
+{
+	auto time_to_give_up = std::chrono::system_clock::now() + timelimit;
 
 	struct packHeader hdr;
-	for (i = 0; i < 1000; ++i)
-	{
-		ret = read(fd, &hdr, sizeof(hdr));
-		if (ret >= 0)
-			break;
-		std::this_thread::sleep_for(std::chrono::microseconds{1000});
-	}
-	if (ret <= 0)
+	if (!readTimeLimited(fd, hdr, time_to_give_up))
 	{
 		return false;
 	}
@@ -303,19 +326,12 @@ static bool readPacket(int fd, pcap_pkthdr* header, u_char* data)
 		throw "";
 	}
 
-	for (; i < 1000; i++)
+	if (!readTimeLimited(fd, data, hdr.data_length, time_to_give_up))
 	{
-		ret = read(fd, data, hdr.data_length);
-		if (ret >= 0)
-			break;
-		std::this_thread::sleep_for(std::chrono::microseconds{1000});
-	}
-	if (ret <= 0)
-	{
-		YANET_LOG_ERROR("error: read bytes %d: %s\n", hdr.data_length, strerror(errno));
 		return false;
 	}
-	header->len = ret;
+
+	header->len = hdr.data_length;
 	header->caplen = header->len;
 	return true;
 }
@@ -442,7 +458,7 @@ void tAutotest::dumpThread(std::string interfaceName,
 
 	for (;;)
 	{
-		if (!readPacket(iface, &tmp_pcap_packetHeader, buffer))
+		if (!readPacket(iface, &tmp_pcap_packetHeader, buffer, DEFAULT_PACKET_READ_TIME_LIMIT))
 		{
 			break;
 		}
@@ -558,7 +574,8 @@ private:
 };
 
 void tAutotest::recvThread(std::string interfaceName,
-                           std::vector<std::string> expectFilePaths)
+                           std::vector<std::string> expectFilePaths,
+                           Duration timelimit)
 {
 	PcapDumper pcapDumper(std::tmpnam(nullptr) + std::string(".pcap"));
 
@@ -570,6 +587,13 @@ void tAutotest::recvThread(std::string interfaceName,
 
 	TextDumper dumper;
 
+	if (timelimit > WARN_WAIT_THRESHOLD)
+	{
+		YANET_LOG_INFO("Will wait for packets for %lu seconds.\n",
+		               std::chrono::duration_cast<std::chrono::seconds>(timelimit).count());
+	}
+	auto time_to_give_up = std::chrono::system_clock::now() + timelimit;
+
 	auto iface = pcaps[interfaceName];
 	bool success = true;
 	uint64_t packetsCount = 0;
@@ -578,7 +602,13 @@ void tAutotest::recvThread(std::string interfaceName,
 		u_char buffer[MAX_PACK_LEN];
 		pcap_pkthdr tmp_pcap_packetHeader;
 
-		if (!readPacket(iface, &tmp_pcap_packetHeader, buffer))
+		auto now = std::chrono::system_clock::now();
+		if (now > time_to_give_up)
+		{
+			YANET_LOG_ERROR("error[%s]: step time limit exceeded\n", interfaceName.data());
+			throw "";
+		}
+		if (!readPacket(iface, &tmp_pcap_packetHeader, buffer, time_to_give_up - now))
 		{
 			std::stringstream buf;
 			bool not_first = false;
@@ -674,7 +704,7 @@ void tAutotest::recvThread(std::string interfaceName,
 		u_char buffer[MAX_PACK_LEN];
 		pcap_pkthdr tmp_pcap_packetHeader;
 
-		if (!readPacket(iface, &tmp_pcap_packetHeader, buffer))
+		if (!readPacket(iface, &tmp_pcap_packetHeader, buffer, DEFAULT_PACKET_READ_TIME_LIMIT))
 		{
 			break;
 		}
@@ -910,10 +940,18 @@ bool tAutotest::step_sendPackets(const YAML::Node& yamlStep,
 				paths.push_back(path + "/" + yamlExpect.as<std::string>());
 			}
 
-			threads.emplace_back([this, &success, interfaceName, paths]() {
+			Duration timelimit = DEFAULT_STEP_TIME_LIMIT;
+			auto& yamlTimelimit = yamlPort["timelimit"];
+			if (yamlTimelimit)
+			{
+				using namespace std::chrono;
+				timelimit = duration_cast<Duration>(seconds{yamlTimelimit.as<unsigned int>()});
+			}
+
+			threads.emplace_back([this, &success, interfaceName, paths, timelimit]() {
 				try
 				{
-					recvThread(interfaceName, paths);
+					recvThread(interfaceName, paths, timelimit);
 				}
 				catch (...)
 				{
@@ -1974,3 +2012,5 @@ void tAutotest::fflushSharedMemory()
 	void* memaddr = std::get<1>(rawShmInfo);
 	memset(memaddr, 0, size);
 }
+
+} // namespace autotest

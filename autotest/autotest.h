@@ -12,6 +12,9 @@
 #include "common/idataplane.h"
 #include "common/result.h"
 
+namespace nAutotest
+{
+
 using ipv4_address_t = common::ipv4_address_t;
 using ipv6_address_t = common::ipv6_address_t;
 using ip_address_t = common::ip_address_t;
@@ -21,8 +24,12 @@ using ip_prefix_t = common::ip_prefix_t;
 using community_t = common::community_t;
 using large_community_t = common::large_community_t;
 
-namespace nAutotest
-{
+using namespace std::chrono_literals;
+using Duration = std::chrono::system_clock::duration;
+inline constexpr Duration DEFAULT_PACKET_READ_TIME_LIMIT = 2s;
+inline constexpr Duration DEFAULT_STEP_TIME_LIMIT = 2s;
+inline constexpr Duration READ_WAIT_UNTIL_RETRY = 1000us;
+inline constexpr Duration WARN_WAIT_THRESHOLD = 10s;
 
 class tAutotest
 {
@@ -39,7 +46,7 @@ public:
 
 protected:
 	void sendThread(std::string interfaceName, std::string sendFilePath);
-	void recvThread(std::string interfaceName, std::vector<std::string> expectFilePaths);
+	void recvThread(std::string interfaceName, std::vector<std::string> expectFilePaths, Duration timelimit);
 	void dumpThread(std::string interfaceName, std::string dumpFilePath);
 
 	bool step_ipv4Update(const YAML::Node& yamlStep);
@@ -121,5 +128,13 @@ protected:
 	uint32_t memorized_coreId;
 	uint64_t memorized_counter_value;
 };
+
+bool readTimeLimited(int fd, u_char* data, ssize_t len, std::chrono::system_clock::time_point time_to_give_up);
+
+template<typename T>
+bool readTimeLimited(int fd, T& data, std::chrono::system_clock::time_point time_to_give_up)
+{
+	return readTimeLimited(fd, reinterpret_cast<u_char*>(&data), sizeof(data), time_to_give_up);
+}
 
 }
