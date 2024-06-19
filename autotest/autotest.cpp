@@ -557,10 +557,18 @@ private:
 	std::vector<u_char> buffer;
 };
 
+static std::string
+generate_temp_filepath(const std::filesystem::path& dir = std::filesystem::temp_directory_path())
+{
+	auto time = std::chrono::system_clock::now().time_since_epoch().count();
+	std::string filename = "file" + std::to_string(time);
+	return dir / filename;
+}
+
 void tAutotest::recvThread(std::string interfaceName,
                            std::vector<std::string> expectFilePaths)
 {
-	PcapDumper pcapDumper(std::tmpnam(nullptr) + std::string(".pcap"));
+	PcapDumper pcapDumper(generate_temp_filepath() + ".pcap");
 
 	std::vector<pcap_expectation> expect_pcaps;
 	for (const auto& expectFilePath : expectFilePaths)
