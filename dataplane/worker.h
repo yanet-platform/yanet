@@ -18,7 +18,6 @@
 #include "samples.h"
 #include "sharedmemory.h"
 
-class cDataPlane;
 namespace worker
 {
 
