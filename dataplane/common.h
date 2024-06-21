@@ -99,4 +99,10 @@ namespace dataplane
 class memory_pointer;
 class memory_manager;
 
+enum class FlowDirection
+{
+	Ingress,
+	Egress
+};
+
 }
