@@ -18,6 +18,12 @@
 #include "samples.h"
 #include "sharedmemory.h"
 
+namespace dataplane
+{
+template<dataplane::FlowDirection Direction>
+struct ActionDispatcher;
+}
+
 namespace worker
 {
 
@@ -224,6 +230,8 @@ public:
 	friend class dregress_t;
 	friend class worker_gc_t;
 	friend class dataplane::globalBase::generation;
+	friend struct dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>;
+	friend struct dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>;
 
 	cDataPlane* dataPlane;
 	tCoreId coreId;

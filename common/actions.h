@@ -7,12 +7,6 @@
 #include "config.release.h"
 #include "stream.h"
 
-#define FIXME_ACTIONS 1
-
-#if FIXME_ACTIONS
-#include <iostream>
-#endif
-
 namespace common
 {
 
@@ -106,14 +100,6 @@ struct DumpAction final
 	DumpAction() :
 	        dump_id(0){};
 
-	void execute() const
-	{
-#if FIXME_ACTIONS
-		std::cout << __PRETTY_FUNCTION__ << std::endl;
-		assert(false && "Semantics for actions are not implemented");
-#endif
-	}
-
 	[[nodiscard]] bool terminating() const { return false; }
 
 	void pop(stream_in_t& stream)
@@ -148,14 +134,6 @@ struct FlowAction final
 	FlowAction() :
 	        flow(globalBase::tFlow()) {}
 
-	void execute() const
-	{
-#if FIXME_ACTIONS
-		std::cout << __PRETTY_FUNCTION__ << std::endl;
-		assert(false && "Semantics for actions are not implemented");
-#endif
-	}
-
 	[[nodiscard]] bool terminating() const { return true; }
 
 	void pop(stream_in_t& stream)
@@ -183,14 +161,6 @@ struct CheckStateAction final
 
 	CheckStateAction(const acl::check_state_t&){};
 	CheckStateAction() = default;
-
-	void execute() const
-	{
-#if FIXME_ACTIONS
-		std::cout << __PRETTY_FUNCTION__ << std::endl;
-		assert(false && "Semantics for actions are not implemented");
-#endif
-	}
 
 	[[nodiscard]] bool terminating() const { return false; }
 
@@ -227,11 +197,6 @@ struct Action
 	{
 		stream.push(raw_action);
 	}
-
-	void execute() const
-	{
-		std::visit([](const auto& act) { act.execute(); }, raw_action);
-	}
 };
 
 /**
@@ -250,14 +215,6 @@ private:
 public:
 	Actions() = default;
 	Actions(const Action& action) { add(action); };
-
-	void execute() const
-	{
-		for (const auto& action : path_)
-		{
-			action.execute();
-		}
-	}
 
 	void add(const Action& action)
 	{
@@ -319,6 +276,11 @@ public:
 	void push(stream_out_t& stream) const
 	{
 		stream.push(path_);
+	}
+
+	[[nodiscard]] const std::vector<Action>& get_actions() const
+	{
+		return path_;
 	}
 };
 
