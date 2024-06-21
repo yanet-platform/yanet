@@ -1,7 +1,17 @@
 #pragma once
 
-#include "stream.h"
 #include <utility>
+
+#include "common/type.h"
+#include "common/variant.h"
+#include "config.release.h"
+#include "stream.h"
+
+#define FIXME_ACTIONS 1
+
+#if FIXME_ACTIONS
+#include <iostream>
+#endif
 
 namespace common
 {
@@ -77,4 +87,222 @@ struct check_state_t
 };
 
 } // namespace acl
+
+// TODO: When rewriting the current ACL library into LibFilter, we could consider using inheritance.
+// All "action" classes should implement some operators and pop/push methods, so it's beneficial to enforce this
+// at the language level. However, if the same structures are used in the dataplane, it could impact performance
+// due to extra pointer dereferences in vtable, if compiler does not succeed in devirtualization.
+// Anyway, this is something to think about.
+struct DumpAction final
+{
+	// Only one DumpAction is allowed in one Actions object.
+	// See @class Actions.
+	static constexpr size_t MAX_COUNT = YANET_CONFIG_DUMP_ID_SIZE;
+
+	uint64_t dump_id;
+
+	DumpAction(const acl::action_t& dump_action) :
+	        dump_id(dump_action.dump_id){};
+
+	DumpAction() :
+	        dump_id(0){};
+
+	void execute() const
+	{
+#if FIXME_ACTIONS
+		std::cout << __PRETTY_FUNCTION__ << std::endl;
+		assert(false && "Semantics for actions are not implemented");
+#endif
+	}
+
+	[[nodiscard]] bool terminating() const { return false; }
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(dump_id);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(dump_id);
+	}
+};
+
+struct FlowAction final
+{
+	// Only one FlowAction is allowed in one Actions object.
+	// See @class Actions.
+	static constexpr size_t MAX_COUNT = 1;
+
+	globalBase::tFlow flow;
+
+	FlowAction(const globalBase::tFlow& flow) :
+	        flow(flow){};
+
+	FlowAction(globalBase::tFlow&& flow) :
+	        flow(std::move(flow)) {}
+
+	FlowAction() :
+	        flow(globalBase::tFlow()) {}
+
+	void execute() const
+	{
+#if FIXME_ACTIONS
+		std::cout << __PRETTY_FUNCTION__ << std::endl;
+		assert(false && "Semantics for actions are not implemented");
+#endif
+	}
+
+	[[nodiscard]] bool terminating() const { return true; }
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(flow);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(flow);
+	}
+};
+
+struct CheckStateAction final
+{
+	// Only one CheckStateAction is allowed in one Actions object.
+	// See @class Actions.
+	static constexpr size_t MAX_COUNT = 1;
+
+	CheckStateAction(const acl::check_state_t&){};
+	CheckStateAction() = default;
+
+	void execute() const
+	{
+#if FIXME_ACTIONS
+		std::cout << __PRETTY_FUNCTION__ << std::endl;
+		assert(false && "Semantics for actions are not implemented");
+#endif
+	}
+
+	[[nodiscard]] bool terminating() const { return false; }
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop((char*)this, sizeof(*this));
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push((char*)this, sizeof(*this));
+	}
+};
+
+struct Action
+{
+	std::variant<FlowAction, DumpAction, CheckStateAction> raw_action;
+
+	Action() :
+	        raw_action(FlowAction()) {}
+
+	template<typename T>
+	Action(T action) :
+	        raw_action(std::move(action)) {}
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(raw_action);
+	}
+	void push(stream_out_t& stream) const
+	{
+		stream.push(raw_action);
+	}
+
+	void execute() const
+	{
+		std::visit([](const auto& act) { act.execute(); }, raw_action);
+	}
+};
+
+class Actions
+{
+private:
+	std::vector<Action> path_{};
+	std::array<size_t, std::variant_size_v<decltype(Action::raw_action)>> action_counts_ = {0};
+
+public:
+	Actions() = default;
+	Actions(const Action& action) { add(action); };
+
+	void execute() const
+	{
+		for (const auto& action : path_)
+		{
+			action.execute();
+		}
+	}
+
+	void add(const Action& action)
+	{
+		size_t index = action.raw_action.index();
+		static constexpr size_t flow_action_index =
+		        common::variant::get_index<FlowAction, decltype(Action::raw_action)>::value;
+
+		if (index == flow_action_index)
+		{
+			assert(action_counts_[index] == 0 && "Cannot add more than one FlowAction");
+		}
+		else
+		{
+			size_t max_count = std::visit([](auto&& arg) { return std::decay_t<decltype(arg)>::MAX_COUNT; },
+			                              action.raw_action);
+			if (action_counts_[index] >= max_count)
+			{
+				return;
+			}
+		}
+
+		action_counts_[index]++;
+		path_.push_back(action);
+	}
+
+	[[nodiscard]] const Action& get_last() const
+	{
+		assert(!path_.empty());
+		return path_.back();
+	}
+
+	Action& get_last()
+	{
+		assert(!path_.empty());
+		return path_.back();
+	}
+
+	[[nodiscard]] const common::globalBase::tFlow& get_flow() const
+	{
+		assert(std::holds_alternative<FlowAction>(get_last().raw_action));
+		return std::get<FlowAction>(get_last().raw_action).flow;
+	}
+
+	[[nodiscard]] common::globalBase::tFlow& get_flow()
+	{
+		assert(std::holds_alternative<FlowAction>(get_last().raw_action));
+		return std::get<FlowAction>(get_last().raw_action).flow;
+	}
+
+	// TODO: Why do we need it?..
+	bool operator<(const Actions& second) const
+	{
+		return get_flow() < second.get_flow();
+	}
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(path_);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(path_);
+	}
+};
+
 } // namespace common
