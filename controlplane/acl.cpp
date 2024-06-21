@@ -324,6 +324,7 @@ struct firewall_rules_t
 					case ipfw::rule_action_t::ALLOW:
 					case ipfw::rule_action_t::DUMP:
 					case ipfw::rule_action_t::DENY:
+					case ipfw::rule_action_t::CHECKSTATE:
 					{
 						// handle only meaning rules
 						auto& ruleref = yanet_rules.emplace_back(rulep, configp);
@@ -487,6 +488,14 @@ static bool unwind(int64_t start_from, firewall_rules_t& fw, const dispatcher_ru
 				                   ids,
 				                   log || rule.log);
 				ACL_DBGMSG("tFlow gathered...");
+			}
+			else if (std::holds_alternative<common::acl::check_state_t>(rule.action))
+			{
+				rules.emplace_back(std::move(result_filter),
+				                   std::get<common::acl::check_state_t>(rule.action),
+				                   ids,
+				                   log || rule.log);
+				ACL_DBGMSG("check_state gathered...");
 			}
 			else
 			{

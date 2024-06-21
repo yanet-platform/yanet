@@ -59,5 +59,22 @@ public:
 	uint64_t dump_id;
 	std::string dump_tag;
 };
+
+struct check_state_t
+{
+	// Unique identifier for hash calculation
+	static constexpr int64_t HASH_IDENTIFIER = 12345;
+
+	bool operator==([[maybe_unused]] const check_state_t& o) const
+	{
+		return true; // TODO: why do we need this operator?
+	}
+
+	constexpr bool operator<([[maybe_unused]] const check_state_t& o) const
+	{
+		return true; // TODO: why do we need this operator?
+	}
+};
+
 } // namespace acl
 } // namespace common
