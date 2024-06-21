@@ -17,19 +17,16 @@ public:
 	                          unsigned int>; ///< transport_table_filter_id
 
 	void clear();
-	unsigned int collect(const unsigned int rule_id, const filter& filter);
+	void collect(const unsigned int rule_id, const filter& filter);
 	void prepare();
 	void compile();
 
-
 public:
+	std::map<common::acl::total_key_t, unsigned int> table;
+
+private:
 	acl::compiler_t* compiler;
-
-	std::map<common::acl::total_key_t, tAclGroupId> table;
-
-	std::vector<filter> filters;
-	std::map<filter, unsigned int> filter_ids;
-	std::vector<std::set<tAclGroupId>> filter_id_group_ids;
+	std::unordered_map<unsigned int, std::vector<filter>> acl_rules_by_filter_id;
+	std::unordered_map<tAclGroupId, std::unordered_map<unsigned int, std::set<unsigned int>>> group_to_acl_rule_map;
 };
-
 }
