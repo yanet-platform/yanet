@@ -193,6 +193,19 @@ private:
 	std::vector<Action> path_{};
 	std::array<size_t, std::variant_size_v<decltype(Action::raw_action)>> action_counts_ = {0};
 
+	// TODO: Consider how to implement the check-state path.
+	//
+	// We want to avoid checking a return code every time to determine whether to proceed further
+	// (for example, if check-state succeeds, we shouldn't proceed any further).
+	// We can determine this in advance and choose between two paths at runtime with a single check at the beginning.
+	// Here, we can create these two paths so we can simply follow them without additional condition checks.
+
+	/* std::vector<AbstractAction> failed_check_state_path_; */
+
+	// One potential solution is to add a flag that we will check in the dataplane.
+	// This flag will indicate whether we need to perform a check-state to determine the final destination for the packet.
+	// If the flag is not set, we can proceed through a regular path without any conditionals like check-state.
+	// If the flag is set, we can perform the check-state and then follow either the regular path or the failed check-state path.
 public:
 	Actions() = default;
 	Actions(const Action& action) { add(action); };
