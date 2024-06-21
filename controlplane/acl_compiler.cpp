@@ -272,8 +272,10 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 			                                                          rule.transport_table_filter_id));
 		}
 
-		/// value
 		{
+			// FIXME: unwind_rule being const makes that we cannot use move semantics, even though at this point
+			// we don't need unwinded rules anymore. It will be nice to use moves, but this requires a little bit API
+			// tweaking. Move here does nothing, as this is a const pointer, so just passing by value
 			if (auto flow = std::get_if<common::globalBase::tFlow>(&unwind_rule.action))
 			{
 				rule.value_filter_id = value.collect({*flow});
@@ -281,6 +283,10 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 			else if (auto action = std::get_if<common::acl::action_t>(&unwind_rule.action))
 			{
 				rule.value_filter_id = value.collect({*action});
+			}
+			else if (auto check_state = std::get_if<common::acl::check_state_t>(&unwind_rule.action))
+			{
+				rule.value_filter_id = value.collect({*check_state});
 			}
 		}
 
