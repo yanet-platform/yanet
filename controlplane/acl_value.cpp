@@ -1,5 +1,4 @@
 #include "acl_value.h"
-#include "acl_compiler.h"
 
 using namespace acl::compiler;
 
@@ -11,72 +10,38 @@ value_t::value_t()
 void value_t::clear()
 {
 	vector.clear();
-	filters.clear();
-	filter_ids.clear();
+	rule_actions.clear();
 
 	{
 		/// @todo: find default_flow
+
 		common::globalBase::flow_t default_flow;
 		default_flow.type = common::globalBase::eFlowType::drop;
-		collect({default_flow});
+		collect_initial_rule(std::move(default_flow));
 	}
 }
 
-unsigned int value_t::collect(const filter& filter)
+unsigned int value_t::collect(unsigned int rule_action_id)
 {
-	auto it = filter_ids.find(filter);
-	if (it == filter_ids.end())
-	{
-		filters.emplace_back(filter);
-		it = filter_ids.emplace_hint(it, filter, filter_ids.size());
-	}
-
-	return it->second;
+	vector.emplace_back(rule_actions[rule_action_id]);
+	return vector.size() - 1;
 }
 
-// This collect function is only used in acl_total_table compiler to squash
-// non-terminating and terminating rules into one unique group_id.
-unsigned int value_t::collect(const tAclGroupId prev_id, const tAclGroupId id)
+void value_t::append_to_last(unsigned int rule_action_id)
 {
-	unsigned int ret;
-	auto prev_filter = filters[prev_id];
-	if (std::holds_alternative<common::globalBase::flow_t>(prev_filter.back()))
-	{
-		ret = prev_id;
-	}
-	else
-	{
-		const auto& filter = filters[id];
-		prev_filter.emplace_back(filter.back());
-		ret = collect(prev_filter);
-	}
-
-	return ret;
+	vector.back().add(rule_actions[rule_action_id]);
 }
 
 void value_t::compile()
 {
-	for (const auto& filter : filters)
+	for (auto& actions : vector)
 	{
-		int dumps_counter = 0;
-		common::acl::value_t value;
-		for (const auto& it : filter)
-		{
-			if (auto action = std::get_if<common::acl::action_t>(&it))
-			{
-				if (dumps_counter >= YANET_CONFIG_DUMP_ID_SIZE)
-				{
-					continue;
-				}
-				value.dump_ids[dumps_counter] = action->dump_id;
-				dumps_counter++;
-			}
-			else
-			{
-				value.flow = std::get<common::globalBase::tFlow>(it);
-			}
-		}
+		auto last_action = actions.get_last();
 
-		vector.emplace_back(std::move(value));
+		if (!std::visit([](const auto& act) { return act.terminating(); }, last_action.raw_action))
+		{
+			// Adding default "drop" rule to the end
+			actions.add(rule_actions[0]);
+		}
 	}
 }
