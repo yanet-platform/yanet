@@ -20,6 +20,7 @@
 #include "common/fallback.h"
 #include "common/nat46clat.h"
 
+#include "action_dispatcher.h"
 #include "checksum.h"
 #include "common.h"
 #include "dataplane.h"
@@ -1543,44 +1544,7 @@ inline void cWorker::acl_ingress_handle4()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->flow.data.aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->flow.data.aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_ingress_flow(mbuf, value.flow);
+		dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_ingress_stack4.clear();
@@ -1734,44 +1698,7 @@ inline void cWorker::acl_ingress_handle6()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->flow.data.aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->flow.data.aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_ingress_flow(mbuf, value.flow);
+		dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_ingress_stack6.clear();
@@ -5311,44 +5238,7 @@ inline void cWorker::acl_egress_handle4()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_egress_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_egress_flow(mbuf, value.flow);
+		dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_egress_stack4.clear();
@@ -5495,44 +5385,7 @@ inline void cWorker::acl_egress_handle6()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_egress_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_egress_flow(mbuf, value.flow);
+		dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_egress_stack6.clear();
