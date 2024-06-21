@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "common/actions.h"
 #include "libfwparser/fw_parser.h"
 
 #include "network.h"
