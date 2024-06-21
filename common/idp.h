@@ -14,6 +14,7 @@
 
 #include "acl.h"
 #include "balancer.h"
+#include "common/actions.h"
 #include "config.h"
 #include "memory_manager.h"
 #include "neighbor.h"
@@ -368,7 +369,7 @@ using request = std::vector<std::tuple<acl::total_key_t, tAclGroupId>>;
 
 namespace acl_values
 {
-using request = std::vector<acl::value_t>;
+using request = std::vector<common::Actions>;
 }
 
 namespace dump_tags_ids

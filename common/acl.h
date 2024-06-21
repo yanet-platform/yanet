@@ -116,34 +116,6 @@ struct total_key_t
 	tAclGroupId transport_id;
 };
 
-struct value_t
-{
-	value_t()
-	{
-		memset(dump_ids, 0, sizeof(dump_ids));
-	}
-
-	constexpr bool operator<(const value_t& second) const
-	{
-		return flow < second.flow;
-	}
-
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(flow);
-		stream.pop(dump_ids);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(flow);
-		stream.push(dump_ids);
-	}
-
-	common::globalBase::tFlow flow;
-	uint32_t dump_ids[YANET_CONFIG_DUMP_ID_SIZE];
-};
-
 template<typename type_t>
 class range_t
 {
