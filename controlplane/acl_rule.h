@@ -22,7 +22,6 @@ public:
 	unsigned int transport_filter_id;
 	unsigned int transport_table_filter_id;
 	unsigned int via_filter_id;
-	unsigned int total_table_filter_id;
 	unsigned int value_filter_id;
 	bool terminating;
 };

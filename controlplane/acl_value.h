@@ -1,9 +1,6 @@
 #pragma once
 
-#include "acl_base.h"
-
-#include "common/acl.h"
-#include "common/type.h"
+#include "common/actions.h"
 
 namespace acl::compiler
 {
@@ -14,18 +11,34 @@ public:
 	value_t();
 
 public:
-	using filter = std::vector<std::variant<common::globalBase::flow_t, common::acl::action_t>>;
-
 	void clear();
-	unsigned int collect(const filter& filter);
-	unsigned int collect(const tAclGroupId prev_id, const tAclGroupId id);
+
+	template<typename T>
+	unsigned int collect_initial_rule(T&& rule)
+	{
+		static_assert(std::is_same_v<std::decay_t<T>, common::globalBase::tFlow> ||
+		                      std::is_same_v<std::decay_t<T>, common::acl::action_t> ||
+		                      std::is_same_v<std::decay_t<T>, common::acl::check_state_t>,
+		              "Unsupported type in rule_action");
+
+		rule_actions.emplace_back(std::forward<T>(rule));
+		return rule_actions.size() - 1;
+	}
+
+	unsigned int collect(unsigned int rule_actions_id);
+
 	void compile();
 
 public:
-	std::vector<common::acl::value_t> vector;
+	// FIXME: I don't like this name.. Why was it called like that previously?
+	std::vector<common::Actions> vector;
 
-	std::vector<filter> filters;
-	std::map<filter, unsigned int> filter_ids;
+	// FIXME: The initial objects are created using collect_inintial_rule and stored here.
+	// Then we create copies in vector. I've tried to use shared pointers and/or real pointers,
+	// but then a bunch of issues arise when serializing a `vector` with stream.push/pop
+	std::vector<common::Action> rule_actions;
+
+	void append_to_last(unsigned int rule_action_id);
 };
 
 }
