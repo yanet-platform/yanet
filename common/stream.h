@@ -16,6 +16,12 @@
 namespace common
 {
 
+// TODO: This class offers serialization/deserialization of objects, but it is too restrictive.
+// Due to the pop method interface, which returns objects by reference in an argument,
+// we cannot use this with non DefaultConstructible objects.
+// This means that even though we serialize an object and want to deserialize it by
+// creating an object directly, without needing to first create a default one,
+// we are unable to do so.
 class stream_in_t
 {
 public:
