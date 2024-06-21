@@ -101,7 +101,7 @@ void compiler_t::compile(const std::vector<rule_t>& unwind_rules,
 		result.acl_total_table.emplace_back(key, value);
 	}
 
-	result.acl_values.swap(value.vector);
+	result.acl_values = std::move(value.vector);
 
 	YANET_LOG_INFO("acl::compile: done\n");
 }
