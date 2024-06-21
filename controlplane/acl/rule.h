@@ -1035,7 +1035,7 @@ const int64_t DISPATCHER = -1;
 // sense.
 //
 // Additionally, we might have another variant for representing rules that are suitable for execution in the dataplane.
-using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::action_t>;
+using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::action_t, common::acl::check_state_t>;
 
 struct rule_t
 {
@@ -1059,6 +1059,10 @@ public:
 	{}
 
 	rule_t(const ref_t<filter_t>& _filter, common::acl::action_t action, const ids_t& ids, bool log) :
+	        rule_t(_filter, rule_action(action), ids, log)
+	{}
+
+	rule_t(const ref_t<filter_t>& _filter, common::acl::check_state_t action, const ids_t& ids, bool log) :
 	        rule_t(_filter, rule_action(action), ids, log)
 	{}
 
@@ -1102,6 +1106,9 @@ public:
 				break;
 			case ipfw::rule_action_t::ALLOW:
 				action = DISPATCHER;
+				break;
+			case ipfw::rule_action_t::CHECKSTATE:
+				action = common::acl::check_state_t{};
 				break;
 			case ipfw::rule_action_t::DUMP:
 				action = common::acl::action_t(std::get<std::string>(rulep->action_arg));
@@ -1178,6 +1185,10 @@ public:
 			{
 				text = "dump(" + rule_action.dump_tag + ")";
 			}
+		}
+		else if (std::holds_alternative<common::acl::check_state_t>(action))
+		{
+			text = "check-state";
 		}
 		else
 		{
@@ -1355,6 +1366,14 @@ struct hash<acl::rule_t>
 		{
 			auto flow = std::get<common::globalBase::tFlow>(r.action);
 			hash_combine(h, 1, (uint64_t(flow.type) << 32) & flow.data.atomic);
+		}
+		else if (std::holds_alternative<common::acl::check_state_t>(r.action))
+		{
+			// Since check_state_t acts as a marker (either present or not),
+			// it doesn't have specific members to hash.
+			// To uniquely identify its presence in the hash, we use a
+			// predefined static constant as a unique identifier.
+			hash_combine(h, common::acl::check_state_t::HASH_IDENTIFIER);
 		}
 		else
 		{
