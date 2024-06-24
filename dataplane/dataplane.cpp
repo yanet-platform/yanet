@@ -40,6 +40,7 @@
 #include "report.h"
 #include "sock_dev.h"
 #include "worker.h"
+#include "worker_gc.h"
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_INFO;
 
@@ -865,8 +866,6 @@ eResult cDataPlane::initGlobalBases()
 
 eResult cDataPlane::initWorkers()
 {
-	tQueueId outQueueId = 0;
-
 	/// slow worker
 	{
 		const tCoreId& coreId = config.controlPlaneCoreId;
@@ -884,7 +883,7 @@ eResult cDataPlane::initWorkers()
 
 		dataplane::base::permanently basePermanently;
 		basePermanently.globalBaseAtomic = globalBaseAtomics[socket_id];
-		basePermanently.outQueueId = outQueueId; ///< 0
+		basePermanently.outQueueId = out_queues_; ///< 0
 		for (const auto& portIter : ports)
 		{
 			if (!basePermanently.ports.Register(portIter.first))
@@ -910,7 +909,7 @@ eResult cDataPlane::initWorkers()
 		controlPlane->slowWorker = worker;
 		workers_vector.emplace_back(worker);
 
-		outQueueId++;
+		out_queues_++;
 	}
 
 	for (const auto& configWorkerIter : config.workers)
@@ -1039,7 +1038,7 @@ eResult cDataPlane::initWorkers()
 			}
 		}
 
-		basePermanently.outQueueId = outQueueId;
+		basePermanently.outQueueId = out_queues_;
 
 		dataplane::base::generation base;
 		{
@@ -1064,7 +1063,14 @@ eResult cDataPlane::initWorkers()
 		workers[coreId] = worker;
 		workers_vector.emplace_back(worker);
 
-		outQueueId++;
+		out_queues_++;
+	}
+
+	worker_gc_t::PortToSocketArray port_to_socket;
+	for (const auto& [port_id, port] : ports)
+	{
+		(void)port;
+		port_to_socket[port_id] = rte_eth_dev_socket_id(port_id);
 	}
 
 	/// worker_gc
@@ -1074,9 +1080,20 @@ eResult cDataPlane::initWorkers()
 
 		YADECAP_LOG_INFO("initWorker. coreId: %u [worker_gc]\n", core_id);
 
+		worker_gc_t::SamplersVector samplers;
+		for (cWorker* worker : workers_vector)
+		{
+			if (worker->socketId != socket_id)
+				continue;
+
+			samplers.push_back(&worker->sampler);
+		}
+
 		auto* worker = memory_manager.create_static<worker_gc_t>("worker_gc",
 		                                                         socket_id,
-		                                                         this);
+		                                                         config_values_,
+		                                                         port_to_socket,
+		                                                         std::move(samplers));
 		if (!worker)
 		{
 			return eResult::errorAllocatingMemory;
@@ -1144,6 +1161,15 @@ eResult cDataPlane::initWorkers()
 		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[core_id]);
 		worker_gcs[core_id] = worker;
 		socket_worker_gcs[socket_id] = worker;
+
+		auto conn = worker->RegisterSlowWorker("cw" + core_id,
+		                                       config_values_.ring_normalPriority_size,
+		                                       config_values_.ring_toFreePackets_size);
+		if (!conn)
+		{
+			YANET_LOG_ERROR("Failed no link garbage collector with slow worker");
+		}
+		controlPlane->to_gcs_.push_back(conn.value());
 	}
 
 	return eResult::success;
@@ -1254,7 +1280,7 @@ int cDataPlane::lcoreThread(void* args)
 	}
 	else if (exist(dataPlane->worker_gcs, rte_lcore_id()))
 	{
-		dataPlane->worker_gcs[rte_lcore_id()]->start();
+		dataPlane->worker_gcs[rte_lcore_id()]->start(&dataPlane->runBarrier);
 	}
 	else
 	{

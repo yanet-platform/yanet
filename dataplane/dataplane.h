@@ -26,7 +26,6 @@
 #include "neighbor.h"
 #include "report.h"
 #include "type.h"
-#include "worker_gc.h"
 
 struct tDataPlaneConfig
 {
@@ -172,6 +171,7 @@ protected:
 	                    bool ///< symmetric_mode
 	                    >>
 	        ports;
+	tQueueId out_queues_ = 0;
 	std::map<tCoreId, cWorker*> workers;
 	std::map<tCoreId, worker_gc_t*> worker_gcs;
 

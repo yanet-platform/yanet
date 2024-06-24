@@ -6,6 +6,7 @@
 #include "dataplane.h"
 #include "report.h"
 #include "worker.h"
+#include "worker_gc.h"
 
 namespace
 {
