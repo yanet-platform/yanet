@@ -533,7 +533,8 @@ void remove6(const std::string& module,
 
 void reload()
 {
-	interface::controlPlane controlPlane{};
+	interface::controlPlane controlPlane
+	{};
 	if (auto ec = controlPlane.loadConfig({}); ec != eResult::success)
 	{
 		std::cerr << "error: " << common::result_to_c_str(ec) << std::endl;
