@@ -62,40 +62,40 @@ public:
 	using this_type = default_value_t<type_t, default_value>;
 
 public:
-	inline default_value_t() :
+	default_value_t() :
 	        value(default_value)
 	{
 	}
 
-	inline default_value_t(const type_t& value) :
+	default_value_t(const type_t& value) :
 	        value(value)
 	{
 	}
 
-	inline operator const type_t&() const
+	operator const type_t&() const
 	{
 		return value;
 	}
 
-	inline this_type& operator+=(const this_type& second)
+	this_type& operator+=(const this_type& second)
 	{
 		this->value += second.value;
 		return *this;
 	}
 
-	inline this_type& operator-=(const this_type& second)
+	this_type& operator-=(const this_type& second)
 	{
 		this->value -= second.value;
 		return *this;
 	}
 
-	inline this_type& operator++()
+	this_type& operator++()
 	{
 		this->value++;
 		return *this;
 	}
 
-	inline this_type& operator--()
+	this_type& operator--()
 	{
 		this->value--;
 		return *this;
@@ -2317,12 +2317,12 @@ public:
 		data.atomic = 0;
 	}
 
-	inline bool operator==(const tFlow& second) const
+	bool operator==(const tFlow& second) const
 	{
 		return std::tie(type_params_atomic, data.atomic) == std::tie(second.type_params_atomic, second.data.atomic);
 	}
 
-	inline bool operator!=(const tFlow& second) const
+	bool operator!=(const tFlow& second) const
 	{
 		return !operator==(second);
 	}

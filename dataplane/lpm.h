@@ -138,9 +138,9 @@ public:
 		return copy_root_chunk(stats, remap_chunks, second);
 	}
 
-	inline void lookup(const uint32_t* ipAddresses,
-	                   uint32_t* valueIds,
-	                   const unsigned int& count) const
+	void lookup(const uint32_t* ipAddresses,
+	            uint32_t* valueIds,
+	            const unsigned int& count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -175,9 +175,9 @@ public:
 	}
 
 	template<unsigned int TOffset>
-	inline void lookup(rte_mbuf** mbufs,
-	                   uint32_t* valueIds,
-	                   const unsigned int& count) const
+	void lookup(rte_mbuf** mbufs,
+	            uint32_t* valueIds,
+	            const unsigned int& count) const
 	{
 		uint32_t ipAddresses[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 
@@ -194,8 +194,8 @@ public:
 		lookup(ipAddresses, valueIds, count);
 	}
 
-	inline bool lookup(const uint32_t& ipAddress,
-	                   uint32_t* valueId = nullptr) const
+	bool lookup(const uint32_t& ipAddress,
+	            uint32_t* valueId = nullptr) const
 	{
 		uint32_t lvalueId;
 
@@ -831,9 +831,9 @@ public:
 		return copy_root_chunk(stats, remap_chunks, second);
 	}
 
-	inline void lookup(const ipv6_address_t* ipv6Addresses,
-	                   uint32_t* valueIds,
-	                   const unsigned int& count) const
+	void lookup(const ipv6_address_t* ipv6Addresses,
+	            uint32_t* valueIds,
+	            const unsigned int& count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -876,10 +876,10 @@ public:
 
 	constexpr static uint32_t mask_full = 0xFFFFFFFFu;
 
-	inline void lookup(const uint32_t mask,
-	                   const ipv6_address_t* ipv6Addresses,
-	                   uint32_t* valueIds,
-	                   const unsigned int& count) const
+	void lookup(const uint32_t mask,
+	            const ipv6_address_t* ipv6Addresses,
+	            uint32_t* valueIds,
+	            const unsigned int& count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -931,9 +931,9 @@ public:
 	}
 
 	template<unsigned int TOffset>
-	inline void lookup(rte_mbuf** mbufs,
-	                   uint32_t* valueIds,
-	                   const unsigned int& count) const
+	void lookup(rte_mbuf** mbufs,
+	            uint32_t* valueIds,
+	            const unsigned int& count) const
 	{
 		ipv6_address_t ipv6Addresses[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 
@@ -952,8 +952,8 @@ public:
 		lookup(ipv6Addresses, valueIds, count);
 	}
 
-	inline bool lookup(const std::array<uint8_t, 16>& ipv6Address,
-	                   uint32_t* valueId = nullptr) const
+	bool lookup(const std::array<uint8_t, 16>& ipv6Address,
+	            uint32_t* valueId = nullptr) const
 	{
 		ipv6_address_t lipv6Address;
 		uint32_t lvalueId;
@@ -974,8 +974,8 @@ public:
 		return false;
 	}
 
-	inline bool lookup(const uint8_t* ipv6_address,
-	                   uint32_t* value_id = nullptr) const
+	bool lookup(const uint8_t* ipv6_address,
+	            uint32_t* value_id = nullptr) const
 	{
 		ipv6_address_t lipv6Address;
 		uint32_t lvalueId;
@@ -1514,7 +1514,7 @@ public:
 			remap_chunks.resize(tree_size, 0);
 		}
 
-		inline unsigned int allocate_extended_chunk()
+		unsigned int allocate_extended_chunk()
 		{
 			if (extended_chunks_count >= extended_chunks_size)
 			{
@@ -1527,7 +1527,7 @@ public:
 			return new_chunk_id;
 		}
 
-		inline unsigned int& remap(const unsigned int from_chunk_id)
+		unsigned int& remap(const unsigned int from_chunk_id)
 		{
 			return remap_chunks[from_chunk_id];
 		}
@@ -1576,9 +1576,9 @@ public:
 
 public:
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
-	inline void lookup(const ipv4_address_t (&addresses)[burst_size],
-	                   uint32_t (&group_ids)[burst_size],
-	                   const unsigned int count) const
+	void lookup(const ipv4_address_t (&addresses)[burst_size],
+	            uint32_t (&group_ids)[burst_size],
+	            const unsigned int count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -1788,9 +1788,9 @@ public:
 	}
 
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
-	inline void lookup(const ipv4_address_t (&addresses)[burst_size],
-	                   uint32_t (&group_ids)[burst_size],
-	                   const unsigned int count) const
+	void lookup(const ipv4_address_t (&addresses)[burst_size],
+	            uint32_t (&group_ids)[burst_size],
+	            const unsigned int count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -1997,7 +1997,7 @@ public:
 			remap_chunks.resize(tree_size, 0);
 		}
 
-		inline unsigned int allocate_chunk()
+		unsigned int allocate_chunk()
 		{
 			if (chunks_count >= chunks_size)
 			{
@@ -2010,7 +2010,7 @@ public:
 			return new_chunk_id;
 		}
 
-		inline unsigned int& remap(const unsigned int from_chunk_id)
+		unsigned int& remap(const unsigned int from_chunk_id)
 		{
 			return remap_chunks[from_chunk_id];
 		}
@@ -2049,9 +2049,9 @@ public:
 
 public:
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
-	inline void lookup(const ipv6_address_t (&addresses)[burst_size],
-	                   uint32_t (&group_ids)[burst_size],
-	                   const unsigned int count) const
+	void lookup(const ipv6_address_t (&addresses)[burst_size],
+	            uint32_t (&group_ids)[burst_size],
+	            const unsigned int count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -2084,10 +2084,10 @@ public:
 	}
 
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
-	inline void lookup(const uint32_t mask,
-	                   const ipv6_address_t (&addresses)[burst_size],
-	                   uint32_t (&group_ids)[burst_size],
-	                   const unsigned int count) const
+	void lookup(const uint32_t mask,
+	            const ipv6_address_t (&addresses)[burst_size],
+	            uint32_t (&group_ids)[burst_size],
+	            const unsigned int count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -2279,7 +2279,7 @@ public:
 		}
 
 	protected:
-		inline unsigned int allocate_chunk()
+		unsigned int allocate_chunk()
 		{
 			if (chunks_count >= chunks_size)
 			{
@@ -2383,9 +2383,9 @@ public:
 
 public:
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
-	inline void lookup(const ipv6_address_t (&addresses)[burst_size],
-	                   uint32_t (&group_ids)[burst_size],
-	                   const unsigned int count) const
+	void lookup(const ipv6_address_t (&addresses)[burst_size],
+	            uint32_t (&group_ids)[burst_size],
+	            const unsigned int count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -2418,10 +2418,10 @@ public:
 	}
 
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
-	inline void lookup(const uint32_t mask,
-	                   const ipv6_address_t (&addresses)[burst_size],
-	                   uint32_t (&group_ids)[burst_size],
-	                   const unsigned int count) const
+	void lookup(const uint32_t mask,
+	            const ipv6_address_t (&addresses)[burst_size],
+	            uint32_t (&group_ids)[burst_size],
+	            const unsigned int count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -2519,9 +2519,9 @@ public:
 	}
 
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
-	inline void lookup(const ipv6_address_t (&addresses)[burst_size],
-	                   uint32_t (&group_ids)[burst_size],
-	                   const unsigned int count) const
+	void lookup(const ipv6_address_t (&addresses)[burst_size],
+	            uint32_t (&group_ids)[burst_size],
+	            const unsigned int count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -2554,10 +2554,10 @@ public:
 	}
 
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
-	inline void lookup(const uint32_t mask,
-	                   const ipv6_address_t (&addresses)[burst_size],
-	                   uint32_t (&group_ids)[burst_size],
-	                   const unsigned int count) const
+	void lookup(const uint32_t mask,
+	            const ipv6_address_t (&addresses)[burst_size],
+	            uint32_t (&group_ids)[burst_size],
+	            const unsigned int count) const
 	{
 		/// @todo: OPT: le -> be
 
@@ -2618,7 +2618,7 @@ protected:
 	constexpr static unsigned int root_chunk_id = 0;
 	constexpr static uint32_t mask_full = 0xFFFFFFFFu;
 
-	inline unsigned int allocate_extended_chunk(stats_t& stats)
+	unsigned int allocate_extended_chunk(stats_t& stats)
 	{
 		if (stats.extended_chunks_count >= stats.extended_chunks_size)
 		{

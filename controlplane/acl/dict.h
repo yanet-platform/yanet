@@ -477,7 +477,7 @@ struct id_dict_t
 	{
 	}
 
-	inline void insert(unsigned int id, unsigned int idx)
+	void insert(unsigned int id, unsigned int idx)
 	{
 		if (id >= table.size())
 		{

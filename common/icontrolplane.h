@@ -387,7 +387,7 @@ protected:
 	}
 
 	template<common::icp::requestType T, class Req = std::tuple<>>
-	inline common::icp::response call(const Req& request = Req()) const
+	common::icp::response call(const Req& request = Req()) const
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		connectToControlPlane();
