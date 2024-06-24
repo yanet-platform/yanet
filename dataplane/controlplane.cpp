@@ -23,6 +23,7 @@
 #include "metadata.h"
 #include "prepare.h"
 #include "worker.h"
+#include "worker_gc.h"
 
 cControlPlane::cControlPlane(cDataPlane* dataPlane) :
         dataPlane(dataPlane),
@@ -1460,20 +1461,14 @@ void cControlPlane::mainThread()
 		}
 
 		/// dequeue packets from worker_gc's ring to slowworker
-		for (const auto& [core_id, worker_gc] : dataPlane->worker_gcs)
+		rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
+		unsigned rxSize;
+		for (auto& gc : to_gcs_)
 		{
-			(void)core_id;
-
-			rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
-
-			unsigned rxSize = rte_ring_sc_dequeue_burst(worker_gc->ring_to_slowworker,
-			                                            (void**)mbufs,
-			                                            CONFIG_YADECAP_MBUFS_BURST_SIZE,
-			                                            nullptr);
-
+			rxSize = gc.process.DequeueBurstSC(mbufs);
 			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
 			{
-				rte_mbuf* mbuf = convertMempool(worker_gc->ring_to_free_mbuf, mbufs[mbuf_i]);
+				rte_mbuf* mbuf = convertMempool(gc.free._Underlying(), mbufs[mbuf_i]);
 				if (!mbuf)
 				{
 					continue;

@@ -6,6 +6,7 @@
 #include "dataplane.h"
 #include "globalbase.h"
 #include "worker.h"
+#include "worker_gc.h"
 
 #include "common/counters.h"
 #include "common/define.h"

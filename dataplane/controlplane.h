@@ -15,9 +15,11 @@
 
 #include "common/idp.h"
 #include "common/result.h"
+#include "common/static_vector.h"
 #include "common/type.h"
 
 #include "dregress.h"
+#include "dpdk.h"
 #include "fragmentation.h"
 #include "kernel_interface_handle.h"
 #include "slow_worker.h"
@@ -167,6 +169,7 @@ public:
 	cWorker* slowWorker;
 
 protected:
+	utils::StaticVector<dpdk::RingConn<rte_mbuf*>, YANET_CONFIG_NUMA_SIZE> to_gcs_;
 	std::queue<std::tuple<rte_mbuf*,
 	                      common::globalBase::tFlow>>
 	        slowWorkerMbufs;

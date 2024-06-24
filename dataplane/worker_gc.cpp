@@ -10,18 +10,19 @@
 #include "worker.h"
 #include "worker_gc.h"
 
-worker_gc_t::worker_gc_t(cDataPlane* dataplane) :
-        dataplane(dataplane),
-        controlplane(nullptr),
+worker_gc_t::worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, SamplersVector&& samplers) :
         mempool(nullptr),
         core_id(-1),
         socket_id(-1),
         iteration(0),
         current_base_id(0),
         local_base_id(0),
-        ring_to_slowworker(nullptr),
-        ring_to_free_mbuf(nullptr),
-        callback_id(0)
+        toSlowWorker_(toSlowWorkers_.begin(), toSlowWorkers_.end()),
+        port_id_to_socket_id{pts},
+        samplers_{samplers},
+        callback_id(0),
+        gc_step{static_cast<uint32_t>(cfg.gc_step)},
+        sample_gc_step{static_cast<uint32_t>(cfg.sample_gc_step)}
 {
 	memset(counters, 0, sizeof(counters));
 }
@@ -33,14 +34,14 @@ worker_gc_t::~worker_gc_t()
 		rte_mempool_free(mempool);
 	}
 
-	if (ring_to_slowworker)
+	for (auto& ring : toSlowWorkers_)
 	{
-		rte_ring_free(ring_to_slowworker);
+		ring.Destroy();
 	}
 
-	if (ring_to_free_mbuf)
+	for (auto& ring : toFree_)
 	{
-		rte_ring_free(ring_to_free_mbuf);
+		ring.Destroy();
 	}
 }
 
@@ -54,17 +55,6 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 	this->base_permanently = base_permanently;
 	this->bases[local_base_id] = base;
 	this->bases[local_base_id ^ 1] = base;
-
-	this->controlplane = dataplane->controlPlane.get();
-
-	for (const auto& [port_id, port] : dataplane->ports)
-	{
-		(void)port;
-		port_id_to_socket_id[port_id] = rte_eth_dev_socket_id(port_id);
-	}
-
-	gc_step = dataplane->getConfigValues().gc_step;
-	sample_gc_step = dataplane->getConfigValues().sample_gc_step;
 
 	mempool = rte_mempool_create(("wgc" + std::to_string(core_id)).data(),
 	                             CONFIG_YADECAP_MBUFS_COUNT + 3 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE,
@@ -83,37 +73,57 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 		return eResult::errorInitMempool;
 	}
 
-	ring_to_slowworker = rte_ring_create(("r_tsw_" + std::to_string(core_id)).c_str(),
-	                                     dataplane->getConfigValues().ring_normalPriority_size,
-	                                     socket_id,
-	                                     RING_F_SP_ENQ | RING_F_SC_DEQ);
-	if (!ring_to_slowworker)
-	{
-		return eResult::errorInitRing;
-	}
-
-	ring_to_free_mbuf = rte_ring_create(("r_tfmb_" + std::to_string(core_id)).c_str(),
-	                                    dataplane->getConfigValues().ring_toFreePackets_size,
-	                                    socket_id,
-	                                    RING_F_SP_ENQ | RING_F_SC_DEQ);
-	if (!ring_to_free_mbuf)
-	{
-		return eResult::errorInitRing;
-	}
-
 	return eResult::success;
 }
 
-void worker_gc_t::start()
+[[nodiscard]] std::optional<dpdk::RingConn<rte_mbuf*>> worker_gc_t::RegisterSlowWorker(const std::string& name,
+                                                                                       unsigned int capacity,
+                                                                                       unsigned int capacity_to_free)
+{
+	if (toSlowWorkers_.Full() || toFree_.Full())
+	{
+		YANET_LOG_ERROR("Trying to assign to many workers to garbage collector on core %d\n", core_id);
+		return std::nullopt;
+	}
+	auto rs = dpdk::Ring<rte_mbuf*>::Make(
+	        "r_gc" + std::to_string(socket_id) + "_to_" + name,
+	        capacity,
+	        socket_id,
+	        RING_F_SP_ENQ | RING_F_SC_DEQ);
+	if (!rs)
+	{
+		return std::nullopt;
+	}
+
+	auto rf = dpdk::Ring<rte_mbuf*>::Make(
+	        "r_tfmb_gc" + std::to_string(socket_id) + "_from_" + name,
+	        capacity_to_free,
+	        socket_id,
+	        RING_F_SP_ENQ | RING_F_SC_DEQ);
+
+	if (!rf)
+	{
+		rs.value().Destroy();
+		return std::nullopt;
+	}
+
+	toSlowWorkers_.push_back(rs.value());
+	toFree_.push_back(rf.value());
+
+	toSlowWorker_ = {toSlowWorkers_.begin(), toSlowWorkers_.end()};
+	return dpdk::RingConn<rte_mbuf*>{std::move(rs.value()), std::move(rf.value())};
+}
+
+void worker_gc_t::start(pthread_barrier_t* runBarrier)
 {
 	/// @todo: prepare
 
 	int rc;
 
-	rc = pthread_barrier_wait(&dataplane->runBarrier);
+	rc = pthread_barrier_wait(runBarrier);
 	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
 	{
-		pthread_barrier_destroy(&dataplane->runBarrier);
+		pthread_barrier_destroy(runBarrier);
 	}
 	else if (rc != 0)
 	{
@@ -830,7 +840,8 @@ void worker_gc_t::handle_acl_sync()
 				mbuf_clone->pkt_len = mbuf->pkt_len;
 
 				stats.fwsync_multicast_egress_packets++;
-				send_to_slowworker(mbuf_clone, flow);
+				utils::SetFlow(mbuf_clone, flow);
+				SendToSlowWorker(mbuf_clone);
 			}
 
 			if (!fw_state_config.ipv6_address_unicast.empty())
@@ -858,7 +869,8 @@ void worker_gc_t::handle_acl_sync()
 					mbuf_clone->pkt_len = mbuf->pkt_len;
 
 					stats.fwsync_unicast_egress_packets++;
-					send_to_slowworker(mbuf_clone, fw_state_config.ingress_flow);
+					utils::SetFlow(mbuf_clone, fw_state_config.ingress_flow);
+					SendToSlowWorker(mbuf_clone);
 				}
 			}
 		}
@@ -910,16 +922,10 @@ void worker_gc_t::handle_free_mbuf()
 	rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 	unsigned int mbufs_count;
 
-	mbufs_count = rte_ring_sc_dequeue_burst(ring_to_free_mbuf,
-	                                        (void**)mbufs,
-	                                        CONFIG_YADECAP_MBUFS_BURST_SIZE,
-	                                        nullptr);
-	for (unsigned int mbuf_i = 0;
-	     mbuf_i < mbufs_count;
-	     mbuf_i++)
+	for (auto& ring : toFree_)
 	{
-		rte_mbuf* mbuf = mbufs[mbuf_i];
-		rte_pktmbuf_free(mbuf);
+		mbufs_count = ring.DequeueBurstSC(mbufs);
+		rte_pktmbuf_free_bulk(mbufs, mbufs_count);
 	}
 }
 
@@ -974,30 +980,9 @@ void worker_gc_t::nat64stateful_remove_state(const dataplane::globalBase::nat64s
 	}
 }
 
-void worker_gc_t::send_to_slowworker(rte_mbuf* mbuf,
-                                     const common::globalBase::eFlowType& flow_type)
+void worker_gc_t::SendToSlowWorker(rte_mbuf* mbuf)
 {
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-	metadata->flow.type = flow_type;
-
-	if (rte_ring_sp_enqueue(ring_to_slowworker, (void*)mbuf))
-	{
-		stats.ring_to_slowworker_drops++;
-		rte_pktmbuf_free(mbuf);
-	}
-	else
-	{
-		stats.ring_to_slowworker_packets++;
-	}
-}
-
-void worker_gc_t::send_to_slowworker(rte_mbuf* mbuf,
-                                     const common::globalBase::tFlow& flow)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-	metadata->flow = flow;
-
-	if (rte_ring_sp_enqueue(ring_to_slowworker, (void*)mbuf))
+	if (toSlowWorker_->EnqueueSP(mbuf))
 	{
 		stats.ring_to_slowworker_drops++;
 		rte_pktmbuf_free(mbuf);
@@ -1017,14 +1002,9 @@ void worker_gc_t::handle_samples()
 
 	std::lock_guard<std::mutex> guard(samples_mutex);
 
-	for (const auto& iter : dataplane->workers)
+	for (auto sampler : samplers_)
 	{
-		if (iter.second->socketId != socket_id)
-			continue;
-
-		auto& sampler = iter.second->sampler;
-
-		sampler.visit6([this](auto& sample) {
+		sampler->visit6([this](auto& sample) {
 			if (samples.size() < YANET_CONFIG_SAMPLES_SIZE * 8)
 			{
 				samples.emplace(sample.proto, sample.in_logicalport_id, sample.out_logicalport_id, sample.src_port, sample.dst_port, sample.src_addr.bytes, sample.dst_addr.bytes);
@@ -1034,7 +1014,7 @@ void worker_gc_t::handle_samples()
 				stats.drop_samples++;
 			}
 		});
-		sampler.visit4([this](auto& sample) {
+		sampler->visit4([this](auto& sample) {
 			if (samples.size() < YANET_CONFIG_SAMPLES_SIZE * 8)
 			{
 				samples.emplace(sample.proto, sample.in_logicalport_id, sample.out_logicalport_id, sample.src_port, sample.dst_port, rte_be_to_cpu_32(sample.src_addr.address), rte_be_to_cpu_32(sample.dst_addr.address));
@@ -1044,7 +1024,7 @@ void worker_gc_t::handle_samples()
 				stats.drop_samples++;
 			}
 		});
-		sampler.clear();
+		sampler->clear();
 	}
 
 	if (samples_current_base_id != current_base_id)
