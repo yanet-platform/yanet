@@ -736,7 +736,7 @@ struct fw_state_sync_frame_t
 	uint32_t flow_id6;
 	uint32_t extra;
 
-	static inline fw_state_sync_frame_t from_state_key(const fw4_state_key_t& key)
+	static fw_state_sync_frame_t from_state_key(const fw4_state_key_t& key)
 	{
 		fw_state_sync_frame_t sync_frame{};
 		sync_frame.proto = uint8_t(key.proto);
@@ -749,7 +749,7 @@ struct fw_state_sync_frame_t
 		return sync_frame;
 	}
 
-	static inline fw_state_sync_frame_t from_state_key(const fw6_state_key_t& key)
+	static fw_state_sync_frame_t from_state_key(const fw6_state_key_t& key)
 	{
 		fw_state_sync_frame_t sync_frame{};
 		sync_frame.proto = uint8_t(key.proto);

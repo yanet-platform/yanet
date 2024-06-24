@@ -82,14 +82,14 @@ public:
 	}
 
 public:
-	inline void lock()
+	void lock()
 	{
 		YADECAP_MEMORY_BARRIER_COMPILE;
 		rte_spinlock_recursive_lock(&locker);
 		YADECAP_MEMORY_BARRIER_COMPILE;
 	}
 
-	inline void unlock()
+	void unlock()
 	{
 		YADECAP_MEMORY_BARRIER_COMPILE;
 		rte_spinlock_recursive_unlock(&locker);
@@ -111,12 +111,12 @@ public:
 	}
 
 public:
-	inline void lock()
+	void lock()
 	{
 		rte_spinlock_lock(&locker);
 	}
 
-	inline void unlock()
+	void unlock()
 	{
 		rte_spinlock_unlock(&locker);
 	}
@@ -166,9 +166,9 @@ public:
 	constexpr static uint64_t keysSize = size_T * pairsPerChunk_T + extendedSize_T * pairsPerExtendedChunk_T;
 
 public:
-	inline void lookup(const TKey* keys,
-	                   TValue** values,
-	                   const unsigned int& count)
+	void lookup(const TKey* keys,
+	            TValue** values,
+	            const unsigned int& count)
 	{
 		for (unsigned int key_i = 0;
 		     key_i < count;
@@ -229,8 +229,8 @@ public:
 		}
 	}
 
-	inline bool lookup(const TKey& key,
-	                   TValue*& value) const
+	bool lookup(const TKey& key,
+	            TValue*& value) const
 	{
 		lookup(&key, &value, 1);
 		return (value != nullptr);
@@ -416,7 +416,7 @@ protected:
 		}
 
 	public:
-		inline uint32_t getNextExtendedChunkId() const
+		uint32_t getNextExtendedChunkId() const
 		{
 			return nextExtendedChunkId & 0x00FFFFFFu;
 		}
@@ -426,7 +426,7 @@ protected:
 			nextExtendedChunkId = (nextExtendedChunkId & 0xFF000000u) | (extendedChunkId & 0x00FFFFFFu);
 		}
 
-		inline bool isValid(const unsigned int& key_i) const
+		bool isValid(const unsigned int& key_i) const
 		{
 			return keyValids & (1 << key_i);
 		}
@@ -443,22 +443,22 @@ protected:
 			YADECAP_MEMORY_BARRIER_COMPILE;
 		}
 
-		inline const TKey& getKey(unsigned int key_i) const
+		const TKey& getKey(unsigned int key_i) const
 		{
 			return pairs[key_i].key;
 		}
 
-		inline TKey& getKey(unsigned int key_i)
+		TKey& getKey(unsigned int key_i)
 		{
 			return pairs[key_i].key;
 		}
 
-		inline const TValue& getValue(unsigned int key_i) const
+		const TValue& getValue(unsigned int key_i) const
 		{
 			return pairs[key_i].value;
 		}
 
-		inline TValue& getValue(unsigned int key_i)
+		TValue& getValue(unsigned int key_i)
 		{
 			return pairs[key_i].value;
 		}
@@ -492,7 +492,7 @@ protected:
 		}
 
 	public:
-		inline uint32_t getNextExtendedChunkId() const
+		uint32_t getNextExtendedChunkId() const
 		{
 			return nextExtendedChunkId & 0x00FFFFFFu;
 		}
@@ -502,7 +502,7 @@ protected:
 			nextExtendedChunkId = (nextExtendedChunkId & 0xFF000000u) | (extendedChunkId & 0x00FFFFFFu);
 		}
 
-		inline bool isValid(const unsigned int& key_i) const
+		bool isValid(const unsigned int& key_i) const
 		{
 			return keyValids & (1 << key_i);
 		}
@@ -519,22 +519,22 @@ protected:
 			YADECAP_MEMORY_BARRIER_COMPILE;
 		}
 
-		inline const TKey& getKey(unsigned int key_i) const
+		const TKey& getKey(unsigned int key_i) const
 		{
 			return pairs[key_i].key;
 		}
 
-		inline TKey& getKey(unsigned int key_i)
+		TKey& getKey(unsigned int key_i)
 		{
 			return pairs[key_i].key;
 		}
 
-		inline const TValue& getValue(unsigned int key_i) const
+		const TValue& getValue(unsigned int key_i) const
 		{
 			return pairs[key_i].value;
 		}
 
-		inline TValue& getValue(unsigned int key_i)
+		TValue& getValue(unsigned int key_i)
 		{
 			return pairs[key_i].value;
 		}
@@ -559,8 +559,8 @@ protected:
 	};
 
 protected:
-	static inline bool compareKeys(const TKey& first,
-	                               const TKey& second)
+	static bool compareKeys(const TKey& first,
+	                        const TKey& second)
 	{
 		return !memcmp(&first, &second, sizeof(TKey));
 	}
@@ -651,9 +651,9 @@ public:
 	constexpr static uint64_t keysSize = size_T * pairsPerChunk_T + extendedSize_T * pairsPerExtendedChunk_T;
 
 public:
-	inline void lookup(const key_T& key,
-	                   value_T*& value,
-	                   spinlock_t*& locker)
+	void lookup(const key_T& key,
+	            value_T*& value,
+	            spinlock_t*& locker)
 	{
 		const uint32_t hash = rte_hash_crc(&key, sizeof(key_T), 0);
 		auto& chunk = chunks[hash & (size_T - 1)];
@@ -701,8 +701,8 @@ public:
 		locker->unlock();
 	}
 
-	inline bool insert(const key_T& key,
-	                   const value_T& value)
+	bool insert(const key_T& key,
+	            const value_T& value)
 	{
 		value_T* chunk_value{nullptr};
 		spinlock_t* locker{nullptr};
@@ -726,7 +726,7 @@ public:
 	///
 	/// Returns "false" when the table is full, in this case the lock is
 	/// automatically unlocked.
-	inline eResult get(const key_T& key, value_T*& value, spinlock_t*& locker)
+	eResult get(const key_T& key, value_T*& value, spinlock_t*& locker)
 
 	{
 		const uint32_t hash = rte_hash_crc(&key, sizeof(key_T), 0);
@@ -843,7 +843,7 @@ public:
 		return eResult::isFull;
 	}
 
-	inline bool remove(const key_T& key)
+	bool remove(const key_T& key)
 	{
 		const uint32_t hash = rte_hash_crc(&key, sizeof(key_T), 0);
 		auto& chunk = chunks[hash & (size_T - 1)];
@@ -1234,27 +1234,27 @@ protected:
 		}
 
 	public:
-		inline uint32_t getNextExtendedChunkId() const
+		uint32_t getNextExtendedChunkId() const
 		{
 			return nextExtendedChunkId & 0x00FFFFFFu;
 		}
 
-		inline void setNextExtendedChunkId(const uint32_t& extendedChunkId)
+		void setNextExtendedChunkId(const uint32_t& extendedChunkId)
 		{
 			nextExtendedChunkId = (nextExtendedChunkId & 0xFF000000u) | (extendedChunkId & 0x00FFFFFFu);
 		}
 
-		inline bool isValid(const unsigned int& key_i) const
+		bool isValid(const unsigned int& key_i) const
 		{
 			return keyValids & (1u << key_i);
 		}
 
-		inline void setValid(const unsigned int& key_i)
+		void setValid(const unsigned int& key_i)
 		{
 			keyValids |= (1u << key_i);
 		}
 
-		inline void unsetValid(const unsigned int& key_i)
+		void unsetValid(const unsigned int& key_i)
 		{
 			keyValids &= ~(1u << key_i);
 		}
@@ -1266,22 +1266,22 @@ protected:
 			YADECAP_MEMORY_BARRIER_COMPILE;
 		}
 
-		inline const key_T& getKey(unsigned int key_i) const
+		const key_T& getKey(unsigned int key_i) const
 		{
 			return pairs[key_i].key;
 		}
 
-		inline key_T& getKey(unsigned int key_i)
+		key_T& getKey(unsigned int key_i)
 		{
 			return pairs[key_i].key;
 		}
 
-		inline const value_T& getValue(unsigned int key_i) const
+		const value_T& getValue(unsigned int key_i) const
 		{
 			return pairs[key_i].value;
 		}
 
-		inline value_T& getValue(unsigned int key_i)
+		value_T& getValue(unsigned int key_i)
 		{
 			return pairs[key_i].value;
 		}
@@ -1315,27 +1315,27 @@ protected:
 		}
 
 	public:
-		inline uint32_t getNextExtendedChunkId() const
+		uint32_t getNextExtendedChunkId() const
 		{
 			return nextExtendedChunkId & 0x00FFFFFFu;
 		}
 
-		inline void setNextExtendedChunkId(const uint32_t& extendedChunkId)
+		void setNextExtendedChunkId(const uint32_t& extendedChunkId)
 		{
 			nextExtendedChunkId = (nextExtendedChunkId & 0xFF000000u) | (extendedChunkId & 0x00FFFFFFu);
 		}
 
-		inline bool isValid(const unsigned int& key_i) const
+		bool isValid(const unsigned int& key_i) const
 		{
 			return keyValids & (1u << key_i);
 		}
 
-		inline void setValid(const unsigned int& key_i)
+		void setValid(const unsigned int& key_i)
 		{
 			keyValids |= (1u << key_i);
 		}
 
-		inline void unsetValid(const unsigned int& key_i)
+		void unsetValid(const unsigned int& key_i)
 		{
 			keyValids &= ~(1u << key_i);
 		}
@@ -1347,22 +1347,22 @@ protected:
 			YADECAP_MEMORY_BARRIER_COMPILE;
 		}
 
-		inline const key_T& getKey(unsigned int key_i) const
+		const key_T& getKey(unsigned int key_i) const
 		{
 			return pairs[key_i].key;
 		}
 
-		inline key_T& getKey(unsigned int key_i)
+		key_T& getKey(unsigned int key_i)
 		{
 			return pairs[key_i].key;
 		}
 
-		inline const value_T& getValue(unsigned int key_i) const
+		const value_T& getValue(unsigned int key_i) const
 		{
 			return pairs[key_i].value;
 		}
 
-		inline value_T& getValue(unsigned int key_i)
+		value_T& getValue(unsigned int key_i)
 		{
 			return pairs[key_i].value;
 		}
@@ -1387,8 +1387,8 @@ protected:
 	};
 
 protected:
-	static inline bool compareKeys(const key_T& first,
-	                               const key_T& second)
+	static bool compareKeys(const key_T& first,
+	                        const key_T& second)
 	{
 		return !memcmp(&first, &second, sizeof(key_T));
 	}
@@ -1559,10 +1559,10 @@ public:
 	/// & 1VV	& 0VV		& VVV
 	/// ^ 100	^ 100		^ 100
 	/// = 0VV	= 1VV		= 1VV
-	inline uint32_t lookup(uint32_t (&hashes)[burst_size],
-	                       const key_t (&keys)[burst_size],
-	                       uint32_t (&values)[burst_size],
-	                       const unsigned int count) const
+	uint32_t lookup(uint32_t (&hashes)[burst_size],
+	                const key_t (&keys)[burst_size],
+	                uint32_t (&values)[burst_size],
+	                const unsigned int count) const
 	{
 		uint32_t mask = mask_full;
 
@@ -1743,17 +1743,17 @@ protected:
 	} pairs[total_size];
 
 protected:
-	inline bool is_valid(const uint32_t index) const
+	bool is_valid(const uint32_t index) const
 	{
 		return (pairs[index].value >> shift_valid) & 1;
 	}
 
-	inline bool is_equal(const uint32_t index, const key_t& key) const
+	bool is_equal(const uint32_t index, const key_t& key) const
 	{
 		return !memcmp(&pairs[index].key, &key, sizeof(key_t));
 	}
 
-	inline bool is_valid_and_equal(const uint32_t index, const key_t& key) const
+	bool is_valid_and_equal(const uint32_t index, const key_t& key) const
 	{
 		return is_valid(index) && is_equal(index, key);
 	}
@@ -1819,10 +1819,10 @@ public:
 	/// valid	invalid
 	/// = 0VV	= 1VV
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
-	inline uint32_t lookup(uint32_t (&hashes)[burst_size],
-	                       const key_t (&keys)[burst_size],
-	                       uint32_t (&values)[burst_size],
-	                       const unsigned int count) const
+	uint32_t lookup(uint32_t (&hashes)[burst_size],
+	                const key_t (&keys)[burst_size],
+	                uint32_t (&values)[burst_size],
+	                const unsigned int count) const
 	{
 		uint32_t mask = mask_full;
 
@@ -1980,17 +1980,17 @@ public:
 	}
 
 protected:
-	inline bool is_valid(const uint32_t index) const
+	bool is_valid(const uint32_t index) const
 	{
 		return (pairs[index].value >> shift_valid) & 1;
 	}
 
-	inline bool is_equal(const uint32_t index, const key_t& key) const
+	bool is_equal(const uint32_t index, const key_t& key) const
 	{
 		return !memcmp(&pairs[index].key, &key, sizeof(key_t));
 	}
 
-	inline bool is_valid_and_equal(const uint32_t index, const key_t& key) const
+	bool is_valid_and_equal(const uint32_t index, const key_t& key) const
 	{
 		return is_valid(index) && is_equal(index, key);
 	}
@@ -2068,9 +2068,9 @@ public:
 	}
 
 public:
-	inline uint32_t lookup(const key_t& key,
-	                       value_t*& value,
-	                       spinlock_nonrecursive_t*& locker)
+	uint32_t lookup(const key_t& key,
+	                value_t*& value,
+	                spinlock_nonrecursive_t*& locker)
 	{
 		uint32_t hash = calculate_hash(key);
 		auto& chunk = chunks[hash & (total_size / chunk_size - 1)];
@@ -2111,9 +2111,9 @@ public:
 		return hash;
 	}
 
-	inline bool insert(const uint32_t hash,
-	                   const key_t& key,
-	                   const value_t& value)
+	bool insert(const uint32_t hash,
+	            const key_t& key,
+	            const value_t& value)
 	{
 		auto& chunk = chunks[hash & (total_size / chunk_size - 1)];
 
@@ -2166,8 +2166,8 @@ public:
 		return false;
 	}
 
-	inline bool insert_or_update(const key_t& key,
-	                             const value_t& value)
+	bool insert_or_update(const key_t& key,
+	                      const value_t& value)
 	{
 		bool result = true;
 
@@ -2342,17 +2342,17 @@ protected:
 		} pairs[chunk_size];
 	} chunks[total_size / chunk_size];
 
-	inline bool is_valid(const chunk_t& chunk, const uint32_t pair_index) const
+	bool is_valid(const chunk_t& chunk, const uint32_t pair_index) const
 	{
 		return (chunk.valid_mask >> pair_index) & 1;
 	}
 
-	inline bool is_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
+	bool is_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
 	{
 		return !memcmp(&chunk.pairs[pair_index].key, &key, sizeof(key_t));
 	}
 
-	inline bool is_valid_and_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
+	bool is_valid_and_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
 	{
 		return is_valid(chunk, pair_index) && is_equal(chunk, pair_index, key);
 	}
@@ -2545,9 +2545,9 @@ public:
 	}
 
 public:
-	inline uint32_t lookup(const key_t& key,
-	                       value_t*& value,
-	                       spinlock_nonrecursive_t*& locker)
+	uint32_t lookup(const key_t& key,
+	                value_t*& value,
+	                spinlock_nonrecursive_t*& locker)
 	{
 		uint32_t hash = calculate_hash(key);
 		auto& chunk = chunks[hash & total_mask];
@@ -2588,9 +2588,9 @@ public:
 		return hash;
 	}
 
-	inline bool insert(const uint32_t hash,
-	                   const key_t& key,
-	                   const value_t& value)
+	bool insert(const uint32_t hash,
+	            const key_t& key,
+	            const value_t& value)
 	{
 		auto& chunk = chunks[hash & total_mask];
 
@@ -2643,8 +2643,8 @@ public:
 		return false;
 	}
 
-	inline bool insert_or_update(const key_t& key,
-	                             const value_t& value)
+	bool insert_or_update(const key_t& key,
+	                      const value_t& value)
 	{
 		bool result = true;
 
@@ -2665,7 +2665,7 @@ public:
 		return result;
 	}
 
-	inline void remove(const key_t& key)
+	void remove(const key_t& key)
 	{
 		uint32_t hash = calculate_hash(key);
 		auto& chunk = chunks[hash & total_mask];
@@ -2856,17 +2856,17 @@ protected:
 		} pairs[chunk_size];
 	} chunks[];
 
-	inline bool is_valid(const chunk_t& chunk, const uint32_t pair_index) const
+	bool is_valid(const chunk_t& chunk, const uint32_t pair_index) const
 	{
 		return (chunk.valid_mask >> pair_index) & 1;
 	}
 
-	inline bool is_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
+	bool is_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
 	{
 		return !memcmp(&chunk.pairs[pair_index].key, &key, sizeof(key_t));
 	}
 
-	inline bool is_valid_and_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
+	bool is_valid_and_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
 	{
 		return is_valid(chunk, pair_index) && is_equal(chunk, pair_index, key);
 	}
@@ -3095,8 +3095,8 @@ public:
 	}
 
 public:
-	inline uint32_t lookup(const key_t& key,
-	                       value_t*& value)
+	uint32_t lookup(const key_t& key,
+	                value_t*& value)
 	{
 		uint32_t hash = calculate_hash(key);
 		auto& chunk = chunks[hash & total_mask];
@@ -3134,8 +3134,8 @@ public:
 		return hash;
 	}
 
-	inline uint32_t lookup(const key_t& key,
-	                       value_t const*& value) const
+	uint32_t lookup(const key_t& key,
+	                value_t const*& value) const
 	{
 		uint32_t hash = calculate_hash(key);
 		auto& chunk = chunks[hash & total_mask];
@@ -3173,9 +3173,9 @@ public:
 		return hash;
 	}
 
-	inline bool insert(const uint32_t hash,
-	                   const key_t& key,
-	                   const value_t& value)
+	bool insert(const uint32_t hash,
+	            const key_t& key,
+	            const value_t& value)
 	{
 		auto& chunk = chunks[hash & total_mask];
 
@@ -3228,8 +3228,8 @@ public:
 		return false;
 	}
 
-	inline bool insert_or_update(const key_t& key,
-	                             const value_t& value)
+	bool insert_or_update(const key_t& key,
+	                      const value_t& value)
 	{
 		bool result = true;
 
@@ -3248,7 +3248,7 @@ public:
 		return result;
 	}
 
-	inline bool remove(const key_t& key)
+	bool remove(const key_t& key)
 	{
 		uint32_t hash = calculate_hash(key);
 		auto& chunk = chunks[hash & total_mask];
@@ -3421,17 +3421,17 @@ protected:
 		} pairs[chunk_size];
 	} chunks[];
 
-	inline bool is_valid(const chunk_t& chunk, const uint32_t pair_index) const
+	bool is_valid(const chunk_t& chunk, const uint32_t pair_index) const
 	{
 		return (chunk.valid_mask >> pair_index) & 1;
 	}
 
-	inline bool is_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
+	bool is_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
 	{
 		return !memcmp(&chunk.pairs[pair_index].key, &key, sizeof(key_t));
 	}
 
-	inline bool is_valid_and_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
+	bool is_valid_and_equal(const chunk_t& chunk, const uint32_t pair_index, const key_t& key) const
 	{
 		return is_valid(chunk, pair_index) && is_equal(chunk, pair_index, key);
 	}
