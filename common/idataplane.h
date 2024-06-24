@@ -283,7 +283,7 @@ protected:
 	}
 
 	template<common::idp::requestType T, class Req>
-	inline common::idp::response call(const Req& request) const
+	common::idp::response call(const Req& request) const
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		connectToDataPlane();
@@ -297,7 +297,7 @@ protected:
 	}
 
 	template<common::idp::requestType T, class Req>
-	inline common::idp::response call(Req&& request) const
+	common::idp::response call(Req&& request) const
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		connectToDataPlane();

@@ -19,32 +19,32 @@ public:
 		return id < second.id;
 	}
 
-	inline bool is_empty() const
+	bool is_empty() const
 	{
 		return !id;
 	}
 
-	inline uint32_t get_group_id() const
+	uint32_t get_group_id() const
 	{
 		return id;
 	}
 
-	inline void set_group_id(const uint32_t group_id)
+	void set_group_id(const uint32_t group_id)
 	{
 		id = group_id;
 	}
 
-	inline bool is_chunk_id() const
+	bool is_chunk_id() const
 	{
 		return id & 0x80000000u;
 	}
 
-	inline uint32_t get_chunk_id() const
+	uint32_t get_chunk_id() const
 	{
 		return id ^ 0x80000000u;
 	}
 
-	inline void set_chunk_id(const uint32_t chunk_id)
+	void set_chunk_id(const uint32_t chunk_id)
 	{
 		id = chunk_id ^ 0x80000000u;
 	}
@@ -62,12 +62,12 @@ public:
 	{
 	}
 
-	inline void pop(common::stream_in_t& stream)
+	void pop(common::stream_in_t& stream)
 	{
 		stream.pop(values);
 	}
 
-	inline void push(common::stream_out_t& stream) const
+	void push(common::stream_out_t& stream) const
 	{
 		stream.push(values);
 	}
@@ -142,12 +142,12 @@ public:
 	}
 
 public:
-	inline type_t from() const
+	type_t from() const
 	{
 		return std::get<0>(from_to);
 	}
 
-	inline type_t to() const
+	type_t to() const
 	{
 		return std::get<1>(from_to);
 	}
