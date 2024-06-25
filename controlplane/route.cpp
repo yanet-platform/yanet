@@ -195,6 +195,7 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 				(void)communities;
 
 				if ((prefix.is_ipv4() && nexthop.is_ipv4()) ||
+				    (prefix.is_ipv4() && nexthop.is_ipv6()) ||
 				    (prefix.is_ipv6() && nexthop.is_ipv6()))
 				{
 					if (labels.size() == 1)
@@ -209,7 +210,7 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 							origin_as = aspath.back();
 						}
 
-						auto pi_it = path_information.find(':');
+						auto pi_it = path_information.find_last_of(':');
 						if (pi_it != std::string::npos)
 						{
 							try

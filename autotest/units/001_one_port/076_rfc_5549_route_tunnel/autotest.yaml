@@ -1,0 +1,30 @@
+steps:
+- cli:
+  - neighbor insert route0 kni0.200 c0de::200:1 00:00:00:00:00:02
+  - neighbor flush
+- cli:
+  - rib static insert default 1.0.0.0/24 8888::1 1100 10000 1 1
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv6 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 8888::2
+        prefix: 2.0.0.0/24
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1200
+- ipv6Update:
+  - "::/0 -> c0de::200:1"
+- cli:
+  - rib prefixes
+  - route tunnel lookup route0 1.0.0.1
+  - route tunnel lookup route0 2.0.0.1
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
