@@ -386,6 +386,7 @@ struct nexthop ///< @todo
 	ipv6_address_t neighbor_address;
 	uint32_t labelExpTransport; ///< @todo: rename first
 	uint32_t labelExpService; ///< @todo: rename second
+	bool is_ipv6;
 };
 
 struct nexthop_tunnel_t
@@ -396,6 +397,7 @@ struct nexthop_tunnel_t
 	uint32_t label;
 	ipv6_address_t nexthop_address;
 	ipv6_address_t neighbor_address;
+	bool is_ipv6;
 };
 
 static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid YANET_CONFIG_COUNTERS_SIZE");

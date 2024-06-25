@@ -2264,6 +2264,11 @@ inline void cWorker::route_handle4()
 			{
 				key.address.mapped_ipv4_address.address = ipv4Header->dst_addr;
 			}
+			else if (nexthop.is_ipv6)
+			{
+				key.flags |= dataplane::neighbor::flag_is_ipv6;
+				memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
+			}
 			else
 			{
 				key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
@@ -2592,6 +2597,11 @@ inline void cWorker::route_tunnel_handle4()
 			{
 				key.address.mapped_ipv4_address.address = ipv4Header->dst_addr;
 			}
+			else if (nexthop.is_ipv6)
+			{
+				key.flags |= dataplane::neighbor::flag_is_ipv6;
+				memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
+			}
 			else
 			{
 				key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
@@ -2794,7 +2804,8 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 	}
 
 	uint16_t payload_length;
-	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	bool is_ipv4 = metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
+	if (is_ipv4 && !nexthop.is_ipv6)
 	{
 		rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 
@@ -2829,7 +2840,22 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 	}
 	else
 	{
-		rte_ipv6_hdr* ipv6HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		uint32_t vtc_flow;
+		uint16_t payload_len;
+		if (is_ipv4)
+		{
+			rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+			vtc_flow = rte_cpu_to_be_32((0x6 << 28) | (ipv4HeaderInner->type_of_service << 20)); ///< @todo: flow label
+			payload_len = rte_cpu_to_be_16(sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE + rte_be_to_cpu_16(ipv4HeaderInner->total_length));
+			payload_length = rte_be_to_cpu_16(ipv4HeaderInner->total_length);
+		}
+		else
+		{
+			rte_ipv6_hdr* ipv6HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+			vtc_flow = ipv6HeaderInner->vtc_flow & rte_cpu_to_be_32(0xFFF00000);
+			payload_len = rte_cpu_to_be_16(sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE + sizeof(rte_ipv6_hdr) + rte_be_to_cpu_16(ipv6HeaderInner->payload_len));
+			payload_length = sizeof(rte_ipv6_hdr) + rte_be_to_cpu_16(ipv6HeaderInner->payload_len);
+		}
 
 		/// @todo: mpls_header_t
 		rte_pktmbuf_prepend(mbuf, sizeof(rte_ipv6_hdr) + sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE);
@@ -2843,16 +2869,15 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 
 		rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
 
-		ipv6Header->vtc_flow = ipv6HeaderInner->vtc_flow & rte_cpu_to_be_32(0xFFF00000);
-		ipv6Header->payload_len = rte_cpu_to_be_16(sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE + sizeof(rte_ipv6_hdr) + rte_be_to_cpu_16(ipv6HeaderInner->payload_len));
+		ipv6Header->vtc_flow = vtc_flow;
+		ipv6Header->payload_len = payload_len;
+
 		ipv6Header->proto = IPPROTO_UDP;
 		ipv6Header->hop_limits = 64;
 		rte_memcpy(ipv6Header->src_addr, route.ipv6AddressSource.bytes, 16);
 		rte_memcpy(ipv6Header->dst_addr, nexthop.nexthop_address.bytes, 16);
 
 		metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv6_hdr);
-
-		payload_length = sizeof(rte_ipv6_hdr) + rte_be_to_cpu_16(ipv6HeaderInner->payload_len);
 	}
 
 	{

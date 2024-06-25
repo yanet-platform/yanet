@@ -1843,6 +1843,7 @@ eResult generation::route_value_update(const common::idp::updateGlobalBase::rout
 			route_value.interface.nexthops[ecmp_i].interfaceId = interface_id;
 			route_value.interface.nexthops[ecmp_i].flags = nexthop_flags;
 			route_value.interface.nexthops[ecmp_i].neighbor_address = ipv6_address_t::convert(neighbor_address);
+			route_value.interface.nexthops[ecmp_i].is_ipv6 = neighbor_address.is_ipv6();
 
 			if (labels.size() == 0)
 			{
@@ -2041,6 +2042,7 @@ eResult generation::route_tunnel_value_update(const common::idp::updateGlobalBas
 			route_tunnel_value.interface.nexthops[ecmp_i].label = label;
 			route_tunnel_value.interface.nexthops[ecmp_i].nexthop_address = ipv6_address_t::convert(nexthop_address);
 			route_tunnel_value.interface.nexthops[ecmp_i].neighbor_address = ipv6_address_t::convert(neighbor_address);
+			route_tunnel_value.interface.nexthops[ecmp_i].is_ipv6 = nexthop_address.is_ipv6();
 		}
 
 		route_tunnel_value.interface.weight_start = weight_start;
