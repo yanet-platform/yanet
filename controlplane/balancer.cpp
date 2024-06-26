@@ -883,6 +883,12 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 					}
 				}
 
+				auto reals_wlc = reals_wlc_weight.find(key);
+				if (reals_wlc != reals_wlc_weight.end() && reals_wlc->second.has_value())
+				{
+					effective_weight = reals_wlc->second.value();
+				}
+
 				uint32_t real_unordered_id = 0;
 				{
 					std::lock_guard<std::mutex> guard(reals_unordered_mutex);
@@ -926,8 +932,152 @@ void balancer_t::reconfigure_wlc_thread()
 {
 	while (!flagStop)
 	{
-		balancer_real_flush();
+		if (balancer_t::reconfigure_wlc())
+		{
+			balancer_real_flush();
+		}
 
 		std::this_thread::sleep_for(std::chrono::seconds(YANET_CONFIG_BALANCER_WLC_RECONFIGURE));
 	}
+}
+
+bool balancer_t::reconfigure_wlc()
+{
+	bool wlc_weight_changed = false;
+
+	common::idp::updateGlobalBaseBalancer::request balancer;
+	const auto balancer_real_connections = dataplane.balancer_real_connections();
+
+	std::lock_guard<std::mutex> guard(reals_enabled_mutex);
+
+	for (const auto& [module_name, balancer] : generations_config.current().config_balancers)
+	{
+
+		for (const auto& [service_id,
+		                  virtual_ip,
+		                  proto,
+		                  virtual_port,
+		                  version,
+		                  scheduler,
+		                  scheduler_params,
+		                  forwarding_method,
+		                  flags,
+		                  ipv4_outer_source_network,
+		                  ipv6_outer_source_network,
+		                  reals] : balancer.services)
+		{
+			(void)flags;
+			(void)version;
+			(void)forwarding_method;
+			(void)ipv4_outer_source_network;
+			(void)ipv6_outer_source_network;
+
+			if (scheduler != ::balancer::scheduler::wlc)
+			{
+				continue;
+			}
+
+			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
+			{
+				continue;
+			}
+
+			std::vector<std::tuple<balancer::real_key_global_t, uint32_t, uint32_t>> service_reals_usage_info;
+			uint32_t connection_sum = 0;
+			uint32_t weight_sum = 0;
+
+			for (const auto& [real_ip, real_port, weight] : reals)
+			{
+				balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
+				uint32_t effective_weight = weight;
+				{
+					auto it = reals_enabled.find(key);
+					if (it != reals_enabled.end())
+					{
+						if (it->second.has_value())
+						{
+							effective_weight = it->second.value();
+						}
+					}
+				}
+
+				weight_sum += effective_weight;
+
+				// don`t count connections for disabled reals - it can make other reals "feel" underloaded
+				if (effective_weight == 0)
+				{
+					continue;
+				}
+
+				common::idp::balancer_real_connections::real_key_t real_connections_key = {balancer.balancer_id,
+				                                                                           virtual_ip,
+				                                                                           proto,
+				                                                                           virtual_port.value(),
+				                                                                           real_ip,
+				                                                                           real_port.value()};
+				uint32_t connections = 0;
+				for (auto& [socket_id, real_connections] : balancer_real_connections)
+				{
+					(void)socket_id;
+
+					auto it = real_connections.find(real_connections_key);
+					if (it == real_connections.end())
+					{
+						continue;
+					}
+					connections += it->second;
+				}
+
+				connection_sum += connections;
+
+				service_reals_usage_info.emplace_back(key,
+				                                      effective_weight,
+				                                      connections);
+			}
+
+			for (auto [key,
+			           effective_weight,
+			           connections] : service_reals_usage_info)
+			{
+				uint32_t wlc_power = scheduler_params.wlc_power;
+				if (wlc_power < 1 || wlc_power > 100)
+				{
+					wlc_power = YANET_CONFIG_BALANCER_WLC_DEFAULT_POWER;
+				}
+
+				effective_weight = calculate_wlc_weight(effective_weight, connections, weight_sum, connection_sum, wlc_power);
+
+				if (reals_wlc_weight[key] != effective_weight)
+				{
+					reals_wlc_weight[key] = effective_weight;
+					real_updates.insert(key);
+					if (in_reload)
+					{
+						real_reload_updates.insert(key);
+					}
+					wlc_weight_changed = true;
+				}
+			}
+		}
+	}
+
+	return wlc_weight_changed;
+}
+
+uint32_t balancer_t::calculate_wlc_weight(uint32_t weight, uint32_t connections, uint32_t weight_sum, uint32_t connection_sum, uint32_t wlc_power)
+{
+	if (weight == 0 || weight_sum == 0 || connection_sum < weight_sum)
+	{
+		return weight;
+	}
+
+	auto wlc_ratio = std::max(1.0, wlc_power * (1 - 1.0 * connections * weight_sum / connection_sum / weight));
+	auto wlc_weight = (uint32_t)(weight * wlc_ratio);
+
+	if (wlc_weight > YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX)
+	{
+		wlc_weight = YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX;
+	}
+
+	return wlc_weight;
 }
