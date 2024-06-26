@@ -1593,16 +1593,6 @@ eResult generation::update_balancer_unordered_real(const common::idp::updateGlob
 	return eResult::success;
 }
 
-double wlc_ratio(uint32_t weight, uint32_t connections, uint32_t weight_sum, uint32_t connection_sum, uint32_t power)
-{
-	if (weight == 0 || weight_sum == 0 || connection_sum < weight_sum)
-	{
-		return 1;
-	}
-	auto a = power * (1 - 1.0 * connections * weight_sum / connection_sum / weight);
-	return std::max(1.0, a);
-}
-
 inline uint64_t generation::count_real_connections(uint32_t counter_id)
 {
 	uint64_t sessions_created = 0;
@@ -1635,27 +1625,6 @@ void generation::evaluate_service_ring()
 	for (uint32_t service_idx = 0; service_idx < balancer_services_count; ++service_idx)
 	{
 		balancer_service_t* service = balancer_services + balancer_active_services[service_idx];
-		uint64_t connection_sum = 0;
-		uint32_t weight_sum = 0;
-		if (service->scheduler == ::balancer::scheduler::wlc)
-		{
-			for (uint32_t real_idx = service->real_start;
-			     real_idx < service->real_start + service->real_size;
-			     ++real_idx)
-			{
-				uint32_t real_id = balancer_service_reals[real_idx];
-				balancer_real_state_t* state = balancer_real_states + real_id;
-				// don`t count connections for disabled reals - it can make other reals "feel" underloaded
-				if (state->weight == 0)
-				{
-					continue;
-				}
-				weight_sum += state->weight;
-
-				const balancer_real_t& real = balancer_reals[real_id];
-				connection_sum += count_real_connections(real.counter_id);
-			}
-		}
 
 		balancer_service_range_t* range = ring->ranges + balancer_active_services[service_idx];
 
@@ -1665,7 +1634,6 @@ void generation::evaluate_service_ring()
 		     ++real_idx)
 		{
 			uint32_t real_id = balancer_service_reals[real_idx];
-			const balancer_real_t& real = balancer_reals[real_id];
 			balancer_real_state_t* state = balancer_real_states + real_id;
 
 			if (state->weight == 0)
@@ -1674,21 +1642,6 @@ void generation::evaluate_service_ring()
 			}
 
 			auto weight = state->weight;
-
-			if (service->scheduler == ::balancer::scheduler::wlc)
-			{
-				uint64_t real_connections = count_real_connections(real.counter_id);
-
-				weight = (int)(weight * wlc_ratio(state->weight, real_connections, weight_sum, connection_sum, service->wlc_power));
-				// todo check weight change
-			}
-
-			// clamp weight to a maximum possible value
-			if (weight > YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX)
-			{
-				// TODO: think about accounting the clamping
-				weight = YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX;
-			}
 
 			while (weight-- > 0)
 			{

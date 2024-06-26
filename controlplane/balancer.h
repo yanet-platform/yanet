@@ -113,6 +113,8 @@ protected:
 
 	std::map<balancer::real_key_global_t, std::optional<uint32_t>> reals_enabled;
 
+	std::map<balancer::real_key_global_t, std::optional<uint32_t>> reals_wlc_weight;
+
 	// The set contains all reals touched after the last one flush operation
 	std::set<balancer::real_key_global_t> real_updates;
 
@@ -133,7 +135,11 @@ protected:
 	friend class telegraf_t;
 	counter_t<balancer::service_counter_key_t, (size_t)balancer::service_counter::size> service_counters;
 	counter_t<balancer::real_counter_key_t, (size_t)balancer::real_counter::size> real_counters;
+
 	void RealFind(google::protobuf::RpcController* controller, const common::icp_proto::BalancerRealFindRequest* request, common::icp_proto::BalancerRealFindResponse* response, google::protobuf::Closure* done) override;
 	void Real(google::protobuf::RpcController* controller, const ::common::icp_proto::BalancerRealRequest* request, ::common::icp_proto::Empty* response, ::google::protobuf::Closure* done) override;
 	void RealFlush(google::protobuf::RpcController* controller, const ::common::icp_proto::Empty* request, ::common::icp_proto::Empty* response, ::google::protobuf::Closure* done) override;
+
+	bool reconfigure_wlc();
+	uint32_t calculate_wlc_weight(uint32_t weight, uint32_t connections, uint32_t weight_sum, uint32_t connection_sum, uint32_t wlc_power);
 };
