@@ -8,8 +8,6 @@ YANET_VERSION_MINOR ?= 0
 %:
 	dh $@ --builddirectory=build
 
-
-
 override_dh_auto_configure:
 	dh_auto_configure -- \
 		-Dtarget=release \
