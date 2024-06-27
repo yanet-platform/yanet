@@ -1,0 +1,49 @@
+ARG DIST=22.04
+FROM ubuntu:${DIST} as builder
+
+RUN apt-get update
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          build-essential \
+          ninja-build \
+          pkg-config \
+          git \
+          libnuma-dev \
+          libibverbs-dev \
+          libpcap-dev \
+          libsystemd-dev \
+          libyaml-cpp-dev \
+          libgtest-dev \
+          flex \
+          libfl-dev \
+          netbase \
+          devscripts \
+          debhelper \
+          dupload \
+          python3-pyelftools \
+          python3-pip \
+          protobuf-compiler \
+          libprotobuf-dev \
+          bison \
+          debhelper-compat
+
+RUN python3 -m pip install meson==0.61.2
+
+FROM builder as stage1
+
+ARG YANET_VERSION_MAJOR=0
+ARG YANET_VERSION_MINOR=0
+ARG YANET_VERSION_REVISION=0
+ARG YANET_VERSION_HASH=00000000
+ARG YANET_VERSION_CUSTOM=develop
+
+COPY . /opt/yanet
+WORKDIR /opt/yanet
+RUN dpkg-buildpackage
+RUN ls /opt
+
+
+FROM ubuntu:${DIST}
+
+COPY --from=stage1 /opt/*.deb /opt/
+
