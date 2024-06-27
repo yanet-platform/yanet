@@ -1,8 +1,49 @@
-Package: yanet
-Version: __VERSION__
-Architecture: amd64
+Source: yanet
 Section: net
-Maintainer: Timur Aitov <taitov@yandex-team.ru>
+Priority: optional
+Maintainer: Georgy Kirichenko <g-e-o-r-g-y@@yandex-team.ru>
+Build-Depends: debhelper-compat (= 11), python3-pyelftools, libnuma-dev, libprotobuf-dev, protobuf-compiler, pkg-config, flex, bison, libsystemd-dev, libibverbs-dev
+Standards-Version: 4.6.0
 Homepage: https://github.com/yanet-platform/yanet
-Description: Software forwarding traffic based on DPDK
- YANET is an open-source extensible framework for software forwarding traffic based on DPDK
+Rules-Requires-Root: no
+
+Package: yanet
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, yanet-controlplane, yanet-dataplane, yanet-cli
+Suggests: yanet-dataplane-systemd, yanet-controlplane-systemd, yanet-utils
+Description: DPDK-based network packet processor
+
+Package: yanet-controlplane
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Control daemon for network packet processor
+
+Package: yanet-controlplane-systemd
+Architecture: amd64
+Depends: yanet-controlplane
+Description: Systemd unit file for yanet-controlplane
+
+Package: yanet-dataplane
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: DPDK-based network packet processor
+
+Package: yanet-dataplane-systemd
+Architecture: amd64
+Depends: yanet-dataplane
+Description: Systemd unit file for yanet-dataplane
+
+Package: yanet-cli
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: YANET controlling and monitoring utility
+
+Package: yanet-dev
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Various development files for YANET integration
+
+Package: yanet-utils
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Various YANET utilities

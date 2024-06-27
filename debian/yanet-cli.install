@@ -1,0 +1,3 @@
+usr/bin/yanet-cli
+etc/bash_completion.d/yanet-cli
+usr/share/zsh/vendor-completions/_yanet-cli

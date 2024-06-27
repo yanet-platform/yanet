@@ -1,0 +1,22 @@
+[Unit]
+Description=yanet controlplane
+After=yanet-dataplane.service
+Requires=yanet-dataplane.service
+BindsTo=yanet-dataplane.service
+StartLimitBurst=3600000
+StartLimitIntervalSec=0
+
+[Service]
+Type=notify
+User=yanet
+Group=yanet
+
+ExecStart=/usr/bin/yanet-controlplane -c /etc/yanet/controlplane.conf
+ExecReload=/usr/bin/yanet-cli reload
+TimeoutSec=1200
+Restart=always
+RestartSec=1
+LimitCORE=infinity
+
+[Install]
+WantedBy=multi-user.target

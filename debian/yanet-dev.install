@@ -1,0 +1,4 @@
+usr/include/yanet/meta.proto
+usr/include/yanet/controlplane.proto
+usr/lib/libyanet-rib.so
+usr/include/libyanet-rib.h
