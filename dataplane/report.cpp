@@ -10,21 +10,6 @@
 namespace
 {
 
-template<typename hashtable_chain_T>
-nlohmann::json convertHashtable(const hashtable_chain_T& hashtable)
-{
-	nlohmann::json json;
-
-	const auto& stats = hashtable.stats();
-
-	json["extendedChunksCount"] = stats.extendedChunksCount;
-	json["longestChain"] = stats.longestChain;
-	json["pairs"] = stats.pairs;
-	json["insertFailed"] = stats.insertFailed;
-
-	return json;
-}
-
 template<typename hashtable_mod_T,
          typename stats_T>
 nlohmann::json convertHashtable(const hashtable_mod_T& hashtable, const stats_T& stats_generation)
@@ -48,6 +33,31 @@ nlohmann::json convertHashtable(const hashtable_mod_T& hashtable, const stats_T&
 }
 
 } // namespace
+
+namespace common
+{
+namespace dregress
+{
+void to_json(nlohmann::json& j, const stats_t& stats)
+{
+	j = nlohmann::json{
+	        {"bad_decap_transport", stats.bad_decap_transport},
+	        {"fragment", stats.fragment},
+	        {"bad_transport", stats.bad_transport},
+	        {"lookup_miss", stats.lookup_miss},
+	        {"local", stats.local},
+	        {"tcp_syn", stats.tcp_syn},
+	        {"tcp_unknown_option", stats.tcp_unknown_option},
+	        {"tcp_no_option", stats.tcp_no_option},
+	        {"tcp_insert_sessions", stats.tcp_insert_sessions},
+	        {"tcp_close_sessions", stats.tcp_close_sessions},
+	        {"tcp_retransmission", stats.tcp_retransmission},
+	        {"tcp_ok", stats.tcp_ok},
+	        {"tcp_timeout_sessions", stats.tcp_timeout_sessions},
+	        {"tcp_unknown_sessions", stats.tcp_unknown_sessions}};
+}
+} // namespace dregress
+} // namespace common
 
 cReport::cReport(cDataPlane* dataPlane) :
         dataPlane(dataPlane)
@@ -352,6 +362,18 @@ nlohmann::json cReport::convertPort(const tPortId& portId)
 	return json;
 }
 
+namespace dataplane
+{
+void to_json(nlohmann::json& j, const hashtable_chain_spinlock_stats_t& stats)
+{
+	j = nlohmann::json{
+	        {"extendedChunksCount", stats.extendedChunksCount},
+	        {"longestChain", stats.longestChain},
+	        {"pairs", stats.pairs},
+	        {"insertFailed", stats.insertFailed}};
+}
+} // namespace dataplane
+
 nlohmann::json cReport::convertControlPlane(const cControlPlane* controlPlane)
 {
 	nlohmann::json json;
@@ -386,21 +408,8 @@ nlohmann::json cReport::convertControlPlane(const cControlPlane* controlPlane)
 	json["slowworker_packets"] = controlPlane->stats.slowworker_packets;
 	json["mempool_is_empty"] = controlPlane->stats.mempool_is_empty;
 
-	json["dregress"]["bad_decap_transport"] = controlPlane->dregress.stats.bad_decap_transport;
-	json["dregress"]["fragment"] = controlPlane->dregress.stats.fragment;
-	json["dregress"]["bad_transport"] = controlPlane->dregress.stats.bad_transport;
-	json["dregress"]["lookup_miss"] = controlPlane->dregress.stats.lookup_miss;
-	json["dregress"]["local"] = controlPlane->dregress.stats.local;
-	json["dregress"]["tcp_syn"] = controlPlane->dregress.stats.tcp_syn;
-	json["dregress"]["tcp_unknown_option"] = controlPlane->dregress.stats.tcp_unknown_option;
-	json["dregress"]["tcp_no_option"] = controlPlane->dregress.stats.tcp_no_option;
-	json["dregress"]["tcp_insert_sessions"] = controlPlane->dregress.stats.tcp_insert_sessions;
-	json["dregress"]["tcp_close_sessions"] = controlPlane->dregress.stats.tcp_close_sessions;
-	json["dregress"]["tcp_retransmission"] = controlPlane->dregress.stats.tcp_retransmission;
-	json["dregress"]["tcp_ok"] = controlPlane->dregress.stats.tcp_ok;
-	json["dregress"]["tcp_timeout_sessions"] = controlPlane->dregress.stats.tcp_timeout_sessions;
-	json["dregress"]["tcp_unknown_sessions"] = controlPlane->dregress.stats.tcp_unknown_sessions;
-	json["dregress"]["connections"] = convertHashtable(*controlPlane->dregress.connections);
+	json["dregress"] = controlPlane->DregressStats();
+	json["dregress"]["connections"] = controlPlane->DregressConnectionsStats();
 
 	return json;
 }
