@@ -621,6 +621,22 @@ private:
 	static_assert(pairsPerExtendedChunk_T <= 7);
 } __rte_aligned(RTE_CACHE_LINE_SIZE);
 
+struct hashtable_chain_spinlock_stats_t
+{
+	uint64_t extendedChunksCount;
+	uint64_t longestChain;
+	uint64_t pairs;
+	uint64_t insertFailed;
+	hashtable_chain_spinlock_stats_t& operator+=(const hashtable_chain_spinlock_stats_t& other)
+	{
+		extendedChunksCount += other.extendedChunksCount;
+		longestChain += other.longestChain;
+		pairs += other.pairs;
+		insertFailed += other.insertFailed;
+		return *this;
+	}
+};
+
 template<typename key_T,
          typename value_T,
          uint32_t size_T,
@@ -1209,11 +1225,6 @@ public:
 		return range(gcIndex, steps);
 	}
 
-	const auto& getStats() const
-	{
-		return stats;
-	}
-
 protected:
 	constexpr static uint8_t flagExtendedChunkOccupied = 1 << 7;
 	constexpr static uint32_t extendedChunkIdUnknown = 0x00FFFFFF;
@@ -1432,15 +1443,16 @@ protected:
 		extendedChunkLocker.unlock();
 	}
 
-protected:
-	struct
-	{
-		uint64_t extendedChunksCount;
-		uint64_t longestChain;
-		uint64_t pairs;
-		uint64_t insertFailed;
-	} stats;
+	hashtable_chain_spinlock_stats_t stats_;
 
+public:
+	hashtable_chain_spinlock_stats_t stats;
+	const hashtable_chain_spinlock_stats_t& getStats() const
+	{
+		return stats;
+	}
+
+protected:
 	spinlock_t extendedChunkLocker;
 	uint32_t gcIndex;
 	uint32_t freeExtendedChunkId;
