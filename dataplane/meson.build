@@ -18,6 +18,7 @@ sources = files('bus.cpp',
                 'neighbor.cpp',
                 'report.cpp',
                 'sharedmemory.cpp',
+                'slow_worker.cpp',
                 'sock_dev.cpp',
                 'worker.cpp',
                 'worker_gc.cpp')

@@ -69,14 +69,19 @@ public:
 
 	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
 
+	const dataplane::base::generation& current_base() { return bases[localBaseId & 1]; }
+
 protected:
 	eResult sanityCheck();
 
 	YANET_NEVER_INLINE void mainThread();
 
 	inline void calcHash(rte_mbuf* mbuf, uint8_t without_ports = 0);
+
+public:
 	void preparePacket(rte_mbuf* mbuf); ///< @todo: inline
 
+protected:
 	constexpr static uint32_t translation_ignore = 0xFFFFFFFFu;
 	inline void translation_ipv4_to_ipv6(rte_mbuf* mbuf, const ipv6_address_t& ipv6_source, const ipv6_address_t& ipv6_destination, const uint32_t port_source, const uint32_t port_destination, const uint32_t identifier);
 	inline void translation_ipv6_to_ipv4(rte_mbuf* mbuf, const ipv4_address_t& ipv4_source, const ipv4_address_t& ipv4_destination, const uint32_t port_source, const uint32_t port_destination, const uint32_t identifier);

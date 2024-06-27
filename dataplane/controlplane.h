@@ -20,6 +20,7 @@
 #include "dregress.h"
 #include "fragmentation.h"
 #include "kernel_interface_handle.h"
+#include "slow_worker.h"
 #include "type.h"
 
 class cControlPlane ///< @todo: move to cDataPlane
@@ -45,6 +46,8 @@ public:
 	common::idp::getControlPlanePortStats::response getControlPlanePortStats(const common::idp::getControlPlanePortStats::request& request);
 	common::idp::getPortStatsEx::response getPortStatsEx();
 	common::idp::getFragmentationStats::response getFragmentationStats();
+	common::dregress::stats_t DregressStats() const;
+	dataplane::hashtable_chain_spinlock_stats_t DregressConnectionsStats() const;
 	common::idp::getFWState::response getFWState();
 	common::idp::getFWStateStats::response getFWStateStats();
 	eResult clearFWState();
@@ -120,6 +123,7 @@ protected:
 	cDataPlane* dataPlane;
 
 	fragmentation::Fragmentation fragmentation_;
+	dataplane::SlowWorker slow_;
 	dregress_t dregress;
 
 	std::mutex mutex;
@@ -159,7 +163,10 @@ protected:
 	common::slowworker::stats_t stats;
 	common::idp::getErrors::response errors; ///< @todo: class errorsManager
 
+public:
 	cWorker* slowWorker;
+
+protected:
 	std::queue<std::tuple<rte_mbuf*,
 	                      common::globalBase::tFlow>>
 	        slowWorkerMbufs;
