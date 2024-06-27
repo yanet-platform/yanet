@@ -4,19 +4,45 @@
 #include "common/fallback.h"
 
 #include "checksum.h"
-#include "controlplane.h"
 #include "dataplane.h"
 #include "dregress.h"
 #include "metadata.h"
-#include "worker.h"
+#include "slow_worker.h"
 
-dregress_t::dregress_t(cControlPlane* controlplane,
-                       cDataPlane* dataplane) :
-        controlplane(controlplane),
-        dataplane(dataplane)
+dregress_t::dregress_t(dataplane::SlowWorker* slow, cDataPlane* dataplane, uint32_t gc_step) :
+        slow_worker_{slow},
+        dataplane{dataplane},
+        stats{},
+        connections{new dregress::ConnTable},
+        gc_step{gc_step}
+{}
+dregress_t::dregress_t(dregress_t&& other) :
+        connections{nullptr}
 {
-	memset(&stats, 0, sizeof(stats));
-	connections = new dataplane::hashtable_chain_spinlock_t<dregress::connection_key_t, dregress::connection_value_t, YANET_CONFIG_DREGRESS_HT_SIZE, YANET_CONFIG_DREGRESS_HT_EXTENDED_SIZE, 4, 4>();
+	*this = std::move(other);
+
+	other.connections = nullptr;
+}
+
+dregress_t& dregress_t::operator=(dregress_t&& other)
+{
+	slow_worker_ = other.slow_worker_;
+	dataplane = other.dataplane;
+	stats = other.stats;
+	std::swap(connections, other.connections);
+
+	auto pre_guard = std::lock_guard(other.prefixes_mutex);
+	std::swap(local_prefixes_v4, other.local_prefixes_v4);
+	std::swap(local_prefixes_v6, other.local_prefixes_v6);
+	std::swap(prefixes, other.prefixes);
+	std::swap(values, other.values);
+
+	auto count_guard = std::lock_guard(other.counters_mutex);
+	std::swap(counters_v4, other.counters_v4);
+	std::swap(counters_v6, other.counters_v6);
+
+	gc_step = other.gc_step;
+	return *this;
 }
 
 dregress_t::~dregress_t()
@@ -28,14 +54,14 @@ void dregress_t::insert(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-	const auto& base = controlplane->slowWorker->bases[controlplane->slowWorker->localBaseId & 1];
+	const auto& base = slow_worker_->current_base();
 	const auto& dregress = base.globalBase->dregresses[metadata->flow.data.dregressId];
 
 	if (metadata->network_flags & YANET_NETWORK_FLAG_FRAGMENT)
 	{
 		stats.fragment++;
 
-		controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
+		slow_worker_->SendToSlowWorker(mbuf, dregress.flow);
 		return;
 	}
 
@@ -43,7 +69,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 	{
 		stats.bad_transport++;
 
-		controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
+		slow_worker_->SendToSlowWorker(mbuf, dregress.flow);
 		return;
 	}
 
@@ -84,7 +110,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 		{
 			stats.lookup_miss++;
 
-			controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
+			slow_worker_->SendToSlowWorker(mbuf, dregress.flow);
 			return;
 		}
 
@@ -122,7 +148,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 			{
 				stats.lookup_miss++;
 
-				controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
+				slow_worker_->SendToSlowWorker(mbuf, dregress.flow);
 				return;
 			}
 
@@ -388,8 +414,8 @@ void dregress_t::insert(rte_mbuf* mbuf)
 	}
 
 	/// @todo: opt
-	controlplane->slowWorker->preparePacket(mbuf);
-	controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
+	slow_worker_->PreparePacket(mbuf);
+	slow_worker_->SendToSlowWorker(mbuf, dregress.flow);
 }
 
 void dregress_t::handle()
@@ -430,7 +456,7 @@ void dregress_t::handle()
 std::optional<dregress::direction_t> dregress_t::lookup(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-	const auto& base = controlplane->slowWorker->bases[controlplane->slowWorker->localBaseId & 1];
+	const auto& base = slow_worker_->current_base();
 	const auto& dregress = base.globalBase->dregresses[metadata->flow.data.dregressId];
 
 	std::map<std::tuple<common::ip_address_t, ///< nexthop
@@ -622,34 +648,11 @@ bool dregress_t::tcp_parse(rte_mbuf* mbuf,
 	return false;
 }
 
-common::idp::get_dregress_counters::response dregress_t::get_dregress_counters()
+dregress::LimitsStats dregress_t::limits() const
 {
-	common::idp::get_dregress_counters::response response;
-
-	{
-		std::lock_guard<std::mutex> guard(counters_mutex); ///< @todo: free lock
-		common::stream_out_t stream;
-		counters_v4.push(stream);
-		counters_v6.push(stream);
-		response = stream.getBuffer();
-
-		YANET_MEMORY_BARRIER_COMPILE;
-
-		counters_v4.clear(); ///< @todo: swap
-		counters_v6.clear(); ///< @todo: swap
-	}
-
-	return response;
-}
-
-void dregress_t::limits(common::idp::limits::response& response)
-{
-	limit_insert(response,
-	             "dregress.ht.keys",
-	             connections->stats().pairs,
-	             connections->keysSize);
-	limit_insert(response,
-	             "dregress.ht.extended_chunks",
-	             connections->stats().extendedChunksCount,
-	             YANET_CONFIG_DREGRESS_HT_EXTENDED_SIZE);
+	return {
+	        connections->stats().pairs,
+	        connections->keysSize,
+	        connections->stats().extendedChunksCount,
+	};
 }

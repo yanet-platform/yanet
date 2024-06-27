@@ -30,7 +30,10 @@ cControlPlane::cControlPlane(cDataPlane* dataPlane) :
 	                sendPacketToSlowWorker(pkt, flow);
                 },
                 dataPlane->getConfigValues().fragmentation),
-        dregress(this, dataPlane),
+        slow_(this),
+        dregress(&slow_,
+                 dataPlane,
+                 dataPlane->getConfigValues().gc_step),
         mempool(nullptr),
         use_kernel_interface(false),
         slowWorker(nullptr),
@@ -381,7 +384,12 @@ common::idp::get_worker_gc_stats::response cControlPlane::get_worker_gc_stats()
 
 common::idp::get_dregress_counters::response cControlPlane::get_dregress_counters()
 {
-	return dregress.get_dregress_counters();
+	auto guard = dregress.LockCounters();
+	common::stream_out_t stream;
+	dregress.Counters4().push(stream);
+	dregress.Counters6().push(stream);
+	dregress.ClearCounters();
+	return stream.getBuffer();
 }
 
 common::idp::get_ports_stats::response cControlPlane::get_ports_stats()
@@ -492,6 +500,16 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 common::idp::getFragmentationStats::response cControlPlane::getFragmentationStats()
 {
 	return fragmentation_.getStats();
+}
+
+common::dregress::stats_t cControlPlane::DregressStats() const
+{
+	return dregress.Stats();
+}
+
+dataplane::hashtable_chain_spinlock_stats_t cControlPlane::DregressConnectionsStats() const
+{
+	return dregress.Connections()->stats();
 }
 
 common::idp::getFWState::response cControlPlane::getFWState()
@@ -916,7 +934,16 @@ common::idp::limits::response cControlPlane::limits()
 		worker_gc->limits(response);
 	}
 
-	dregress.limits(response);
+	auto dregress = this->dregress.limits();
+
+	limit_insert(response,
+	             "dregress.ht.keys",
+	             dregress.pairs,
+	             dregress.keysSize);
+	limit_insert(response,
+	             "dregress.ht.extended_chunks",
+	             dregress.extendedChunksCount,
+	             YANET_CONFIG_DREGRESS_HT_EXTENDED_SIZE);
 
 	return response;
 }
