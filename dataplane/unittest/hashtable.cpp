@@ -70,7 +70,7 @@ TEST(HashtableTest, Extended)
 	}
 
 	EXPECT_TRUE(ok);
-	EXPECT_NE(t.getStats().extendedChunksCount, 0);
+	EXPECT_NE(t.stats().extendedChunksCount, 0);
 
 	uint32_t from = 0;
 	for (auto iter : t.range(from, 8192))
@@ -100,8 +100,8 @@ TEST(HashtableTest, Extended)
 		iter.unlock();
 	}
 
-	EXPECT_EQ(t.getStats().extendedChunksCount, 0);
-	EXPECT_EQ(t.getStats().pairs, 0);
+	EXPECT_EQ(t.stats().extendedChunksCount, 0);
+	EXPECT_EQ(t.stats().pairs, 0);
 
 	for (int k = 0; k < 512; ++k)
 	{
@@ -127,21 +127,21 @@ TEST(HashtableTest, Extended)
 		iter.unlock();
 	}
 
-	EXPECT_EQ(t.getStats().extendedChunksCount, 0);
-	EXPECT_EQ(t.getStats().pairs, 0);
+	EXPECT_EQ(t.stats().extendedChunksCount, 0);
+	EXPECT_EQ(t.stats().pairs, 0);
 
 	for (int k = 0; k < 100500; ++k)
 	{
 		t.insert(k, k);
 	}
 
-	EXPECT_EQ(t.getStats().extendedChunksCount, 128);
-	EXPECT_EQ(t.getStats().pairs, 128 * 2 + 128 * 4);
+	EXPECT_EQ(t.stats().extendedChunksCount, 128);
+	EXPECT_EQ(t.stats().pairs, 128 * 2 + 128 * 4);
 
 	t.clear();
 
-	EXPECT_EQ(t.getStats().extendedChunksCount, 0);
-	EXPECT_EQ(t.getStats().pairs, 0);
+	EXPECT_EQ(t.stats().extendedChunksCount, 0);
+	EXPECT_EQ(t.stats().pairs, 0);
 }
 
 TEST(hashtable_mod_id32, basic)
