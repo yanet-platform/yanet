@@ -646,10 +646,10 @@ void dregress_t::limits(common::idp::limits::response& response)
 {
 	limit_insert(response,
 	             "dregress.ht.keys",
-	             connections->getStats().pairs,
+	             connections->stats().pairs,
 	             connections->keysSize);
 	limit_insert(response,
 	             "dregress.ht.extended_chunks",
-	             connections->getStats().extendedChunksCount,
+	             connections->stats().extendedChunksCount,
 	             YANET_CONFIG_DREGRESS_HT_EXTENDED_SIZE);
 }

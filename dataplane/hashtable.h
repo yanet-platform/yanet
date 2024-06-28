@@ -661,7 +661,7 @@ public:
 		extendedChunk.setNextExtendedChunkId(extendedChunkIdUnknown);
 
 		freeExtendedChunkId = 0;
-		memset(&stats, 0, sizeof(stats));
+		memset(&stats_, 0, sizeof(stats_));
 	}
 
 	constexpr static uint64_t keysSize = size_T * pairsPerChunk_T + extendedSize_T * pairsPerExtendedChunk_T;
@@ -808,8 +808,8 @@ public:
 
 					chunk.setValid(chunk_key_i);
 
-					__atomic_add_fetch(&stats.pairs, 1, __ATOMIC_RELAXED);
-					stats.longestChain = RTE_MAX(stats.longestChain, longestChain);
+					__atomic_add_fetch(&stats_.pairs, 1, __ATOMIC_RELAXED);
+					stats_.longestChain = RTE_MAX(stats_.longestChain, longestChain);
 
 					return eResult::success;
 				}
@@ -842,8 +842,8 @@ public:
 
 						extendedChunk.setValid(extended_chunk_key_i);
 
-						__atomic_add_fetch(&stats.pairs, 1, __ATOMIC_RELAXED);
-						stats.longestChain = RTE_MAX(stats.longestChain, longestChain);
+						__atomic_add_fetch(&stats_.pairs, 1, __ATOMIC_RELAXED);
+						stats_.longestChain = RTE_MAX(stats_.longestChain, longestChain);
 
 						return eResult::success;
 					}
@@ -853,7 +853,7 @@ public:
 
 		/// chain is full
 
-		__atomic_add_fetch(&stats.insertFailed, 1, __ATOMIC_RELAXED);
+		__atomic_add_fetch(&stats_.insertFailed, 1, __ATOMIC_RELAXED);
 
 		chunk.locker.unlock();
 		return eResult::isFull;
@@ -879,7 +879,7 @@ public:
 
 					chunk.unsetValid(chunk_key_i);
 
-					__atomic_sub_fetch(&stats.pairs, 1, __ATOMIC_RELAXED);
+					__atomic_sub_fetch(&stats_.pairs, 1, __ATOMIC_RELAXED);
 
 					chunk.locker.unlock();
 					return true;
@@ -903,7 +903,7 @@ public:
 
 						/// use gc for remove extended chunk
 
-						__atomic_sub_fetch(&stats.pairs, 1, __ATOMIC_RELAXED);
+						__atomic_sub_fetch(&stats_.pairs, 1, __ATOMIC_RELAXED);
 
 						chunk.locker.unlock();
 						return true;
@@ -937,7 +937,7 @@ public:
 					{
 						chunk.unsetValid(chunk_key_i);
 
-						__atomic_sub_fetch(&stats.pairs, 1, __ATOMIC_RELAXED);
+						__atomic_sub_fetch(&stats_.pairs, 1, __ATOMIC_RELAXED);
 					}
 				}
 
@@ -953,7 +953,7 @@ public:
 						{
 							extendedChunk.unsetValid(extended_chunk_key_i);
 
-							__atomic_sub_fetch(&stats.pairs, 1, __ATOMIC_RELAXED);
+							__atomic_sub_fetch(&stats_.pairs, 1, __ATOMIC_RELAXED);
 						}
 					}
 
@@ -1052,7 +1052,7 @@ public:
 				{
 					chunk.unsetValid(key_i);
 
-					__atomic_sub_fetch(&hashtable->stats.pairs, 1, __ATOMIC_RELAXED);
+					__atomic_sub_fetch(&hashtable->stats_.pairs, 1, __ATOMIC_RELAXED);
 				}
 				else if (chunk.getNextExtendedChunkId() != extendedChunkIdUnknown)
 				{
@@ -1060,7 +1060,7 @@ public:
 
 					extendedChunk.unsetValid(key_i - pairsPerChunk_T);
 
-					__atomic_sub_fetch(&hashtable->stats.pairs, 1, __ATOMIC_RELAXED);
+					__atomic_sub_fetch(&hashtable->stats_.pairs, 1, __ATOMIC_RELAXED);
 				}
 			}
 
@@ -1419,7 +1419,7 @@ protected:
 		freeExtendedChunkId = extendedChunk.getNextExtendedChunkId();
 		extendedChunk.setNextExtendedChunkId(extendedChunkIdUnknown);
 
-		stats.extendedChunksCount++;
+		stats_.extendedChunksCount++;
 		extendedChunkLocker.unlock();
 
 		return chunkId;
@@ -1439,17 +1439,16 @@ protected:
 		extendedChunk.setNextExtendedChunkId(freeExtendedChunkId);
 		freeExtendedChunkId = extendedChunkId;
 
-		stats.extendedChunksCount--;
+		stats_.extendedChunksCount--;
 		extendedChunkLocker.unlock();
 	}
 
 	hashtable_chain_spinlock_stats_t stats_;
 
 public:
-	hashtable_chain_spinlock_stats_t stats;
-	const hashtable_chain_spinlock_stats_t& getStats() const
+	const hashtable_chain_spinlock_stats_t& stats() const
 	{
-		return stats;
+		return stats_;
 	}
 
 protected:
