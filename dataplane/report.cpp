@@ -15,7 +15,7 @@ nlohmann::json convertHashtable(const hashtable_chain_T& hashtable)
 {
 	nlohmann::json json;
 
-	const auto& stats = hashtable.getStats();
+	const auto& stats = hashtable.stats();
 
 	json["extendedChunksCount"] = stats.extendedChunksCount;
 	json["longestChain"] = stats.longestChain;
