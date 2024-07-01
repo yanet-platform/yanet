@@ -4742,7 +4742,7 @@ inline void cWorker::balancer_icmp_forward_handle()
 	balancer_icmp_forward_stack.clear();
 }
 
-inline cWorker::FlowFromState cWorker::acl_try_keepstate(rte_mbuf* mbuf)
+inline cWorker::FlowFromState cWorker::acl_checkstate(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -4780,7 +4780,7 @@ inline cWorker::FlowFromState cWorker::acl_try_keepstate(rte_mbuf* mbuf)
 		dataplane::spinlock_nonrecursive_t* locker;
 		basePermanently.globalBaseAtomic->fw4_state->lookup(key, value, locker);
 
-		return acl_try_keepstate(mbuf, value, locker);
+		return acl_checkstate(mbuf, value, locker);
 	}
 	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
 	{
@@ -4816,15 +4816,15 @@ inline cWorker::FlowFromState cWorker::acl_try_keepstate(rte_mbuf* mbuf)
 		dataplane::spinlock_nonrecursive_t* locker;
 		basePermanently.globalBaseAtomic->fw6_state->lookup(key, value, locker);
 
-		return acl_try_keepstate(mbuf, value, locker);
+		return acl_checkstate(mbuf, value, locker);
 	}
 
 	return std::nullopt;
 }
 
-inline cWorker::FlowFromState cWorker::acl_try_keepstate(rte_mbuf* mbuf,
-                                                         dataplane::globalBase::fw_state_value_t* value,
-                                                         dataplane::spinlock_nonrecursive_t* locker)
+inline cWorker::FlowFromState cWorker::acl_checkstate(rte_mbuf* mbuf,
+                                                      dataplane::globalBase::fw_state_value_t* value,
+                                                      dataplane::spinlock_nonrecursive_t* locker)
 {
 	// Checking both value and locker for non-being-nullptr seems redundant.
 	if (value == nullptr)
@@ -5473,7 +5473,7 @@ void cWorker::acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAc
 	stats.logs_packets++;
 }
 
-inline cWorker::FlowFromState cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
+inline cWorker::FlowFromState cWorker::acl_egress_checkstate(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -5511,7 +5511,7 @@ inline cWorker::FlowFromState cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
 		dataplane::spinlock_nonrecursive_t* locker;
 		basePermanently.globalBaseAtomic->fw4_state->lookup(key, value, locker);
 
-		return acl_egress_try_keepstate(mbuf, value, locker);
+		return acl_egress_checkstate(mbuf, value, locker);
 	}
 	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
 	{
@@ -5547,15 +5547,15 @@ inline cWorker::FlowFromState cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
 		dataplane::spinlock_nonrecursive_t* locker;
 		basePermanently.globalBaseAtomic->fw6_state->lookup(key, value, locker);
 
-		return acl_egress_try_keepstate(mbuf, value, locker);
+		return acl_egress_checkstate(mbuf, value, locker);
 	}
 
 	return std::nullopt;
 }
 
-inline cWorker::FlowFromState cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf,
-                                                                dataplane::globalBase::fw_state_value_t* value,
-                                                                dataplane::spinlock_nonrecursive_t* locker)
+inline cWorker::FlowFromState cWorker::acl_egress_checkstate(rte_mbuf* mbuf,
+                                                             dataplane::globalBase::fw_state_value_t* value,
+                                                             dataplane::spinlock_nonrecursive_t* locker)
 {
 	// Checking both value and locker for non-being-nullptr seems redundant.
 	if (value == nullptr)
