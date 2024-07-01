@@ -184,10 +184,10 @@ protected:
 
 	/// fw state
 	using FlowFromState = std::optional<common::globalBase::tFlow>;
-	inline FlowFromState acl_try_keepstate(rte_mbuf* mbuf);
-	inline FlowFromState acl_try_keepstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
-	inline FlowFromState acl_egress_try_keepstate(rte_mbuf* mbuf);
-	inline FlowFromState acl_egress_try_keepstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
+	inline FlowFromState acl_checkstate(rte_mbuf* mbuf);
+	inline FlowFromState acl_checkstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
+	inline FlowFromState acl_egress_checkstate(rte_mbuf* mbuf);
+	inline FlowFromState acl_egress_checkstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
 	inline void acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow);
 	inline void acl_state_emit(tAclId aclId, const dataplane::globalBase::fw_state_sync_frame_t& frame);
 
