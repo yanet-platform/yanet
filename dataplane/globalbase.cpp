@@ -253,7 +253,7 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		const auto& type = std::get<0>(iter);
 		const auto& data = std::get<1>(iter);
 
-		YADECAP_LOG_DEBUG("running update of type %d\n", (int)type);
+		/* YADECAP_LOG_DEBUG("running update of type %d\n", (int)type); */
 
 		if (type == common::idp::updateGlobalBase::requestType::clear)
 		{
@@ -438,7 +438,7 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 			YADECAP_LOG_ERROR("invalid request type\n");
 			return eResult::invalidType;
 		}
-		YADECAP_LOG_DEBUG("done update of type %d %i\n", (int)type, result != eResult::success ? 0 : 1);
+		/* YADECAP_LOG_DEBUG("done update of type %d %i\n", (int)type, result != eResult::success ? 0 : 1); */
 
 		if (result != eResult::success)
 		{
@@ -459,7 +459,7 @@ eResult generation::updateBalancer(const common::idp::updateGlobalBaseBalancer::
 		const auto& type = std::get<0>(iter);
 		const auto& data = std::get<1>(iter);
 
-		YADECAP_LOG_DEBUG("running update of type %d\n", (int)type);
+		/* YADECAP_LOG_DEBUG("running update of type %d\n", (int)type); */
 
 		if (type == common::idp::updateGlobalBaseBalancer::requestType::update_balancer_unordered_real)
 		{

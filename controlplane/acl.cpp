@@ -324,6 +324,7 @@ struct firewall_rules_t
 					case ipfw::rule_action_t::ALLOW:
 					case ipfw::rule_action_t::DUMP:
 					case ipfw::rule_action_t::DENY:
+					case ipfw::rule_action_t::CHECKSTATE:
 					{
 						// handle only meaning rules
 						auto& ruleref = yanet_rules.emplace_back(rulep, configp);
@@ -381,15 +382,6 @@ static inline auto is_term_filter(const ref_t<filter_t>& filter)
 	return (!filter || (!filter->src && !filter->dst && !filter->flags && !filter->proto));
 }
 
-static inline auto is_nonterm_action(const std::variant<int64_t, common::globalBase::tFlow, common::acl::action_t>& action)
-{
-	if (std::holds_alternative<common::acl::action_t>(action))
-	{
-		return true;
-	}
-	return false;
-}
-
 // gather matching rules from dispatcher
 static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher,
                               const ref_t<filter_t>& filter,
@@ -421,7 +413,7 @@ static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher,
 		ids.resize(idSize);
 
 		ACL_DBGMSG("gathered...");
-		if (is_term_filter(rule.filter) && !is_nonterm_action(rule.action))
+		if (is_term_filter(rule.filter) && (rule.is_term() || rule.is_skipto()))
 		{
 			ACL_DBGMSG("terminating filter...");
 			break;
@@ -497,6 +489,14 @@ static bool unwind(int64_t start_from, firewall_rules_t& fw, const dispatcher_ru
 				                   log || rule.log);
 				ACL_DBGMSG("tFlow gathered...");
 			}
+			else if (std::holds_alternative<common::acl::check_state_t>(rule.action))
+			{
+				rules.emplace_back(std::move(result_filter),
+				                   std::get<common::acl::check_state_t>(rule.action),
+				                   ids,
+				                   log || rule.log);
+				ACL_DBGMSG("check_state gathered...");
+			}
 			else
 			{
 				rules.emplace_back(std::move(result_filter),
@@ -507,7 +507,7 @@ static bool unwind(int64_t start_from, firewall_rules_t& fw, const dispatcher_ru
 			}
 
 			ids.resize(idSize);
-			if (is_term_filter(rule.filter) && !is_nonterm_action(rule.action))
+			if (is_term_filter(rule.filter) && (rule.is_term() || rule.is_skipto()))
 			{
 				ACL_DBGMSG("terminating filter...");
 				return true;
@@ -883,9 +883,12 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 			start_filter = start_filter & filter;
 
 			auto rules = unwind_rules(fw, dispatcher, start_filter, iface);
-
-			for (auto& rule : rules)
+			auto rules_iter = rules.begin();
+			while (rules_iter != rules.end())
 			{
+				auto& rule = *rules_iter;
+				bool remove_rule = false;
+
 				if (std::holds_alternative<common::globalBase::tFlow>(rule.action))
 				{
 					auto& flow = std::get<common::globalBase::tFlow>(rule.action);
@@ -925,15 +928,28 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 					auto& action = std::get<common::acl::action_t>(rule.action);
 					if (!action.dump_tag.empty())
 					{
-						auto it = result.tag_to_dump_id.find(action.dump_tag);
-						if (it == result.tag_to_dump_id.end())
+						if (result.dump_id_to_tag.size() >= YANET_CONFIG_DUMP_ID_TO_TAG_SIZE)
 						{
-							result.dump_id_to_tag.emplace_back(action.dump_tag);
-							it = result.tag_to_dump_id.emplace_hint(it, action.dump_tag, result.dump_id_to_tag.size());
+							// We should remove this rule because the dump_id would exceed the limit
+							remove_rule = true;
 						}
-						action.dump_id = it->second;
+						else
+						{
+							auto it = result.tag_to_dump_id.find(action.dump_tag);
+							if (it == result.tag_to_dump_id.end())
+							{
+								result.dump_id_to_tag.emplace_back(action.dump_tag);
+								it = result.tag_to_dump_id.emplace_hint(it, action.dump_tag, result.dump_id_to_tag.size());
+							}
+							action.dump_id = it->second;
+						}
 					}
 				}
+
+				if (remove_rule)
+					rules_iter = rules.erase(rules_iter);
+				else
+					++rules_iter;
 			}
 
 			auto [it, inserted] = rules_map.try_emplace(std::move(rules), aclId);
@@ -981,6 +997,11 @@ void compile(const std::map<std::string, controlplane::base::acl_t>& acls,
 
 		YANET_LOG_INFO("acl::compile: unwind\n");
 		auto rules_used = unwind_used_rules(acls, iface_map, nullptr, result);
+
+		// FIXME: remove, this is temporary ouput of unwinded rules for debug purposes
+		for (auto const& rule : rules_used)
+			YANET_LOG_DEBUG("\033[31m%s\033[0m\n", rule.to_string().c_str());
+
 		compiler.compile(rules_used, result);
 	}
 	catch (const std::exception& ex)

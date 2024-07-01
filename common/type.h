@@ -2390,6 +2390,20 @@ public:
 		stream.push((char*)this, sizeof(*this));
 	}
 
+	[[nodiscard]] std::string to_string() const
+	{
+		std::ostringstream oss;
+		oss << "tFlow {"
+		    << "\n  type: " << eFlowType_toString(type)
+		    << "\n  flags: " << static_cast<int>(flags)
+		    << "\n  counter_id: " << counter_id
+		    << "\n  data: {"
+		    << "\n    atomic: " << data.atomic
+		    << "\n  }"
+		    << "\n}";
+		return oss.str();
+	}
+
 public:
 	union
 	{
