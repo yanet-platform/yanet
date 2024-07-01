@@ -1,6 +1,7 @@
 #include <netinet/icmp6.h>
 #include <netinet/ip_icmp.h>
 
+#include <optional>
 #include <string>
 
 #include <rte_cycles.h>
@@ -4737,7 +4738,7 @@ inline void cWorker::balancer_icmp_forward_handle()
 	balancer_icmp_forward_stack.clear();
 }
 
-inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf)
+inline cWorker::FlowFromState cWorker::acl_try_keepstate(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -4814,19 +4815,19 @@ inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf)
 		return acl_try_keepstate(mbuf, value, locker);
 	}
 
-	return false;
+	return std::nullopt;
 }
 
-inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf,
-                                       dataplane::globalBase::fw_state_value_t* value,
-                                       dataplane::spinlock_nonrecursive_t* locker)
+inline cWorker::FlowFromState cWorker::acl_try_keepstate(rte_mbuf* mbuf,
+                                                         dataplane::globalBase::fw_state_value_t* value,
+                                                         dataplane::spinlock_nonrecursive_t* locker)
 {
 	// Checking both value and locker for non-being-nullptr seems redundant.
 	if (value == nullptr)
 	{
 		// No record found, the caller should continue as usual.
 		locker->unlock();
-		return false;
+		return std::nullopt;
 	}
 
 	uint8_t flags = 0;
@@ -4845,9 +4846,7 @@ inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf,
 	value->tcp.dst_flags |= flags;
 	locker->unlock();
 
-	// Handle the packet according its flow.
-	acl_ingress_flow(mbuf, flow);
-	return true;
+	return {flow};
 }
 
 inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow)
@@ -5466,7 +5465,7 @@ void cWorker::acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAc
 	stats.logs_packets++;
 }
 
-inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
+inline cWorker::FlowFromState cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -5543,19 +5542,19 @@ inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
 		return acl_egress_try_keepstate(mbuf, value, locker);
 	}
 
-	return false;
+	return std::nullopt;
 }
 
-inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf,
-                                              dataplane::globalBase::fw_state_value_t* value,
-                                              dataplane::spinlock_nonrecursive_t* locker)
+inline cWorker::FlowFromState cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf,
+                                                                dataplane::globalBase::fw_state_value_t* value,
+                                                                dataplane::spinlock_nonrecursive_t* locker)
 {
 	// Checking both value and locker for non-being-nullptr seems redundant.
 	if (value == nullptr)
 	{
 		// No record found, the caller should continue as usual.
 		locker->unlock();
-		return false;
+		return std::nullopt;
 	}
 
 	uint8_t flags = 0;
@@ -5574,9 +5573,7 @@ inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf,
 	value->tcp.dst_flags |= flags;
 	locker->unlock();
 
-	// Handle the packet according its flow.
-	acl_egress_flow(mbuf, flow);
-	return true;
+	return {flow};
 }
 
 inline void cWorker::acl_egress_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow)
