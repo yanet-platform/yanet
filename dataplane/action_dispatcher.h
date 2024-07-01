@@ -53,7 +53,7 @@ struct ActionDispatcher
 			// Try to match against stateful dynamic rules. If so - a packet will be handled.
 			if constexpr (Direction == FlowDirection::Egress)
 			{
-				if (auto flow = worker->acl_egress_try_keepstate(mbuf); flow)
+				if (auto flow = worker->acl_egress_checkstate(mbuf); flow)
 				{
 					worker->acl_egress_flow(mbuf, flow.value());
 					return;
@@ -61,7 +61,7 @@ struct ActionDispatcher
 			}
 			else
 			{
-				if (auto flow = worker->acl_try_keepstate(mbuf); flow)
+				if (auto flow = worker->acl_checkstate(mbuf); flow)
 				{
 					worker->acl_ingress_flow(mbuf, flow.value());
 					return;
