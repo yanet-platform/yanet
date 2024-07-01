@@ -48,27 +48,6 @@ struct ActionDispatcher
 		auto worker = args.worker;
 		auto mbuf = args.mbuf;
 
-		if (action.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if constexpr (Direction == FlowDirection::Egress)
-			{
-				if (auto flow = worker->acl_egress_try_keepstate(mbuf); flow)
-				{
-					worker->acl_egress_flow(mbuf, flow.value());
-					return;
-				}
-			}
-			else
-			{
-				if (auto flow = worker->acl_try_keepstate(mbuf); flow)
-				{
-					worker->acl_ingress_flow(mbuf, flow.value());
-					return;
-				}
-			}
-		}
-
 		worker->aclCounters[action.flow.counter_id]++;
 
 		tAclId acl_id = 0;
