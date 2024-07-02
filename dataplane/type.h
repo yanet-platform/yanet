@@ -383,6 +383,7 @@ struct nexthop ///< @todo
 {
 	tInterfaceId interfaceId : 16;
 	uint16_t flags;
+	tCounterId counter_id;
 	ipv6_address_t neighbor_address;
 	uint32_t labelExpTransport; ///< @todo: rename first
 	uint32_t labelExpService; ///< @todo: rename second

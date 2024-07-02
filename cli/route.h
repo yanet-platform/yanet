@@ -5,6 +5,7 @@
 #include "common/icontrolplane.h"
 
 #include "helper.h"
+#include "influxdb_format.h"
 
 namespace route
 {
@@ -111,6 +112,51 @@ void get(const std::string& route_name,
 	}
 
 	table.print();
+}
+
+void counters(const std::optional<std::string>& format)
+{
+	bool use_table = true;
+	if (format != std::nullopt)
+	{
+		if (*format == "influxdb")
+		{
+			use_table = false;
+		}
+		else if (*format != "table")
+		{
+			fprintf(stderr, "unknown output format: %s\n", format->c_str());
+			return;
+		}
+	}
+	interface::controlPlane controlplane;
+	auto response = controlplane.route_counters();
+
+	if (use_table)
+	{
+		table_t table;
+		table.insert("peer",
+		             "nexthop",
+		             "prefix",
+		             "counts",
+		             "size");
+
+		for (const auto& item : response)
+		{
+			const auto& [peer, nexthop, prefix, counts, size] = item;
+			table.insert(peer, nexthop, prefix, counts, size);
+		}
+
+		table.print();
+	}
+	else
+	{
+		for (const auto& item : response)
+		{
+			const auto& [peer, nexthop, prefix, counts, size] = item;
+			influxdb_format::print("route_counters", {{"peer", peer}, {"nexthop", nexthop}, {"prefix", prefix}}, {{"counts", counts}, {"size", size}});
+		}
+	}
 }
 
 namespace tunnel
