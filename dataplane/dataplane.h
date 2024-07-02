@@ -22,12 +22,21 @@
 #include "config_values.h"
 #include "controlplane.h"
 #include "globalbase.h"
+#include "kernel_interface_handler.h"
 #include "memory_manager.h"
 #include "neighbor.h"
 #include "report.h"
+#include "slow_worker.h"
 #include "type.h"
 
 using InterfaceName = std::string;
+
+struct CPlaneWorkerConfig
+{
+	std::set<InterfaceName> interfaces;
+	std::set<tCoreId> workers;
+	std::set<tCoreId> gcs;
+};
 
 struct tDataPlaneConfig
 {
@@ -47,7 +56,7 @@ struct tDataPlaneConfig
 
 	std::set<tCoreId> workerGCs;
 	tCoreId controlPlaneCoreId;
-	std::map<tCoreId, std::set<InterfaceName>> controlplane_workers;
+	std::map<tCoreId, CPlaneWorkerConfig> controlplane_workers;
 	std::map<tCoreId, std::vector<InterfaceName>> workers;
 	bool useHugeMem = true;
 	bool use_kernel_interface = true;
@@ -98,6 +107,7 @@ public:
 	std::map<std::string, common::uint64> getPortStats(const tPortId& portId) const;
 	std::optional<tPortId> interface_name_to_port_id(const std::string& interface_name);
 	const std::set<tSocketId>& get_socket_ids() const;
+	const std::set<tCoreId> FastWorkerCores() const;
 	const std::vector<cWorker*>& get_workers() const;
 	void run_on_worker_gc(const tSocketId socket_id, const std::function<bool()>& callback);
 
@@ -112,8 +122,8 @@ public:
 protected:
 	eResult parseConfig(const std::string& configFilePath);
 	eResult parseJsonPorts(const nlohmann::json& json);
-	std::optional<std::map<tCoreId, std::set<InterfaceName>>> parseControlPlaneWorkers(const nlohmann::json& config);
-	std::optional<std::pair<tCoreId, std::set<InterfaceName>>> parseControlPlaneWorker(const nlohmann::json& cpwj);
+	std::optional<std::map<tCoreId, CPlaneWorkerConfig>> parseControlPlaneWorkers(const nlohmann::json& config);
+	std::optional<std::pair<tCoreId, CPlaneWorkerConfig>> parseControlPlaneWorker(const nlohmann::json& cpwj);
 	nlohmann::json makeLegacyControlPlaneWorkerConfig();
 	std::set<InterfaceName> workerInterfacesToService();
 	eResult parseConfigValues(const nlohmann::json& json);
@@ -121,7 +131,6 @@ protected:
 	eResult parseSharedMemory(const nlohmann::json& json);
 	eResult checkConfig();
 	bool checkControlPlaneWorkersConfig();
-	bool checkValidCoreId(const nlohmann::json& j);
 
 	eResult initEal(const std::string& binaryPath, const std::string& filePrefix);
 	eResult initPorts();
@@ -133,12 +142,13 @@ public:
 	void StartInterfaces();
 
 protected:
-	eResult InitControlPlane();
 	eResult init_kernel_interfaces();
 	bool KNIAddTxQueue(tQueueId queue, tSocketId socket);
 	bool KNIAddRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool);
 	eResult initGlobalBases();
 	eResult initWorkers();
+	eResult InitSlowWorker(const tCoreId core, const CPlaneWorkerConfig& ports);
+	eResult InitSlowWorkers();
 	eResult initKniQueues();
 	eResult InitTxQueues();
 	eResult InitRxQueues();
@@ -151,7 +161,6 @@ protected:
 	common::idp::get_shm_info::response getShmInfo();
 	common::idp::get_shm_tsc_info::response getShmTscInfo();
 
-	static int lcoreThread(void* args);
 	void timestamp_thread();
 	void SWRateLimiterTimeTracker();
 	std::chrono::high_resolution_clock::time_point prevTimePointForSWRateLimiter;
@@ -188,11 +197,16 @@ protected:
 	tQueueId tx_queues_ = 0;
 	std::map<tCoreId, cWorker*> workers;
 	std::map<tCoreId, worker_gc_t*> worker_gcs;
-	cWorker* slow_worker;
+	std::map<tCoreId, dataplane::SlowWorker*> slow_workers;
+	std::map<tCoreId, dataplane::KernelInterfaceWorker*> kni_workers;
 
 	std::mutex currentGlobalBaseId_mutex;
 	uint8_t currentGlobalBaseId;
+
+public:
 	std::map<tSocketId, dataplane::globalBase::atomic*> globalBaseAtomics;
+
+protected:
 	size_t numaNodesInUse;
 	std::map<tSocketId, std::array<dataplane::globalBase::generation*, 2>> globalBases;
 	uint32_t globalBaseSerial;
