@@ -924,4 +924,19 @@ void shm_tsc_set_base_value(std::string counter_name, uint32_t value)
 	}
 }
 
+void counters_stat()
+{
+	interface::controlPlane controlplane;
+	auto [common_info, sizes_info] = controlplane.counters_stat();
+	auto [free_blocks, free_cells, errors_external, errors_internal] = common_info;
+	printf("Counters usage info\n");
+	printf("Free blocks: %d, counters: %d\n", free_blocks, free_cells);
+	printf("Errors external: %ld, internal: %ld\n", errors_external, errors_internal);
+
+	for (auto [size, used_blocks, busy_blocks, used_segments] : sizes_info)
+	{
+		printf("size: %d, used blocks: %d, busy blocks: %d, used segments: %d\n", size, used_blocks, busy_blocks, used_segments);
+	}
+}
+
 }

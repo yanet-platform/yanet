@@ -212,7 +212,7 @@ void balancer_t::controlplane_values(common::icp::controlplane_values::response&
 		controlplane_values.emplace_back("balancer.reals_unordered.size", std::to_string(reals_unordered.size()));
 		controlplane_values.emplace_back("balancer.reals_unordered_ids_unused.size", std::to_string(reals_unordered_ids_unused.size()));
 	}
-	controlplane_values.emplace_back("balancer.real_counters.size", std::to_string(real_counters.get_counters().size()));
+	controlplane_values.emplace_back("balancer.real_counters.size", std::to_string(real_counters.size()));
 }
 
 void balancer_t::reload_before()
@@ -780,7 +780,7 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 
 				balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
 
-				const auto counter_ids = real_counters.get_ids(key);
+				const auto counter_id = real_counters.get_id(key);
 
 				uint32_t real_unordered_id = 0;
 				{
@@ -800,15 +800,15 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 				req_reals.emplace_back(common::idp::updateGlobalBase::update_balancer_services::real{
 				        real_unordered_id,
 				        real_ip,
-				        counter_ids[0]});
+				        counter_id});
 				req_binding.emplace_back(real_unordered_id);
 			}
 
-			const auto counter_ids = service_counters.get_ids({module_name, {virtual_ip, proto, virtual_port}});
+			const auto counter_id = service_counters.get_id({module_name, {virtual_ip, proto, virtual_port}});
 			req_services.emplace_back(common::idp::updateGlobalBase::update_balancer_services::service{
 			        service_id,
 			        flags,
-			        counter_ids[0],
+			        counter_id,
 			        scheduler,
 			        forwarding_method,
 			        balancer.default_wlc_power, // todo use scheduler_params.wlc_power when other services will be able to set it
