@@ -2355,10 +2355,14 @@ eResult generation::dregress_prefix_update(const common::idp::updateGlobalBase::
 {
 	eResult result = eResult::success;
 
-	for (const auto& [prefix, value_id] : request)
+	for (auto it : dataPlane->slow_workers)
 	{
-		std::lock_guard<std::mutex> guard(dataPlane->controlPlane->dregress.prefixes_mutex);
-		dataPlane->controlPlane->dregress.prefixes.insert(prefix, value_id);
+		::dregress_t& dregress = it.second->Dregress();
+		for (const auto& [prefix, value_id] : request)
+		{
+			std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
+			dregress.prefixes.insert(prefix, value_id);
+		}
 	}
 
 	return result;
@@ -2368,12 +2372,15 @@ eResult generation::dregress_prefix_remove(const common::idp::updateGlobalBase::
 {
 	eResult result = eResult::success;
 
-	for (const auto& prefix : request)
+	for (auto it : dataPlane->slow_workers)
 	{
-		std::lock_guard<std::mutex> guard(dataPlane->controlPlane->dregress.prefixes_mutex);
-		dataPlane->controlPlane->dregress.prefixes.remove(prefix);
+		::dregress_t& dregress = it.second->Dregress();
+		for (const auto& prefix : request)
+		{
+			std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
+			dregress.prefixes.remove(prefix);
+		}
 	}
-
 	return result;
 }
 
@@ -2381,8 +2388,12 @@ eResult generation::dregress_prefix_clear()
 {
 	eResult result = eResult::success;
 
-	std::lock_guard<std::mutex> guard(dataPlane->controlPlane->dregress.prefixes_mutex);
-	dataPlane->controlPlane->dregress.prefixes.clear();
+	for (auto it : dataPlane->slow_workers)
+	{
+		::dregress_t& dregress = it.second->Dregress();
+		std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
+		dregress.prefixes.clear();
+	}
 
 	return result;
 }
@@ -2391,23 +2402,26 @@ eResult generation::dregress_local_prefix_update(const common::idp::updateGlobal
 {
 	eResult result = eResult::success;
 
-	std::lock_guard<std::mutex> guard(dataPlane->controlPlane->dregress.prefixes_mutex);
-
-	dataPlane->controlPlane->dregress.local_prefixes_v4.clear();
-	dataPlane->controlPlane->dregress.local_prefixes_v6.clear();
-
-	for (const auto& prefix : request)
+	for (auto it : dataPlane->slow_workers)
 	{
-		if (prefix.is_ipv4())
+		::dregress_t& dregress = it.second->Dregress();
+		std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
+
+		dregress.local_prefixes_v4.clear();
+		dregress.local_prefixes_v6.clear();
+
+		for (const auto& prefix : request)
 		{
-			dataPlane->controlPlane->dregress.local_prefixes_v4.emplace(prefix.get_ipv4());
-		}
-		else
-		{
-			dataPlane->controlPlane->dregress.local_prefixes_v6.emplace(prefix.get_ipv6());
+			if (prefix.is_ipv4())
+			{
+				dregress.local_prefixes_v4.insert(prefix.get_ipv4());
+			}
+			else
+			{
+				dregress.local_prefixes_v6.insert(prefix.get_ipv6());
+			}
 		}
 	}
-
 	return result;
 }
 
@@ -2415,15 +2429,18 @@ eResult generation::dregress_value_update(const common::idp::updateGlobalBase::d
 {
 	eResult result = eResult::success;
 
-	std::lock_guard<std::mutex> guard(dataPlane->controlPlane->dregress.prefixes_mutex);
-
-	for (const auto& [value_id, value] : request)
+	for (auto it : dataPlane->slow_workers)
 	{
-		/// @todo: check value_id
+		::dregress_t& dregress = it.second->Dregress();
+		std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
 
-		dataPlane->controlPlane->dregress.values[value_id] = value;
+		for (const auto& [value_id, value] : request)
+		{
+			/// @todo: check value_id
+
+			dregress.values[value_id] = value;
+		}
 	}
-
 	return result;
 }
 
@@ -2468,8 +2485,9 @@ eResult generation::fwstate_synchronization_update(const common::idp::updateGlob
 		fw_state_multicast_acl_ids.emplace(multicastIpv6Address, aclId);
 	}
 
-	std::lock_guard<std::mutex> lock(dataPlane->controlPlane->fw_state_multicast_acl_ids_mutex);
-	std::swap(dataPlane->controlPlane->fw_state_multicast_acl_ids, fw_state_multicast_acl_ids);
+	dataPlane->controlPlane->fw_state_multicast_acl_ids.apply([&](auto& fsm_ids) {
+		std::swap(fsm_ids, fw_state_multicast_acl_ids);
+	});
 
 	return eResult::success;
 }

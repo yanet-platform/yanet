@@ -2545,6 +2545,19 @@ struct stats_t
 	uint64_t slowworker_drops;
 	uint64_t mempool_is_empty;
 	uint64_t unknown_dump_interface;
+
+	stats_t& operator+=(const stats_t& b)
+	{
+		repeat_packets += b.repeat_packets;
+		tofarm_packets += b.tofarm_packets;
+		farm_packets += b.farm_packets;
+		fwsync_multicast_ingress_packets += b.fwsync_multicast_ingress_packets;
+		slowworker_packets += b.slowworker_packets;
+		slowworker_drops += b.slowworker_drops;
+		mempool_is_empty += b.mempool_is_empty;
+		unknown_dump_interface += b.unknown_dump_interface;
+		return *this;
+	}
 };
 
 }

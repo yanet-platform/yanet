@@ -2,6 +2,7 @@
 #include <optional>
 #include <string>
 
+#include <rte_mbuf.h>
 #include <rte_ring.h>
 
 #include "common/type.h"

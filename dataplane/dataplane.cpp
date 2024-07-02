@@ -39,6 +39,7 @@
 #include "lpm.h"
 #include "report.h"
 #include "sock_dev.h"
+#include "work_runner.h"
 #include "worker.h"
 #include "worker_gc.h"
 
@@ -49,6 +50,7 @@ cDataPlane::cDataPlane() :
         currentGlobalBaseId(0),
         globalBaseSerial(0),
         report(this),
+        controlPlane(new cControlPlane(this)),
         bus(this),
         memory_manager(this)
 {
@@ -59,6 +61,10 @@ cDataPlane::~cDataPlane()
 	if (mempool_log)
 	{
 		rte_mempool_free(mempool_log);
+	}
+	for (auto it : socket_cplane_mempools)
+	{
+		rte_mempool_free(it.second);
 	}
 }
 
@@ -100,12 +106,6 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	}
 
 	result = initEal(binaryPath, filePrefix);
-	if (result != eResult::success)
-	{
-		return result;
-	}
-
-	result = InitControlPlane();
 	if (result != eResult::success)
 	{
 		return result;
@@ -157,10 +157,15 @@ eResult cDataPlane::init(const std::string& binaryPath,
 			return eResult::errorAllocatingMemory;
 		}
 		socket_cplane_mempools.emplace(socket, pool);
-		YANET_LOG_ERROR("created mempool cp-%s\n", std::to_string(socket).c_str());
 	}
 
 	result = initWorkers();
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
+	result = InitSlowWorkers();
 	if (result != eResult::success)
 	{
 		return result;
@@ -173,11 +178,13 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	}
 
 	/// sanity check
-	if (rte_lcore_count() != workers.size() + worker_gcs.size() + 1)
+	if (rte_lcore_count() != workers.size() + worker_gcs.size() + slow_workers.size())
 	{
-		YADECAP_LOG_ERROR("invalid cores count: %u != %lu\n",
+		YADECAP_LOG_ERROR("invalid cores count: %u != %luwork + %lugc + %luslow\n",
 		                  rte_lcore_count(),
-		                  workers.size() + worker_gcs.size() + 1);
+		                  workers.size(),
+		                  worker_gcs.size(),
+		                  slow_workers.size());
 		return eResult::invalidCoresCount;
 	}
 
@@ -443,6 +450,7 @@ eResult cDataPlane::initPorts()
 		tPortId portId;
 		if (strncmp(name.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
 		{
+			YANET_LOG_INFO("Opening sockdev with path %s\n", name.data() + strlen(SOCK_DEV_PREFIX));
 			portId = sock_dev_create(name.data() + strlen(SOCK_DEV_PREFIX), interfaceName.c_str(), 0);
 		}
 		else if (rte_eth_dev_get_port_by_name(name.data(), &portId))
@@ -598,12 +606,6 @@ void cDataPlane::StartInterfaces()
 			}
 		}
 	}
-}
-
-eResult cDataPlane::InitControlPlane()
-{
-	controlPlane = std::make_unique<cControlPlane>(this);
-	return eResult::success;
 }
 
 eResult cDataPlane::init_kernel_interfaces()
@@ -822,52 +824,6 @@ eResult cDataPlane::initGlobalBases()
 
 eResult cDataPlane::initWorkers()
 {
-	/// slow worker
-	{
-		const tCoreId& coreId = config.controlPlaneCoreId;
-		const tSocketId socket_id = rte_lcore_to_socket_id(coreId);
-
-		YADECAP_LOG_INFO("initWorker. coreId: %u [slow worker]\n", coreId);
-
-		auto* worker = memory_manager.create_static<cWorker>("worker",
-		                                                     socket_id,
-		                                                     this);
-		if (!worker)
-		{
-			return eResult::errorAllocatingMemory;
-		}
-
-		dataplane::base::permanently basePermanently;
-		basePermanently.globalBaseAtomic = globalBaseAtomics[socket_id];
-		basePermanently.outQueueId = tx_queues_; ///< 0
-		for (const auto& portIter : ports)
-		{
-			if (!basePermanently.ports.Register(portIter.first))
-				return eResult::invalidPortsCount;
-		}
-
-		basePermanently.SWNormalPriorityRateLimitPerWorker = config.SWNormalPriorityRateLimitPerWorker;
-
-		dataplane::base::generation base;
-		base.globalBase = globalBases[socket_id][currentGlobalBaseId];
-
-		eResult result = worker->init(coreId,
-		                              basePermanently,
-		                              base);
-		if (result != eResult::success)
-		{
-			return result;
-		}
-
-		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[coreId]);
-
-		slow_worker = worker;
-		controlPlane->slowWorker = worker;
-		workers_vector.emplace_back(worker);
-
-		tx_queues_++;
-	}
-
 	for (const auto& configWorkerIter : config.workers)
 	{
 		const tCoreId& coreId = configWorkerIter.first;
@@ -1117,16 +1073,140 @@ eResult cDataPlane::initWorkers()
 		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[core_id]);
 		worker_gcs[core_id] = worker;
 		socket_worker_gcs[socket_id] = worker;
+	}
 
-		auto conn = worker->RegisterSlowWorker("cw" + core_id,
-		                                       config_values_.ring_normalPriority_size,
-		                                       config_values_.ring_toFreePackets_size,
-		                                       &(controlPlane->slowWorker->sampler));
-		if (!conn)
+	return eResult::success;
+}
+
+eResult cDataPlane::InitSlowWorker(const tCoreId core, const CPlaneWorkerConfig& cfg)
+{
+	const tSocketId socket_id = rte_lcore_to_socket_id(core);
+
+	YADECAP_LOG_INFO("initWorker. coreId: %u [controlplane worker]\n", core);
+
+	auto* worker = memory_manager.create_static<cWorker>("worker",
+	                                                     socket_id,
+	                                                     this);
+	if (!worker)
+	{
+		return eResult::errorAllocatingMemory;
+	}
+
+	dataplane::base::permanently basePermanently;
+	basePermanently.globalBaseAtomic = globalBaseAtomics[socket_id];
+	basePermanently.outQueueId = tx_queues_;
+	for (const auto& port : ports)
+	{
+		if (!basePermanently.ports.Register(port.first))
+			return eResult::invalidPortsCount;
+	}
+
+	basePermanently.SWNormalPriorityRateLimitPerWorker = config.SWNormalPriorityRateLimitPerWorker;
+
+	dataplane::base::generation base;
+	base.globalBase = globalBases[socket_id][currentGlobalBaseId];
+
+	eResult result = worker->init(core,
+	                              basePermanently,
+	                              base);
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
+	worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[core]);
+
+	workers_vector.emplace_back(worker);
+
+	std::vector<dataplane::KernelInterfaceBundleConfig> kni_bundleconf;
+
+	std::vector<tPortId> ports_to_service;
+	if (config.use_kernel_interface)
+	{
+		for (auto iface : cfg.interfaces)
 		{
-			YANET_LOG_ERROR("Failed no link garbage collector with slow worker");
+			tPortId port;
+			if (rte_eth_dev_get_port_by_name(iface.data(), &port))
+			{
+				YANET_LOG_ERROR("Failed to get port id by interface name \"%s\"\n", iface.data());
+				std::terminate();
+			}
+			ports_to_service.push_back(port);
+			auto& [fwd, in, out, drop] = kni_interface_handles.at(port);
+			kni_bundleconf.emplace_back(
+			        dataplane::KernelInterfaceBundleConfig{
+			                {port, tx_queues_},
+			                {fwd.Id(), 0},
+			                {in.Id(), 0},
+			                {out.Id(), 0},
+			                {drop.Id(), 0}});
 		}
-		controlPlane->to_gcs_.push_back(conn.value());
+		std::stringstream ss;
+		for (auto p : ports_to_service)
+		{
+			ss << p;
+		}
+		YANET_LOG_INFO("controlplane worker on core %d, serving [%s]\n", core, ss.str().c_str());
+	}
+	YANET_LOG_ERROR("ending with kni bundleconf\n");
+
+	dataplane::KernelInterfaceWorkerConfig kni_config{std::move(kni_bundleconf), &basePermanently.ports};
+
+	std::vector<cWorker*> workers_to_service;
+	for (auto& core : cfg.workers)
+	{
+		workers_to_service.push_back(workers.at(core));
+	}
+
+	std::vector<worker_gc_t*> gcs_to_service;
+	for (auto& core : cfg.gcs)
+	{
+		gcs_to_service.push_back(worker_gcs.at(core));
+	}
+
+	std::vector<dpdk::RingConn<rte_mbuf*>> rings_from_gcs;
+	for (auto& gccore : cfg.gcs)
+	{
+		auto r = worker_gcs.at(gccore)->RegisterSlowWorker("cw" + core,
+		                                                   config_values_.ring_normalPriority_size,
+		                                                   config_values_.ring_toFreePackets_size,
+		                                                   &(worker->sampler));
+		if (r)
+		{
+			rings_from_gcs.push_back(r.value());
+		}
+		else
+		{
+			abort();
+		}
+	}
+
+	auto slow = new dataplane::SlowWorker(worker,
+	                                      std::move(ports_to_service),
+	                                      std::move(workers_to_service),
+	                                      std::move(rings_from_gcs),
+	                                      kni_config,
+	                                      socket_cplane_mempools.at(socket_id),
+	                                      config.use_kernel_interface,
+	                                      config.SWICMPOutRateLimit);
+	if (!slow)
+	{
+		return eResult::dataplaneIsBroken;
+	}
+	slow_workers.emplace(core, slow);
+	YANET_LOG_ERROR("slow workers size is %lu\n", slow_workers.size());
+	++tx_queues_;
+	return eResult::success;
+}
+
+eResult cDataPlane::InitSlowWorkers()
+{
+	for (auto& [core, cfg] : config.controlplane_workers)
+	{
+		if (auto res = InitSlowWorker(core, cfg); res != eResult::success)
+		{
+			return res;
+		}
 	}
 
 	return eResult::success;
@@ -1204,13 +1284,13 @@ eResult cDataPlane::initKniQueues()
 	for (auto& it : kni_interface_handles)
 	{
 		uint16_t port_id = it.first;
-		for (std::size_t i = 0, max = 1; i < max; ++i)
+		for (std::size_t i = 0, max = slow_workers.size(); i < max; ++i)
 		{
 			const auto& socket_id = rte_eth_dev_socket_id(port_id);
 			KNIAddTxQueue(i, socket_id);
 		}
 
-		for (std::size_t i = 0, max = 1; i < max; ++i)
+		for (std::size_t i = 0, max = slow_workers.size(); i < max; ++i)
 		{
 			const auto& socket_id = rte_eth_dev_socket_id(port_id);
 			KNIAddRxQueue(i, socket_id, socket_cplane_mempools.at(socket_id));
@@ -1229,6 +1309,17 @@ void cDataPlane::init_worker_base()
 		base_nexts.emplace_back(worker->socketId, base);
 		base_nexts.emplace_back(worker->socketId, base_next);
 	}
+
+	for (auto& iter : slow_workers)
+	{
+		cWorker* worker = iter.second->GetWorker();
+
+		auto* base = &worker->bases[worker->currentBaseId];
+		auto* base_next = &worker->bases[worker->currentBaseId ^ 1];
+		base_nexts.emplace_back(worker->socketId, base);
+		base_nexts.emplace_back(worker->socketId, base_next);
+	}
+
 	for (auto& [core_id, worker] : worker_gcs)
 	{
 		(void)core_id;
@@ -1240,31 +1331,6 @@ void cDataPlane::init_worker_base()
 	}
 
 	neighbor.update_worker_base(base_nexts);
-}
-
-void cDataPlane::SWRateLimiterTimeTracker()
-{
-	for (;;)
-	{
-		// seem to be sufficiently fast function for slowWorker whose threshold is 200'000 packets per second
-		std::chrono::high_resolution_clock::time_point curTimePointForSWRateLimiter = std::chrono::high_resolution_clock::now();
-
-		// is it time to reset icmpPacketsToSW counters?
-		if (std::chrono::duration_cast<std::chrono::milliseconds>(curTimePointForSWRateLimiter - prevTimePointForSWRateLimiter) >= std::chrono::milliseconds(1000 / config.rateLimitDivisor))
-		{
-			// the only place thread-shared variable icmpPacketsToSW is changed
-			for (cWorker* worker : workers_vector)
-			{
-				__atomic_store_n(&worker->packetsToSWNPRemainder, config.SWNormalPriorityRateLimitPerWorker, __ATOMIC_RELAXED);
-			}
-
-			controlPlane->icmpOutRemainder = config.SWICMPOutRateLimit / config.rateLimitDivisor;
-
-			prevTimePointForSWRateLimiter = curTimePointForSWRateLimiter;
-		}
-		using namespace std::chrono_literals;
-		std::this_thread::sleep_for(100ms / config.rateLimitDivisor);
-	}
 }
 
 void cDataPlane::timestamp_thread()
@@ -1287,6 +1353,36 @@ void cDataPlane::timestamp_thread()
 		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	}
+}
+
+void cDataPlane::SWRateLimiterTimeTracker()
+{
+	for (;;)
+	{
+		using namespace std::chrono_literals;
+		// seem to be sufficiently fast function for slowWorker whose threshold is 200'000 packets per second
+		std::chrono::high_resolution_clock::time_point curTimePointForSWRateLimiter = std::chrono::high_resolution_clock::now();
+
+		// is it time to reset icmpPacketsToSW counters?
+		if (std::chrono::duration_cast<std::chrono::milliseconds>(
+		            curTimePointForSWRateLimiter - prevTimePointForSWRateLimiter) >= 1000ms / config.rateLimitDivisor)
+		{
+			// the only place thread-shared variable icmpPacketsToSW is changed
+			for (cWorker* worker : workers_vector)
+			{
+
+				__atomic_store_n(&worker->packetsToSWNPRemainder, config.SWNormalPriorityRateLimitPerWorker, __ATOMIC_RELAXED);
+			}
+
+			for (auto it : slow_workers)
+			{
+				it.second->ResetIcmpOutRemainder(config.SWICMPOutRateLimit / config.rateLimitDivisor);
+			}
+
+			prevTimePointForSWRateLimiter = curTimePointForSWRateLimiter;
+		}
+		std::this_thread::sleep_for(100ms / config.rateLimitDivisor);
 	}
 }
 
@@ -1323,9 +1419,8 @@ void cDataPlane::start()
 	{
 		if (coreFunctions_.find(core) != coreFunctions_.end())
 		{
-			YANET_LOG_ERROR("Worker: Multiple workloads assigned to core %d\n", core);
+			YANET_LOG_ERROR("Multiple workloads assigned to core %d\n", core);
 		}
-		YANET_LOG_INFO("Worker assigned to core %d\n", core);
 		coreFunctions_.emplace(core, [worker]() {
 			worker->start();
 		});
@@ -1335,22 +1430,24 @@ void cDataPlane::start()
 	{
 		if (coreFunctions_.find(core) != coreFunctions_.end())
 		{
-			YANET_LOG_ERROR("GC: Multiple workloads assigned to core %d\n", core);
+			YANET_LOG_ERROR("Multiple workloads assigned to core %d\n", core);
 		}
-		YANET_LOG_INFO("GC assigned to core %d\n", core);
 		coreFunctions_.emplace(core, [garbage_collector]() {
 			garbage_collector->start();
 		});
 	}
 
-	if (coreFunctions_.find(config.controlPlaneCoreId) != coreFunctions_.end())
+	for (auto& [core, slow] : slow_workers)
 	{
-		YANET_LOG_ERROR("CP: Multiple workloads assigned to core %d\n", config.controlPlaneCoreId);
+		if (coreFunctions_.find(core) != coreFunctions_.end())
+		{
+			YANET_LOG_ERROR("Multiple workloads assigned to core %d\n", core);
+		}
+		coreFunctions_.emplace(core, [slow]() {
+			auto work_runner = dpdk::WorkRunner{slow, dpdk::Yielder{}};
+			work_runner.Run();
+		});
 	}
-	YANET_LOG_INFO("Worker assigned to core %d\n", config.controlPlaneCoreId);
-	coreFunctions_.emplace(config.controlPlaneCoreId, [&]() {
-		controlPlane->start();
-	});
 
 	StartInterfaces();
 
@@ -1713,6 +1810,7 @@ void cDataPlane::switch_worker_base()
 		auto* base_next = &worker->bases[worker->currentBaseId ^ 1];
 		base_nexts.emplace_back(worker->socketId, base_next);
 	}
+
 	for (auto& [core_id, worker] : worker_gcs)
 	{
 		(void)core_id;
@@ -1922,7 +2020,7 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 	return eResult::success;
 }
 
-std::optional<std::map<tCoreId, std::set<InterfaceName>>> cDataPlane::parseControlPlaneWorkers(const nlohmann::json& root)
+std::optional<std::map<tCoreId, CPlaneWorkerConfig>> cDataPlane::parseControlPlaneWorkers(const nlohmann::json& root)
 {
 	nlohmann::json dflt;
 	auto cpw = root.find("controlPlaneWorkers");
@@ -1930,17 +2028,17 @@ std::optional<std::map<tCoreId, std::set<InterfaceName>>> cDataPlane::parseContr
 	{
 		dflt = makeLegacyControlPlaneWorkerConfig();
 		YADECAP_LOG_WARNING("no config for control plane workers provided, using default legacy config\"%s\"\n",
-		                    nlohmann::to_string(dflt).c_str());
+		                    dflt.dump().c_str());
 		cpw = dflt.find("controlPlaneWorkers");
 	}
 
-	std::map<tCoreId, std::set<InterfaceName>> result;
+	std::map<tCoreId, CPlaneWorkerConfig> result;
 
 	auto add_worker = [&](const nlohmann::json& j) {
 		auto worker = parseControlPlaneWorker(j);
 		if (!worker)
 		{
-			YADECAP_LOG_ERROR("invalid control plane worker config \"%s\"\n", nlohmann::to_string(j).c_str());
+			YADECAP_LOG_ERROR("invalid control plane worker config \"%s\"\n", j.dump().c_str());
 			return false;
 		}
 		result[worker->first] = worker->second;
@@ -1972,6 +2070,7 @@ nlohmann::json cDataPlane::makeLegacyControlPlaneWorkerConfig()
 	nlohmann::json j;
 	j["core"] = config.controlPlaneCoreId;
 	j["interfaces"] = workerInterfacesToService();
+	j["serviced_cores"] = FastWorkerCores();
 	return nlohmann::json{{"controlPlaneWorkers", j}};
 }
 
@@ -1989,7 +2088,20 @@ std::set<InterfaceName> cDataPlane::workerInterfacesToService()
 	return res;
 }
 
-std::optional<std::pair<tCoreId, std::set<InterfaceName>>> cDataPlane::parseControlPlaneWorker(const nlohmann::json& cpwj)
+const std::set<tCoreId> cDataPlane::FastWorkerCores() const
+{
+	std::set<tCoreId> cores;
+	for (auto it : config.workers)
+	{
+		if (!cores.insert(it.first).second)
+		{
+			YANET_LOG_ERROR("Same core specified in config for multiple workers\n");
+		}
+	}
+	return cores;
+}
+
+std::optional<std::pair<tCoreId, CPlaneWorkerConfig>> cDataPlane::parseControlPlaneWorker(const nlohmann::json& cpwj)
 {
 	auto jcore = cpwj.find("core");
 	if (jcore == cpwj.end())
@@ -2010,14 +2122,7 @@ std::optional<std::pair<tCoreId, std::set<InterfaceName>>> cDataPlane::parseCont
 		YADECAP_LOG_ERROR("controlPlaneWorker entry has no \"interfaces\" field\n");
 		return std::nullopt;
 	}
-	if (jports.value().is_number_unsigned())
-	{
-		const std::set<InterfaceName> ifaces = jports.value();
-		return std::optional{
-		        std::pair<tCoreId, std::set<InterfaceName>>{
-		                core,
-		                std::set<InterfaceName>{InterfaceName{jports.value()}}}};
-	}
+
 	if (!jports.value().is_array())
 	{
 		YADECAP_LOG_ERROR("controlPlaneWorker entry \"interfaces\" has invalid type.\n");
@@ -2034,10 +2139,46 @@ std::optional<std::pair<tCoreId, std::set<InterfaceName>>> cDataPlane::parseCont
 		}
 		worker_ports.insert(InterfaceName{j});
 	}
-	return std::optional{
-	        std::pair<tCoreId, std::set<InterfaceName>>{
-	                core,
-	                std::move(worker_ports)}};
+
+	auto jworkers = cpwj.find("serviced_cores");
+	if (!jworkers.value().is_array())
+	{
+		YADECAP_LOG_ERROR("controlPlaneWorker entry \"workers\" has invalid type.\n");
+		return std::nullopt;
+	}
+
+	std::set<tCoreId> worker_cores;
+	for (auto j : jworkers.value())
+	{
+		if (!j.is_number_unsigned())
+		{
+			YANET_LOG_ERROR("controlPlaneWorker entry in \"serviced_cores\" is not an unsigned integer\n");
+			return std::nullopt;
+		}
+		tCoreId id = j;
+		if (config.workers.find(id) == config.workers.end())
+		{
+			YANET_LOG_ERROR("controlPlaneWorker entry in \"serviced_cores\" is not a valid worker core id\n");
+		}
+		if (!worker_cores.insert(id).second)
+		{
+			YANET_LOG_ERROR("controlPlaneWorker entry %d in \"serviced_cores\" is duplicate\n", id);
+		}
+	}
+
+	std::set<tCoreId> gc_cores;
+	for (auto gc_core : config.workerGCs)
+	{
+		if (rte_lcore_to_socket_id(gc_core) == rte_lcore_to_socket_id(core))
+		{
+			gc_cores.insert(gc_core);
+		}
+	}
+
+	return std::make_pair(core,
+	                      CPlaneWorkerConfig{std::move(worker_ports),
+	                                         std::move(worker_cores),
+	                                         std::move(gc_cores)});
 }
 
 eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
@@ -2154,9 +2295,9 @@ bool cDataPlane::checkControlPlaneWorkersConfig()
 	std::set<InterfaceName> assigned;
 	std::set<InterfaceName> to_assign = workerInterfacesToService();
 	bool result = true;
-	for (const auto& [core, worker_ports] : config.controlplane_workers)
+	for (const auto& [core, cfg] : config.controlplane_workers)
 	{
-		for (const auto& p : worker_ports)
+		for (const auto& p : cfg.interfaces)
 		{
 
 			if (assigned.find(p) != assigned.end())

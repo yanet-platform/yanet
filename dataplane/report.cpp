@@ -376,35 +376,43 @@ nlohmann::json cReport::convertControlPlane(const cControlPlane* controlPlane)
 {
 	nlohmann::json json;
 
-	json["mempool"] = convertMempool(controlPlane->mempool);
-
-	auto& portmapper = controlPlane->slowWorker->basePermanently.ports;
-	for (int i = 0; i < portmapper.size(); ++i)
+	json["mempool"] = convertMempool(dataPlane->slow_workers.begin()->second->Mempool());
+	for (const auto& it : dataPlane->slow_workers)
 	{
-		nlohmann::json jsonKni;
-
-		const auto& port = controlPlane->kernel_interfaces[i];
-		const auto& stats = controlPlane->kernel_stats[i];
-
-		jsonKni["portId"] = portmapper.ToDpdk(i);
-		jsonKni["interfaceName"] = port.interface_name;
-		jsonKni["stats"]["ipackets"] = stats.ipackets;
-		jsonKni["stats"]["ibytes"] = stats.ibytes;
-		jsonKni["stats"]["idropped"] = stats.idropped;
-		jsonKni["stats"]["opackets"] = stats.opackets;
-		jsonKni["stats"]["obytes"] = stats.obytes;
-		jsonKni["stats"]["odropped"] = stats.odropped;
-
-		json["knis"].emplace_back(jsonKni);
+		json["mempools"].emplace_back(convertMempool(it.second->Mempool()));
 	}
 
-	json["repeat_packets"] = controlPlane->stats.repeat_packets;
-	json["tofarm_packets"] = controlPlane->stats.tofarm_packets;
-	json["farm_packets"] = controlPlane->stats.farm_packets;
-	json["fwsync_multicast_ingress_packets"] = controlPlane->stats.fwsync_multicast_ingress_packets;
-	json["slowworker_drops"] = controlPlane->stats.slowworker_drops;
-	json["slowworker_packets"] = controlPlane->stats.slowworker_packets;
-	json["mempool_is_empty"] = controlPlane->stats.mempool_is_empty;
+	for (const auto it : dataPlane->slow_workers)
+	{
+		const dataplane::KernelInterfaceWorker& worker = it.second->KniWorker();
+
+		auto stats_it = worker.PortsStats().first;
+
+		for (auto [current, end] = worker.PortsIds(); current != end; ++current, ++stats_it)
+		{
+			nlohmann::json jsonKni;
+			jsonKni["portId"] = *current;
+			jsonKni["interfaceName"] = dataPlane->InterfaceNameFromPort(*current);
+			jsonKni["stats"]["ipackets"] = stats_it->ipackets;
+			jsonKni["stats"]["ibytes"] = stats_it->ibytes;
+			jsonKni["stats"]["idropped"] = stats_it->idropped;
+			jsonKni["stats"]["opackets"] = stats_it->opackets;
+			jsonKni["stats"]["obytes"] = stats_it->obytes;
+			jsonKni["stats"]["odropped"] = stats_it->odropped;
+
+			json["knis"].emplace_back(std::move(jsonKni));
+		}
+	}
+
+	const auto& slow_stats = controlPlane->SlowWorkerStats();
+
+	json["repeat_packets"] = slow_stats.repeat_packets;
+	json["tofarm_packets"] = slow_stats.tofarm_packets;
+	json["farm_packets"] = slow_stats.farm_packets;
+	json["fwsync_multicast_ingress_packets"] = slow_stats.fwsync_multicast_ingress_packets;
+	json["slowworker_drops"] = slow_stats.slowworker_drops;
+	json["slowworker_packets"] = slow_stats.slowworker_packets;
+	json["mempool_is_empty"] = slow_stats.mempool_is_empty;
 
 	json["dregress"] = controlPlane->DregressStats();
 	json["dregress"]["connections"] = controlPlane->DregressConnectionsStats();
