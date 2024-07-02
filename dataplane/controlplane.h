@@ -102,8 +102,6 @@ protected:
 	void handlePacket_balancer_icmp_forward(rte_mbuf* mbuf);
 	void handlePacket_dump(rte_mbuf* mbuf);
 
-	void SWRateLimiterTimeTracker();
-
 	rte_mbuf* convertMempool(rte_ring* ring_to_free_mbuf, rte_mbuf* mbuf);
 
 protected:

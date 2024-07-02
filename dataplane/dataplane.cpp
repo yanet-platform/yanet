@@ -50,6 +50,7 @@ bool StartsWith(const std::string& str, const std::string& prefix)
 }
 
 cDataPlane::cDataPlane() :
+        prevTimePointForSWRateLimiter(std::chrono::high_resolution_clock::now()),
         currentGlobalBaseId(0),
         globalBaseSerial(0),
         report(this),
@@ -1264,6 +1265,33 @@ void cDataPlane::init_worker_base()
 	neighbor.update_worker_base(base_nexts);
 }
 
+void cDataPlane::SWRateLimiterTimeTracker()
+{
+	for (;;)
+	{
+		// seem to be sufficiently fast function for slowWorker whose threshold is 200'000 packets per second
+		std::chrono::high_resolution_clock::time_point curTimePointForSWRateLimiter = std::chrono::high_resolution_clock::now();
+
+		// is it time to reset icmpPacketsToSW counters?
+		if (std::chrono::duration_cast<std::chrono::milliseconds>(curTimePointForSWRateLimiter - prevTimePointForSWRateLimiter) >= std::chrono::milliseconds(1000 / config.rateLimitDivisor))
+		{
+			// the only place thread-shared variable icmpPacketsToSW is changed
+			for (auto& [coreId, worker] : workers)
+			{
+				(void)coreId;
+
+				__atomic_store_n(&worker->packetsToSWNPRemainder, config.SWNormalPriorityRateLimitPerWorker, __ATOMIC_RELAXED);
+			}
+
+			controlPlane->icmpOutRemainder = config.SWICMPOutRateLimit / config.rateLimitDivisor;
+
+			prevTimePointForSWRateLimiter = curTimePointForSWRateLimiter;
+		}
+		using namespace std::chrono_literals;
+		std::this_thread::sleep_for(100ms / config.rateLimitDivisor);
+	}
+}
+
 int cDataPlane::lcoreThread(void* args)
 {
 	cDataPlane* dataPlane = (cDataPlane*)args;
@@ -1318,6 +1346,11 @@ void cDataPlane::start()
 {
 	threads.emplace_back([this]() {
 		timestamp_thread();
+	});
+
+	threads.emplace_back([this]() {
+		YANET_LOG_INFO("Rate limiter started\n");
+		SWRateLimiterTimeTracker();
 	});
 
 	bus.run();
