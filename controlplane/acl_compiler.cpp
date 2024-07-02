@@ -279,9 +279,9 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 			{
 				rule.value_filter_id = value.collect_initial_rule(*flow);
 			}
-			else if (auto action = std::get_if<common::acl::action_t>(&unwind_rule.action))
+			else if (auto dump = std::get_if<common::acl::dump_t>(&unwind_rule.action))
 			{
-				rule.value_filter_id = value.collect_initial_rule(*action);
+				rule.value_filter_id = value.collect_initial_rule(*dump);
 			}
 			else if (auto check_state = std::get_if<common::acl::check_state_t>(&unwind_rule.action))
 			{
