@@ -38,8 +38,7 @@ cControlPlane::cControlPlane(cDataPlane* dataPlane) :
                  dataPlane->getConfigValues().gc_step),
         mempool(nullptr),
         use_kernel_interface(false),
-        slowWorker(nullptr),
-        prevTimePointForSWRateLimiter(std::chrono::high_resolution_clock::now())
+        slowWorker(nullptr)
 {
 	memset(&stats, 0, sizeof(stats));
 }
@@ -1408,11 +1407,6 @@ void cControlPlane::mainThread()
 
 	for (;;)
 	{
-		if (dataPlane->config.SWNormalPriorityRateLimitPerWorker || dataPlane->config.SWICMPOutRateLimit)
-		{
-			SWRateLimiterTimeTracker();
-		}
-
 		slowWorker->slowWorkerBeforeHandlePackets();
 
 		/// dequeue packets from worker's rings
@@ -2481,32 +2475,5 @@ void cControlPlane::freeWorkerPacket(rte_ring* ring_to_free_mbuf,
 	while (rte_ring_sp_enqueue(ring_to_free_mbuf, mbuf) != 0)
 	{
 		std::this_thread::yield();
-	}
-}
-
-void cControlPlane::SWRateLimiterTimeTracker()
-{
-	// seem to be sufficiently fast function for slowWorker whose threshold is 200'000 packets per second
-	std::chrono::high_resolution_clock::time_point curTimePointForSWRateLimiter = std::chrono::high_resolution_clock::now();
-
-	// is it time to reset icmpPacketsToSW counters?
-	if (std::chrono::duration_cast<std::chrono::milliseconds>(curTimePointForSWRateLimiter - prevTimePointForSWRateLimiter) >= std::chrono::milliseconds(1000 / dataPlane->config.rateLimitDivisor))
-	{
-		// the only place thread-shared variable icmpPacketsToSW is changed
-		for (auto& [coreId, worker] : dataPlane->workers)
-		{
-			(void)coreId;
-
-			if (slowWorker == worker)
-			{
-				continue;
-			}
-
-			__atomic_store_n(&worker->packetsToSWNPRemainder, dataPlane->config.SWNormalPriorityRateLimitPerWorker, __ATOMIC_RELAXED);
-		}
-
-		icmpOutRemainder = dataPlane->config.SWICMPOutRateLimit / dataPlane->config.rateLimitDivisor;
-
-		prevTimePointForSWRateLimiter = curTimePointForSWRateLimiter;
 	}
 }
