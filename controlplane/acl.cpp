@@ -500,10 +500,10 @@ static bool unwind(int64_t start_from, firewall_rules_t& fw, const dispatcher_ru
 			else
 			{
 				rules.emplace_back(std::move(result_filter),
-				                   std::get<common::acl::action_t>(rule.action),
+				                   std::get<common::acl::dump_t>(rule.action),
 				                   ids,
 				                   log || rule.log);
-				ACL_DBGMSG("action_t gathered...");
+				ACL_DBGMSG("dump_t gathered...");
 			}
 
 			ids.resize(idSize);
@@ -923,9 +923,9 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 						}
 					}
 				}
-				else if (std::holds_alternative<common::acl::action_t>(rule.action))
+				else if (std::holds_alternative<common::acl::dump_t>(rule.action))
 				{
-					auto& action = std::get<common::acl::action_t>(rule.action);
+					auto& action = std::get<common::acl::dump_t>(rule.action);
 					if (!action.dump_tag.empty())
 					{
 						if (result.dump_id_to_tag.size() >= YANET_CONFIG_DUMP_ID_TO_TAG_SIZE)

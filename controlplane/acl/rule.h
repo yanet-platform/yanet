@@ -1035,7 +1035,7 @@ const int64_t DISPATCHER = -1;
 // sense.
 //
 // Additionally, we might have another variant for representing rules that are suitable for execution in the dataplane.
-using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::action_t, common::acl::check_state_t>;
+using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::dump_t, common::acl::check_state_t>;
 
 struct rule_t
 {
@@ -1058,7 +1058,7 @@ public:
 	        rule_t(_filter, rule_action(flow), ids, log)
 	{}
 
-	rule_t(const ref_t<filter_t>& _filter, common::acl::action_t action, const ids_t& ids, bool log) :
+	rule_t(const ref_t<filter_t>& _filter, common::acl::dump_t action, const ids_t& ids, bool log) :
 	        rule_t(_filter, rule_action(action), ids, log)
 	{}
 
@@ -1111,7 +1111,7 @@ public:
 				action = common::acl::check_state_t{};
 				break;
 			case ipfw::rule_action_t::DUMP:
-				action = common::acl::action_t(std::get<std::string>(rulep->action_arg));
+				action = common::acl::dump_t(std::get<std::string>(rulep->action_arg));
 				break;
 			default:
 				YANET_LOG_WARNING("unexpected rule action in rule '%s'\n", rulep->text.data());
@@ -1178,9 +1178,9 @@ public:
 				text = "flow " + std::string(eFlowType_toString(flow.type)) + "(" + std::to_string(flow.data.atomic) + ")";
 			}
 		}
-		else if (std::holds_alternative<common::acl::action_t>(action))
+		else if (std::holds_alternative<common::acl::dump_t>(action))
 		{
-			auto rule_action = std::get<common::acl::action_t>(action);
+			auto rule_action = std::get<common::acl::dump_t>(action);
 			if (!rule_action.dump_tag.empty())
 			{
 				text = "dump(" + rule_action.dump_tag + ")";
@@ -1377,7 +1377,7 @@ struct hash<acl::rule_t>
 		}
 		else
 		{
-			auto action = std::get<common::acl::action_t>(r.action);
+			auto action = std::get<common::acl::dump_t>(r.action);
 			hash_combine(h, action.dump_id);
 		}
 		if (r.filter)

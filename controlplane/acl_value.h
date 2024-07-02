@@ -17,7 +17,7 @@ public:
 	unsigned int collect_initial_rule(T&& rule)
 	{
 		static_assert(std::is_same_v<std::decay_t<T>, common::globalBase::tFlow> ||
-		                      std::is_same_v<std::decay_t<T>, common::acl::action_t> ||
+		                      std::is_same_v<std::decay_t<T>, common::acl::dump_t> ||
 		                      std::is_same_v<std::decay_t<T>, common::acl::check_state_t>,
 		              "Unsupported type in rule_action");
 
