@@ -149,6 +149,8 @@ protected:
 
 	static int lcoreThread(void* args);
 	void timestamp_thread();
+	void SWRateLimiterTimeTracker();
+	std::chrono::high_resolution_clock::time_point prevTimePointForSWRateLimiter;
 
 protected:
 	friend class cWorker;
