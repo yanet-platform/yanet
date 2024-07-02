@@ -67,12 +67,11 @@ public:
 	~cWorker();
 
 	eResult init(const tCoreId& coreId, const dataplane::base::permanently& basePermanently, const dataplane::base::generation& base);
-
 	void start();
 
 	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
 
-	const dataplane::base::generation& current_base() { return bases[localBaseId & 1]; }
+	const dataplane::base::generation& current_base() const { return bases[localBaseId & 1]; }
 
 protected:
 	eResult sanityCheck();
@@ -221,15 +220,21 @@ protected:
 
 protected:
 	/// @todo: move to slow_worker_t
+public:
 	YANET_NEVER_INLINE void slowWorkerBeforeHandlePackets();
 	YANET_NEVER_INLINE void slowWorkerHandlePackets();
+
 	YANET_NEVER_INLINE void slowWorkerHandleFragment(rte_mbuf* mbuf);
 	YANET_NEVER_INLINE void slowWorkerFarmHandleFragment(rte_mbuf* mbuf);
+
 	YANET_NEVER_INLINE void slowWorkerAfterHandlePackets();
+
 	YANET_NEVER_INLINE void slowWorkerFlow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 	YANET_NEVER_INLINE void slowWorkerTranslation(rte_mbuf* mbuf, const dataplane::globalBase::tNat64stateless& nat64stateless, const dataplane::globalBase::nat64stateless_translation_t& translation, bool direction); /** true: ingress, false: egress */
+	const dataplane::base::generation& CurrentBase() { return bases[localBaseId & 1]; }
+	void IncrementCounter(common::globalBase::static_counter_type type) { counters[(uint32_t)type]++; }
+	uint32_t CurrentTime() const { return basePermanently.globalBaseAtomic->currentTime; }
 
-public:
 	friend class cDataPlane;
 	friend class cReport;
 	friend class cControlPlane;
@@ -329,12 +334,15 @@ protected:
 	worker::tStack<> after_early_decap_stack4;
 	worker::tStack<> after_early_decap_stack6;
 
+public:
 	rte_ring* ring_highPriority;
 	rte_ring* ring_normalPriority;
 	rte_ring* ring_lowPriority;
 	dataplane::perf::tsc_deltas* tsc_deltas;
 	rte_ring* ring_toFreePackets;
+	common::worker::stats::common& Stats() { return stats; }
 
+protected:
 	rte_ring* ring_log;
 
 	common::worker::stats::common stats;

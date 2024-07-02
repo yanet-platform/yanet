@@ -11,6 +11,7 @@
 
 #include "common/fallback.h"
 #include "common/idp.h"
+#include "common/type.h"
 #include "common/version.h"
 
 #include "checksum.h"
@@ -27,28 +28,9 @@
 
 cControlPlane::cControlPlane(cDataPlane* dataPlane) :
         dataPlane(dataPlane),
-        fragmentation_(
-                [this](rte_mbuf* pkt, const common::globalBase::tFlow& flow) {
-	                sendPacketToSlowWorker(pkt, flow);
-                },
-                dataPlane->getConfigValues().fragmentation),
-        slow_(this),
-        dregress(&slow_,
-                 dataPlane,
-                 dataPlane->getConfigValues().gc_step),
-        mempool(nullptr),
-        use_kernel_interface(false),
-        slowWorker(nullptr)
+        use_kernel_interface(false)
 {
 	memset(&stats, 0, sizeof(stats));
-}
-
-cControlPlane::~cControlPlane()
-{
-	if (mempool)
-	{
-		rte_mempool_free(mempool);
-	}
 }
 
 eResult cControlPlane::init(bool use_kernel_interface)
@@ -57,24 +39,7 @@ eResult cControlPlane::init(bool use_kernel_interface)
 
 	eResult result = eResult::success;
 
-	/// init mempool for kernel interfaces and slow worker
-	result = initMempool();
-	if (result != eResult::success)
-	{
-		return result;
-	}
-
-	gc_step = dataPlane->getConfigValues().gc_step;
-	dregress.gc_step = gc_step;
-
-	icmpOutRemainder = dataPlane->config.SWICMPOutRateLimit / dataPlane->config.rateLimitDivisor;
-
 	return result;
-}
-
-void cControlPlane::start()
-{
-	mainThread();
 }
 
 common::idp::updateGlobalBase::response cControlPlane::updateGlobalBase(const common::idp::updateGlobalBase::request& request)
@@ -236,35 +201,41 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 
 	common::idp::getWorkerStats::response response;
 
-	if (request.size())
+	auto add_stats_to_response = [this, &response](tCoreId coreId, const cWorker* worker) {
+		std::map<tPortId, common::worker::stats::port> portsStats;
+		for (const auto& portIter : dataPlane->ports)
+		{
+			portsStats[portIter.first] = worker->statsPorts[portIter.first];
+		}
+
+		response[coreId] = {worker->iteration,
+		                    worker->stats,
+		                    portsStats};
+	};
+
+	if (!request.empty())
 	{
 		for (const auto& coreId : request)
 		{
 			const cWorker* worker;
-
 			if (auto it = dataPlane->workers.find(coreId); it != dataPlane->workers.end())
 			{
 				worker = it->second;
 			}
-			if (!worker && coreId == dataPlane->config.controlPlaneCoreId)
+			if (!worker)
 			{
-				worker = dataPlane->slow_worker;
+				if (auto slow = dataPlane->slow_workers.find(coreId); slow != dataPlane->slow_workers.end())
+				{
+					worker = slow->second->GetWorker();
+				}
 			}
 			if (!worker)
 			{
-				YANET_LOG_ERROR("Worker stats requested for unused core id (%d)\n", coreId);
+				YANET_LOG_ERROR("Worker stats requested for non-worker core id (%d)\n", coreId);
 				continue;
 			}
 
-			std::map<tPortId, common::worker::stats::port> portsStats;
-			for (const auto& portIter : dataPlane->ports)
-			{
-				portsStats[portIter.first] = worker->statsPorts[portIter.first];
-			}
-
-			response[coreId] = {worker->iteration,
-			                    worker->stats,
-			                    portsStats};
+			add_stats_to_response(coreId, worker);
 		}
 	}
 	else
@@ -273,29 +244,39 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 
 		for (const cWorker* worker : dataPlane->workers_vector)
 		{
-			std::map<tPortId, common::worker::stats::port> portsStats;
-			for (const auto& portIter : dataPlane->ports)
-			{
-				portsStats[portIter.first] = worker->statsPorts[portIter.first];
-			}
-
-			response[worker->coreId] = {worker->iteration,
-			                            worker->stats,
-			                            portsStats};
+			add_stats_to_response(worker->coreId, worker);
 		}
 	}
 
 	return response;
 }
 
-common::idp::getSlowWorkerStats::response cControlPlane::getSlowWorkerStats()
+const std::vector<cWorker*>& cControlPlane::workers_vector() const
+{
+	return dataPlane->workers_vector;
+}
+
+const std::map<tCoreId, dataplane::SlowWorker*>& cControlPlane::slow_workers() const
+{
+	return dataPlane->slow_workers;
+}
+
+common::slowworker::stats_t cControlPlane::SlowWorkerStats() const
+{
+	return accumulateSlowWorkerStats(
+	        [](dataplane::SlowWorker* worker) {
+		        return worker->Stats();
+	        });
+}
+
+common::idp::getSlowWorkerStats::response cControlPlane::SlowWorkerStatsResponse()
 {
 	/// unsafe
 
 	common::idp::getSlowWorkerStats::response response;
 	auto& [slowworker_stats, hashtable_gc_stats] = response;
 
-	slowworker_stats = stats;
+	slowworker_stats = SlowWorkerStats();
 	/// @todo
 	// hashtable_gc_stats.emplace_back(slowWorker->socketId,
 	//                                 "dregress",
@@ -352,11 +333,19 @@ common::idp::get_worker_gc_stats::response cControlPlane::get_worker_gc_stats()
 
 common::idp::get_dregress_counters::response cControlPlane::get_dregress_counters()
 {
-	auto guard = dregress.LockCounters();
+	common::dregress::counters_t counters_v4;
+	common::dregress::counters_t counters_v6;
+	for (auto it : dataPlane->slow_workers)
+	{
+		dregress_t& dregress = it.second->Dregress();
+		auto guard = dregress.LockCounters();
+		counters_v4.merge(dregress.Counters4());
+		counters_v6.merge(dregress.Counters6());
+		dregress.ClearCounters();
+	}
 	common::stream_out_t stream;
-	dregress.Counters4().push(stream);
-	dregress.Counters6().push(stream);
-	dregress.ClearCounters();
+	counters_v4.push(stream);
+	counters_v6.push(stream);
 	return stream.getBuffer();
 }
 
@@ -374,11 +363,10 @@ common::idp::get_ports_stats::response cControlPlane::get_ports_stats()
 			rte_eth_stats_get(portId, &stats);
 		}
 
-		uint64_t physicalPort_egress_drops = 0;
-		for (const cWorker* worker : dataPlane->workers_vector)
-		{
-			physicalPort_egress_drops += worker->statsPorts[portId].physicalPort_egress_drops;
-		}
+		uint64_t physicalPort_egress_drops = accumulateWorkerStats(
+		        [portId](cWorker* worker) {
+			        return worker->statsPorts[portId].physicalPort_egress_drops;
+		        });
 
 		response[portId] = {stats.ipackets,
 		                    stats.ibytes,
@@ -416,17 +404,21 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 
 	common::idp::getControlPlanePortStats::response response;
 
-	const auto& portmapper = slowWorker->basePermanently.ports;
+	if (!use_kernel_interface)
+	{
+		return response;
+	}
 
 	if (request.size())
 	{
 		for (const auto& portId : request)
 		{
-			if ((!use_kernel_interface) || (!portmapper.ValidDpdk(portId)))
+			const auto& maybe_stats = KniStats(portId);
+			if (!maybe_stats)
 			{
 				YANET_LOG_ERROR("Controlplane statistics requested for invalid port id ( %u )", portId);
 			}
-			const auto& stats = kernel_stats[portmapper.ToLogical(portId)];
+			const dataplane::sKniStats& stats = maybe_stats.value();
 
 			response[portId] = {stats.ipackets,
 			                    stats.ibytes,
@@ -441,21 +433,21 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 	else
 	{
 		/// all ports
-		if (use_kernel_interface)
+		for (auto it : dataPlane->slow_workers)
 		{
-			for (tPortId i = 0; i < portmapper.size(); ++i)
-			{
-				const auto& stats = kernel_stats[i];
-				const auto& portId = portmapper.ToDpdk(i);
+			const auto& kni_worker = it.second->KniWorker();
 
-				response[portId] = {stats.ipackets,
-				                    stats.ibytes,
-				                    0,
-				                    stats.idropped,
-				                    stats.opackets,
-				                    stats.obytes,
-				                    0,
-				                    stats.odropped};
+			auto stats = kni_worker.PortsStats().first;
+			for (auto [current, end] = kni_worker.PortsIds(); current != end; ++current, ++stats)
+			{
+				response[*current] = {stats->ipackets,
+				                      stats->ibytes,
+				                      0,
+				                      stats->idropped,
+				                      stats->opackets,
+				                      stats->obytes,
+				                      0,
+				                      stats->odropped};
 			}
 		}
 	}
@@ -463,19 +455,49 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 	return response;
 }
 
-common::idp::getFragmentationStats::response cControlPlane::getFragmentationStats()
+common::idp::getFragmentationStats::response cControlPlane::getFragmentationStats() const
 {
-	return fragmentation_.getStats();
+	return accumulateSlowWorkerStats(
+	        [](dataplane::SlowWorker* worker) {
+		        return worker->Fragmentation().getStats();
+	        });
 }
 
 common::dregress::stats_t cControlPlane::DregressStats() const
 {
-	return dregress.Stats();
+	return accumulateSlowWorkerStats(
+	        [](dataplane::SlowWorker* worker) {
+		        return worker->Dregress().Stats();
+	        });
+}
+
+std::optional<std::reference_wrapper<const dataplane::sKniStats>> cControlPlane::KniStats(tPortId pid) const
+{
+	// Dumb iteration over slow workers and their assigned ports, should not be a bottleneck
+	for (auto it : dataPlane->slow_workers)
+	{
+		if (const auto& stats = it.second->KniWorker().PortStats(pid))
+		{
+			return stats;
+		}
+	}
+	return std::nullopt;
 }
 
 dataplane::hashtable_chain_spinlock_stats_t cControlPlane::DregressConnectionsStats() const
 {
-	return dregress.Connections()->stats();
+	return accumulateSlowWorkerStats(
+	        [](dataplane::SlowWorker* worker) {
+		        return worker->Dregress().Connections()->stats();
+	        });
+}
+
+dregress::LimitsStats cControlPlane::DregressLimitsStats() const
+{
+	return accumulateSlowWorkerStats(
+	        [](dataplane::SlowWorker* worker) {
+		        return worker->Dregress().limits();
+	        });
 }
 
 common::idp::getFWState::response cControlPlane::getFWState()
@@ -621,13 +643,10 @@ common::idp::getCounters::response cControlPlane::getCounters(const common::idp:
 			continue;
 		}
 
-		uint64_t counter = 0;
-		for (const cWorker* worker : dataPlane->workers_vector)
-		{
-			counter += worker->counters[counter_id];
-		}
-
-		response[i] = counter;
+		response[i] = accumulateWorkerStats(
+		        [counter_id](cWorker* worker) {
+			        return worker->counters[counter_id];
+		        });
 	}
 
 	return response;
@@ -892,7 +911,7 @@ common::idp::limits::response cControlPlane::limits()
 		worker_gc->limits(response);
 	}
 
-	auto dregress = this->dregress.limits();
+	auto dregress = DregressLimitsStats();
 
 	limit_insert(response,
 	             "dregress.ht.keys",
@@ -1305,12 +1324,6 @@ void cControlPlane::waitAllWorkers()
 	YADECAP_MEMORY_BARRIER_COMPILE;
 }
 
-eResult cControlPlane::initMempool()
-{
-	mempool = dataPlane->socket_cplane_mempools[rte_lcore_to_socket_id(dataPlane->config.controlPlaneCoreId)];
-	return eResult::success;
-}
-
 void cControlPlane::flush_kernel_interface(KniPortData& port_data, sKniStats& stats)
 {
 
@@ -1348,1089 +1361,4 @@ void cControlPlane::flush_kernel_interface(KniPortData& port_data)
 	rte_pktmbuf_free_bulk(&port_data.mbufs[txSize], port_data.mbufs_count - txSize);
 
 	port_data.mbufs_count = 0;
-}
-
-void cControlPlane::mainThread()
-{
-	rte_mbuf* operational[CONFIG_YADECAP_MBUFS_BURST_SIZE];
-
-	for (;;)
-	{
-		slowWorker->slowWorkerBeforeHandlePackets();
-
-		/// dequeue packets from worker's rings
-		for (unsigned nIter = 0; nIter < YANET_CONFIG_RING_PRIORITY_RATIO; nIter++)
-		{
-			for (unsigned hIter = 0; hIter < YANET_CONFIG_RING_PRIORITY_RATIO; hIter++)
-			{
-				unsigned hProcessed = 0;
-				for (cWorker* worker : dataPlane->workers_vector)
-				{
-					hProcessed += ring_handle(worker->ring_toFreePackets, worker->ring_highPriority);
-				}
-				if (!hProcessed)
-				{
-					break;
-				}
-			}
-
-			unsigned nProcessed = 0;
-			for (cWorker* worker : dataPlane->workers_vector)
-			{
-				nProcessed += ring_handle(worker->ring_toFreePackets, worker->ring_normalPriority);
-			}
-			if (!nProcessed)
-			{
-				break;
-			}
-		}
-		for (cWorker* worker : dataPlane->workers_vector)
-		{
-			ring_handle(worker->ring_toFreePackets, worker->ring_lowPriority);
-		}
-
-		if (use_kernel_interface)
-		{
-			for (int i = 0; i < slowWorker->basePermanently.ports.size(); ++i)
-			{
-				flush_kernel_interface(kernel_interfaces[i], kernel_stats[i]);
-				flush_kernel_interface(in_dump_kernel_interfaces[i]);
-				flush_kernel_interface(out_dump_kernel_interfaces[i]);
-				flush_kernel_interface(drop_dump_kernel_interfaces[i]);
-			}
-		}
-
-		/// dequeue packets from worker_gc's ring to slowworker
-		rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
-		unsigned rxSize;
-		for (auto& gc : to_gcs_)
-		{
-			rxSize = gc.process.DequeueBurstSC(mbufs);
-			for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
-			{
-				rte_mbuf* mbuf = convertMempool(gc.free._Underlying(), mbufs[mbuf_i]);
-				if (!mbuf)
-				{
-					continue;
-				}
-
-				dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-				sendPacketToSlowWorker(mbuf, metadata->flow);
-			}
-		}
-
-		fragmentation_.handle();
-		dregress.handle();
-
-		if (use_kernel_interface)
-		{
-			/// recv packets from kernel interface and send to physical port
-			for (int i = 0; i < slowWorker->basePermanently.ports.size(); ++i)
-			{
-				auto kernel_port_id = kernel_interfaces[i].kernel_port_id;
-
-				unsigned rxSize = rte_eth_rx_burst(kernel_port_id,
-				                                   0,
-				                                   operational,
-				                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-				uint64_t bytes = 0;
-				for (uint16_t i = 0; i < rxSize; ++i)
-				{
-					bytes += rte_pktmbuf_pkt_len(operational[i]);
-				}
-				uint16_t txSize = rte_eth_tx_burst(slowWorker->basePermanently.ports.ToDpdk(i),
-				                                   0,
-				                                   operational,
-				                                   rxSize);
-				for (auto i = rxSize; i < txSize; ++i)
-				{
-					bytes -= rte_pktmbuf_pkt_len(operational[i]);
-				}
-				auto to_drop = rxSize - txSize;
-				rte_pktmbuf_free_bulk(operational + txSize, to_drop);
-				sKniStats& stats = kernel_stats[i];
-				stats.odropped += to_drop;
-				stats.opackets += txSize;
-				stats.obytes += bytes;
-			}
-
-			/// recv from in.X/out.X/drop.X interfaces and free packets
-			for (int i = 0; i < slowWorker->basePermanently.ports.size(); ++i)
-			{
-				unsigned rxSize;
-				rxSize = rte_eth_rx_burst(in_dump_kernel_interfaces[i].kernel_port_id,
-				                          0,
-				                          operational,
-				                          CONFIG_YADECAP_MBUFS_BURST_SIZE);
-				rte_pktmbuf_free_bulk(operational, rxSize);
-
-				rxSize = rte_eth_rx_burst(out_dump_kernel_interfaces[i].kernel_port_id,
-				                          0,
-				                          operational,
-				                          CONFIG_YADECAP_MBUFS_BURST_SIZE);
-				rte_pktmbuf_free_bulk(operational, rxSize);
-
-				rxSize = rte_eth_rx_burst(drop_dump_kernel_interfaces[i].kernel_port_id,
-				                          0,
-				                          operational,
-				                          CONFIG_YADECAP_MBUFS_BURST_SIZE);
-				rte_pktmbuf_free_bulk(operational, rxSize);
-			}
-		}
-
-		/// push packets to slow worker
-		while (!slowWorkerMbufs.empty())
-		{
-			for (unsigned int i = 0;
-			     i < CONFIG_YADECAP_MBUFS_BURST_SIZE;
-			     i++)
-			{
-				if (slowWorkerMbufs.empty())
-				{
-					break;
-				}
-
-				auto& tuple = slowWorkerMbufs.front();
-				slowWorker->slowWorkerFlow(std::get<0>(tuple), std::get<1>(tuple));
-
-				slowWorkerMbufs.pop();
-			}
-
-			slowWorker->slowWorkerHandlePackets();
-		}
-
-		slowWorker->slowWorkerAfterHandlePackets();
-
-		/// @todo: AUTOTEST_CONTROLPLANE
-
-		std::this_thread::yield();
-
-#ifdef CONFIG_YADECAP_AUTOTEST
-		std::this_thread::sleep_for(std::chrono::microseconds{1});
-#endif // CONFIG_YADECAP_AUTOTEST
-	}
-}
-
-unsigned cControlPlane::ring_handle(rte_ring* ring_to_free_mbuf,
-                                    rte_ring* ring)
-{
-	rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
-
-	unsigned rxSize = rte_ring_sc_dequeue_burst(ring,
-	                                            (void**)mbufs,
-	                                            CONFIG_YADECAP_MBUFS_BURST_SIZE,
-	                                            nullptr);
-
-#ifdef CONFIG_YADECAP_AUTOTEST
-	if (rxSize)
-	{
-		std::this_thread::sleep_for(std::chrono::microseconds{400});
-	}
-#endif // CONFIG_YADECAP_AUTOTEST
-
-	for (uint16_t mbuf_i = 0; mbuf_i < rxSize; mbuf_i++)
-	{
-		rte_mbuf* mbuf = convertMempool(ring_to_free_mbuf, mbufs[mbuf_i]);
-		if (!mbuf)
-		{
-			continue;
-		}
-
-		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-		if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_nat64stateless_ingress_icmp)
-		{
-			handlePacket_icmp_translate_v6_to_v4(mbuf);
-		}
-		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_nat64stateless_ingress_fragmentation)
-		{
-			metadata->flow.type = common::globalBase::eFlowType::nat64stateless_ingress_checked;
-			handlePacket_fragment(mbuf);
-		}
-		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_nat64stateless_egress_icmp)
-		{
-			handlePacket_icmp_translate_v4_to_v6(mbuf);
-		}
-		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_nat64stateless_egress_fragmentation)
-		{
-			metadata->flow.type = common::globalBase::eFlowType::nat64stateless_egress_checked;
-			handlePacket_fragment(mbuf);
-		}
-		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_dregress)
-		{
-			handlePacket_dregress(mbuf);
-		}
-		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_nat64stateless_egress_farm)
-		{
-			handlePacket_farm(mbuf);
-		}
-		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_dump)
-		{
-			handlePacket_dump(mbuf);
-		}
-		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_repeat)
-		{
-			handlePacket_repeat(mbuf);
-		}
-		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_fw_sync)
-		{
-			handlePacket_fw_state_sync(mbuf);
-		}
-		else if (metadata->flow.type == common::globalBase::eFlowType::slowWorker_balancer_icmp_forward)
-		{
-			handlePacket_balancer_icmp_forward(mbuf);
-		}
-		else
-		{
-			handlePacketFromForwardingPlane(mbuf);
-		}
-	}
-	return rxSize;
-}
-
-void cControlPlane::handlePacketFromForwardingPlane(rte_mbuf* mbuf)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	if (handlePacket_fw_state_sync_ingress(mbuf))
-	{
-		stats.fwsync_multicast_ingress_packets++;
-		rte_pktmbuf_free(mbuf);
-		return;
-	}
-
-#ifdef CONFIG_YADECAP_AUTOTEST
-	if (metadata->flow.type != common::globalBase::eFlowType::slowWorker_kni_local)
-	{
-		// drop by default in tests
-		stats.slowworker_drops++;
-		rte_pktmbuf_free(mbuf);
-		return;
-	}
-	rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, rte_ether_hdr*);
-	memset(ethernetHeader->dst_addr.addr_bytes,
-	       0x71,
-	       6);
-
-#endif
-
-	if (!use_kernel_interface)
-	{
-		// TODO stats
-		unsigned txSize = rte_eth_tx_burst(metadata->fromPortId, 0, &mbuf, 1);
-		if (!txSize)
-		{
-			rte_pktmbuf_free(mbuf);
-		}
-		return;
-	}
-	else
-	{
-		const auto& portmapper = slowWorker->basePermanently.ports;
-
-		auto& iface = kernel_interfaces[portmapper.ToLogical(metadata->fromPortId)];
-		if (iface.mbufs_count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
-		{
-			flush_kernel_interface(iface, kernel_stats[portmapper.ToLogical(metadata->fromPortId)]);
-		}
-		iface.mbufs[iface.mbufs_count++] = mbuf;
-	}
-}
-
-void cControlPlane::handlePacket_icmp_translate_v6_to_v4(rte_mbuf* mbuf)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	const auto& base = slowWorker->bases[slowWorker->localBaseId & 1];
-	const auto& nat64stateless = base.globalBase->nat64statelesses[metadata->flow.data.nat64stateless.id];
-	const auto& translation = base.globalBase->nat64statelessTranslations[metadata->flow.data.nat64stateless.translationId];
-
-	slowWorker->slowWorkerTranslation(mbuf, nat64stateless, translation, true);
-
-	if (dataplane::do_icmp_translate_v6_to_v4(mbuf, translation))
-	{
-		slowWorker->stats.nat64stateless_ingressPackets++;
-		sendPacketToSlowWorker(mbuf, nat64stateless.flow);
-	}
-	else
-	{
-		slowWorker->stats.nat64stateless_ingressUnknownICMP++;
-		rte_pktmbuf_free(mbuf);
-	}
-}
-
-void cControlPlane::handlePacket_icmp_translate_v4_to_v6(rte_mbuf* mbuf)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	const auto& base = slowWorker->bases[slowWorker->localBaseId & 1];
-	const auto& nat64stateless = base.globalBase->nat64statelesses[metadata->flow.data.nat64stateless.id];
-	const auto& translation = base.globalBase->nat64statelessTranslations[metadata->flow.data.nat64stateless.translationId];
-
-	slowWorker->slowWorkerTranslation(mbuf, nat64stateless, translation, false);
-
-	if (dataplane::do_icmp_translate_v4_to_v6(mbuf, translation))
-	{
-		slowWorker->stats.nat64stateless_egressPackets++;
-		sendPacketToSlowWorker(mbuf, nat64stateless.flow);
-	}
-	else
-	{
-		slowWorker->stats.nat64stateless_egressUnknownICMP++;
-		rte_pktmbuf_free(mbuf);
-	}
-}
-
-void cControlPlane::handlePacket_dregress(rte_mbuf* mbuf)
-{
-	dregress.insert(mbuf);
-}
-
-void cControlPlane::handlePacket_repeat(rte_mbuf* mbuf)
-{
-	const rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, rte_ether_hdr*);
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	if (ethernetHeader->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_VLAN))
-	{
-		const rte_vlan_hdr* vlanHeader = rte_pktmbuf_mtod_offset(mbuf, rte_vlan_hdr*, sizeof(rte_ether_hdr));
-
-		metadata->flow.data.logicalPortId = CALCULATE_LOGICALPORT_ID(metadata->fromPortId, rte_be_to_cpu_16(vlanHeader->vlan_tci));
-	}
-	else
-	{
-		metadata->flow.data.logicalPortId = CALCULATE_LOGICALPORT_ID(metadata->fromPortId, 0);
-	}
-
-	/// @todo: opt
-	slowWorker->preparePacket(mbuf);
-
-	const auto& base = slowWorker->bases[slowWorker->localBaseId & 1];
-	const auto& logicalPort = base.globalBase->logicalPorts[metadata->flow.data.logicalPortId];
-
-	stats.repeat_packets++;
-	sendPacketToSlowWorker(mbuf, logicalPort.flow);
-}
-
-void cControlPlane::handlePacket_fragment(rte_mbuf* mbuf)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	const auto& base = slowWorker->bases[slowWorker->localBaseId & 1];
-	const auto& nat64stateless = base.globalBase->nat64statelesses[metadata->flow.data.nat64stateless.id];
-
-	if (nat64stateless.defrag_farm_prefix.empty() || metadata->network_headerType != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4) || nat64stateless.farm)
-	{
-		fragmentation_.insert(mbuf);
-		return;
-	}
-
-	stats.tofarm_packets++;
-	slowWorker->slowWorkerHandleFragment(mbuf);
-	sendPacketToSlowWorker(mbuf, nat64stateless.flow);
-}
-
-void cControlPlane::handlePacket_farm(rte_mbuf* mbuf)
-{
-	stats.farm_packets++;
-	slowWorker->slowWorkerFarmHandleFragment(mbuf);
-}
-
-void cControlPlane::handlePacket_fw_state_sync(rte_mbuf* mbuf)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	const auto& base = slowWorker->bases[slowWorker->localBaseId & 1];
-	const auto& fw_state_config = base.globalBase->fw_state_sync_configs[metadata->flow.data.aclId];
-
-	metadata->network_headerType = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
-	metadata->network_headerOffset = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr);
-	metadata->transport_headerType = IPPROTO_UDP;
-	metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv6_hdr);
-
-	generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
-	ethernetHeader->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_VLAN);
-	rte_ether_addr_copy(&fw_state_config.ether_address_destination, &ethernetHeader->dst_addr);
-
-	rte_vlan_hdr* vlanHeader = rte_pktmbuf_mtod_offset(mbuf, rte_vlan_hdr*, sizeof(rte_ether_hdr));
-	vlanHeader->eth_proto = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
-
-	rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
-	ipv6Header->vtc_flow = rte_cpu_to_be_32(0x6 << 28);
-	ipv6Header->payload_len = rte_cpu_to_be_16(sizeof(rte_udp_hdr) + sizeof(dataplane::globalBase::fw_state_sync_frame_t));
-	ipv6Header->proto = IPPROTO_UDP;
-	ipv6Header->hop_limits = 64;
-	memcpy(ipv6Header->src_addr, fw_state_config.ipv6_address_source.bytes, 16);
-	memcpy(ipv6Header->dst_addr, fw_state_config.ipv6_address_multicast.bytes, 16);
-
-	rte_udp_hdr* udpHeader = rte_pktmbuf_mtod_offset(mbuf, rte_udp_hdr*, metadata->network_headerOffset + sizeof(rte_ipv6_hdr));
-	udpHeader->src_port = fw_state_config.port_multicast; // IPFW reuses the same port for both src and dst.
-	udpHeader->dst_port = fw_state_config.port_multicast;
-	udpHeader->dgram_len = rte_cpu_to_be_16(sizeof(rte_udp_hdr) + sizeof(dataplane::globalBase::fw_state_sync_frame_t));
-	udpHeader->dgram_cksum = 0;
-	udpHeader->dgram_cksum = rte_ipv6_udptcp_cksum(ipv6Header, udpHeader);
-
-	// Iterate for all interested ports.
-	for (unsigned int port_id = 0; port_id < fw_state_config.flows_size; port_id++)
-	{
-		rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
-		if (mbuf_clone == nullptr)
-		{
-			slowWorker->stats.fwsync_multicast_egress_drops++;
-			continue;
-		}
-
-		*YADECAP_METADATA(mbuf_clone) = *YADECAP_METADATA(mbuf);
-
-		memcpy(rte_pktmbuf_mtod(mbuf_clone, char*),
-		       rte_pktmbuf_mtod(mbuf, char*),
-		       mbuf->data_len);
-		mbuf_clone->data_len = mbuf->data_len;
-		mbuf_clone->pkt_len = mbuf->pkt_len;
-
-		const auto& flow = fw_state_config.flows[port_id];
-		slowWorker->stats.fwsync_multicast_egress_packets++;
-		sendPacketToSlowWorker(mbuf_clone, flow);
-	}
-
-	if (!fw_state_config.ipv6_address_unicast.empty())
-	{
-		memcpy(ipv6Header->src_addr, fw_state_config.ipv6_address_unicast_source.bytes, 16);
-		memcpy(ipv6Header->dst_addr, fw_state_config.ipv6_address_unicast.bytes, 16);
-		udpHeader->src_port = fw_state_config.port_unicast;
-		udpHeader->dst_port = fw_state_config.port_unicast;
-		udpHeader->dgram_cksum = 0;
-		udpHeader->dgram_cksum = rte_ipv6_udptcp_cksum(ipv6Header, udpHeader);
-
-		rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
-		if (mbuf_clone == nullptr)
-		{
-			slowWorker->stats.fwsync_unicast_egress_drops++;
-		}
-		else
-		{
-			*YADECAP_METADATA(mbuf_clone) = *YADECAP_METADATA(mbuf);
-
-			memcpy(rte_pktmbuf_mtod(mbuf_clone, char*),
-			       rte_pktmbuf_mtod(mbuf, char*),
-			       mbuf->data_len);
-			mbuf_clone->data_len = mbuf->data_len;
-			mbuf_clone->pkt_len = mbuf->pkt_len;
-
-			slowWorker->stats.fwsync_unicast_egress_packets++;
-			sendPacketToSlowWorker(mbuf_clone, fw_state_config.ingress_flow);
-		}
-	}
-
-	rte_pktmbuf_free(mbuf);
-}
-
-bool cControlPlane::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
-	if ((ethernetHeader->dst_addr.addr_bytes[0] & 1) == 0)
-	{
-		return false;
-	}
-
-	// Confirmed multicast packet.
-	// Try to match against our multicast groups.
-	if (ethernetHeader->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_VLAN))
-	{
-		return false;
-	}
-
-	rte_vlan_hdr* vlanHeader = rte_pktmbuf_mtod_offset(mbuf, rte_vlan_hdr*, sizeof(rte_ether_hdr));
-	if (vlanHeader->eth_proto != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
-	{
-		return false;
-	}
-
-	rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr));
-	if (metadata->transport_headerType != IPPROTO_UDP)
-	{
-		return false;
-	}
-
-	const auto udp_payload_len = rte_be_to_cpu_16(ipv6Header->payload_len) - sizeof(rte_udp_hdr);
-	// Can contain multiple states per sync packet.
-	if (udp_payload_len % sizeof(dataplane::globalBase::fw_state_sync_frame_t) != 0)
-	{
-		return false;
-	}
-
-	tAclId aclId;
-	if (!dataPlane->controlPlane->fw_state_multicast_acl_ids.apply([&](auto& fw_state_multicast_acl_ids) {
-		    auto it = fw_state_multicast_acl_ids.find(common::ipv6_address_t(ipv6Header->dst_addr));
-		    if (it == fw_state_multicast_acl_ids.end())
-		    {
-			    return false;
-		    }
-		    aclId = it->second;
-		    return true;
-	    }))
-	{
-		return false;
-	}
-
-	const auto& base = slowWorker->bases[slowWorker->localBaseId & 1];
-	const auto& fw_state_config = base.globalBase->fw_state_sync_configs[aclId];
-
-	if (memcmp(ipv6Header->src_addr, fw_state_config.ipv6_address_source.bytes, 16) == 0)
-	{
-		// Ignore self-generated packets.
-		return false;
-	}
-
-	rte_udp_hdr* udpHeader = rte_pktmbuf_mtod_offset(mbuf, rte_udp_hdr*, sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + sizeof(rte_ipv6_hdr));
-	if (udpHeader->dst_port != fw_state_config.port_multicast)
-	{
-		return false;
-	}
-
-	for (size_t idx = 0; idx < udp_payload_len / sizeof(dataplane::globalBase::fw_state_sync_frame_t); ++idx)
-	{
-		dataplane::globalBase::fw_state_sync_frame_t* payload = rte_pktmbuf_mtod_offset(
-		        mbuf,
-		        dataplane::globalBase::fw_state_sync_frame_t*,
-		        sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + sizeof(rte_ipv6_hdr) + sizeof(rte_udp_hdr) + idx * sizeof(dataplane::globalBase::fw_state_sync_frame_t));
-
-		if (payload->addr_type == 6)
-		{
-			dataplane::globalBase::fw6_state_key_t key;
-			key.proto = payload->proto;
-			key.__nap = 0;
-			// Swap src and dst addresses.
-			memcpy(key.dst_addr.bytes, payload->src_ip6.bytes, 16);
-			memcpy(key.src_addr.bytes, payload->dst_ip6.bytes, 16);
-
-			if (payload->proto == IPPROTO_TCP || payload->proto == IPPROTO_UDP)
-			{
-				// Swap src and dst ports.
-				key.dst_port = payload->src_port;
-				key.src_port = payload->dst_port;
-			}
-			else
-			{
-				key.dst_port = 0;
-				key.src_port = 0;
-			}
-
-			dataplane::globalBase::fw_state_value_t value;
-			value.type = static_cast<dataplane::globalBase::fw_state_type>(payload->proto);
-			value.owner = dataplane::globalBase::fw_state_owner_e::external;
-			value.last_seen = slowWorker->basePermanently.globalBaseAtomic->currentTime;
-			value.flow = fw_state_config.ingress_flow;
-			value.acl_id = aclId;
-			value.last_sync = slowWorker->basePermanently.globalBaseAtomic->currentTime;
-			value.packets_since_last_sync = 0;
-			value.packets_backward = 0;
-			value.packets_forward = 0;
-			value.tcp.unpack(payload->flags);
-
-			uint32_t state_timeout = dataPlane->getConfigValues().stateful_firewall_other_protocols_timeout;
-			if (payload->proto == IPPROTO_UDP)
-			{
-				state_timeout = dataPlane->getConfigValues().stateful_firewall_udp_timeout;
-			}
-			else if (payload->proto == IPPROTO_TCP)
-			{
-				state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_timeout;
-				uint8_t flags = value.tcp.src_flags | value.tcp.dst_flags;
-				if (flags & (uint8_t)common::fwstate::tcp_flags_e::ACK)
-				{
-					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_syn_ack_timeout;
-				}
-				else if (flags & (uint8_t)common::fwstate::tcp_flags_e::SYN)
-				{
-					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_syn_timeout;
-				}
-				if (flags & (uint8_t)common::fwstate::tcp_flags_e::FIN)
-				{
-					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_fin_timeout;
-				}
-			}
-			value.state_timeout = state_timeout;
-
-			for (auto& [socketId, globalBaseAtomic] : dataPlane->globalBaseAtomics)
-			{
-				(void)socketId;
-
-				dataplane::globalBase::fw_state_value_t* lookup_value;
-				dataplane::spinlock_nonrecursive_t* locker;
-				const uint32_t hash = globalBaseAtomic->fw6_state->lookup(key, lookup_value, locker);
-				if (lookup_value)
-				{
-					// Keep state alive for us even if there were no packets received.
-					// Do not reset other counters.
-					lookup_value->last_seen = slowWorker->basePermanently.globalBaseAtomic->currentTime;
-					lookup_value->tcp.src_flags |= value.tcp.src_flags;
-					lookup_value->tcp.dst_flags |= value.tcp.dst_flags;
-					lookup_value->state_timeout = std::max(lookup_value->state_timeout, value.state_timeout);
-				}
-				else
-				{
-					globalBaseAtomic->fw6_state->insert(hash, key, value);
-				}
-				locker->unlock();
-			}
-		}
-		else if (payload->addr_type == 4)
-		{
-			dataplane::globalBase::fw4_state_key_t key;
-			key.proto = payload->proto;
-			key.__nap = 0;
-			// Swap src and dst addresses.
-			key.dst_addr.address = payload->src_ip;
-			key.src_addr.address = payload->dst_ip;
-
-			if (payload->proto == IPPROTO_TCP || payload->proto == IPPROTO_UDP)
-			{
-				// Swap src and dst ports.
-				key.dst_port = payload->src_port;
-				key.src_port = payload->dst_port;
-			}
-			else
-			{
-				key.dst_port = 0;
-				key.src_port = 0;
-			}
-
-			dataplane::globalBase::fw_state_value_t value;
-			value.type = static_cast<dataplane::globalBase::fw_state_type>(payload->proto);
-			value.owner = dataplane::globalBase::fw_state_owner_e::external;
-			value.last_seen = slowWorker->basePermanently.globalBaseAtomic->currentTime;
-			value.flow = fw_state_config.ingress_flow;
-			value.acl_id = aclId;
-			value.last_sync = slowWorker->basePermanently.globalBaseAtomic->currentTime;
-			value.packets_since_last_sync = 0;
-			value.packets_backward = 0;
-			value.packets_forward = 0;
-			value.tcp.unpack(payload->flags);
-
-			uint32_t state_timeout = dataPlane->getConfigValues().stateful_firewall_other_protocols_timeout;
-			if (payload->proto == IPPROTO_UDP)
-			{
-				state_timeout = dataPlane->getConfigValues().stateful_firewall_udp_timeout;
-			}
-			else if (payload->proto == IPPROTO_TCP)
-			{
-				state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_timeout;
-				uint8_t flags = value.tcp.src_flags | value.tcp.dst_flags;
-				if (flags & (uint8_t)common::fwstate::tcp_flags_e::ACK)
-				{
-					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_syn_ack_timeout;
-				}
-				else if (flags & (uint8_t)common::fwstate::tcp_flags_e::SYN)
-				{
-					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_syn_timeout;
-				}
-				if (flags & (uint8_t)common::fwstate::tcp_flags_e::FIN)
-				{
-					state_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_fin_timeout;
-				}
-			}
-			value.state_timeout = state_timeout;
-
-			for (auto& [socketId, globalBaseAtomic] : dataPlane->globalBaseAtomics)
-			{
-				(void)socketId;
-
-				dataplane::globalBase::fw_state_value_t* lookup_value;
-				dataplane::spinlock_nonrecursive_t* locker;
-				const uint32_t hash = globalBaseAtomic->fw4_state->lookup(key, lookup_value, locker);
-				if (lookup_value)
-				{
-					// Keep state alive for us even if there were no packets received.
-					// Do not reset other counters.
-					lookup_value->last_seen = slowWorker->basePermanently.globalBaseAtomic->currentTime;
-					lookup_value->tcp.src_flags |= value.tcp.src_flags;
-					lookup_value->tcp.dst_flags |= value.tcp.dst_flags;
-					lookup_value->state_timeout = std::max(lookup_value->state_timeout, value.state_timeout);
-				}
-				else
-				{
-					globalBaseAtomic->fw4_state->insert(hash, key, value);
-				}
-				locker->unlock();
-			}
-		}
-	}
-
-	return true;
-}
-
-void cControlPlane::BalancerICMPForwardCriticalSection(
-        rte_mbuf* mbuf,
-        cControlPlane::VipToBalancers& vip_to_balancers,
-        cControlPlane::VipVportProto& vip_vport_proto)
-{
-	const auto& base = slowWorker->bases[slowWorker->localBaseId & 1];
-
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	common::ip_address_t original_src_from_icmp_payload;
-	common::ip_address_t src_from_ip_header;
-	uint16_t original_src_port_from_icmp_payload;
-
-	uint32_t balancer_id = metadata->flow.data.balancer.id;
-
-	dataplane::metadata inner_metadata;
-
-	if (metadata->transport_headerType == IPPROTO_ICMP)
-	{
-		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-		src_from_ip_header = common::ip_address_t(rte_be_to_cpu_32(ipv4Header->src_addr));
-
-		rte_ipv4_hdr* icmpPayloadIpv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->transport_headerOffset + sizeof(icmpv4_header_t));
-		original_src_from_icmp_payload = common::ip_address_t(rte_be_to_cpu_32(icmpPayloadIpv4Header->src_addr));
-
-		inner_metadata.network_headerType = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
-		inner_metadata.network_headerOffset = metadata->transport_headerOffset + sizeof(icmpv4_header_t);
-	}
-	else
-	{
-		rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
-		src_from_ip_header = common::ip_address_t(ipv6Header->src_addr);
-
-		rte_ipv6_hdr* icmpPayloadIpv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->transport_headerOffset + sizeof(icmpv6_header_t));
-		original_src_from_icmp_payload = common::ip_address_t(icmpPayloadIpv6Header->src_addr);
-
-		inner_metadata.network_headerType = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
-		inner_metadata.network_headerOffset = metadata->transport_headerOffset + sizeof(icmpv6_header_t);
-	}
-
-	if (!prepareL3(mbuf, &inner_metadata))
-	{
-		/* we are not suppossed to get in here anyway, same check was done earlier by balancer_icmp_forward_handle(),
-		   but we needed to call prepareL3() to determine icmp payload original packets transport header offset */
-		if (inner_metadata.network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
-		{
-			slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_icmpv4_payload_too_short_ip]++;
-		}
-		else
-		{
-			slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_icmpv6_payload_too_short_ip]++;
-		}
-
-		rte_pktmbuf_free(mbuf);
-		return;
-	}
-
-	if (inner_metadata.transport_headerType != IPPROTO_TCP && inner_metadata.transport_headerType != IPPROTO_UDP)
-	{
-		// not supported protocol for cloning and distributing, drop
-		rte_pktmbuf_free(mbuf);
-		slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_unexpected_transport_protocol]++;
-		return;
-	}
-
-	// check whether ICMP payload is too short to contain "offending" packet's IP header and ports is performed earlier by balancer_icmp_forward_handle()
-	void* icmpPayloadTransportHeader = rte_pktmbuf_mtod_offset(mbuf, void*, inner_metadata.transport_headerOffset);
-
-	// both TCP and UDP headers have src port (16 bits) as the first field
-	original_src_port_from_icmp_payload = rte_be_to_cpu_16(*(uint16_t*)icmpPayloadTransportHeader);
-
-	if (vip_to_balancers.size() <= balancer_id)
-	{
-		// no vip_to_balancers table for this balancer_id
-		rte_pktmbuf_free(mbuf);
-		slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_no_unrdup_table_for_balancer_id]++;
-		return;
-	}
-
-	if (!vip_to_balancers[balancer_id].count(original_src_from_icmp_payload))
-	{
-		// vip is not listed in unrdup config - neighbor balancers are unknown, drop
-		rte_pktmbuf_free(mbuf);
-		slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_unrdup_vip_not_found]++;
-		return;
-	}
-
-	if (vip_vport_proto.size() <= balancer_id)
-	{
-		// no vip_vport_proto table for this balancer_id
-		rte_pktmbuf_free(mbuf);
-		slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id]++;
-		return;
-	}
-
-	if (!vip_vport_proto[balancer_id].count({original_src_from_icmp_payload, original_src_port_from_icmp_payload, inner_metadata.transport_headerType}))
-	{
-		// such combination of vip-vport-protocol is absent, don't clone, drop
-		rte_pktmbuf_free(mbuf);
-		slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_unknown_service]++;
-		return;
-	}
-
-	const auto& neighbor_balancers = vip_to_balancers[balancer_id][original_src_from_icmp_payload];
-
-	for (const auto& neighbor_balancer : neighbor_balancers)
-	{
-		// will not send a cloned packet if source address in "balancer" section of controlplane.conf is absent
-		if (neighbor_balancer.is_ipv4() && !base.globalBase->balancers[metadata->flow.data.balancer.id].source_ipv4.address)
-		{
-			slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_no_balancer_src_ipv4]++;
-			continue;
-		}
-
-		if (neighbor_balancer.is_ipv6() && base.globalBase->balancers[metadata->flow.data.balancer.id].source_ipv6.empty())
-		{
-			slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_no_balancer_src_ipv6]++;
-			continue;
-		}
-
-		rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
-		if (mbuf_clone == nullptr)
-		{
-			slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_failed_to_clone]++;
-			continue;
-		}
-
-		*YADECAP_METADATA(mbuf_clone) = *YADECAP_METADATA(mbuf);
-		dataplane::metadata* clone_metadata = YADECAP_METADATA(mbuf_clone);
-
-		rte_memcpy(rte_pktmbuf_mtod(mbuf_clone, char*),
-		           rte_pktmbuf_mtod(mbuf, char*),
-		           mbuf->data_len);
-
-		if (neighbor_balancer.is_ipv4())
-		{
-			rte_pktmbuf_prepend(mbuf_clone, sizeof(rte_ipv4_hdr));
-			memmove(rte_pktmbuf_mtod(mbuf_clone, char*),
-			        rte_pktmbuf_mtod_offset(mbuf_clone, char*, sizeof(rte_ipv4_hdr)),
-			        clone_metadata->network_headerOffset);
-
-			rte_ipv4_hdr* outerIpv4Header = rte_pktmbuf_mtod_offset(mbuf_clone, rte_ipv4_hdr*, clone_metadata->network_headerOffset);
-
-			outerIpv4Header->src_addr = base.globalBase->balancers[metadata->flow.data.balancer.id].source_ipv4.address;
-			outerIpv4Header->dst_addr = rte_cpu_to_be_32(neighbor_balancer.get_ipv4());
-
-			outerIpv4Header->version_ihl = 0x45;
-			outerIpv4Header->type_of_service = 0x00;
-			outerIpv4Header->packet_id = rte_cpu_to_be_16(0x01);
-			outerIpv4Header->fragment_offset = 0;
-			outerIpv4Header->time_to_live = 64;
-
-			outerIpv4Header->total_length = rte_cpu_to_be_16((uint16_t)(mbuf->pkt_len - clone_metadata->network_headerOffset + sizeof(rte_ipv4_hdr)));
-
-			if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
-			{
-				outerIpv4Header->next_proto_id = IPPROTO_IPIP;
-			}
-			else
-			{
-				outerIpv4Header->next_proto_id = IPPROTO_IPV6;
-			}
-
-			yanet_ipv4_checksum(outerIpv4Header);
-
-			mbuf_clone->data_len = mbuf->data_len + sizeof(rte_ipv4_hdr);
-			mbuf_clone->pkt_len = mbuf->pkt_len + sizeof(rte_ipv4_hdr);
-
-			// might need to change next protocol type in ethernet/vlan header in cloned packet
-
-			rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf_clone, rte_ether_hdr*);
-			if (ethernetHeader->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_VLAN))
-			{
-				rte_vlan_hdr* vlanHeader = rte_pktmbuf_mtod_offset(mbuf_clone, rte_vlan_hdr*, sizeof(rte_ether_hdr));
-				vlanHeader->eth_proto = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
-			}
-			else
-			{
-				ethernetHeader->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
-			}
-		}
-		else if (neighbor_balancer.is_ipv6())
-		{
-			rte_pktmbuf_prepend(mbuf_clone, sizeof(rte_ipv6_hdr));
-			memmove(rte_pktmbuf_mtod(mbuf_clone, char*),
-			        rte_pktmbuf_mtod_offset(mbuf_clone, char*, sizeof(rte_ipv6_hdr)),
-			        clone_metadata->network_headerOffset);
-
-			rte_ipv6_hdr* outerIpv6Header = rte_pktmbuf_mtod_offset(mbuf_clone, rte_ipv6_hdr*, clone_metadata->network_headerOffset);
-
-			rte_memcpy(outerIpv6Header->src_addr, base.globalBase->balancers[metadata->flow.data.balancer.id].source_ipv6.bytes, sizeof(outerIpv6Header->src_addr));
-			if (src_from_ip_header.is_ipv6())
-			{
-				((uint32_t*)outerIpv6Header->src_addr)[2] = ((uint32_t*)src_from_ip_header.get_ipv6().data())[2] ^ ((uint32_t*)src_from_ip_header.get_ipv6().data())[3];
-			}
-			else
-			{
-				((uint32_t*)outerIpv6Header->src_addr)[2] = src_from_ip_header.get_ipv4();
-			}
-			rte_memcpy(outerIpv6Header->dst_addr, neighbor_balancer.get_ipv6().data(), sizeof(outerIpv6Header->dst_addr));
-
-			outerIpv6Header->vtc_flow = rte_cpu_to_be_32((0x6 << 28));
-			outerIpv6Header->payload_len = rte_cpu_to_be_16((uint16_t)(mbuf->pkt_len - clone_metadata->network_headerOffset));
-			outerIpv6Header->hop_limits = 64;
-
-			if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
-			{
-				outerIpv6Header->proto = IPPROTO_IPIP;
-			}
-			else
-			{
-				outerIpv6Header->proto = IPPROTO_IPV6;
-			}
-
-			mbuf_clone->data_len = mbuf->data_len + sizeof(rte_ipv6_hdr);
-			mbuf_clone->pkt_len = mbuf->pkt_len + sizeof(rte_ipv6_hdr);
-
-			// might need to change next protocol type in ethernet/vlan header in cloned packet
-
-			rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf_clone, rte_ether_hdr*);
-			if (ethernetHeader->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_VLAN))
-			{
-				rte_vlan_hdr* vlanHeader = rte_pktmbuf_mtod_offset(mbuf_clone, rte_vlan_hdr*, sizeof(rte_ether_hdr));
-				vlanHeader->eth_proto = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
-			}
-			else
-			{
-				ethernetHeader->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6);
-			}
-		}
-
-		slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_clone_forwarded]++;
-
-		const auto& flow = base.globalBase->balancers[metadata->flow.data.balancer.id].flow;
-
-		slowWorker->preparePacket(mbuf_clone);
-		sendPacketToSlowWorker(mbuf_clone, flow);
-	}
-}
-
-
-void cControlPlane::handlePacket_balancer_icmp_forward(rte_mbuf* mbuf)
-{
-	if (dataPlane->config.SWICMPOutRateLimit != 0)
-	{
-		if (icmpOutRemainder == 0)
-		{
-			slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_out_rate_limit_reached]++;
-			rte_pktmbuf_free(mbuf);
-			return;
-		}
-
-		--icmpOutRemainder;
-	}
-
-	dataPlane->controlPlane->vip_to_balancers.apply([&](auto& vip_to_balancers) {
-		dataPlane->controlPlane->vip_vport_proto.apply([&](auto& vip_vport_proto) {
-			BalancerICMPForwardCriticalSection(mbuf, vip_to_balancers, vip_vport_proto);
-		});
-	});
-
-	// packet itself is not going anywhere, only its clones with prepended header
-	rte_pktmbuf_free(mbuf);
-}
-
-void cControlPlane::handlePacket_dump(rte_mbuf* mbuf)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	const auto& portmapper = slowWorker->basePermanently.ports;
-	if (!portmapper.ValidDpdk(metadata->flow.data.dump.id))
-	{
-		stats.unknown_dump_interface++;
-		rte_pktmbuf_free(mbuf);
-		return;
-	}
-	const auto local_port_id = portmapper.ToLogical(metadata->flow.data.dump.id);
-
-	auto push = [this, mbuf](KniPortData& iface) {
-		if (iface.mbufs_count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
-		{
-			flush_kernel_interface(iface);
-		}
-		iface.mbufs[iface.mbufs_count++] = mbuf;
-	};
-
-	if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_ingress)
-	{
-		push(in_dump_kernel_interfaces[local_port_id]);
-		return;
-	}
-	else if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_egress)
-	{
-		push(out_dump_kernel_interfaces[local_port_id]);
-		return;
-	}
-	else if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_drop)
-	{
-		push(drop_dump_kernel_interfaces[local_port_id]);
-		return;
-	}
-
-	stats.unknown_dump_interface++;
-	rte_pktmbuf_free(mbuf);
-}
-
-rte_mbuf* cControlPlane::convertMempool(rte_ring* ring_to_free_mbuf,
-                                        rte_mbuf* old_mbuf)
-{
-	/// we dont support attached mbufs
-
-	rte_mbuf* mbuf = rte_pktmbuf_alloc(mempool);
-	if (!mbuf)
-	{
-		stats.mempool_is_empty++;
-
-		freeWorkerPacket(ring_to_free_mbuf, old_mbuf);
-		return nullptr;
-	}
-
-	*YADECAP_METADATA(mbuf) = *YADECAP_METADATA(old_mbuf);
-
-	/// @todo: rte_pktmbuf_append() and check error
-
-	memcpy(rte_pktmbuf_mtod(mbuf, char*),
-	       rte_pktmbuf_mtod(old_mbuf, char*),
-	       old_mbuf->data_len);
-
-	mbuf->data_len = old_mbuf->data_len;
-	mbuf->pkt_len = old_mbuf->pkt_len;
-
-	freeWorkerPacket(ring_to_free_mbuf, old_mbuf);
-
-	if (rte_mbuf_refcnt_read(mbuf) != 1)
-	{
-		YADECAP_LOG_ERROR("something wrong\n");
-	}
-
-	return mbuf;
-}
-
-void cControlPlane::sendPacketToSlowWorker(rte_mbuf* mbuf,
-                                           const common::globalBase::tFlow& flow)
-{
-	/// we dont support attached mbufs
-
-	if (slowWorkerMbufs.size() >= 1024) ///< @todo: variable
-	{
-		stats.slowworker_drops++;
-		rte_pktmbuf_free(mbuf);
-		return;
-	}
-
-	stats.slowworker_packets++;
-	slowWorkerMbufs.emplace(mbuf, flow);
-}
-
-void cControlPlane::freeWorkerPacket(rte_ring* ring_to_free_mbuf,
-                                     rte_mbuf* mbuf)
-{
-	if (ring_to_free_mbuf == slowWorker->ring_toFreePackets)
-	{
-		rte_pktmbuf_free(mbuf);
-		return;
-	}
-
-	while (rte_ring_sp_enqueue(ring_to_free_mbuf, mbuf) != 0)
-	{
-		std::this_thread::yield();
-	}
 }

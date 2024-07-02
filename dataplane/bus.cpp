@@ -212,7 +212,7 @@ void cBus::clientThread(int clientSocket)
 		}
 		else if (type == common::idp::requestType::getSlowWorkerStats)
 		{
-			response = callWithResponse(&cControlPlane::getSlowWorkerStats, request);
+			response = callWithResponse(&cControlPlane::SlowWorkerStatsResponse, request);
 		}
 		else if (type == common::idp::requestType::get_worker_gc_stats)
 		{

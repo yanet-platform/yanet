@@ -28,12 +28,22 @@
 
 class cControlPlane ///< @todo: move to cDataPlane
 {
+protected:
+	struct sKniStats
+	{
+		uint64_t ipackets = 0;
+		uint64_t ibytes = 0;
+		uint64_t idropped = 0;
+		uint64_t opackets = 0;
+		uint64_t obytes = 0;
+		uint64_t odropped = 0;
+	};
+
 public:
 	cControlPlane(cDataPlane* dataPlane);
-	virtual ~cControlPlane();
+	virtual ~cControlPlane() = default;
 
 	eResult init(bool use_kernel_interface);
-	void start();
 	void stop();
 	void join();
 
@@ -41,16 +51,19 @@ public:
 	eResult updateGlobalBaseBalancer(const common::idp::updateGlobalBaseBalancer::request& request);
 	common::idp::getGlobalBase::response getGlobalBase(const common::idp::getGlobalBase::request& request);
 	common::idp::getWorkerStats::response getWorkerStats(const common::idp::getWorkerStats::request& request);
-	common::idp::getSlowWorkerStats::response getSlowWorkerStats();
+	common::slowworker::stats_t SlowWorkerStats() const;
+	common::idp::getSlowWorkerStats::response SlowWorkerStatsResponse();
 	common::idp::get_worker_gc_stats::response get_worker_gc_stats();
 	common::idp::get_dregress_counters::response get_dregress_counters();
 	common::idp::get_ports_stats::response get_ports_stats();
 	common::idp::get_ports_stats_extended::response get_ports_stats_extended();
 	common::idp::getControlPlanePortStats::response getControlPlanePortStats(const common::idp::getControlPlanePortStats::request& request);
 	common::idp::getPortStatsEx::response getPortStatsEx();
-	common::idp::getFragmentationStats::response getFragmentationStats();
+	common::idp::getFragmentationStats::response getFragmentationStats() const;
 	common::dregress::stats_t DregressStats() const;
+	std::optional<std::reference_wrapper<const dataplane::sKniStats>> KniStats(tPortId) const;
 	dataplane::hashtable_chain_spinlock_stats_t DregressConnectionsStats() const;
+	dregress::LimitsStats DregressLimitsStats() const;
 	common::idp::getFWState::response getFWState();
 	common::idp::getFWStateStats::response getFWStateStats();
 	eResult clearFWState();
@@ -82,34 +95,39 @@ public:
 	void switchGlobalBase();
 	virtual void waitAllWorkers();
 
-	void sendPacketToSlowWorker(rte_mbuf* mbuf, const common::globalBase::tFlow& flow); ///< @todo: remove flow
-	void freeWorkerPacket(rte_ring* ring_to_free_mbuf, rte_mbuf* mbuf);
+private:
+	const std::vector<cWorker*>& workers_vector() const;
+	const std::map<tCoreId, dataplane::SlowWorker*>& slow_workers() const;
 
-protected:
-	eResult initMempool();
+	template<typename F>
+	// @brief returns sum of results of applying F to all cWorker*s
+	auto accumulateWorkerStats(F func) const
+	{
+		using R = std::invoke_result_t<F, cWorker*>;
+		return std::accumulate(
+		        workers_vector().begin(),
+		        workers_vector().end(),
+		        R{},
+		        [func](R total, cWorker* worker) {
+			        total += func(worker);
+			        return total;
+		        });
+	}
 
-	void mainThread();
-	unsigned ring_handle(rte_ring* ring_to_free_mbuf, rte_ring* ring);
-
-	void handlePacketFromForwardingPlane(rte_mbuf* mbuf); ///< @todo: rename
-	void handlePacket_icmp_translate_v6_to_v4(rte_mbuf* mbuf);
-	void handlePacket_icmp_translate_v4_to_v6(rte_mbuf* mbuf);
-	void handlePacket_dregress(rte_mbuf* mbuf);
-	void handlePacket_repeat(rte_mbuf* mbuf);
-	void handlePacket_fragment(rte_mbuf* mbuf);
-	void handlePacket_farm(rte_mbuf* mbuf);
-	void handlePacket_fw_state_sync(rte_mbuf* mbuf);
-	bool handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf);
-	using VipToBalancers = std::vector<std::unordered_map<common::ip_address_t, std::unordered_set<common::ip_address_t>>>;
-	using VipVportProto = std::vector<std::unordered_set<std::tuple<common::ip_address_t, std::optional<uint16_t>, uint8_t>>>;
-	void BalancerICMPForwardCriticalSection(
-	        rte_mbuf* mbuf,
-	        VipToBalancers& vip_to_balancers,
-	        VipVportProto& vip_vport_proto);
-	void handlePacket_balancer_icmp_forward(rte_mbuf* mbuf);
-	void handlePacket_dump(rte_mbuf* mbuf);
-
-	rte_mbuf* convertMempool(rte_ring* ring_to_free_mbuf, rte_mbuf* mbuf);
+	template<typename F>
+	// @brief returns sum of results of applying F to all SlowWorker*s
+	auto accumulateSlowWorkerStats(F func) const
+	{
+		using R = std::invoke_result_t<F, dataplane::SlowWorker*>;
+		return std::accumulate(
+		        slow_workers().begin(),
+		        slow_workers().end(),
+		        R{},
+		        [&func](R total, const auto& pair) {
+			        total += func(pair.second);
+			        return total;
+		        });
+	}
 
 protected:
 	friend class cReport;
@@ -117,26 +135,11 @@ protected:
 	friend class dataplane::globalBase::generation;
 	friend class dregress_t;
 
-	struct sKniStats
-	{
-		uint64_t ipackets = 0;
-		uint64_t ibytes = 0;
-		uint64_t idropped = 0;
-		uint64_t opackets = 0;
-		uint64_t obytes = 0;
-		uint64_t odropped = 0;
-	};
-
 	cDataPlane* dataPlane;
-
-	fragmentation::Fragmentation fragmentation_;
-	dataplane::SlowWorker slow_;
-	dregress_t dregress;
 
 	std::mutex mutex;
 	std::mutex balancer_mutex;
 
-	rte_mempool* mempool;
 	bool use_kernel_interface;
 
 	struct KniHandleBundle
@@ -167,26 +170,19 @@ protected:
 	common::slowworker::stats_t stats;
 	common::idp::getErrors::response errors; ///< @todo: class errorsManager
 
-public:
-	cWorker* slowWorker;
-
-protected:
-	utils::StaticVector<dpdk::RingConn<rte_mbuf*>, YANET_CONFIG_NUMA_SIZE> to_gcs_;
 	std::queue<std::tuple<rte_mbuf*,
 	                      common::globalBase::tFlow>>
 	        slowWorkerMbufs;
-	std::mutex fw_state_multicast_acl_ids_mutex;
+
+public:
+	using VipToBalancers = std::vector<std::unordered_map<common::ip_address_t, std::unordered_set<common::ip_address_t>>>;
+	utils::Sequential<VipToBalancers> vip_to_balancers;
+	using VipVportProto = std::vector<std::unordered_set<std::tuple<common::ip_address_t, std::optional<uint16_t>, uint8_t>>>;
+	// check presence prior to cloning
+	utils::Sequential<VipVportProto> vip_vport_proto;
 	using FwStateMulticastAclIds = std::map<common::ipv6_address_t, tAclId>;
 	utils::Sequential<FwStateMulticastAclIds> fw_state_multicast_acl_ids;
 
-	// provided by unrdup.cfg, used to clone some icmp packets to neighbor balancers, index is balancer_id
-	utils::Sequential<VipToBalancers> vip_to_balancers;
-
-	// check presence prior to cloning
-	utils::Sequential<VipVportProto> vip_vport_proto;
-
-	std::chrono::high_resolution_clock::time_point prevTimePointForSWRateLimiter;
-
-	uint32_t icmpOutRemainder;
+protected:
 	uint32_t gc_step;
 };
