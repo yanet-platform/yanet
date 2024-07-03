@@ -5,4 +5,5 @@ add skipto :IN ip from any to any in
 add allow ip from 13.0.0.0/24 to any keep-state
 add allow ip from any to 2332:898:ff1c:2030::/64 keep-state
 add allow tcp from 2332:898:ffee:0:0:5678::/ffff:ffff:ffff:0000:ffff:ffff:: to 2332:898:ffee:0:0:5678::/ffff:ffff:ffff:0000:ffff:ffff:: 10053 keep-state
+add check-state
 add deny ip from any to any

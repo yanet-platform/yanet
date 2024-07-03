@@ -1,3 +1,4 @@
 :BEGIN
+add check-state
 add deny ip from any to any
 
