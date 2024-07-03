@@ -480,4 +480,115 @@ add 200 deny ip from any to any
 	EXPECT_THAT(std::get<1>(result.rules[200].front()), ::testing::Eq("deny"));
 }
 
+TEST(ACL, 019_CheckStateBasic)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add 100 check-state
+add 200 allow ip from { 1.2.3.4 } to any
+add 300 deny ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
+	{
+		(void)total_table_key;
+
+		const auto& value = result.acl_values[total_table_value];
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path does not include the check-state action
+				EXPECT_THAT(actions.get_actions().size(), 1);
+				EXPECT_FALSE(std::holds_alternative<common::CheckStateAction>(actions.get_actions()[0].raw_action));
+
+				// Check that the check-state path includes the check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			}
+		},
+		           value);
+	}
+}
+
+TEST(ACL, 020_ManyCheckStates)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add 100 check-state
+add 200 dump ring1 ip from { 1.2.3.4 } to any
+add 300 check-state
+add 400 deny ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	// We're interested in second group, i.e the group where src ip is { 1.2.3.4 }
+	auto total_table_value = std::get<1>(result.acl_total_table[1]);
+
+	const auto& value = result.acl_values[total_table_value];
+	std::visit([&](const auto& actions) {
+		if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+		{
+			// Check that the regular path includes the actions after the first and second check-states
+			EXPECT_THAT(actions.get_actions().size(), 2);
+			EXPECT_TRUE(std::holds_alternative<common::DumpAction>(actions.get_actions()[0].raw_action));
+			EXPECT_TRUE(std::holds_alternative<common::FlowAction>(actions.get_actions()[1].raw_action));
+
+			// Check that the check-state path includes the first check-state action and no other actions
+			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+			EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+		}
+	},
+	           value);
+}
+
+TEST(ACL, 021_CheckStateComplex)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add 100 dump ring1 ip from { 1.2.3.4 } to any
+add 200 check-state
+add 300 dump ring2 ip from { 1.2.3.4 } to any
+add 500 check-state
+add 500 deny ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	// We're interested in second group, i.e the group where src ip is { 1.2.3.4 }
+	auto total_table_value = std::get<1>(result.acl_total_table[1]);
+
+	const auto& value = result.acl_values[total_table_value];
+	std::visit([&](const auto& actions) {
+		if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+		{
+			// Check that the regular path includes actions before and after the check-state
+			EXPECT_THAT(actions.get_actions().size(), 3);
+			EXPECT_TRUE(std::holds_alternative<common::DumpAction>(actions.get_actions()[0].raw_action));
+			EXPECT_TRUE(std::holds_alternative<common::DumpAction>(actions.get_actions()[1].raw_action));
+			EXPECT_TRUE(std::holds_alternative<common::FlowAction>(actions.get_actions()[2].raw_action));
+
+			// Check that the check-state path includes actions up to and including the check-state action
+			EXPECT_THAT(actions.get_check_state_actions().size(), 2);
+			EXPECT_TRUE(std::holds_alternative<common::DumpAction>(actions.get_check_state_actions()[0].raw_action));
+			EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions()[1].raw_action));
+		}
+	},
+	           value);
+}
+
 } // namespace
