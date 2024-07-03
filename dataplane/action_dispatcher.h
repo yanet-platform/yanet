@@ -52,6 +52,8 @@ struct ActionDispatcher
 				flow = worker->acl_checkstate(mbuf);
 			}
 
+			YANET_LOG_DEBUG("Check state was matched and state was%s found\n", flow ? "" : " not");
+
 			if (flow)
 			{
 				execute_path(actions.get_check_state_actions(), flow.value(), args);
@@ -68,6 +70,7 @@ struct ActionDispatcher
 		for (const auto& action : actions)
 		{
 			std::visit([&](const auto& act) {
+				YANET_LOG_DEBUG("Executing action %s\n", act.to_string().c_str());
 				execute(act, flow, args);
 			},
 			           action.raw_action);

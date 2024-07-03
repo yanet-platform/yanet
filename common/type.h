@@ -2365,6 +2365,17 @@ public:
 		stream.push(reinterpret_cast<const uint8_t(&)[sizeof(*this)]>(*this));
 	}
 
+	[[nodiscard]] std::string to_string() const
+	{
+		std::ostringstream oss;
+		oss << "tFlow { type: " << eFlowType_toString(type)
+		    << ", flags: " << static_cast<int>(flags)
+		    << ", counter_id: " << counter_id
+		    << ", data: { atomic: " << data.atomic
+		    << " } }";
+		return oss.str();
+	}
+
 public:
 	union
 	{
