@@ -4,8 +4,6 @@
 #include "metadata.h"
 #include "worker.h"
 
-#include <iostream>
-
 namespace dataplane
 {
 
@@ -22,10 +20,55 @@ struct ActionDispatcher
 {
 	static void execute(const common::Actions& actions, const ActionDispatcherArgs& args)
 	{
-		for (const auto& action : actions.get_actions())
+		std::visit([&](const auto& specific_actions) {
+			execute_impl(specific_actions, args);
+		},
+		           actions);
+	}
+
+	/**
+	 * Determine the correct path to execute based on the presence of a check-state action.
+	 *
+	 * If HasCheckState is true and the state check succeeds,
+	 * it executes the check_state_path_ and then returns.
+	 * Otherwise, it executes the regular path. The egress/ingress flow
+	 * is handled by the CheckStateAction execute method.
+	 */
+	template<bool HasCheckState>
+	static void execute_impl(const common::BaseActions<HasCheckState>& actions, const ActionDispatcherArgs& args)
+	{
+		if constexpr (HasCheckState)
+		{
+			auto worker = args.worker;
+			auto mbuf = args.mbuf;
+			cWorker::FlowFromState flow;
+
+			if constexpr (Direction == FlowDirection::Egress)
+			{
+				flow = worker->acl_egress_checkstate(mbuf);
+			}
+			else
+			{
+				flow = worker->acl_checkstate(mbuf);
+			}
+
+			if (flow)
+			{
+				execute_path(actions.get_check_state_actions(), flow.value(), args);
+				return;
+			}
+		}
+
+		// Execute regular path
+		execute_path(actions.get_actions(), actions.get_flow(), args);
+	}
+
+	static void execute_path(const std::vector<common::Action>& actions, const common::globalBase::tFlow& flow, const ActionDispatcherArgs& args)
+	{
+		for (const auto& action : actions)
 		{
 			std::visit([&](const auto& act) {
-				execute(act, actions.get_flow(), args);
+				execute(act, flow, args);
 			},
 			           action.raw_action);
 		}
@@ -101,10 +144,16 @@ struct ActionDispatcher
 		}
 	}
 
-	static void execute([[maybe_unused]] const common::CheckStateAction& action, [[maybe_unused]] const common::globalBase::tFlow& flow, [[maybe_unused]] const ActionDispatcherArgs& args)
+	static void execute([[maybe_unused]] const common::CheckStateAction& action, const common::globalBase::tFlow& flow, const ActionDispatcherArgs& args)
 	{
-		std::cout << "CheckStateAction matched" << std::endl;
-		// Implementation here
+		if constexpr (Direction == FlowDirection::Egress)
+		{
+			args.worker->acl_egress_flow(args.mbuf, flow);
+		}
+		else
+		{
+			args.worker->acl_ingress_flow(args.mbuf, flow);
+		}
 	}
 };
 
