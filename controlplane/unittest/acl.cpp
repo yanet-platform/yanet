@@ -152,8 +152,8 @@ add 7 deny ip from any to any
 		(void)total_table_key;
 
 		const auto& value = result.acl_values[total_table_value];
-		EXPECT_THAT(value.get_flow().counter_id, ::testing::Ge(1));
-		EXPECT_THAT(value.get_flow().counter_id, ::testing::Lt(5));
+		std::visit([&](const auto& actions) { EXPECT_THAT(actions.get_flow().counter_id, ::testing::Ge(1)); }, value);
+		std::visit([&](const auto& actions) { EXPECT_THAT(actions.get_flow().counter_id, ::testing::Lt(5)); }, value);
 	}
 	EXPECT_THAT(ids_map[0], ::testing::ElementsAre());
 	EXPECT_THAT(ids_map[1], ::testing::ElementsAre(1, 2, 5));
@@ -182,7 +182,10 @@ add 2 allow ip from { 1.2.3.4 } to any in
 		(void)total_table_key;
 
 		const auto& value = result.acl_values[total_table_value];
-		EXPECT_THAT(value.get_flow().type, ::testing::Eq(common::globalBase::eFlowType::drop));
+		std::visit([&](const auto& actions) {
+			EXPECT_THAT(actions.get_flow().type, ::testing::Eq(common::globalBase::eFlowType::drop));
+		},
+		           value);
 	}
 	EXPECT_THAT(ids_map[0], ::testing::ElementsAre());
 	EXPECT_THAT(ids_map[1], ::testing::ElementsAre(1));
@@ -357,7 +360,10 @@ add 300 deny ip from any to any
 	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
 	{
 		(void)total_table_key;
-		EXPECT_THAT(result.acl_values[total_table_value].get_flow().flags, ::testing::Eq((uint8_t)common::globalBase::eFlowFlags::log));
+		std::visit([&](const auto& actions) {
+			EXPECT_THAT(actions.get_flow().flags, ::testing::Eq((uint8_t)common::globalBase::eFlowFlags::log));
+		},
+		           result.acl_values[total_table_value]);
 	}
 
 	auto& ids_map = result.ids_map;
