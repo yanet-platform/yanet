@@ -60,7 +60,9 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 	libpcap0.8 \
 	libibverbs1 \
 	libmlx5-1 \
-	libatomic1
+	libatomic1 \
+        jq \
+        iproute2
 
 COPY --from=stage1 /opt/yanet/build/controlplane/yanet-controlplane /usr/bin/
 COPY --from=stage1 /opt/yanet/build/dataplane/yanet-dataplane /usr/bin/
