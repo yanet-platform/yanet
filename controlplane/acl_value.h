@@ -31,6 +31,9 @@ public:
 
 public:
 	// FIXME: I don't like this name.. Why was it called like that previously?
+	std::vector<common::acl::Actions> intermediate_vector;
+
+	// FIXME: I don't like this name.. Why was it called like that previously?
 	std::vector<common::Actions> vector;
 
 	// FIXME: The initial objects are created using collect_inintial_rule and stored here.

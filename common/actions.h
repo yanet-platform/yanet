@@ -199,20 +199,26 @@ struct Action
 	}
 };
 
-/**
- * @brief Represents a collection of actions to be performed on a packet.
- *
- * The last rule in the path_ is always a terminating rule.
- */
-class Actions
+namespace acl
 {
-private:
-	// The sequence of actions to be executed.
-	std::vector<Action> path_{};
-	// Count of each type of action.
-	std::array<size_t, std::variant_size_v<decltype(Action::raw_action)>> action_counts_ = {0};
+/**
+ * This struct is used for an intermediate representation of an object that
+ * describes a list of actions that needs to be performed on a packet that matched some group.
+ *
+ * Such objects are created in total_table_t::compile.
+ *
+ * This representation is intermediate cause the Actions objects that are we going to use in dataplane
+ * will have slightly different representation of the internal vector based on whether we have
+ * a "check-state" action or not. This way we can reduce a number of branching in the dataplane and
+ * also reduce the size of the object since we will use std::variant to hold either a "check-state"-object,
+ * or a regular one (see common::Actions definition below)
+ */
+struct Actions
+{
+	std::vector<Action> path{};
+	std::array<size_t, std::variant_size_v<decltype(Action::raw_action)>> action_counts = {0};
+	std::optional<size_t> check_state_index{};
 
-public:
 	Actions() = default;
 	Actions(const Action& action) { add(action); };
 
@@ -222,20 +228,122 @@ public:
 
 		if (std::holds_alternative<FlowAction>(action.raw_action))
 		{
-			assert(action_counts_[index] == 0 && "Incorrectly requested to add more than one FlowAction");
+			assert(action_counts[index] == 0 && "Incorrectly requested to add more than one FlowAction");
 		}
 		else
 		{
 			size_t max_count = std::visit([](auto&& arg) { return std::decay_t<decltype(arg)>::MAX_COUNT; },
 			                              action.raw_action);
-			if (action_counts_[index] >= max_count)
+			if (action_counts[index] >= max_count)
 			{
 				return;
 			}
 		}
 
-		action_counts_[index]++;
-		path_.push_back(action);
+		if (std::holds_alternative<CheckStateAction>(action.raw_action))
+		{
+			check_state_index = path.size();
+		}
+
+		action_counts[index]++;
+		path.push_back(action);
+	}
+};
+
+} // namespace acl
+
+template<bool HasCheckState>
+class BaseActions;
+
+template<>
+class BaseActions<false>
+{
+private:
+	std::vector<Action> path_{};
+
+public:
+	BaseActions() = default;
+
+	BaseActions(acl::Actions&& actions) :
+	        path_(std::move(actions.path)) {}
+
+	[[nodiscard]] const Action& get_last() const
+	{
+		assert(!path_.empty());
+		return path_.back();
+	}
+
+	Action& get_last()
+	{
+		assert(!path_.empty());
+		return path_.back();
+	}
+
+	[[nodiscard]] const std::vector<Action>& get_actions() const
+	{
+		return path_;
+	}
+
+	[[nodiscard]] const common::globalBase::tFlow& get_flow() const
+	{
+		assert(std::holds_alternative<FlowAction>(get_last().raw_action));
+		return std::get<FlowAction>(get_last().raw_action).flow;
+	}
+
+	[[nodiscard]] common::globalBase::tFlow& get_flow()
+	{
+		assert(std::holds_alternative<FlowAction>(get_last().raw_action));
+		return std::get<FlowAction>(get_last().raw_action).flow;
+	}
+
+	bool operator<(const BaseActions& second) const
+	{
+		return get_flow() < second.get_flow();
+	}
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(path_);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(path_);
+	}
+};
+
+template<>
+class BaseActions<true>
+{
+private:
+	std::vector<Action> path_{};
+	// TODO: This is a prefix of a path_, in C++-20 I would use std::span to avoid extra copying
+	std::vector<Action> check_state_path_{};
+
+public:
+	BaseActions() = default;
+	BaseActions(acl::Actions&& actions)
+	{
+		assert(actions.check_state_index.has_value());
+		auto check_state_index = static_cast<std::ptrdiff_t>(actions.check_state_index.value());
+
+		path_ = std::move(actions.path);
+
+		// check_state_path_ is the prefix up to the check-state action inclusively
+		check_state_path_.assign(path_.begin(), path_.begin() + check_state_index + 1);
+
+		// Remove the check-state action from the main path_
+		path_.erase(path_.begin() + check_state_index);
+	}
+
+	[[nodiscard]] const std::vector<Action>& get_actions() const
+	{
+		return path_;
+	}
+
+	[[nodiscard]] const std::vector<Action>& get_check_state_actions() const
+	{
+		return check_state_path_;
 	}
 
 	[[nodiscard]] const Action& get_last() const
@@ -262,8 +370,7 @@ public:
 		return std::get<FlowAction>(get_last().raw_action).flow;
 	}
 
-	// TODO: Why do we need it?..
-	bool operator<(const Actions& second) const
+	bool operator<(const BaseActions& second) const
 	{
 		return get_flow() < second.get_flow();
 	}
@@ -271,17 +378,30 @@ public:
 	void pop(stream_in_t& stream)
 	{
 		stream.pop(path_);
+		stream.pop(check_state_path_);
 	}
 
 	void push(stream_out_t& stream) const
 	{
 		stream.push(path_);
-	}
-
-	[[nodiscard]] const std::vector<Action>& get_actions() const
-	{
-		return path_;
+		stream.push(check_state_path_);
 	}
 };
+
+/**
+ * The Actions type is defined as a std::variant to efficiently handle two possible states of action sequences:
+ * - BaseActions<true>: This specialization is used when the action sequence contains a check-state action.
+ * - BaseActions<false>: This specialization is used when the action sequence does not contain a check-state action.
+ *
+ * This approach allows us to avoid runtime branching to check for the presence of a check-state action, thereby
+ * enhancing performance. Instead, the decision is made once when constructing the Actions object.
+ *
+ * During packet processing in the dataplane, this enables a more efficient execution path, as the
+ * type of Actions being processed (with or without check-state) can be resolved at compile time using std::visit.
+ * We will still have one extra branch on packet cause we need to know whether it will require a check-state, but
+ * that will be only once. Once the result of a check-state is determined, we will choose correct path and execute it
+ * without any additional checks.
+ */
+using Actions = std::variant<BaseActions<true>, BaseActions<false>>;
 
 } // namespace common
