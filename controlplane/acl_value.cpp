@@ -9,7 +9,7 @@ value_t::value_t()
 
 void value_t::clear()
 {
-	vector.clear();
+	intermediate_vector.clear();
 	rule_actions.clear();
 
 	{
@@ -23,25 +23,34 @@ void value_t::clear()
 
 unsigned int value_t::collect(unsigned int rule_action_id)
 {
-	vector.emplace_back(rule_actions[rule_action_id]);
-	return vector.size() - 1;
+	intermediate_vector.emplace_back(rule_actions[rule_action_id]);
+	return intermediate_vector.size() - 1;
 }
 
 void value_t::append_to_last(unsigned int rule_action_id)
 {
-	vector.back().add(rule_actions[rule_action_id]);
+	intermediate_vector.back().add(rule_actions[rule_action_id]);
 }
 
 void value_t::compile()
 {
-	for (auto& actions : vector)
+	for (auto& intermediate_actions : intermediate_vector)
 	{
-		auto last_action = actions.get_last();
+		auto last_action = intermediate_actions.path.back();
 
 		if (!std::visit([](const auto& act) { return act.terminating(); }, last_action.raw_action))
 		{
 			// Adding default "drop" rule to the end
-			actions.add(rule_actions[0]);
+			intermediate_actions.add(rule_actions[0]);
+		}
+
+		if (intermediate_actions.check_state_index.has_value())
+		{
+			vector.emplace_back(common::BaseActions<true>(std::move(intermediate_actions)));
+		}
+		else
+		{
+			vector.emplace_back(common::BaseActions<false>(std::move(intermediate_actions)));
 		}
 	}
 }
