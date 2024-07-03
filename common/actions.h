@@ -112,6 +112,13 @@ struct DumpAction final
 	{
 		stream.push(dump_id);
 	}
+
+	[[nodiscard]] std::string to_string() const
+	{
+		std::ostringstream oss;
+		oss << "DumpAction(dump_id=" << dump_id << ")";
+		return oss.str();
+	}
 };
 
 /**
@@ -146,6 +153,13 @@ struct FlowAction final
 	{
 		stream.push(flow);
 	}
+
+	[[nodiscard]] std::string to_string() const
+	{
+		std::ostringstream oss;
+		oss << "FlowAction(flow=" << flow.to_string() << ")";
+		return oss.str();
+	}
 };
 
 /**
@@ -174,6 +188,11 @@ struct CheckStateAction final
 	{
 		stream.push((char*)this, sizeof(*this));
 	}
+
+	[[nodiscard]] std::string to_string() const
+	{
+		return "CheckStateAction()";
+	}
 };
 
 /**
@@ -197,6 +216,11 @@ struct Action
 	void push(stream_out_t& stream) const
 	{
 		stream.push(raw_action);
+	}
+
+	[[nodiscard]] std::string to_string() const
+	{
+		return std::visit([](auto&& action) { return action.to_string(); }, raw_action);
 	}
 };
 
