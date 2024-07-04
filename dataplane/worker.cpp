@@ -231,35 +231,9 @@ void cWorker::start()
 		abort();
 	}
 
-	for (const auto& [port, queue]: basePermanently.rx_points)
-	{
-		rc = rte_eth_rx_queue_setup(port,
-		                            queue,
-		                            dataPlane->getConfigValues().port_rx_queue_size,
-		                            rte_eth_dev_socket_id(port),
-		                            nullptr, ///< @todo
-		                            mempool);
-		if (rc < 0)
-		{
-			YADECAP_LOG_ERROR("rte_eth_rx_queue_setup() = %d\n", rc);
-			abort();
-		}
-	}
-
 	if (rte_mempool_default_cache(mempool, coreId))
 	{
 		YADECAP_LOG_ERROR("mempool cache not empty\n");
-		abort();
-	}
-
-	rc = pthread_barrier_wait(&dataPlane->initPortBarrier);
-	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
-	{
-		pthread_barrier_destroy(&dataPlane->initPortBarrier);
-	}
-	else if (rc != 0)
-	{
-		YADECAP_LOG_ERROR("pthread_barrier_wait() = %d\n", rc);
 		abort();
 	}
 
