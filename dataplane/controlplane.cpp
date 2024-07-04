@@ -74,18 +74,6 @@ eResult cControlPlane::init(bool use_kernel_interface)
 
 void cControlPlane::start()
 {
-	int rc = pthread_barrier_wait(&dataPlane->initPortBarrier);
-	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
-	{
-		pthread_barrier_destroy(&dataPlane->initPortBarrier);
-	}
-	else if (rc != 0)
-	{
-		YADECAP_LOG_ERROR("pthread_barrier_wait() = %d\n", rc);
-		/// @todo: stop
-		return;
-	}
-
 	/// start devices
 	for (const auto& portIter : dataPlane->ports)
 	{
@@ -104,7 +92,7 @@ void cControlPlane::start()
 		rte_eth_promiscuous_enable(portId);
 	}
 
-	rc = pthread_barrier_wait(&dataPlane->runBarrier);
+	auto rc = pthread_barrier_wait(&dataPlane->runBarrier);
 	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
 	{
 		pthread_barrier_destroy(&dataPlane->runBarrier);

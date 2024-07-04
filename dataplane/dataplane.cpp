@@ -217,7 +217,13 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	}
 	numaNodesInUse = worker_gcs.size();
 
-	result = initQueues();
+	result = InitTxQueues();
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
+	result = InitRxQueues();
 	if (result != eResult::success)
 	{
 		return result;
@@ -243,16 +249,8 @@ eResult cDataPlane::init(const std::string& binaryPath,
 
 	init_worker_base();
 
-	/// init sync barrier
-	int rc = pthread_barrier_init(&initPortBarrier, nullptr, workers.size());
-	if (rc != 0)
-	{
-		YADECAP_LOG_ERROR("pthread_barrier_init() = %d\n", rc);
-		return eResult::errorInitBarrier;
-	}
-
 	/// init run sync barrier
-	rc = pthread_barrier_init(&runBarrier, nullptr, workers.size() + worker_gcs.size());
+	auto rc = pthread_barrier_init(&runBarrier, nullptr, workers.size() + worker_gcs.size());
 	if (rc != 0)
 	{
 		YADECAP_LOG_ERROR("pthread_barrier_init() = %d\n", rc);
@@ -626,25 +624,6 @@ void cDataPlane::StartInterfaces()
 	}
 }
 
-void cDataPlane::InitPortsBarrier()
-{
-	int rc = pthread_barrier_wait(&initPortBarrier);
-	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
-	{
-		pthread_barrier_destroy(&initPortBarrier);
-	}
-	else if (rc)
-	{
-		YANET_LOG_ERROR("init_ports_barrier pthread_barrier_wait() = %d\n", rc);
-		std::abort();
-	}
-
-	if (rte_get_main_lcore() == rte_lcore_id())
-	{
-		StartInterfaces();
-	}
-}
-
 eResult cDataPlane::InitControlPlane()
 {
 	controlPlane = std::make_unique<cControlPlane>(this);
@@ -884,7 +863,7 @@ eResult cDataPlane::initWorkers()
 
 		dataplane::base::permanently basePermanently;
 		basePermanently.globalBaseAtomic = globalBaseAtomics[socket_id];
-		basePermanently.outQueueId = out_queues_; ///< 0
+		basePermanently.outQueueId = tx_queues_; ///< 0
 		for (const auto& portIter : ports)
 		{
 			if (!basePermanently.ports.Register(portIter.first))
@@ -910,7 +889,7 @@ eResult cDataPlane::initWorkers()
 		controlPlane->slowWorker = worker;
 		workers_vector.emplace_back(worker);
 
-		out_queues_++;
+		tx_queues_++;
 	}
 
 	for (const auto& configWorkerIter : config.workers)
@@ -1039,7 +1018,7 @@ eResult cDataPlane::initWorkers()
 			}
 		}
 
-		basePermanently.outQueueId = out_queues_;
+		basePermanently.outQueueId = tx_queues_;
 
 		dataplane::base::generation base;
 		{
@@ -1064,7 +1043,7 @@ eResult cDataPlane::initWorkers()
 		workers[coreId] = worker;
 		workers_vector.emplace_back(worker);
 
-		out_queues_++;
+		tx_queues_++;
 	}
 
 	worker_gc_t::PortToSocketArray port_to_socket;
@@ -1194,14 +1173,14 @@ std::optional<uint64_t> cDataPlane::getCounterValueByName(const std::string& cou
 	return std::optional<uint64_t>(counter_value);
 }
 
-eResult cDataPlane::initQueues()
+eResult cDataPlane::InitTxQueues()
 {
 	for (const auto& portIter : ports)
 	{
 		const tPortId& portId = portIter.first;
 
 		for (tQueueId queueId = 0;
-		     queueId < workers.size();
+		     queueId < tx_queues_;
 		     queueId++)
 		{
 			int ret = rte_eth_tx_queue_setup(portId,
@@ -1212,6 +1191,29 @@ eResult cDataPlane::initQueues()
 			if (ret < 0)
 			{
 				YADECAP_LOG_ERROR("rte_eth_tx_queue_setup(%u, %u) = %d\n", portId, queueId, ret);
+				return eResult::errorInitQueue;
+			}
+		}
+	}
+
+	return eResult::success;
+}
+
+eResult cDataPlane::InitRxQueues()
+{
+	for (const auto& worker : workers_vector)
+	{
+		for (const auto& [port, queue] : worker->basePermanently.rx_points)
+		{
+			int ret = rte_eth_rx_queue_setup(port,
+			                                 queue,
+			                                 getConfigValues().port_rx_queue_size,
+			                                 worker->socketId,
+			                                 nullptr,
+			                                 worker->mempool);
+			if (ret < 0)
+			{
+				YADECAP_LOG_ERROR("rte_eth_rx_queue_setup(%u, %u) = %d\n", port, queue, ret);
 				return eResult::errorInitQueue;
 			}
 		}
