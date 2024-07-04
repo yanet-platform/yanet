@@ -287,7 +287,7 @@ common::idp::getOtherStats::response cControlPlane::getOtherStats()
 			const cWorker* worker = iter.second;
 
 			std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1> bursts;
-			memcpy(&bursts[0], worker->bursts, sizeof(worker->bursts));
+			memcpy(&bursts[0], worker->bursts, (CONFIG_YADECAP_MBUFS_BURST_SIZE + 1) * sizeof(uint64_t));
 
 			response_workers[coreId] = {bursts};
 		}
@@ -317,7 +317,7 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 			}
 
 			response[coreId] = {worker->iteration,
-			                    worker->stats,
+			                    *worker->stats,
 			                    portsStats};
 		}
 	}
@@ -334,7 +334,7 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 			}
 
 			response[coreId] = {worker->iteration,
-			                    worker->stats,
+			                    *worker->stats,
 			                    portsStats};
 		}
 	}
@@ -398,7 +398,7 @@ common::idp::get_worker_gc_stats::response cControlPlane::get_worker_gc_stats()
 	for (const auto& [core_id, worker] : dataPlane->worker_gcs)
 	{
 		response[core_id] = {worker->iteration,
-		                     worker->stats};
+		                     *worker->stats};
 	}
 
 	return response;
@@ -2214,12 +2214,12 @@ void cControlPlane::handlePacket_icmp_translate_v6_to_v4(rte_mbuf* mbuf)
 
 	if (do_icmp_translate_v6_to_v4(mbuf, translation))
 	{
-		slowWorker->stats.nat64stateless_ingressPackets++;
+		slowWorker->stats->nat64stateless_ingressPackets++;
 		sendPacketToSlowWorker(mbuf, nat64stateless.flow);
 	}
 	else
 	{
-		slowWorker->stats.nat64stateless_ingressUnknownICMP++;
+		slowWorker->stats->nat64stateless_ingressUnknownICMP++;
 		rte_pktmbuf_free(mbuf);
 	}
 }
@@ -2489,12 +2489,12 @@ void cControlPlane::handlePacket_icmp_translate_v4_to_v6(rte_mbuf* mbuf)
 
 	if (do_icmp_translate_v4_to_v6(mbuf, translation))
 	{
-		slowWorker->stats.nat64stateless_egressPackets++;
+		slowWorker->stats->nat64stateless_egressPackets++;
 		sendPacketToSlowWorker(mbuf, nat64stateless.flow);
 	}
 	else
 	{
-		slowWorker->stats.nat64stateless_egressUnknownICMP++;
+		slowWorker->stats->nat64stateless_egressUnknownICMP++;
 		rte_pktmbuf_free(mbuf);
 	}
 }
@@ -2594,7 +2594,7 @@ void cControlPlane::handlePacket_fw_state_sync(rte_mbuf* mbuf)
 		rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
 		if (mbuf_clone == nullptr)
 		{
-			slowWorker->stats.fwsync_multicast_egress_drops++;
+			slowWorker->stats->fwsync_multicast_egress_drops++;
 			continue;
 		}
 
@@ -2607,7 +2607,7 @@ void cControlPlane::handlePacket_fw_state_sync(rte_mbuf* mbuf)
 		mbuf_clone->pkt_len = mbuf->pkt_len;
 
 		const auto& flow = fw_state_config.flows[port_id];
-		slowWorker->stats.fwsync_multicast_egress_packets++;
+		slowWorker->stats->fwsync_multicast_egress_packets++;
 		sendPacketToSlowWorker(mbuf_clone, flow);
 	}
 
@@ -2623,7 +2623,7 @@ void cControlPlane::handlePacket_fw_state_sync(rte_mbuf* mbuf)
 		rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
 		if (mbuf_clone == nullptr)
 		{
-			slowWorker->stats.fwsync_unicast_egress_drops++;
+			slowWorker->stats->fwsync_unicast_egress_drops++;
 		}
 		else
 		{
@@ -2635,7 +2635,7 @@ void cControlPlane::handlePacket_fw_state_sync(rte_mbuf* mbuf)
 			mbuf_clone->data_len = mbuf->data_len;
 			mbuf_clone->pkt_len = mbuf->pkt_len;
 
-			slowWorker->stats.fwsync_unicast_egress_packets++;
+			slowWorker->stats->fwsync_unicast_egress_packets++;
 			sendPacketToSlowWorker(mbuf_clone, fw_state_config.ingress_flow);
 		}
 	}

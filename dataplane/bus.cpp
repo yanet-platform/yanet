@@ -55,6 +55,20 @@ void cBus::join()
 	}
 }
 
+void cBus::FillMetadataBusCounters(common::sdp::MetadataBusCounters& metadata, uint64_t& size)
+{
+	metadata.start_bus_errors = common::sdp::GetStartData((uint32_t)common::idp::errorType::size * sizeof(uint64_t), size);
+	metadata.start_bus_requests = common::sdp::GetStartData((uint32_t)common::idp::requestType::size * sizeof(uint64_t), size);
+	metadata.start_bus_durations = common::sdp::GetStartData((uint32_t)common::idp::requestType::size * sizeof(uint64_t), size);
+}
+
+void cBus::SetBufferForCounters(void* buffer, const common::sdp::MetadataBusCounters& metadata)
+{
+	stats.requests = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_bus_requests);
+	stats.errors = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_bus_errors);
+	stats.durations = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_bus_durations);
+}
+
 static bool recvAll(int clientSocket,
                     char* buffer,
                     uint64_t size)
