@@ -832,8 +832,8 @@ void fw_config_t::add_rule_opcode(const rule_t::opcode_arg_t& value)
 		case rule_t::opcode_t::DIRECTION:
 			m_curr_rule->direction |= std::get<uint32_t>(value);
 			break;
-		case rule_t::opcode_t::KEEPSTATE:
-			m_curr_rule->keepstate = true;
+		case rule_t::opcode_t::RECORDSTATE:
+			m_curr_rule->recordstate = true;
 			break;
 		case rule_t::opcode_t::IPID:
 			break;
