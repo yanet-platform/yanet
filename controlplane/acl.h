@@ -67,7 +67,7 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
                      const std::optional<std::string>& transport_source,
                      const std::optional<std::string>& transport_destination,
                      const std::optional<std::string>& transport_flags,
-                     const std::optional<std::string>& keepstate);
+                     const std::optional<std::string>& recordstate);
 
 std::set<uint32_t> lookup(const std::map<std::string, controlplane::base::acl_t>& acls,
                           const acl::iface_map_t& ifaces,

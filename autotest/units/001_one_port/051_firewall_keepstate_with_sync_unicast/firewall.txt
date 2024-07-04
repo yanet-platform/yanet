@@ -2,7 +2,7 @@
 add skipto :IN ip from any to any in
 
 :IN
-add allow tcp from 12.0.0.0/24 to any 12345 keep-state
-add allow tcp from any to 2220:ddd:ff1c:2030::/60 12345 keep-state
+add allow tcp from 12.0.0.0/24 to any 12345 record-state
+add allow tcp from any to 2220:ddd:ff1c:2030::/60 12345 record-state
 add check-state
 add deny ip from any to any

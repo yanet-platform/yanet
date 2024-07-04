@@ -239,7 +239,7 @@ void fw_dump_t::dump_rule(rule_ptr_t rulep)
 	{
 		std::cerr << "# frag = set(" << std::hex << (int)rulep->ipoff_setflags << "), clear(" << (int)rulep->ipoff_clearflags << ")" << std::dec << std::endl;
 	}
-	std::cerr << "# keepstate = " << rulep->keepstate << std::endl;
+	std::cerr << "# recordstate = " << rulep->recordstate << std::endl;
 	if (rulep->direction == rule_t::direction_t::IN)
 		std::cerr << "# direction = IN" << std::endl;
 	else if (rulep->direction == rule_t::direction_t::OUT)

@@ -727,7 +727,7 @@ using request = std::tuple<std::optional<std::string>, ///< module
                            std::optional<std::string>, ///< transport_source
                            std::optional<std::string>, ///< transport_destination
                            std::optional<std::string>, ///< transport_flags
-                           std::optional<std::string>>; ///< keepstate
+                           std::optional<std::string>>; ///< recordstate
 
 using response = std::vector<std::tuple<std::optional<std::string>,
                                         std::optional<std::string>,

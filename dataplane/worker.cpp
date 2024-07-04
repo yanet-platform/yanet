@@ -4849,7 +4849,7 @@ inline cWorker::FlowFromState cWorker::acl_checkstate(rte_mbuf* mbuf,
 	return {flow};
 }
 
-inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow)
+inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 

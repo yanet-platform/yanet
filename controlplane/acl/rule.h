@@ -850,7 +850,7 @@ struct filter_t : filter_base_t
 	ref_t<filter_prm8_t> flags;
 	ref_t<filter_proto_t> proto;
 	ref_t<filter_id_t> dir;
-	ref_t<filter_bool_t> keepstate;
+	ref_t<filter_bool_t> recordstate;
 
 	filter_t(const ref_t<filter_id_t>& _acl_id,
 	         const ref_t<filter_network_t>& _src,
@@ -858,14 +858,14 @@ struct filter_t : filter_base_t
 	         const ref_t<filter_prm8_t>& _flags,
 	         const ref_t<filter_proto_t>& _proto,
 	         const ref_t<filter_id_t>& _dir,
-	         const ref_t<filter_bool_t>& keepstate) :
+	         const ref_t<filter_bool_t>& recordstate) :
 	        acl_id(_acl_id),
 	        src(_src),
 	        dst(_dst),
 	        flags(_flags),
 	        proto(_proto),
 	        dir(_dir),
-	        keepstate(keepstate)
+	        recordstate(recordstate)
 	{}
 
 	filter_t(ipfw::rule_ptr_t rulep)
@@ -919,15 +919,15 @@ struct filter_t : filter_base_t
 				dir = new filter_id_t(1);
 				break;
 		}
-		if (rulep->keepstate)
+		if (rulep->recordstate)
 		{
-			keepstate = new filter_bool_t(true);
+			recordstate = new filter_bool_t(true);
 		}
 	}
 
 	virtual bool is_none() const
 	{
-		return acl_id.is_none() || src.is_none() || dst.is_none() || proto.is_none() || dir.is_none() || keepstate.is_none();
+		return acl_id.is_none() || src.is_none() || dst.is_none() || proto.is_none() || dir.is_none() || recordstate.is_none();
 	}
 
 	virtual std::string to_string() const
@@ -954,9 +954,9 @@ struct filter_t : filter_base_t
 		{
 			ret += " frag " + frag_to_string(flags);
 		}
-		if (keepstate)
+		if (recordstate)
 		{
-			ret += " keepstate";
+			ret += " recordstate";
 		}
 
 		if (acl_id)
@@ -969,7 +969,7 @@ struct filter_t : filter_base_t
 
 	bool operator==(const filter_t& o) const
 	{
-		return src == o.src && dst == o.dst && flags == o.flags && proto == o.proto && dir == o.dir && keepstate == o.keepstate;
+		return src == o.src && dst == o.dst && flags == o.flags && proto == o.proto && dir == o.dir && recordstate == o.recordstate;
 	}
 };
 
@@ -1024,7 +1024,7 @@ inline ref_t<filter_t> and_op(const ref_t<filter_t>& a, const ref_t<filter_t>& b
 	                    a.filter->flags & b.filter->flags,
 	                    a.filter->proto & b.filter->proto,
 	                    a.filter->dir & b.filter->dir,
-	                    a.filter->keepstate & b.filter->keepstate);
+	                    a.filter->recordstate & b.filter->recordstate);
 }
 
 const int64_t DISPATCHER = -1;
@@ -1345,7 +1345,7 @@ struct hash<acl::filter_t>
 	size_t operator()(const acl::filter_t& f) const noexcept
 	{
 		size_t h = 0;
-		hash_combine(h, f.src, f.dst, f.flags, f.proto, f.dir, f.keepstate);
+		hash_combine(h, f.src, f.dst, f.flags, f.proto, f.dir, f.recordstate);
 
 		return h;
 	}

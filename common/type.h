@@ -2248,7 +2248,7 @@ inline const char* eFlowType_toString(eFlowType t)
 
 enum class eFlowFlags : uint8_t
 {
-	keepstate = 1,
+	recordstate = 1,
 	log = 2,
 };
 

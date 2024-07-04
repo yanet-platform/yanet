@@ -569,7 +569,7 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
                      const std::optional<std::string>& transport_source,
                      const std::optional<std::string>& transport_destination,
                      const std::optional<std::string>& transport_flags,
-                     const std::optional<std::string>& in_keepstate)
+                     const std::optional<std::string>& in_recordstate)
 {
 	(void)module;
 
@@ -664,7 +664,7 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
 				std::string transport_source = "any";
 				std::string transport_destination = "any";
 				std::string transport_flags = "any";
-				std::string keepstate = "false";
+				std::string recordstate = "false";
 				std::string next_module = "any";
 				std::string log = rule.log ? "true" : "false";
 
@@ -719,13 +719,13 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
 						}
 					}
 
-					if (rule.filter->keepstate)
+					if (rule.filter->recordstate)
 					{
-						keepstate = "true";
+						recordstate = "true";
 					}
 
-					if (in_keepstate &&
-					    keepstate != *in_keepstate)
+					if (in_recordstate &&
+					    recordstate != *in_recordstate)
 					{
 						continue;
 					}
@@ -754,7 +754,7 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
 				                    transport_source,
 				                    transport_destination,
 				                    transport_flags,
-				                    keepstate,
+				                    recordstate,
 				                    next_module,
 				                    ids,
 				                    log);
@@ -893,9 +893,9 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 				{
 					auto& flow = std::get<common::globalBase::tFlow>(rule.action);
 
-					if (rule.filter->keepstate)
+					if (rule.filter->recordstate)
 					{
-						flow.flags |= (int)common::globalBase::eFlowFlags::keepstate;
+						flow.flags |= (int)common::globalBase::eFlowFlags::recordstate;
 					}
 					if (rule.log)
 					{
