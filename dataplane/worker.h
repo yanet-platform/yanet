@@ -90,7 +90,7 @@ protected:
 
 	inline void handlePackets();
 
-	inline void physicalPort_ingress_handle(const unsigned int& worker_port_i);
+	inline void physicalPort_ingress_handle(const dpdk::Endpoint& rx_point);
 
 	inline void physicalPort_egress_handle();
 

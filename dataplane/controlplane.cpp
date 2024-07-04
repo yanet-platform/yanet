@@ -694,11 +694,9 @@ common::idp::getConfig::response cControlPlane::getConfig() const
 		const tCoreId& coreId = workerIter.first;
 		const cWorker* worker = workerIter.second;
 
-		for (unsigned int worker_port_i = 0;
-		     worker_port_i < worker->basePermanently.workerPortsCount;
-		     worker_port_i++)
+		for (const auto& endpoint : worker->basePermanently.rx_points)
 		{
-			std::get<0>(response_workers[coreId]).emplace_back(worker->basePermanently.workerPorts[worker_port_i].inPortId);
+			std::get<0>(response_workers[coreId]).emplace_back(endpoint.port);
 		}
 
 		std::get<1>(response_workers[coreId]) = worker->socketId;
