@@ -203,16 +203,15 @@ nlohmann::json cReport::convertWorker(const cWorker* worker)
 
 	/// permanently base
 	json["permanentlyBase"]["globalBaseAtomic"]["pointer"] = pointerToHex(worker->basePermanently.globalBaseAtomic);
-	json["permanentlyBase"]["workerPortsCount"] = worker->basePermanently.workerPortsCount;
-	for (unsigned int worker_port_i = 0;
-	     worker_port_i < worker->basePermanently.workerPortsCount;
-	     worker_port_i++)
+	json["permanentlyBase"]["workerPortsCount"] = worker->basePermanently.rx_points.size();
+	std::size_t idx{};
+	for (const auto& [port, queue] : worker->basePermanently.rx_points)
 	{
 		nlohmann::json jsonPort;
 
-		jsonPort["worker_port_i"] = worker_port_i;
-		jsonPort["inPortId"] = worker->basePermanently.workerPorts[worker_port_i].inPortId;
-		jsonPort["inQueueId"] = worker->basePermanently.workerPorts[worker_port_i].inQueueId;
+		jsonPort["worker_port_i"] = idx++;
+		jsonPort["inPortId"] = port;
+		jsonPort["inQueueId"] = queue;
 
 		json["permanentlyBase"]["workerPorts"].emplace_back(jsonPort);
 	}
@@ -281,16 +280,15 @@ nlohmann::json cReport::convertWorkerGC(const worker_gc_t* worker)
 
 	/// permanently base
 	json["permanentlyBase"]["globalBaseAtomic"]["pointer"] = pointerToHex(worker->base_permanently.globalBaseAtomic);
-	json["permanentlyBase"]["workerPortsCount"] = worker->base_permanently.workerPortsCount;
-	for (unsigned int worker_port_i = 0;
-	     worker_port_i < worker->base_permanently.workerPortsCount;
-	     worker_port_i++)
+	json["permanentlyBase"]["workerPortsCount"] = worker->base_permanently.rx_points.size();
+	std::size_t idx{};
+	for (const auto& [port, queue] : worker->base_permanently.rx_points)
 	{
 		nlohmann::json jsonPort;
 
-		jsonPort["worker_port_i"] = worker_port_i;
-		jsonPort["inPortId"] = worker->base_permanently.workerPorts[worker_port_i].inPortId;
-		jsonPort["inQueueId"] = worker->base_permanently.workerPorts[worker_port_i].inQueueId;
+		jsonPort["worker_port_i"] = idx++;
+		jsonPort["inPortId"] = port;
+		jsonPort["inQueueId"] = queue;
 
 		json["permanentlyBase"]["workerPorts"].emplace_back(jsonPort);
 	}

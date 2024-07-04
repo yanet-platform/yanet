@@ -8,6 +8,8 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
+#include "common/static_vector.h"
+#include "dpdk.h"
 #include "neighbor.h"
 #include "type.h"
 
@@ -60,7 +62,6 @@ class permanently
 public:
 	permanently() :
 	        globalBaseAtomic(nullptr),
-	        workerPortsCount(0),
 	        nat64stateful_numa_mask(0xFFFFu),
 	        nat64stateful_numa_reverse_mask(0),
 	        nat64stateful_numa_id(0)
@@ -79,15 +80,11 @@ public:
 	bool add_worker_port(const tPortId port_id,
 	                     tQueueId queue_id)
 	{
-		if (workerPortsCount >= CONFIG_YADECAP_WORKER_PORTS_SIZE)
+		if (rx_points.Full())
 		{
 			return false;
 		}
-
-		workerPorts[workerPortsCount].inPortId = port_id;
-		workerPorts[workerPortsCount].inQueueId = queue_id;
-		workerPortsCount++;
-
+		rx_points.emplace_back(port_id, queue_id);
 		return true;
 	}
 
@@ -97,12 +94,7 @@ public:
 	/// Used to distribute firewall states.
 	dataplane::globalBase::atomic* globalBaseAtomics[YANET_CONFIG_NUMA_SIZE];
 
-	unsigned int workerPortsCount;
-	struct
-	{
-		tPortId inPortId;
-		tQueueId inQueueId;
-	} workerPorts[CONFIG_YADECAP_WORKER_PORTS_SIZE];
+	utils::StaticVector<dpdk::Endpoint, CONFIG_YADECAP_WORKER_PORTS_SIZE> rx_points;
 
 	PortMapper ports;
 	tQueueId outQueueId;
