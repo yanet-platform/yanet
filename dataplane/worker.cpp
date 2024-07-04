@@ -97,8 +97,8 @@ eResult cWorker::init(const tCoreId& coreId,
 	this->bases[currentBaseId] = base;
 	this->bases[currentBaseId ^ 1] = base;
 
-	unsigned int elements_count = 2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_rx_queue_size +
-	                              2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_tx_queue_size +
+	unsigned int elements_count = 2 * basePermanently.rx_points.size() * dataPlane->getConfigValues().port_rx_queue_size +
+	                              2 * basePermanently.rx_points.size() * dataPlane->getConfigValues().port_tx_queue_size +
 	                              2 * dataPlane->getConfigValues().ring_highPriority_size +
 	                              2 * dataPlane->getConfigValues().ring_normalPriority_size +
 	                              2 * dataPlane->getConfigValues().ring_lowPriority_size;
@@ -201,8 +201,8 @@ void cWorker::start()
 
 	/// @todo: prepare()
 
-	unsigned int mbufs_count_expect = 2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_rx_queue_size +
-	                                  2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_tx_queue_size +
+	unsigned int mbufs_count_expect = 2 * basePermanently.rx_points.size() * dataPlane->getConfigValues().port_rx_queue_size +
+	                                  2 * basePermanently.rx_points.size() * dataPlane->getConfigValues().port_tx_queue_size +
 	                                  2 * dataPlane->getConfigValues().ring_highPriority_size +
 	                                  2 * dataPlane->getConfigValues().ring_normalPriority_size +
 	                                  2 * dataPlane->getConfigValues().ring_lowPriority_size;
@@ -233,17 +233,12 @@ void cWorker::start()
 		abort();
 	}
 
-	for (unsigned int worker_port_i = 0;
-	     worker_port_i < basePermanently.workerPortsCount;
-	     worker_port_i++)
+	for (const auto& [port, queue]: basePermanently.rx_points)
 	{
-		const auto& portId = basePermanently.workerPorts[worker_port_i].inPortId;
-		const auto& queueId = basePermanently.workerPorts[worker_port_i].inQueueId;
-
-		rc = rte_eth_rx_queue_setup(portId,
-		                            queueId,
+		rc = rte_eth_rx_queue_setup(port,
+		                            queue,
 		                            dataPlane->getConfigValues().port_rx_queue_size,
-		                            rte_eth_dev_socket_id(portId),
+		                            rte_eth_dev_socket_id(port),
 		                            nullptr, ///< @todo
 		                            mempool);
 		if (rc < 0)
@@ -393,12 +388,10 @@ YANET_NEVER_INLINE void cWorker::mainThread()
 		localBaseId = currentBaseId;
 
 		/// @todo: opt
-		for (unsigned int worker_port_i = 0;
-		     worker_port_i < basePermanently.workerPortsCount;
-		     worker_port_i++)
+		for (const auto& rx_point : basePermanently.rx_points)
 		{
 			toFreePackets_handle();
-			physicalPort_ingress_handle(worker_port_i);
+			physicalPort_ingress_handle(rx_point);
 
 			if (unlikely(logicalPort_ingress_stack.mbufsCount == 0))
 			{
@@ -1024,11 +1017,11 @@ inline void cWorker::handlePackets()
 static_assert(CONFIG_YADECAP_PORTS_SIZE == 8, "(vlanId << 3) | metadata->fromPortId");
 static_assert(CONFIG_YADECAP_LOGICALPORTS_SIZE == CONFIG_YADECAP_PORTS_SIZE * 8192, "base.globalBase->logicalPorts[CALCULATE_LOGICALPORT_ID(metadata->fromPortId, vlanId)]");
 
-inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port_i)
+inline void cWorker::physicalPort_ingress_handle(const dpdk::Endpoint& rx_point)
 {
 	/// read packets from ports
-	uint16_t rxSize = rte_eth_rx_burst(basePermanently.workerPorts[worker_port_i].inPortId,
-	                                   basePermanently.workerPorts[worker_port_i].inQueueId,
+	uint16_t rxSize = rte_eth_rx_burst(rx_point.port,
+	                                   rx_point.queue,
 	                                   logicalPort_ingress_stack.mbufs,
 	                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
 
@@ -1040,7 +1033,7 @@ inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port
 		rte_mbuf* mbuf = logicalPort_ingress_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		metadata->fromPortId = basePermanently.workerPorts[worker_port_i].inPortId;
+		metadata->fromPortId = rx_point.port;
 		metadata->repeat_ttl = YANET_CONFIG_REPEAT_TTL;
 		metadata->flowLabel = 0;
 		metadata->already_early_decapped = 0;
