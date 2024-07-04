@@ -128,7 +128,6 @@ protected:
 
 public:
 	void StartInterfaces();
-	void InitPortsBarrier();
 
 protected:
 	eResult InitControlPlane();
@@ -138,7 +137,8 @@ protected:
 	eResult initGlobalBases();
 	eResult initWorkers();
 	eResult initKniQueues();
-	eResult initQueues();
+	eResult InitTxQueues();
+	eResult InitRxQueues();
 	void init_worker_base();
 
 	eResult allocateSharedMemory();
@@ -182,7 +182,7 @@ protected:
 	                    bool ///< symmetric_mode
 	                    >>
 	        ports;
-	tQueueId out_queues_ = 0;
+	tQueueId tx_queues_ = 0;
 	std::map<tCoreId, cWorker*> workers;
 	std::map<tCoreId, worker_gc_t*> worker_gcs;
 
@@ -199,7 +199,6 @@ protected:
 	                    rte_ring*>>
 	        ringPorts;
 
-	pthread_barrier_t initPortBarrier;
 	pthread_barrier_t runBarrier;
 
 	rte_mempool* mempool_log;
