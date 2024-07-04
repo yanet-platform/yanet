@@ -111,9 +111,9 @@ struct ActionDispatcher
 		{
 			worker->acl_log(mbuf, action.flow, acl_id);
 		}
-		if (action.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
+		if (action.flow.flags & (uint8_t)common::globalBase::eFlowFlags::recordstate)
 		{
-			worker->acl_create_keepstate(mbuf, acl_id, action.flow);
+			worker->acl_create_state(mbuf, acl_id, action.flow);
 		}
 
 		if constexpr (Direction == FlowDirection::Egress)
