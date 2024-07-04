@@ -192,7 +192,7 @@ protected:
 	inline FlowFromState acl_checkstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
 	inline FlowFromState acl_egress_checkstate(rte_mbuf* mbuf);
 	inline FlowFromState acl_egress_checkstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
-	inline void acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow);
+	inline void acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow);
 	inline void acl_state_emit(tAclId aclId, const dataplane::globalBase::fw_state_sync_frame_t& frame);
 
 	inline void acl_egress_entry(rte_mbuf* mbuf, tAclId aclId);

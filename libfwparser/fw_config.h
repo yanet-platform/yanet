@@ -216,7 +216,7 @@ struct rule_t
 	enum class opcode_t
 	{
 		DIRECTION,
-		KEEPSTATE,
+		RECORDSTATE,
 		IPID,
 		IPLEN,
 		IPTTL,
@@ -299,7 +299,7 @@ struct rule_t
 
 	location_history_t location; // file:lineno
 	rule_state_t state = rule_state_t::UNKNOWN;
-	bool keepstate = false;
+	bool recordstate = false;
 	bool log = false; // has log option
 	unsigned int logamount = 0; // log limit
 	unsigned int setno = 0; // set number

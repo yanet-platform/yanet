@@ -415,7 +415,7 @@ common::icp::limit_summary::response cControlPlane::limit_summary() const
 
 common::icp::acl_unwind::response cControlPlane::acl_unwind(const common::icp::acl_unwind::request& request) const
 {
-	const auto& [module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, keepstate] = request;
+	const auto& [module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, recordstate] = request;
 
 	generations.current_lock();
 	std::map<std::string, controlplane::base::acl_t> acls = generations.current().acls;
@@ -434,7 +434,7 @@ common::icp::acl_unwind::response cControlPlane::acl_unwind(const common::icp::a
 		acls.swap(acls_next);
 	}
 
-	return acl::unwind(acls, iface_map, module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, keepstate);
+	return acl::unwind(acls, iface_map, module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, recordstate);
 }
 
 common::icp::acl_lookup::response cControlPlane::acl_lookup(const common::icp::acl_lookup::request& request) const
