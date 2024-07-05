@@ -1,0 +1,41 @@
+ARG RELEASE=22.04
+FROM --platform=linux/amd64 ubuntu:${RELEASE}
+
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends \
+    build-essential \
+    ninja-build \
+    pkg-config \
+    git \
+    libnuma-dev \
+    libibverbs-dev \
+    libpcap-dev \
+    libsystemd-dev \
+    libyaml-cpp-dev \
+    libgtest-dev \
+    flex \
+    libfl-dev \
+    netbase \
+    devscripts \
+    debhelper \
+    dupload \
+    python3-pyelftools \
+    python3-pip \
+    protobuf-compiler \
+    libprotobuf-dev \
+    bison \
+    debhelper-compat
+
+RUN python3 -m pip install meson==0.61.2
+
+COPY . /opt/yanet
+WORKDIR /opt/yanet
+
+ARG YANET_VERSION_MAJOR=0
+ARG YANET_VERSION_MINOR=0
+ARG YANET_VERSION_REVISION=0
+ARG YANET_VERSION_HASH=0
+ARG YANET_VERSION_CUSTOM=development
+
+RUN dpkg-buildpackage -us -ui -uc
