@@ -1538,9 +1538,8 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 			for (tCounterId i = 0; i < (tCounterId)::balancer::real_counter::size; ++i)
 			{
 				uint64_t sum_worker = 0, sum_gc = 0;
-				for (const auto& [core_id, worker] : dataPlane->workers)
+				for (const cWorker* worker : dataPlane->workers_vector)
 				{
-					(void)core_id;
 					sum_worker += worker->counters[counter_id + i];
 				}
 				for (const auto& [core_id, worker_gc] : dataPlane->worker_gcs)
@@ -1625,9 +1624,8 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 {
 	uint64_t sessions_created = 0;
 	uint64_t sessions_destroyed = 0;
-	for (const auto& [core_id, worker] : dataPlane->workers)
+	for (const cWorker* worker : dataPlane->workers_vector)
 	{
-		(void)core_id;
 		sessions_created += worker->counters[counter_id + (tCounterId)::balancer::real_counter::sessions_created];
 		sessions_destroyed += worker->counters[counter_id + (tCounterId)::balancer::real_counter::sessions_destroyed];
 	}
