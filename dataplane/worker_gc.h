@@ -22,7 +22,7 @@ public:
 	~worker_gc_t();
 
 	eResult init(const tCoreId& core_id, const tSocketId& socket_id, const dataplane::base::permanently& base_permanently, const dataplane::base::generation& base);
-	void start(pthread_barrier_t* runBarrier);
+	void start();
 
 	void run_on_this_thread(const std::function<bool()>& callback);
 	void nat64stateful_state(const common::idp::nat64stateful_state::request& request, common::idp::nat64stateful_state::response& response);

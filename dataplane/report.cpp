@@ -69,9 +69,8 @@ nlohmann::json cReport::getReport()
 {
 	nlohmann::json jsonReport;
 
-	for (const auto& iter : dataPlane->workers)
+	for (const cWorker* worker : dataPlane->workers_vector)
 	{
-		const cWorker* worker = iter.second;
 		jsonReport["workers"].emplace_back(convertWorker(worker));
 	}
 

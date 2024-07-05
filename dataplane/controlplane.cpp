@@ -74,36 +74,6 @@ eResult cControlPlane::init(bool use_kernel_interface)
 
 void cControlPlane::start()
 {
-	/// start devices
-	for (const auto& portIter : dataPlane->ports)
-	{
-		const tPortId& portId = portIter.first;
-
-		int rc = rte_eth_dev_start(portId);
-		if (rc)
-		{
-			YADECAP_LOG_ERROR("can't start eth dev(%d, %d): %s\n",
-			                  rc,
-			                  rte_errno,
-			                  rte_strerror(rte_errno));
-			abort();
-		}
-
-		rte_eth_promiscuous_enable(portId);
-	}
-
-	auto rc = pthread_barrier_wait(&dataPlane->runBarrier);
-	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
-	{
-		pthread_barrier_destroy(&dataPlane->runBarrier);
-	}
-	else if (rc != 0)
-	{
-		YADECAP_LOG_ERROR("pthread_barrier_wait() = %d\n", rc);
-		/// @todo: stop
-		return;
-	}
-
 	mainThread();
 }
 
@@ -248,15 +218,12 @@ common::idp::getOtherStats::response cControlPlane::getOtherStats()
 
 	/// workers
 	{
-		for (const auto& iter : dataPlane->workers)
+		for (const cWorker* worker : dataPlane->workers_vector)
 		{
-			const tCoreId& coreId = iter.first;
-			const cWorker* worker = iter.second;
-
 			std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1> bursts;
 			memcpy(&bursts[0], worker->bursts, sizeof(worker->bursts));
 
-			response_workers[coreId] = {bursts};
+			response_workers[worker->coreId] = {bursts};
 		}
 	}
 
@@ -273,9 +240,21 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 	{
 		for (const auto& coreId : request)
 		{
-			/// @todo: check coreId
+			const cWorker* worker;
 
-			const auto& worker = dataPlane->workers.find(coreId)->second;
+			if (auto it = dataPlane->workers.find(coreId); it != dataPlane->workers.end())
+			{
+				worker = it->second;
+			}
+			if (!worker && coreId == dataPlane->config.controlPlaneCoreId)
+			{
+				worker = dataPlane->slow_worker;
+			}
+			if (!worker)
+			{
+				YANET_LOG_ERROR("Worker stats requested for unused core id (%d)\n", coreId);
+				continue;
+			}
 
 			std::map<tPortId, common::worker::stats::port> portsStats;
 			for (const auto& portIter : dataPlane->ports)
@@ -292,7 +271,7 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 	{
 		/// all workers
 
-		for (const auto& [coreId, worker] : dataPlane->workers)
+		for (const cWorker* worker : dataPlane->workers_vector)
 		{
 			std::map<tPortId, common::worker::stats::port> portsStats;
 			for (const auto& portIter : dataPlane->ports)
@@ -300,9 +279,9 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 				portsStats[portIter.first] = worker->statsPorts[portIter.first];
 			}
 
-			response[coreId] = {worker->iteration,
-			                    worker->stats,
-			                    portsStats};
+			response[worker->coreId] = {worker->iteration,
+			                            worker->stats,
+			                            portsStats};
 		}
 	}
 
@@ -396,10 +375,8 @@ common::idp::get_ports_stats::response cControlPlane::get_ports_stats()
 		}
 
 		uint64_t physicalPort_egress_drops = 0;
-		for (const auto& [coreId, worker] : dataPlane->workers)
+		for (const cWorker* worker : dataPlane->workers_vector)
 		{
-			(void)coreId;
-
 			physicalPort_egress_drops += worker->statsPorts[portId].physicalPort_egress_drops;
 		}
 
@@ -580,10 +557,8 @@ common::idp::getAclCounters::response cControlPlane::getAclCounters()
 	common::idp::getAclCounters::response response;
 
 	response.resize(YANET_CONFIG_ACL_COUNTERS_SIZE);
-	for (const auto& [coreId, worker] : dataPlane->workers)
+	for (const cWorker* worker : dataPlane->workers_vector)
 	{
-		(void)coreId;
-
 		for (size_t i = 0; i < YANET_CONFIG_ACL_COUNTERS_SIZE; i++)
 		{
 			response[i] += worker->aclCounters[i];
@@ -647,9 +622,8 @@ common::idp::getCounters::response cControlPlane::getCounters(const common::idp:
 		}
 
 		uint64_t counter = 0;
-		for (const auto& [core_id, worker] : dataPlane->workers)
+		for (const cWorker* worker : dataPlane->workers_vector)
 		{
-			(void)core_id;
 			counter += worker->counters[counter_id];
 		}
 
@@ -677,17 +651,14 @@ common::idp::getConfig::response cControlPlane::getConfig() const
 		                           pci};
 	}
 
-	for (const auto& workerIter : dataPlane->workers)
+	for (const cWorker* worker : dataPlane->workers_vector)
 	{
-		const tCoreId& coreId = workerIter.first;
-		const cWorker* worker = workerIter.second;
-
 		for (const auto& endpoint : worker->basePermanently.rx_points)
 		{
-			std::get<0>(response_workers[coreId]).emplace_back(endpoint.port);
+			std::get<0>(response_workers[worker->coreId]).emplace_back(endpoint.port);
 		}
 
-		std::get<1>(response_workers[coreId]) = worker->socketId;
+		std::get<1>(response_workers[worker->coreId]) = worker->socketId;
 	}
 
 	/// @todo: worker_gcs
@@ -1123,13 +1094,12 @@ common::idp::get_counter_by_name::response cControlPlane::get_counter_by_name(co
 	}
 
 	// core_id was not specified, return counter for each core_id
-	for (const auto& [core_id, worker] : dataPlane->workers)
+	for (const cWorker* worker : dataPlane->workers_vector)
 	{
-		(void)worker;
-		std::optional<uint64_t> counter_val = dataPlane->getCounterValueByName(counter_name, core_id);
+		std::optional<uint64_t> counter_val = dataPlane->getCounterValueByName(counter_name, worker->coreId);
 		if (counter_val.has_value())
 		{
-			response[core_id] = counter_val.value();
+			response[worker->coreId] = counter_val.value();
 		}
 	}
 
@@ -1252,10 +1222,8 @@ void cControlPlane::switchBase()
 {
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
-	for (auto& iter : dataPlane->workers)
+	for (cWorker* worker : dataPlane->workers_vector)
 	{
-		auto* worker = iter.second;
-
 		worker->currentBaseId ^= 1;
 	}
 
@@ -1272,9 +1240,8 @@ void cControlPlane::switchBase()
 
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
-	for (auto& iter : dataPlane->workers)
+	for (cWorker* worker : dataPlane->workers_vector)
 	{
-		auto* worker = iter.second;
 		auto& base = worker->bases[worker->currentBaseId];
 		auto& baseNext = worker->bases[worker->currentBaseId ^ 1];
 
@@ -1313,10 +1280,8 @@ void cControlPlane::waitAllWorkers()
 {
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
-	for (const auto& [core_id, worker] : dataPlane->workers)
+	for (const cWorker* worker : dataPlane->workers_vector)
 	{
-		(void)core_id;
-
 		uint64_t startIteration = worker->iteration;
 		uint64_t nextIteration = startIteration;
 		while (nextIteration - startIteration <= (uint64_t)16)
@@ -1401,9 +1366,8 @@ void cControlPlane::mainThread()
 			for (unsigned hIter = 0; hIter < YANET_CONFIG_RING_PRIORITY_RATIO; hIter++)
 			{
 				unsigned hProcessed = 0;
-				for (const auto& iter : dataPlane->workers)
+				for (cWorker* worker : dataPlane->workers_vector)
 				{
-					cWorker* worker = iter.second;
 					hProcessed += ring_handle(worker->ring_toFreePackets, worker->ring_highPriority);
 				}
 				if (!hProcessed)
@@ -1413,9 +1377,8 @@ void cControlPlane::mainThread()
 			}
 
 			unsigned nProcessed = 0;
-			for (const auto& iter : dataPlane->workers)
+			for (cWorker* worker : dataPlane->workers_vector)
 			{
-				cWorker* worker = iter.second;
 				nProcessed += ring_handle(worker->ring_toFreePackets, worker->ring_normalPriority);
 			}
 			if (!nProcessed)
@@ -1423,9 +1386,8 @@ void cControlPlane::mainThread()
 				break;
 			}
 		}
-		for (const auto& iter : dataPlane->workers)
+		for (cWorker* worker : dataPlane->workers_vector)
 		{
-			cWorker* worker = iter.second;
 			ring_handle(worker->ring_toFreePackets, worker->ring_lowPriority);
 		}
 
