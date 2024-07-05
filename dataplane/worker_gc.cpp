@@ -114,23 +114,8 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 	return dpdk::RingConn<rte_mbuf*>{std::move(rs.value()), std::move(rf.value())};
 }
 
-void worker_gc_t::start(pthread_barrier_t* runBarrier)
+void worker_gc_t::start()
 {
-	/// @todo: prepare
-
-	int rc;
-
-	rc = pthread_barrier_wait(runBarrier);
-	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
-	{
-		pthread_barrier_destroy(runBarrier);
-	}
-	else if (rc != 0)
-	{
-		YADECAP_LOG_ERROR("pthread_barrier_wait() = %d\n", rc);
-		abort();
-	}
-
 	thread();
 }
 

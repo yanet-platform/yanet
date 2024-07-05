@@ -126,6 +126,9 @@ protected:
 	eResult initEal(const std::string& binaryPath, const std::string& filePrefix);
 	eResult initPorts();
 
+	std::map<tCoreId, std::function<void()>> coreFunctions_;
+	static int LcoreFunc(void* args);
+
 public:
 	void StartInterfaces();
 
@@ -185,6 +188,7 @@ protected:
 	tQueueId tx_queues_ = 0;
 	std::map<tCoreId, cWorker*> workers;
 	std::map<tCoreId, worker_gc_t*> worker_gcs;
+	cWorker* slow_worker;
 
 	std::mutex currentGlobalBaseId_mutex;
 	uint8_t currentGlobalBaseId;
@@ -198,8 +202,6 @@ protected:
 	                    rte_ring*,
 	                    rte_ring*>>
 	        ringPorts;
-
-	pthread_barrier_t runBarrier;
 
 	rte_mempool* mempool_log;
 
