@@ -9,6 +9,7 @@
 
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
+#include "common/sdpclient.h"
 #include "common/tsc_deltas.h"
 
 #include "helper.h"
@@ -151,7 +152,7 @@ void counter(const uint32_t& counter_id,
 		}
 	}
 
-	const auto response = dataplane.getCounters(counter_ids);
+	const auto response = common::sdp::SdpClient::GetCounters(counter_ids);
 
 	table_t table;
 	table.insert("counter_id",

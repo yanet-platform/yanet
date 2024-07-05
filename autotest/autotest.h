@@ -11,6 +11,7 @@
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
 #include "common/result.h"
+#include "common/sdpclient.h"
 
 using ipv4_address_t = common::ipv4_address_t;
 using ipv6_address_t = common::ipv6_address_t;
@@ -89,6 +90,7 @@ protected:
 
 	interface::dataPlane dataPlane;
 	interface::controlPlane controlPlane;
+	common::sdp::DataPlaneInSharedMemory sdp_data;
 
 	common::idp::getConfig::response dataPlaneConfig;
 	common::idp::get_shm_info::response dataPlaneSharedMemory;

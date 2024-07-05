@@ -77,21 +77,21 @@ eResult PrepareSharedMemoryData(DataPlaneInSharedMemory& sdp_data,
 
 	// Part 2 - prepare data dataplane
 	//
-	uint64_t size_dataplane_buffer = YANET_SIZE_BUFFER_METADATA_DATAPLANE;
+	sdp_data.size_dataplane_buffer = YANET_SIZE_BUFFER_METADATA_DATAPLANE;
 
 	// Fill bus info
-	cBus::FillMetadataBusCounters(sdp_data.metadata_bus, size_dataplane_buffer);
+	cBus::FillMetadataBusCounters(sdp_data.metadata_bus, sdp_data.size_dataplane_buffer);
 
 	// Create buffer in shared memory for dataplane data
 	sdp_data.dataplane_data = common::ipc::SharedMemory::CreateBuffer(YANET_SHARED_MEMORY_FILE_DATAPLANE,
-	                                                                  size_dataplane_buffer,
+	                                                                  sdp_data.size_dataplane_buffer,
 	                                                                  use_huge_tlb,
 	                                                                  std::nullopt);
 	if (sdp_data.dataplane_data == nullptr)
 	{
 		YANET_LOG_ERROR("Error create buffer in shared memory for dataplane data, filename=%s, size=%ld",
 		                YANET_SHARED_MEMORY_FILE_DATAPLANE,
-		                size_dataplane_buffer);
+		                sdp_data.size_dataplane_buffer);
 		return eResult::errorInitSharedMemory;
 	}
 
