@@ -27,7 +27,6 @@ public:
 
 	void limits(common::idp::limits::response& response) const;
 
-	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
 	static void FillMetadataWorkerCounters(common::sdp::MetadataWorkerGc& metadata);
 	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorkerGc& metadata);
 
