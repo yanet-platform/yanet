@@ -1,0 +1,5 @@
+steps:
+- cli: "telegraf counters"
+- cli: "telegraf bus"
+- cli: "bus errors"
+- cli: "bus requests"
