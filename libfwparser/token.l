@@ -163,6 +163,7 @@ rf			return ipfw::fw_parser_t::make_RF(*ploc);
 df			return ipfw::fw_parser_t::make_DF(*ploc);
 offset			return ipfw::fw_parser_t::make_OFFSET(*ploc);
 record-state		return ipfw::fw_parser_t::make_RECORDSTATE(*ploc);
+keep-state		return ipfw::fw_parser_t::make_KEEPSTATE(*ploc);
 icmptype|icmptypes	return ipfw::fw_parser_t::make_ICMPTYPES(*ploc);
 icmp6type|icmp6types	return ipfw::fw_parser_t::make_ICMP6TYPES(*ploc);
 from			return ipfw::fw_parser_t::make_FROM(*ploc);
