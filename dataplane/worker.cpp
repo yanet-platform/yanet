@@ -27,6 +27,29 @@
 #include "prepare.h"
 #include "worker.h"
 
+namespace debug
+{
+void check_buf_addr(rte_mbuf* m)
+{
+	if (m->buf_addr == nullptr)
+	{
+		fprintf(stderr, "worker %u freeing poisoned packet %p\n", rte_lcore_id(), reinterpret_cast<void*>(m));
+	}
+}
+void rte_pktmbuf_free(rte_mbuf* m)
+{
+	check_buf_addr(m);
+	::rte_pktmbuf_free(m);
+}
+
+void check_before_tx(rte_mbuf** burst, uint16_t size)
+{
+	for (uint16_t i = 0; i < size; ++i)
+	{
+		check_buf_addr(burst[i]);
+	}
+}
+} // namespace debug
 //
 
 cWorker::cWorker(cDataPlane* dataPlane) :
@@ -1104,6 +1127,7 @@ inline void cWorker::physicalPort_egress_handle()
 			continue;
 		}
 
+		debug::check_before_tx(physicalPort_stack[i].mbufs, physicalPort_stack[i].mbufsCount);
 		uint16_t txSize = rte_eth_tx_burst(portId,
 		                                   basePermanently.outQueueId,
 		                                   physicalPort_stack[i].mbufs,
@@ -1115,7 +1139,7 @@ inline void cWorker::physicalPort_egress_handle()
 		     txSize < physicalPort_stack[i].mbufsCount;
 		     txSize++)
 		{
-			rte_pktmbuf_free(physicalPort_stack[i].mbufs[txSize]);
+			debug::rte_pktmbuf_free(physicalPort_stack[i].mbufs[txSize]);
 		}
 
 		physicalPort_stack[i].clear();
@@ -2237,7 +2261,7 @@ inline void cWorker::route_handle4()
 		if (route_ipv4_values[mbuf_i] == dataplane::lpmValueIdInvalid)
 		{
 			stats.interface_lookupMisses++;
-			rte_pktmbuf_free(mbuf);
+			debug::rte_pktmbuf_free(mbuf);
 			continue;
 		}
 
@@ -2311,7 +2335,7 @@ inline void cWorker::route_handle4()
 			if (metadata->repeat_ttl == 0)
 			{
 				stats.repeat_ttl++;
-				rte_pktmbuf_free(mbuf);
+				debug::rte_pktmbuf_free(mbuf);
 			}
 			else
 			{
@@ -2362,7 +2386,7 @@ inline void cWorker::route_handle6()
 		if (route_ipv6_values[mbuf_i] == dataplane::lpmValueIdInvalid)
 		{
 			stats.interface_lookupMisses++;
-			rte_pktmbuf_free(mbuf);
+			debug::rte_pktmbuf_free(mbuf);
 			continue;
 		}
 
@@ -2430,7 +2454,7 @@ inline void cWorker::route_handle6()
 			if (metadata->repeat_ttl == 0)
 			{
 				stats.repeat_ttl++;
-				rte_pktmbuf_free(mbuf);
+				debug::rte_pktmbuf_free(mbuf);
 			}
 			else
 			{
@@ -2568,7 +2592,7 @@ inline void cWorker::route_tunnel_handle4()
 		if (route_ipv4_values[mbuf_i] == dataplane::lpmValueIdInvalid)
 		{
 			stats.interface_lookupMisses++;
-			rte_pktmbuf_free(mbuf);
+			debug::rte_pktmbuf_free(mbuf);
 			continue;
 		}
 
@@ -2647,7 +2671,7 @@ inline void cWorker::route_tunnel_handle4()
 			if (metadata->repeat_ttl == 0)
 			{
 				stats.repeat_ttl++;
-				rte_pktmbuf_free(mbuf);
+				debug::rte_pktmbuf_free(mbuf);
 			}
 			else
 			{
@@ -2699,7 +2723,7 @@ inline void cWorker::route_tunnel_handle6()
 		if (route_ipv6_values[mbuf_i] == dataplane::lpmValueIdInvalid)
 		{
 			stats.interface_lookupMisses++;
-			rte_pktmbuf_free(mbuf);
+			debug::rte_pktmbuf_free(mbuf);
 			continue;
 		}
 
@@ -2772,7 +2796,7 @@ inline void cWorker::route_tunnel_handle6()
 			if (metadata->repeat_ttl == 0)
 			{
 				stats.repeat_ttl++;
-				rte_pktmbuf_free(mbuf);
+				debug::rte_pktmbuf_free(mbuf);
 			}
 			else
 			{
@@ -5810,7 +5834,7 @@ inline void cWorker::controlPlane_handle()
 	{
 		rte_mbuf* mbuf = controlPlane_stack.mbufs[mbuf_i];
 		stats.ring_normalPriority_drops++;
-		rte_pktmbuf_free(mbuf);
+		debug::rte_pktmbuf_free(mbuf);
 	}
 
 	stats.ring_normalPriority_packets += count;
@@ -5847,7 +5871,7 @@ inline void cWorker::drop(rte_mbuf* mbuf)
 		}
 	}
 
-	rte_pktmbuf_free(mbuf);
+	debug::rte_pktmbuf_free(mbuf);
 }
 
 inline void cWorker::toFreePackets_handle()
@@ -5861,7 +5885,7 @@ inline void cWorker::toFreePackets_handle()
 	     mbuf_i++)
 	{
 		rte_mbuf* mbuf = stack.mbufs[mbuf_i];
-		rte_pktmbuf_free(mbuf);
+		debug::rte_pktmbuf_free(mbuf);
 	}
 }
 
@@ -5876,7 +5900,7 @@ inline void cWorker::slowWorker_entry_highPriority(rte_mbuf* mbuf,
 	if (rte_ring_sp_enqueue(ring_highPriority, (void*)mbuf))
 	{
 		stats.ring_highPriority_drops++;
-		rte_pktmbuf_free(mbuf);
+		debug::rte_pktmbuf_free(mbuf);
 	}
 	else
 	{
@@ -5891,7 +5915,7 @@ inline void cWorker::slowWorker_entry_normalPriority(rte_mbuf* mbuf,
 
 	if (basePermanently.SWNormalPriorityRateLimitPerWorker != 0 && __atomic_fetch_sub(&packetsToSWNPRemainder, 1, __ATOMIC_RELAXED) <= 0)
 	{
-		rte_pktmbuf_free(mbuf);
+		debug::rte_pktmbuf_free(mbuf);
 		counters[(uint32_t)common::globalBase::static_counter_type::slow_worker_normal_priority_rate_limit_exceeded]++;
 
 		return;
@@ -5903,7 +5927,7 @@ inline void cWorker::slowWorker_entry_normalPriority(rte_mbuf* mbuf,
 	if (rte_ring_sp_enqueue(ring_normalPriority, (void*)mbuf))
 	{
 		stats.ring_normalPriority_drops++;
-		rte_pktmbuf_free(mbuf);
+		debug::rte_pktmbuf_free(mbuf);
 	}
 	else
 	{
@@ -5918,7 +5942,7 @@ inline void cWorker::slowWorker_entry_lowPriority(rte_mbuf* mbuf)
 	if (rte_ring_sp_enqueue(ring_lowPriority, (void*)mbuf))
 	{
 		stats.ring_lowPriority_drops++;
-		rte_pktmbuf_free(mbuf);
+		debug::rte_pktmbuf_free(mbuf);
 	}
 	else
 	{
@@ -6061,7 +6085,7 @@ YANET_NEVER_INLINE void cWorker::slowWorkerFarmHandleFragment(rte_mbuf* mbuf)
 	if (metadata->repeat_ttl == 0)
 	{
 		stats.repeat_ttl++;
-		rte_pktmbuf_free(mbuf);
+		debug::rte_pktmbuf_free(mbuf);
 		return;
 	}
 
