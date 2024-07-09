@@ -39,6 +39,7 @@ using location_history_t = struct location_history
 {
 	size_t lineno; // line number in the config file
 	size_t fileno; // file number in the history
+	bool implicitly_generated_rule = false; // flag for implicitly generated rules
 };
 
 using label_info_t = std::tuple<unsigned int, // ruleno
@@ -217,6 +218,7 @@ struct rule_t
 	{
 		DIRECTION,
 		RECORDSTATE,
+		KEEPSTATE,
 		IPID,
 		IPLEN,
 		IPTTL,
@@ -300,6 +302,7 @@ struct rule_t
 	location_history_t location; // file:lineno
 	rule_state_t state = rule_state_t::UNKNOWN;
 	bool recordstate = false;
+	bool implicit_check_state = false;
 	bool log = false; // has log option
 	unsigned int logamount = 0; // log limit
 	unsigned int setno = 0; // set number
@@ -449,6 +452,7 @@ public:
 	{
 		m_curr_rule->log = true;
 	}
+	void fill_rule_number_if_needed();
 	void fill_rule_proto(uint8_t);
 	void fill_rule_proto(const std::string&);
 	void fill_rule_ipver(rule_t::ip_version_t ver);
@@ -497,6 +501,20 @@ public:
 	void add_via_table();
 	void set_rule_flag(uint32_t);
 	void clear_rule_flag(uint32_t);
+
+	/**
+	 * @brief Adds an implicit check-state rule.
+	 *
+	 * This function creates a check-state rule based on the current rule's
+	 * configuration. The newly created rule is marked as implicitly generated
+	 * and is inserted into the rules list. After adding the check-state rule,
+	 * the original rule configuration is restored, and the rule number is reset
+	 * for automatic generation.
+	 *
+	 * This is used to handle the `keep-state` option, which requires an implicit
+	 * check-state rule to be added before the original rule.
+	 */
+	void add_implicit_check_state_rule();
 
 	std::string format_location(const location_history_t& loc);
 	const auto& labels() const
