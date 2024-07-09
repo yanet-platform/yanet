@@ -591,4 +591,113 @@ add 500 deny ip from any to any
 	           value);
 }
 
+TEST(ACL, KeepState_Basic)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add allow ip from any to any keep-state
+add deny ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 1);
+
+	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
+	{
+		(void)total_table_key;
+
+		const auto& value = result.acl_values[total_table_value];
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path includes the allow action
+				EXPECT_THAT(actions.get_actions().size(), 1);
+				EXPECT_TRUE(std::holds_alternative<common::FlowAction>(actions.get_actions()[0].raw_action));
+
+				// Check that the check-state path includes the check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			}
+		},
+		           value);
+	}
+}
+
+TEST(ACL, KeepState_MultipleRules)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add allow ip from { 1.2.3.4 } to any keep-state
+add allow ip from any to any 22 keep-state
+add deny ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
+	{
+		(void)total_table_key;
+
+		const auto& value = result.acl_values[total_table_value];
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path includes the allow action
+				EXPECT_THAT(actions.get_actions().size(), 1);
+				EXPECT_TRUE(std::holds_alternative<common::FlowAction>(actions.get_actions()[0].raw_action));
+
+				// Check that the check-state path includes the check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			}
+		},
+		           value);
+	}
+}
+
+TEST(ACL, KeepState_WithSkipTo)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add skipto :IN ip from { 1.2.3.4 } to any in
+add deny ip from any to any
+
+:IN
+add allow ip from any to any keep-state
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
+	{
+		(void)total_table_key;
+
+		const auto& value = result.acl_values[total_table_value];
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path includes the allow action
+				EXPECT_THAT(actions.get_actions().size(), 1);
+				EXPECT_TRUE(std::holds_alternative<common::FlowAction>(actions.get_actions()[0].raw_action));
+
+				// Check that the check-state path includes the check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			}
+		},
+		           value);
+	}
+}
+
 } // namespace
