@@ -1,6 +1,22 @@
 steps:
 - ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
 - ipv6Update: "::/0 -> fe80::1"
+
+- subtest: with check-state and record-state
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sleep: 1
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+- clearFWState: 1
+
+- reload: controlplane_keepstate.conf
+
+- subtest: with just keep-state
 - sendPackets:
   - port: kni0
     send: 001-send.pcap
