@@ -1756,33 +1756,24 @@ void cControlPlane::mainThread()
 			/// recv from in.X/out.X/drop.X interfaces and free packets
 			for (int i = 0; i < slowWorker->basePermanently.ports.size(); ++i)
 			{
-				for (auto& iface : in_dump_kernel_interfaces)
-				{
+				unsigned rxSize;
+				rxSize = rte_eth_rx_burst(in_dump_kernel_interfaces[i].kernel_port_id,
+				                          0,
+				                          operational,
+				                          CONFIG_YADECAP_MBUFS_BURST_SIZE);
+				rte_pktmbuf_free_bulk(operational, rxSize);
 
-					unsigned rxSize = rte_eth_rx_burst(iface.kernel_port_id,
-					                                   0,
-					                                   operational,
-					                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-					rte_pktmbuf_free_bulk(operational, rxSize);
-				}
-				for (auto& iface : out_dump_kernel_interfaces)
-				{
+				rxSize = rte_eth_rx_burst(out_dump_kernel_interfaces[i].kernel_port_id,
+				                          0,
+				                          operational,
+				                          CONFIG_YADECAP_MBUFS_BURST_SIZE);
+				rte_pktmbuf_free_bulk(operational, rxSize);
 
-					unsigned rxSize = rte_eth_rx_burst(iface.kernel_port_id,
-					                                   0,
-					                                   operational,
-					                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-					rte_pktmbuf_free_bulk(operational, rxSize);
-				}
-				for (auto& iface : drop_dump_kernel_interfaces)
-				{
-
-					unsigned rxSize = rte_eth_rx_burst(iface.kernel_port_id,
-					                                   0,
-					                                   operational,
-					                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
-					rte_pktmbuf_free_bulk(operational, rxSize);
-				}
+				rxSize = rte_eth_rx_burst(drop_dump_kernel_interfaces[i].kernel_port_id,
+				                          0,
+				                          operational,
+				                          CONFIG_YADECAP_MBUFS_BURST_SIZE);
+				rte_pktmbuf_free_bulk(operational, rxSize);
 			}
 		}
 
@@ -3151,8 +3142,8 @@ void cControlPlane::handlePacket_dump(rte_mbuf* mbuf)
 		if (iface.mbufs_count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
 		{
 			flush_kernel_interface(iface);
-			iface.mbufs[iface.mbufs_count++] = mbuf;
 		}
+		iface.mbufs[iface.mbufs_count++] = mbuf;
 	};
 
 	if (metadata->flow.data.dump.type == common::globalBase::dump_type_e::physicalPort_ingress)
