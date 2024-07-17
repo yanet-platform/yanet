@@ -1931,8 +1931,8 @@ void cControlPlane::handlePacketFromForwardingPlane(rte_mbuf* mbuf)
 		if (iface.mbufs_count == CONFIG_YADECAP_MBUFS_BURST_SIZE)
 		{
 			flush_kernel_interface(iface, kernel_stats[portmapper.ToLogical(metadata->fromPortId)]);
-			iface.mbufs[iface.mbufs_count++] = mbuf;
 		}
+		iface.mbufs[iface.mbufs_count++] = mbuf;
 	}
 }
 
