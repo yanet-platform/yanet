@@ -123,6 +123,7 @@ protected: /** commands */
 	common::icp::loadConfig::response command_loadConfig(const common::icp::loadConfig::request& request);
 	common::icp::version::response command_version();
 	common::icp::convert::response command_convert(const common::icp::convert::request& request);
+	common::icp::counters_stat::response command_counters_stat();
 
 	common::icp::convert::response convert_logical_module();
 
