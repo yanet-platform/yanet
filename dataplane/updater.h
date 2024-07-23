@@ -139,15 +139,12 @@ public:
 		return result;
 	}
 
-	eResult clear()
+	void clear()
 	{
 		if (pointer)
 		{
-			memory_manager->destroy(pointer);
-			pointer = nullptr;
+			pointer->clear();
 		}
-
-		return create(2 * object_type::extended_chunks_size_min);
 	}
 
 	void limits(common::idp::limits::response& limits) const
@@ -278,15 +275,12 @@ public:
 		return result;
 	}
 
-	eResult clear()
+	void clear()
 	{
 		if (pointer)
 		{
-			memory_manager->destroy(pointer);
-			pointer = nullptr;
+			pointer->clear();
 		}
-
-		return create(2 * object_type::extended_chunks_size_min);
 	}
 
 	void limits(common::idp::limits::response& limits) const
