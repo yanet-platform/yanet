@@ -49,6 +49,7 @@ struct tDataPlaneConfig
 	std::map<tCoreId, std::vector<std::string>> workers;
 	bool useHugeMem = true;
 	bool use_kernel_interface = true;
+	bool interfaces_required = true;
 	uint64_t rssFlags = RTE_ETH_RSS_IP;
 	uint32_t SWNormalPriorityRateLimitPerWorker = 0;
 	uint32_t SWICMPOutRateLimit = 0;
