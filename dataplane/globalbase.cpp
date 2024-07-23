@@ -199,7 +199,7 @@ eResult generation::init()
 			return result;
 		}
 
-		route_lpm4 = updater.route_lpm4->pointer;
+		route_lpm4 = updater.route_lpm4->pointer();
 	}
 
 	{
@@ -212,7 +212,7 @@ eResult generation::init()
 			return result;
 		}
 
-		route_lpm6 = updater.route_lpm6->pointer;
+		route_lpm6 = updater.route_lpm6->pointer();
 	}
 
 	{
@@ -225,7 +225,7 @@ eResult generation::init()
 			return result;
 		}
 
-		route_tunnel_lpm4 = updater.route_tunnel_lpm4->pointer;
+		route_tunnel_lpm4 = updater.route_tunnel_lpm4->pointer();
 	}
 
 	{
@@ -238,7 +238,7 @@ eResult generation::init()
 			return result;
 		}
 
-		route_tunnel_lpm6 = updater.route_tunnel_lpm6->pointer;
+		route_tunnel_lpm6 = updater.route_tunnel_lpm6->pointer();
 	}
 
 	return result;
@@ -1782,22 +1782,15 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 		{
 			YADECAP_LOG_DEBUG("route lpm clear\n");
 
-			result = updater.route_lpm4->clear();
-			if (result != eResult::success)
-			{
-				return result;
-			}
+			updater.route_lpm4->clear();
+			updater.route_lpm6->clear();
 
-			result = updater.route_lpm6->clear();
-			if (result != eResult::success)
-			{
-				return result;
-			}
+			return eResult::success;
 		}
 	}
 
-	route_lpm4 = updater.route_lpm4->pointer;
-	route_lpm6 = updater.route_lpm6->pointer;
+	route_lpm4 = updater.route_lpm4->pointer();
+	route_lpm6 = updater.route_lpm6->pointer();
 
 	return result;
 }
@@ -1955,22 +1948,15 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 		{
 			YADECAP_LOG_DEBUG("route_tunnel lpm clear\n");
 
-			result = updater.route_tunnel_lpm4->clear();
-			if (result != eResult::success)
-			{
-				return result;
-			}
+			updater.route_tunnel_lpm4->clear();
+			updater.route_tunnel_lpm6->clear();
 
-			result = updater.route_tunnel_lpm6->clear();
-			if (result != eResult::success)
-			{
-				return result;
-			}
+			return eResult::success;
 		}
 	}
 
-	route_tunnel_lpm4 = updater.route_tunnel_lpm4->pointer;
-	route_tunnel_lpm6 = updater.route_tunnel_lpm6->pointer;
+	route_tunnel_lpm4 = updater.route_tunnel_lpm4->pointer();
+	route_tunnel_lpm6 = updater.route_tunnel_lpm6->pointer();
 
 	return result;
 }
