@@ -48,6 +48,12 @@ public:
 		uint64_t extended_chunks_size;
 		uint32_t max_used_chunk_id;
 		tEntry free_chunk_cache;
+		void clear()
+		{
+			extended_chunks_count = 0;
+			max_used_chunk_id = 0;
+			free_chunk_cache.flags = 0;
+		}
 	};
 
 	static uint64_t calculate_sizeof(const uint64_t extended_chunks_size)
@@ -715,6 +721,12 @@ public:
 		uint64_t extended_chunks_size;
 		uint32_t max_used_chunk_id;
 		tEntry free_chunk_cache;
+		void clear()
+		{
+			extended_chunks_count = 0;
+			max_used_chunk_id = 0;
+			free_chunk_cache.flags = 0;
+		}
 	};
 
 	static uint64_t calculate_sizeof(const uint64_t extended_chunks_size)
