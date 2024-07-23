@@ -380,20 +380,27 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 
 void route_t::prefix_flush()
 {
+fprintf(stdout, "flush beg\n");
+
 	common::idp::updateGlobalBase::request globalbase;
 
 	generations.next_lock();
 	generations_neighbors.next_lock();
+fprintf(stdout, "flush 1\n");
 
 	tunnel_counter.allocate();
+fprintf(stdout, "flush 2\n");
 
 	compile(globalbase, generations.current());
+fprintf(stdout, "flush 3\n");
 	dataplane.updateGlobalBase(globalbase); ///< может вызвать исключение, которое никто не поймает, и это приведёт к abort()
+fprintf(stdout, "flush 4\n");
 
 	tunnel_counter.release();
 
 	generations_neighbors.next_unlock();
 	generations.next_unlock();
+fprintf(stdout, "flush end\n");
 }
 
 common::icp::route_config::response route_t::route_config() const

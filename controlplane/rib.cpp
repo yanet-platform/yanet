@@ -119,6 +119,8 @@ void rib_t::reload(const controlplane::base_t& base_prev,
 
 void rib_t::rib_update(const common::icp::rib_update::request& request)
 {
+fprintf(stdout, "rib_update beg\n");
+
 	std::lock_guard<std::mutex> rib_update_guard(rib_update_mutex);
 
 	for (const auto& action : request)
@@ -141,11 +143,14 @@ void rib_t::rib_update(const common::icp::rib_update::request& request)
 		}
 	}
 
+fprintf(stdout, "rib_update end\n");
+
 	need_flushing = true;
 }
 
 void rib_t::rib_insert(const common::icp::rib_update::insert& request)
 {
+fprintf(stdout, "rib_insert beg\n");
 	const auto& [protocol, vrf, priority, attribute_tables] = request;
 
 	rib::vrf_priority_t vrf_priority = {vrf, priority};
@@ -261,6 +266,7 @@ void rib_t::rib_insert(const common::icp::rib_update::insert& request)
 			}
 		}
 	}
+fprintf(stdout, "rib_insert end\n");
 }
 
 void rib_t::rib_remove(const common::icp::rib_update::remove& request)
@@ -548,6 +554,7 @@ void rib_t::rib_clear(const common::icp::rib_update::clear& request)
 
 void rib_t::rib_eor(const common::icp::rib_update::eor& request)
 {
+fprintf(stdout, "rib_eor beg\n");
 	std::lock_guard<std::mutex> summary_guard(summary_mutex);
 
 	const auto& [protocol, vrf, priority, peer, table_name] = request;
@@ -557,10 +564,13 @@ void rib_t::rib_eor(const common::icp::rib_update::eor& request)
 	(void)summary_paths;
 
 	summary_eor = true;
+fprintf(stdout, "rib_eor fin\n");
 }
 
 void rib_t::rib_flush(bool force_flush)
 {
+fprintf(stdout, "rib_flush beg\n");
+
 	bool flush;
 	{
 		std::lock_guard<std::mutex> rib_update_guard(rib_update_mutex);
@@ -600,9 +610,13 @@ void rib_t::rib_flush(bool force_flush)
 
 	if (flush)
 	{
+fprintf(stdout, "rib_flush 1\n");
 		controlPlane->route.prefix_flush();
+fprintf(stdout, "rib_flush 2\n");
 		controlPlane->dregress.prefix_flush();
+fprintf(stdout, "rib_flush 3\n");
 	}
+fprintf(stdout, "rib_flush end\n");
 }
 
 common::icp::rib_summary::response rib_t::rib_summary()

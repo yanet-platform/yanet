@@ -174,13 +174,17 @@ void cBus::clientThread(int clientSocket)
 		}
 
 		{
+
+fprintf(stdout, "pop msg beg\n");
 			common::stream_in_t stream(buffer);
 			stream.pop(request);
 			if (stream.isFailed())
 			{
+fprintf(stdout, "pop msg fail\n");
 				stats.errors[(uint32_t)common::idp::errorType::busParse]++;
 				break;
 			}
+fprintf(stdout, "pop msg end\n");
 		}
 
 		if (messageSize > BigMessage)
@@ -196,7 +200,9 @@ void cBus::clientThread(int clientSocket)
 		YANET_LOG_DEBUG("request type %d\n", (int)type);
 		if (type == common::idp::requestType::updateGlobalBase)
 		{
+		fprintf(stdout, "ugb start\n");
 			response = callWithResponse(&cControlPlane::updateGlobalBase, request);
+		fprintf(stdout, "ugb stop\n");
 		}
 		else if (type == common::idp::requestType::updateGlobalBaseBalancer)
 		{
