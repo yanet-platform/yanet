@@ -528,7 +528,14 @@ eResult cDataPlane::initPorts()
 
 	for (const auto& interface_name : remove_keys)
 	{
+		YANET_LOG_ERROR("Failed to init interface '%s'\n", std::get<0>(config.ports.at(interface_name.c_str())).c_str());
 		config.ports.erase(interface_name);
+	}
+
+	if (config.interfaces_required && config.ports.empty())
+	{
+		YANET_LOG_ERROR("Failed to configure at least one interface\n");
+		return eResult::errorInitEthernetDevice;
 	}
 
 	return eResult::success;
@@ -1557,6 +1564,8 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 	{
 		config.use_kernel_interface = rootJson.find("use_kernel_interface").value();
 	}
+
+	config.interfaces_required = rootJson.value("interfacesRequired", config.interfaces_required);
 
 	if (rootJson.find("rateLimits") != rootJson.end())
 	{
