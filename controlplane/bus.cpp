@@ -123,8 +123,14 @@ void bus::clientThread(int clientSocket)
 		common::icp::response response = std::tuple<>{};
 
 		{
+fprintf(stdout, "MSG SIZE %lu\n", messageSize);
+for (uint64_t idx = 0; idx < messageSize; ++idx) {
+	fprintf(stdout, "%02x", buffer[idx]);
+}
+
 			common::stream_in_t stream(buffer);
 			stream.pop(request);
+fprintf(stdout, "\npopped\n");
 			if (stream.isFailed())
 			{
 				/// @todo: stats
