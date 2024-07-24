@@ -145,17 +145,6 @@ public:
 		return std::nullopt;
 	}
 
-	std::optional<const std::string*> get_vrf(const std::string& route_name) const
-	{
-		auto it = routes.find(route_name);
-		if (it == routes.end())
-		{
-			return std::nullopt;
-		}
-
-		return &it->second.vrf; ///< read only after update
-	}
-
 	const std::map<uint32_t, std::string>* get_peers() const
 	{
 		return &peers;
@@ -169,7 +158,25 @@ public:
 		}
 	}
 
-public:
+	const std::map<std::string, controlplane::route::config_t>& get_routes() const
+	{
+		return routes;
+	}
+
+	bool is_ignored_table(const std::string& table_name) const
+	{
+		for (const auto& [name, module] : routes)
+		{
+			(void)name;
+			if (exist(module.ignore_tables, table_name))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+private:
 	std::map<std::string, controlplane::route::config_t> routes;
 	std::map<ip_prefix_t, std::tuple<tInterfaceId, std::string>> interface_by_neighbors;
 	std::map<uint32_t, std::string> peers; ///< @todo: VRF

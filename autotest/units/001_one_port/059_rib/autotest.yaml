@@ -42,7 +42,7 @@ steps:
 
 # checking whether prefix was indeed flushed
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -135,7 +135,7 @@ steps:
 - echo: "4 rib_insert() test: new nexthop_stuff, new prefix, existing \"peer-proto-table_name\" - START"
 
 - cli_check: |
-    route tunnel get route0 2.0.0.0/24
+    route tunnel get default 2.0.0.0/24
     ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
     ----------------------  -------  -----  ----------------  ----  ----------
 
@@ -175,7 +175,7 @@ steps:
     default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 2.0.0.0/24
+    route tunnel get default 2.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -188,7 +188,7 @@ steps:
 - echo: "5 rib_insert() test: existing nexthop_stuff, new prefix, new \"peer-proto-table_name\" - START"
 
 - cli_check: |
-    route tunnel get route0 3.0.0.0/24
+    route tunnel get default 3.0.0.0/24
     ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
     ----------------------  -------  -----  ----------------  ----  ----------
 
@@ -230,7 +230,7 @@ steps:
     default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 3.0.0.0/24
+    route tunnel get default 3.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -289,7 +289,7 @@ steps:
 - echo: "7 rib_insert() test: existing nexthop_stuff, new prefix, existing \"peer-proto-table_name\" - START"
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
     ----------------------  -------  -----  ----------------  ----  ----------
 
@@ -334,7 +334,7 @@ steps:
     default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -445,7 +445,7 @@ steps:
 - echo: "10 rib_remove() test: trying to remove prefix for unexisting vrf-priority - START"
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -492,7 +492,7 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -505,7 +505,7 @@ steps:
 - echo: "11 rib_remove() test: trying to remove prefix for existing vrf-priority but unexisting protocol-peer-table_name - START"
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -550,7 +550,7 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -563,13 +563,13 @@ steps:
 - echo: "12 rib_remove() test: trying to remove unexisting prefix - START"
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/32
+    route tunnel get default 1.0.0.0/32
     ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
     ----------------------  -------  -----  ----------------  ----  ----------
 
@@ -613,13 +613,13 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/32
+    route tunnel get default 1.0.0.0/32
     ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
     ----------------------  -------  -----  ----------------  ----  ----------
 
@@ -631,7 +631,7 @@ steps:
 - echo: "13 rib_remove() test: trying to remove prefix which has multiple path_info related to it - START"
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -680,7 +680,7 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -693,7 +693,7 @@ steps:
 - echo: "14 rib_remove() test: trying to remove prefix for peer, which has some other prefixes - START"
 
 - cli_check: |
-    route tunnel get route0 2.0.0.0/24
+    route tunnel get default 2.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -741,7 +741,7 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 2.0.0.0/24
+    route tunnel get default 2.0.0.0/24
     ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
     ----------------------  -------  -----  ----------------  ----  ----------
 
@@ -753,7 +753,7 @@ steps:
 - echo: "15 rib_remove() test: trying to remove the last (for this peer) prefix which has the last path_info related to it - START"
 
 - cli_check: |
-    route tunnel get route0 3.0.0.0/24
+    route tunnel get default 3.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -802,7 +802,7 @@ steps:
 
 # this prefix is still known because of other peer
 - cli_check: |
-    route tunnel get route0 3.0.0.0/24
+    route tunnel get default 3.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -866,14 +866,14 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 5.0.0.0/24
+    route tunnel get default 5.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                50.00
     kni0                    192.168.0.2  1100   kni0.200                50.00
 
 - cli_check: |
-    route tunnel get route0 6.0.0.0/24
+    route tunnel get default 6.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.2  1100   kni0.200                100.00
@@ -928,12 +928,12 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 5.0.0.0/24
+    route tunnel get default 5.0.0.0/24
     ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
     ----------------------  -------  -----  ----------------  ----  ----------
 
 - cli_check: |
-    route tunnel get route0 6.0.0.0/24
+    route tunnel get default 6.0.0.0/24
     ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
     ----------------------  -------  -----  ----------------  ----  ----------
 
@@ -945,13 +945,13 @@ steps:
 - echo: "18 rib_remove() test: all parts of request exist separately, however the whole combination does not - START"
 
 - cli_check: |
-    route tunnel get route0 3.0.0.0/24
+    route tunnel get default 3.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1005,13 +1005,13 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 3.0.0.0/24
+    route tunnel get default 3.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1084,19 +1084,19 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 3.0.0.0/24
+    route tunnel get default 3.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 5.0.0.0/24
+    route tunnel get default 5.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1129,19 +1129,19 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 3.0.0.0/24
+    route tunnel get default 3.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 5.0.0.0/24
+    route tunnel get default 5.0.0.0/24
     ingress_physical_ports  nexthop  label  egress_interface  peer  weight (%)
     ----------------------  -------  -----  ----------------  ----  ----------
 
@@ -1153,13 +1153,13 @@ steps:
 - echo: "20 rib_clear() test: request contains protocol, peer, vrf, priority - START"
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1192,13 +1192,13 @@ steps:
     tluafed  5000      1.0.0.0/24  autotest  10.10.10.1  ipv4 mpls-vpn  192.168.0.1:10001  192.168.0.1  1100    0                         incomplete  0    n/s          13238:1:1
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1229,13 +1229,13 @@ steps:
     default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1248,13 +1248,13 @@ steps:
 - echo: "21 rib_clear() test: combination of protocol, peer, vrf, priority from request does not exist (though they exist separately) - nothing to clear - START"
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1285,13 +1285,13 @@ steps:
     default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1304,13 +1304,13 @@ steps:
 - echo: "22 rib_clear() test: protocol/peer/vrf/priority from request do not exist - nothing to clear - START"
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1342,13 +1342,13 @@ steps:
     default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1377,13 +1377,13 @@ steps:
     default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1415,13 +1415,13 @@ steps:
     default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -1453,13 +1453,13 @@ steps:
     default  10000     fe80::/64   static    ::                                            ::                   0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
 
 - cli_check: |
-    route tunnel get route0 4.0.0.0/24
+    route tunnel get default 4.0.0.0/24
     ingress_physical_ports  nexthop      label  egress_interface  peer  weight (%)
     ----------------------  -----------  -----  ----------------  ----  ----------
     kni0                    192.168.0.1  1100   kni0.200                100.00
@@ -2155,7 +2155,7 @@ steps:
     default  10000     fe80::/64   static    ::                                        ::                 0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop    label  egress_interface  peer  weight (%)
     ----------------------  ---------  -----  ----------------  ----  ----------
     kni0                    200.0.0.1  1100   kni0.200                100.00
@@ -2198,7 +2198,7 @@ steps:
     default  10000     fe80::/64   static    ::                                        ::                 0                                     0    n/s          n/s
 
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop    label  egress_interface  peer  weight (%)
     ----------------------  ---------  -----  ----------------  ----  ----------
     kni0                    200.0.0.1  1100   kni0.200                50.00
@@ -2248,7 +2248,7 @@ steps:
 
 # only one route should survive in fib
 - cli_check: |
-    route tunnel get route0 1.0.0.0/24
+    route tunnel get default 1.0.0.0/24
     ingress_physical_ports  nexthop    label  egress_interface  peer  weight (%)
     ----------------------  ---------  -----  ----------------  ----  ----------
     kni0                    200.0.0.1  1200   kni0.200                100.00

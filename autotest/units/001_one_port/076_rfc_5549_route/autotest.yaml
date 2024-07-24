@@ -7,8 +7,8 @@ steps:
 - cli:
   - rib static insert default 1.0.0.0/24 c0de::200:1 1001
   - rib prefixes
-  - route lookup route0 1.0.0.1
-  - route lookup route0 2.0.0.1
+  - route lookup default 1.0.0.1
+  - route lookup default 2.0.0.1
 - sendPackets:
   - port: kni0
     send: 001-send.pcap

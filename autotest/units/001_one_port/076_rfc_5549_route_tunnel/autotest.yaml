@@ -21,8 +21,8 @@ steps:
   - "::/0 -> c0de::200:1"
 - cli:
   - rib prefixes
-  - route tunnel lookup route0 1.0.0.1
-  - route tunnel lookup route0 2.0.0.1
+  - route tunnel lookup default 1.0.0.1
+  - route tunnel lookup default 2.0.0.1
 - sendPackets:
   - port: kni0
     send: 001-send.pcap

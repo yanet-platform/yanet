@@ -234,7 +234,7 @@ steps:
 - ipv6Update:
   - "::/0 -> c0de::100:1 c0de::200:1"
 - cli_check: |
-    route tunnel lookup route0 1.0.0.1
+    route tunnel lookup default 1.0.0.1
     ingress_physical_ports  prefix      nexthop     label  egress_interface  peer   weight (%)
     ----------------------  ----------  ----------  -----  ----------------  -----  ----------
     kni0                    1.0.0.0/24  88.88.88.1  1001   kni0.100          10001  0.19
@@ -250,7 +250,7 @@ steps:
     kni0                    1.0.0.0/24  88.88.88.2  2100   kni0.100          10003  18.80
     kni0                    1.0.0.0/24  88.88.88.2  2100   kni0.200          10003  18.80
 - cli_check: |
-    route tunnel lookup route0 7e57::1
+    route tunnel lookup default 7e57::1
     ingress_physical_ports  prefix     nexthop  label  egress_interface  peer   weight (%)
     ----------------------  ---------  -------  -----  ----------------  -----  ----------
     kni0                    7e57::/64  8888::1  1001   kni0.100          10001  0.19

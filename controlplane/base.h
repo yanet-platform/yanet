@@ -37,6 +37,7 @@ public:
 	uint8_t promiscuousMode;
 	std::string nextModule;
 	common::globalBase::tFlow flow;
+	std::string vrf;
 };
 
 class decap_t

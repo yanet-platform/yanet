@@ -350,6 +350,7 @@ namespace getLogicalPorts
 using response = std::map<std::string,
                           std::tuple<std::string, ///< physicalPortName
                                      uint16_t, ///< vlanId
+                                     std::string, ///< vrf
                                      mac_address_t, ///< macAddress
                                      uint8_t>>; ///< promiscuousMode
 }
@@ -759,7 +760,7 @@ using response = std::vector<std::tuple<uint32_t, ///< ruleno
 
 namespace route_lookup
 {
-using request = std::tuple<std::string, ///< module_name
+using request = std::tuple<std::string, ///< vrf
                            ip_address_t>;
 
 using response = std::set<std::tuple<std::set<std::string>, ///< ingress_physical_ports
@@ -771,7 +772,7 @@ using response = std::set<std::tuple<std::set<std::string>, ///< ingress_physica
 
 namespace route_get
 {
-using request = std::tuple<std::string, ///< module_name
+using request = std::tuple<std::string, ///< vrf
                            ip_prefix_t>;
 
 using response = route_lookup::response;
@@ -779,7 +780,7 @@ using response = route_lookup::response;
 
 namespace route_tunnel_lookup
 {
-using request = std::tuple<std::string, ///< module_name
+using request = std::tuple<std::string, ///< vrf
                            ip_address_t>;
 
 using response = std::set<std::tuple<std::set<std::string>, ///< ingress_physical_ports
@@ -793,7 +794,7 @@ using response = std::set<std::tuple<std::set<std::string>, ///< ingress_physica
 
 namespace route_tunnel_get
 {
-using request = std::tuple<std::string, ///< module_name
+using request = std::tuple<std::string, ///< vrf
                            ip_prefix_t>;
 
 using response = route_tunnel_lookup::response;

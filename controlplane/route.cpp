@@ -49,7 +49,10 @@ eResult route_t::init()
 	return eResult::success;
 }
 
-void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix, const std::vector<rib::pptn_t>& pptns, const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value)
+void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority,
+                            const ip_prefix_t& prefix,
+                            const std::vector<rib::pptn_t>& pptns,
+                            const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value)
 {
 	const auto& [vrf, priority] = vrf_priority;
 
@@ -65,22 +68,12 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 		        interface_destination_next;
 		for (const auto& [pptn_index, path_info_to_nh_ptr] : *nexthops)
 		{
-			const auto& table_name = std::get<2>(pptns[pptn_index]);
-
 			/// @todo: multi route. vrf
 			bool ignore = false;
 			{
+				const auto& table_name = std::get<2>(pptns[pptn_index]);
 				auto current_guard = generations.current_lock_guard();
-				for (const auto& [name, module] : generations.current().routes) ///< @todo: DELETE
-				{
-					(void)name;
-
-					if (exist(module.ignore_tables, table_name))
-					{
-						ignore = true;
-						break;
-					}
-				}
+				ignore = generations.current().is_ignored_table(table_name);
 			}
 			if (ignore)
 			{
@@ -161,7 +154,9 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 	}
 }
 
-void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority_orig, const ip_prefix_t& prefix, const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value)
+void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority_orig,
+                                   const ip_prefix_t& prefix,
+                                   const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value)
 {
 	auto vrf_priority = vrf_priority_orig;
 	auto& [vrf, priority] = vrf_priority;
@@ -399,7 +394,7 @@ void route_t::prefix_flush()
 common::icp::route_config::response route_t::route_config() const
 {
 	auto current_guard = generations.current_lock_guard();
-	return generations.current().routes;
+	return generations.current().get_routes();
 }
 
 common::icp::route_summary::response route_t::route_summary() const
@@ -408,7 +403,7 @@ common::icp::route_summary::response route_t::route_summary() const
 
 	{
 		auto current_guard = generations.current_lock_guard();
-		for (const auto& [route_name, route] : generations.current().routes)
+		for (const auto& [route_name, route] : generations.current().get_routes())
 		{
 			response.emplace_back(route_name, route.vrf);
 		}
@@ -421,22 +416,10 @@ common::icp::route_lookup::response route_t::route_lookup(const common::icp::rou
 {
 	common::icp::route_lookup::response result;
 
-	const auto& [request_route_name, request_address] = request;
+	const auto& [vrf, request_address] = request;
 
 	{
 		std::lock_guard<std::recursive_mutex> guard(mutex);
-
-		std::string vrf;
-		{
-			auto current_guard = generations.current_lock_guard();
-			auto current_vrf = generations.current().get_vrf(request_route_name);
-			if (!current_vrf)
-			{
-				return result;
-			}
-
-			vrf = **current_vrf;
-		}
 
 		if (exist(prefixes, vrf))
 		{
@@ -481,22 +464,10 @@ common::icp::route_get::response route_t::route_get(const common::icp::route_get
 {
 	common::icp::route_get::response result;
 
-	const auto& [request_route_name, request_prefix] = request;
+	const auto& [vrf, request_prefix] = request;
 
 	{
 		std::lock_guard<std::recursive_mutex> guard(mutex);
-
-		std::string vrf;
-		{
-			auto current_guard = generations.current_lock_guard();
-			auto current_vrf = generations.current().get_vrf(request_route_name);
-			if (!current_vrf)
-			{
-				return result;
-			}
-
-			vrf = **current_vrf;
-		}
 
 		if (exist(prefixes, vrf))
 		{
@@ -545,7 +516,7 @@ common::icp::route_interface::response route_t::route_interface() const
 		auto current_guard = generations.current_lock_guard();
 		auto neighbors_current_guard = generations_neighbors.current_lock_guard();
 
-		for (const auto& [route_name, route] : generations.current().routes)
+		for (const auto& [route_name, route] : generations.current().get_routes())
 		{
 			for (const auto& [interface_name, interface] : route.interfaces)
 			{
@@ -585,22 +556,10 @@ common::icp::route_tunnel_lookup::response route_t::route_tunnel_lookup(const co
 {
 	common::icp::route_tunnel_lookup::response result;
 
-	const auto& [request_route_name, request_address] = request;
+	const auto& [vrf, request_address] = request;
 
 	{
 		std::lock_guard<std::recursive_mutex> guard(mutex);
-
-		std::string vrf;
-		{
-			auto current_guard = generations.current_lock_guard();
-			auto current_vrf = generations.current().get_vrf(request_route_name);
-			if (!current_vrf)
-			{
-				return result;
-			}
-
-			vrf = **current_vrf;
-		}
 
 		generations.current_lock();
 		std::map<uint32_t, std::string> peers = *generations.current().get_peers();
@@ -663,22 +622,10 @@ common::icp::route_tunnel_get::response route_t::route_tunnel_get(const common::
 {
 	common::icp::route_tunnel_get::response result;
 
-	const auto& [request_route_name, request_prefix] = request;
+	const auto& [vrf, request_prefix] = request;
 
 	{
 		std::lock_guard<std::recursive_mutex> guard(mutex);
-
-		std::string vrf;
-		{
-			auto current_guard = generations.current_lock_guard();
-			auto current_vrf = generations.current().get_vrf(request_route_name);
-			if (!current_vrf)
-			{
-				return result;
-			}
-
-			vrf = **current_vrf;
-		}
 
 		generations.current_lock();
 		std::map<uint32_t, std::string> peers = *generations.current().get_peers();
@@ -753,7 +700,7 @@ void route_t::compile_interface(common::idp::updateGlobalBase::request& globalba
 {
 	{
 		common::idp::neighbor_update_interfaces::request request;
-		for (const auto& [route_name, route] : generation.routes)
+		for (const auto& [route_name, route] : generation.get_routes())
 		{
 			for (auto& [interface_name, interface] : route.interfaces)
 			{
@@ -765,7 +712,7 @@ void route_t::compile_interface(common::idp::updateGlobalBase::request& globalba
 		dataplane.neighbor_update_interfaces(request);
 	}
 
-	for (const auto& [route_name, route] : generation.routes)
+	for (const auto& [route_name, route] : generation.get_routes())
 	{
 		for (auto& [interface_name, interface] : route.interfaces)
 		{
@@ -842,12 +789,12 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : nat64stateless.nat64_prefixes)
 			{
-				prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				              prefix.get_prefix(),
 				              {}, // TODO: get rid of third parameter
 				              std::monostate());
 
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				                     prefix.get_prefix(),
 				                     std::monostate());
 			}
@@ -859,12 +806,12 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : nat64stateless.nat64_prefixes)
 			{
-				prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				              prefix.get_prefix(),
 				              {}, // TODO: get rid of third parameter
 				              uint32_t(0)); ///< @todo: VIRTUAL_PORT
 
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				                     prefix.get_prefix(),
 				                     uint32_t(0)); ///< @todo: VIRTUAL_PORT
 			}
@@ -876,7 +823,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : config_module.local_prefixes)
 			{
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
 				                     prefix,
 				                     std::monostate());
 			}
@@ -888,7 +835,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : config_module.local_prefixes)
 			{
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
 				                     prefix,
 				                     std::tuple<>());
 			}
@@ -906,7 +853,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 				{
 					if (!ip_prefix.is_host())
 					{
-						prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+						prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 						              ip_prefix.applyMask(ip_prefix.mask()),
 						              {},
 						              std::monostate());
@@ -928,7 +875,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 						route::directly_connected_destination_t directly_connected = {interface.interfaceId,
 						                                                              interface_name};
 
-						prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+						prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 						              ip_prefix.applyMask(ip_prefix.mask()),
 						              {},
 						              directly_connected);

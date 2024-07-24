@@ -60,11 +60,11 @@ void interface()
 	table.print();
 }
 
-void lookup(const std::string& route_name,
+void lookup(const std::string& vrf,
             const common::ip_address_t& address)
 {
 	interface::controlPlane controlplane;
-	auto response = controlplane.route_lookup({route_name, address});
+	auto response = controlplane.route_lookup({vrf, address});
 
 	table_t table;
 	table.insert("ingress_physical_ports",
@@ -87,11 +87,11 @@ void lookup(const std::string& route_name,
 	table.print();
 }
 
-void get(const std::string& route_name,
+void get(const std::string& vrf,
          const common::ip_prefix_t& prefix)
 {
 	interface::controlPlane controlplane;
-	auto response = controlplane.route_get({route_name, prefix});
+	auto response = controlplane.route_get({vrf, prefix});
 
 	table_t table;
 	table.insert("ingress_physical_ports",
@@ -116,11 +116,11 @@ void get(const std::string& route_name,
 namespace tunnel
 {
 
-void lookup(const std::string& route_name,
+void lookup(const std::string& vrf,
             const common::ip_address_t& address)
 {
 	interface::controlPlane controlplane;
-	auto response = controlplane.route_tunnel_lookup({route_name, address});
+	auto response = controlplane.route_tunnel_lookup({vrf, address});
 
 	table_t table;
 	table.insert("ingress_physical_ports",
@@ -153,11 +153,11 @@ void lookup(const std::string& route_name,
 	table.print();
 }
 
-void get(const std::string& route_name,
+void get(const std::string& vrf,
          const common::ip_prefix_t& prefix)
 {
 	interface::controlPlane controlplane;
-	auto response = controlplane.route_tunnel_get({route_name, prefix});
+	auto response = controlplane.route_tunnel_get({vrf, prefix});
 
 	table_t table;
 	table.insert("ingress_physical_ports",

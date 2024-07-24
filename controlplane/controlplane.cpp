@@ -303,6 +303,7 @@ common::icp::getLogicalPorts::response cControlPlane::getLogicalPorts() const
 		{
 			response[logicalPortName] = {logicalPort.physicalPort,
 			                             logicalPort.vlanId,
+										 logicalPort.vrf,
 			                             logicalPort.macAddress,
 			                             logicalPort.promiscuousMode};
 		}

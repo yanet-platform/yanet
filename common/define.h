@@ -103,6 +103,8 @@ extern LogPriority logPriority;
 #define YANET_RIB_PRIORITY_DEFAULT ((uint32_t)10000)
 #define YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK ((uint32_t)11000)
 #define YANET_RIB_PRIORITY_ROUTE_REPEAT ((uint32_t)12000)
+#define YANET_RIB_VRF_DEFAULT "default"
+#define YANET_RIB_VRF_MAX_COUNT 4096
 
 #define YANET_NETWORK_FLAG_FRAGMENT ((uint8_t)(1u << 0))
 #define YANET_NETWORK_FLAG_NOT_FIRST_FRAGMENT ((uint8_t)(1u << 1))

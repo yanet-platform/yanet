@@ -228,6 +228,15 @@ void config_parser_t::loadConfig_logicalPort(controlplane::base_t& baseNext,
 		}
 	}
 
+	if (exist(moduleJson, "vrf"))
+	{
+		logicalPort.vrf = moduleJson["vrf"].get<std::string>();
+	}
+	else
+	{
+		logicalPort.vrf = YANET_RIB_VRF_DEFAULT;
+	}
+	
 	logicalPort.nextModule = moduleJson.value("nextModule", "");
 
 	//
