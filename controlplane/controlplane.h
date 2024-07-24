@@ -100,6 +100,8 @@ public:
 		}
 	}
 
+	std::optional<tVrfId> getVrfId(const std::string& vrf_name, bool create_new_id);
+
 protected: /** commands */
 	common::icp::getPhysicalPorts::response getPhysicalPorts() const;
 	common::icp::getLogicalPorts::response getLogicalPorts() const;
@@ -198,4 +200,6 @@ private:
 	controlplane::base_t base;
 
 	void register_service(google::protobuf::Service* service);
+
+	std::unordered_map<std::string, tVrfId> vrf_ids;
 };

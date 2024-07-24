@@ -980,3 +980,32 @@ void cControlPlane::register_service(google::protobuf::Service* service)
 {
 	services[service->GetDescriptor()->name()] = service;
 }
+
+std::optional<tVrfId> cControlPlane::getVrfId(const std::string& vrf_name, bool create_new_id)
+{
+	// need mutex !!!
+	if (vrf_name.empty() || vrf_name == YANET_RIB_VRF_DEFAULT)
+	{
+		return 0;
+	}
+
+	auto iter = vrf_ids.find(vrf_name);
+	if (iter != vrf_ids.end())
+	{
+		return iter->second;
+	}
+	else if (!create_new_id)
+	{
+		return std::nullopt;
+	}
+
+	tVrfId new_id = vrf_ids.size() + 1;
+	if (new_id >= YANET_RIB_VRF_MAX_COUNT)
+	{
+		// error
+		YANET_LOG_ERROR("Error get id for vrf: %s, max count: %d", vrf_name.c_str(), YANET_RIB_VRF_MAX_COUNT);
+		return std::nullopt;
+	}
+	vrf_ids[vrf_name] = new_id;
+	return new_id;
+}

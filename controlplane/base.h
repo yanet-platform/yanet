@@ -38,6 +38,7 @@ public:
 	std::string nextModule;
 	common::globalBase::tFlow flow;
 	std::string vrf;
+	tVrfId vrfId;
 };
 
 class decap_t

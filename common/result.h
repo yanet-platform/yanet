@@ -39,6 +39,7 @@ enum class result_e : uint32_t
 	invalidNexthop,
 	invalidLogicalPortId,
 	invalidVlanId,
+	invalidVrfId,
 	invalidFlow,
 	invalidDecapId,
 	invalidInterfaceId,
@@ -133,6 +134,8 @@ static constexpr const char* result_to_c_str(common::result_e e)
 			return "invalidLogicalPortId";
 		case result_e::invalidVlanId:
 			return "invalidVlanId";
+		case result_e::invalidVrfId:
+			return "invalidVrfId";
 		case result_e::invalidFlow:
 			return "invalidFlow";
 		case result_e::invalidDecapId:
