@@ -125,8 +125,7 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 			value_remove(*destination_prev);
 		}
 
-		const auto value_id = value_insert({vrf_priority,
-		                                    *destination_next,
+		const auto value_id = value_insert({*destination_next,
 		                                    prefix.get_default()});
 		if (value_id)
 		{
@@ -322,8 +321,7 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 			update.insert(prefix, {});
 		}
 
-		const auto value_id = tunnel_value_insert({vrf_priority,
-		                                           *destination_next,
+		const auto value_id = tunnel_value_insert({*destination_next,
 		                                           prefix.get_default()});
 		if (value_id)
 		{
@@ -1062,8 +1060,7 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 {
 	std::vector<route::value_interface_t> request_interface;
 
-	const auto& [vrf_priority, destination, fallback] = value_key;
-	const auto& [vrf, priority] = vrf_priority;
+	const auto& [destination, fallback] = value_key;
 
 	value_lookup[value_id].clear();
 
@@ -1154,6 +1151,8 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 				prefix_next = {nexthop, 128};
 			}
 
+			std::string vrf = YANET_RIB_VRF_DEFAULT;
+			uint32_t priority = YANET_RIB_PRIORITY_DEFAULT;
 			auto& [priority_current, update] = prefixes[vrf];
 			auto& current = priority_current[priority];
 			(void)update;
@@ -1177,6 +1176,8 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 
 	if (request_interface.empty())
 	{
+		std::string vrf = YANET_RIB_VRF_DEFAULT;
+		uint32_t priority = YANET_RIB_PRIORITY_DEFAULT;
 		auto& [priority_current, update] = prefixes[vrf];
 		auto& current = priority_current[priority];
 		(void)update;
@@ -1283,9 +1284,8 @@ void route_t::value_compile_label(common::idp::updateGlobalBase::request& global
                                   const ip_address_t& first_nexthop)
 {
 	const auto& value_key = values.get_value(value_id);
-	const auto& [vrf_priority, destination, fallback] = value_key;
+	const auto& [destination, fallback] = value_key;
 	(void)globalbase;
-	(void)vrf_priority;
 	(void)fallback;
 
 	if (const auto virtual_port_id = std::get_if<uint32_t>(&destination))
@@ -1334,9 +1334,8 @@ void route_t::value_compile_fallback(common::idp::updateGlobalBase::request& glo
                                      std::vector<route::value_interface_t>& request_interface)
 {
 	const auto& value_key = values.get_value(value_id);
-	const auto& [vrf_priority, destination, fallback] = value_key;
+	const auto& [destination, fallback] = value_key;
 	(void)globalbase;
-	(void)vrf_priority;
 	(void)fallback;
 
 	if (const auto virtual_port_id = std::get_if<uint32_t>(&destination))
@@ -1384,8 +1383,7 @@ std::optional<uint32_t> route_t::tunnel_value_insert(const route::tunnel_value_k
 		return std::nullopt;
 	}
 
-	const auto& [vrf_priority, destination, fallback] = value_key;
-	(void)vrf_priority;
+	const auto& [destination, fallback] = value_key;
 
 	/// counters
 	if (const auto nexthops = std::get_if<route::tunnel_destination_interface_t>(&destination))
@@ -1407,8 +1405,7 @@ void route_t::tunnel_value_remove(const uint32_t& value_id)
 	auto value_key = tunnel_values.remove_id(value_id);
 	if (value_key)
 	{
-		const auto& [vrf_priority, destination, fallback] = *value_key;
-		(void)vrf_priority;
+		const auto& [destination, fallback] = *value_key;
 
 		/// counters
 		if (const auto nexthops = std::get_if<route::tunnel_destination_interface_t>(&destination))
@@ -1431,8 +1428,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 {
 	std::vector<route::tunnel_value_interface_t> request_interface;
 
-	const auto& [vrf_priority, destination, fallback] = value_key;
-	(void)vrf_priority; ///< @todo: VRF
+	const auto& [destination, fallback] = value_key;
 
 	tunnel_value_lookup[value_id].clear();
 

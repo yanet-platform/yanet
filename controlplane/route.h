@@ -23,9 +23,7 @@ using destination_t = std::variant<std::set<std::tuple<ip_address_t,
                                    directly_connected_destination_t, ///< via interface
                                    uint32_t>; ///< virtual_port_id
 
-using value_key_t = std::tuple<std::tuple<std::string, ///< vrf
-                                          uint32_t>, ///< priority
-                               route::destination_t,
+using value_key_t = std::tuple<route::destination_t,
                                ip_prefix_t>; ///< fallback
 
 using value_interface_t = std::tuple<ip_address_t,
@@ -56,9 +54,7 @@ using tunnel_destination_t = std::variant<
         tunnel_destination_default_t,
         uint32_t>; ///< virtual_port_id
 
-using tunnel_value_key_t = std::tuple<std::tuple<std::string, ///< vrf
-                                                 uint32_t>, ///< priority
-                                      route::tunnel_destination_t,
+using tunnel_value_key_t = std::tuple<route::tunnel_destination_t,
                                       ip_prefix_t>; ///< fallback
 
 using tunnel_value_interface_t = std::tuple<ip_address_t, ///< nexthop
