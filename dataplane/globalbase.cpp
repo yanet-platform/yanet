@@ -1732,7 +1732,7 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 {
 	eResult result = eResult::success;
 
-	for (const auto& action : request)
+	for (const auto& [vrfId, action] : request)
 	{
 		if (const auto update = std::get_if<common::idp::lpm::insert>(&action))
 		{
@@ -1742,13 +1742,15 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 				{
 					result = updater.route_lpm4->insert(prefix.get_ipv4().address(),
 					                                    prefix.get_ipv4().mask(),
-					                                    value_id);
+					                                    value_id,
+														vrfId);
 				}
 				else
 				{
 					result = updater.route_lpm6->insert(prefix.get_ipv6().address(),
 					                                    prefix.get_ipv6().mask(),
-					                                    value_id);
+					                                    value_id,
+														vrfId);
 				}
 
 				if (result != eResult::success)
@@ -1764,12 +1766,14 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 				if (prefix.is_ipv4())
 				{
 					result = updater.route_lpm4->remove(prefix.get_ipv4().address(),
-					                                    prefix.get_ipv4().mask());
+					                                    prefix.get_ipv4().mask(),
+														vrfId);
 				}
 				else
 				{
 					result = updater.route_lpm6->remove(prefix.get_ipv6().address(),
-					                                    prefix.get_ipv6().mask());
+					                                    prefix.get_ipv6().mask(),
+														vrfId);
 				}
 
 				if (result != eResult::success)
@@ -1904,7 +1908,7 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 {
 	eResult result = eResult::success;
 
-	for (const auto& action : request)
+	for (const auto& [vrfId, action] : request)
 	{
 		if (const auto update = std::get_if<common::idp::lpm::insert>(&action))
 		{
@@ -1914,13 +1918,15 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 				{
 					result = updater.route_tunnel_lpm4->insert(prefix.get_ipv4().address(),
 					                                           prefix.get_ipv4().mask(),
-					                                           value_id);
+					                                           value_id,
+															   vrfId);
 				}
 				else
 				{
 					result = updater.route_tunnel_lpm6->insert(prefix.get_ipv6().address(),
 					                                           prefix.get_ipv6().mask(),
-					                                           value_id);
+					                                           value_id,
+															   vrfId);
 				}
 
 				if (result != eResult::success)
@@ -1936,12 +1942,14 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 				if (prefix.is_ipv4())
 				{
 					result = updater.route_tunnel_lpm4->remove(prefix.get_ipv4().address(),
-					                                           prefix.get_ipv4().mask());
+					                                           prefix.get_ipv4().mask(),
+															   vrfId);
 				}
 				else
 				{
 					result = updater.route_tunnel_lpm6->remove(prefix.get_ipv6().address(),
-					                                           prefix.get_ipv6().mask());
+					                                           prefix.get_ipv6().mask(),
+															   vrfId);
 				}
 
 				if (result != eResult::success)

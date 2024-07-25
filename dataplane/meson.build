@@ -17,6 +17,7 @@ sources = files('bus.cpp',
                 'report.cpp',
                 'sharedmemory.cpp',
                 'sock_dev.cpp',
+                'vrf.cpp',
                 'worker.cpp',
                 'worker_gc.cpp')
 

@@ -270,6 +270,7 @@ protected:
 			common::acl::total_key_t totals[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 		} key_acl;
 	};
+	tVrfId route_vrf_ids[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 
 	union
 	{

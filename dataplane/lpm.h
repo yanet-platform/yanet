@@ -15,6 +15,8 @@
 #include "metadata.h"
 #include "type.h"
 
+#include "vrf.h"
+
 namespace dataplane
 {
 
@@ -70,6 +72,7 @@ public:
 	               const uint32_t& ipAddress,
 	               const uint8_t& mask,
 	               const uint32_t& valueId,
+				   tVrfId vrfId,
 	               bool* needWait = nullptr)
 	{
 		if (mask > 32 ||
@@ -77,6 +80,11 @@ public:
 		{
 			YADECAP_LOG_DEBUG("invalid prefix or value\n");
 			return eResult::invalidArguments;
+		}
+
+		if (vrfId != 0)
+		{
+			return vrf_ipv4.Insert(vrfId, ipAddress, mask, valueId);
 		}
 
 		if (needWait)
@@ -96,6 +104,7 @@ public:
 	eResult remove(stats_t& stats,
 	               const uint32_t& ipAddress,
 	               const uint8_t& mask,
+				   tVrfId vrfId,
 	               bool* needWait = nullptr)
 	{
 		if (mask > 32)
@@ -109,6 +118,11 @@ public:
 			*needWait = false;
 		}
 
+		if (vrfId != 0)
+		{
+			return vrf_ipv4.Remove(vrfId, ipAddress, mask);
+		}
+
 		return removeStep1(stats,
 		                   ipAddress,
 		                   mask,
@@ -120,6 +134,7 @@ public:
 	void clear()
 	{
 		memset(&rootChunk.entries[0], 0, sizeof(rootChunk.entries));
+		vrf_ipv4.Clear();
 	}
 
 	eResult copy(stats_t& stats,
@@ -133,6 +148,7 @@ public:
 	}
 
 	inline void lookup(const uint32_t* ipAddresses,
+					   const tVrfId* vrfIds,
 	                   uint32_t* valueIds,
 	                   const unsigned int& count) const
 	{
@@ -145,6 +161,13 @@ public:
 			const uint32_t& ipAddress = ipAddresses[ipAddress_i];
 
 			valueIds[ipAddress_i] = lpmValueIdInvalid;
+
+			tVrfId vrfId = vrfIds[ipAddress_i];
+			if (vrfId != 0)
+			{
+				vrf_ipv4.Lookup(vrfId, ipAddress, &valueIds[ipAddress_i]);
+				continue;
+			}
 
 			tEntry entry;
 			entry.atomic = rootChunk.entries[rte_be_to_cpu_32(ipAddress) >> 8].atomic;
@@ -174,6 +197,7 @@ public:
 	                   const unsigned int& count) const
 	{
 		uint32_t ipAddresses[CONFIG_YADECAP_MBUFS_BURST_SIZE];
+		tVrfId vrfIds[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 
 		for (unsigned int mbuf_i = 0;
 		     mbuf_i < count;
@@ -183,17 +207,19 @@ public:
 			dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
 			ipAddresses[mbuf_i] = *(rte_pktmbuf_mtod_offset(mbuf, const uint32_t*, metadata->network_headerOffset + TOffset));
+			vrfIds[mbuf_i] = metadata->vrfId;
 		}
 
-		lookup(ipAddresses, valueIds, count);
+		lookup(ipAddresses, vrfIds, valueIds, count);
 	}
 
 	inline bool lookup(const uint32_t& ipAddress,
+					   tVrfId vrfId,
 	                   uint32_t* valueId = nullptr) const
 	{
 		uint32_t lvalueId;
 
-		lookup(&ipAddress, &lvalueId, 1);
+		lookup(&ipAddress, &vrfId, &lvalueId, 1);
 
 		if (valueId)
 		{
@@ -681,6 +707,7 @@ protected:
 	}
 
 protected:
+	VrfIpv4 vrf_ipv4;
 	tChunk24 rootChunk;
 	tChunk8 extendedChunks[];
 };
@@ -757,6 +784,7 @@ public:
 	               const std::array<uint8_t, 16>& ipv6Address,
 	               const uint8_t& mask,
 	               const uint32_t& valueId,
+				   tVrfId vrfId,
 	               bool* needWait = nullptr)
 	{
 		if (mask > 128 ||
@@ -771,6 +799,11 @@ public:
 			*needWait = false;
 		}
 
+		if (vrfId != 0)
+		{
+			return vrf_ipv6.Insert(vrfId, ipv6Address, mask, valueId);
+		}
+
 		return insertStep(stats,
 		                  ipv6Address,
 		                  mask,
@@ -783,6 +816,7 @@ public:
 	eResult remove(stats_t& stats,
 	               const std::array<uint8_t, 16>& ipv6Address,
 	               const uint8_t& mask,
+				   tVrfId vrfId,
 	               bool* needWait = nullptr)
 	{
 		if (mask > 128)
@@ -796,6 +830,11 @@ public:
 			*needWait = false;
 		}
 
+		if (vrfId != 0)
+		{
+			return vrf_ipv6.Remove(vrfId, ipv6Address, mask);
+		}
+
 		return removeStep(stats,
 		                  ipv6Address,
 		                  mask,
@@ -807,6 +846,7 @@ public:
 	void clear()
 	{
 		this->rootChunk = {};
+		vrf_ipv6.Clear();
 	}
 
 	eResult copy(stats_t& stats,
@@ -820,6 +860,7 @@ public:
 	}
 
 	inline void lookup(const ipv6_address_t* ipv6Addresses,
+					   const tVrfId* vrfIds,
 	                   uint32_t* valueIds,
 	                   const unsigned int& count) const
 	{
@@ -833,6 +874,13 @@ public:
 			const tChunk* currentChunk = &rootChunk;
 
 			valueIds[ipv6Address_i] = lpmValueIdInvalid;
+
+			tVrfId vrfId = vrfIds[ipv6Address_i];
+			if (vrfId != 0)
+			{
+				vrf_ipv6.Lookup(vrfId, ipv6Address.bytes, &valueIds[ipv6Address_i]);
+				continue;
+			}
 
 			for (unsigned int step = 0;
 			     step < 8;
@@ -866,6 +914,7 @@ public:
 
 	inline void lookup(const uint32_t mask,
 	                   const ipv6_address_t* ipv6Addresses,
+					   const tVrfId* vrfIds,
 	                   uint32_t* valueIds,
 	                   const unsigned int& count) const
 	{
@@ -889,6 +938,13 @@ public:
 			const tChunk* currentChunk = &rootChunk;
 
 			valueIds[ipv6Address_i] = lpmValueIdInvalid;
+
+			tVrfId vrfId = vrfIds[ipv6Address_i];
+			if (vrfId != 0)
+			{
+				vrf_ipv6.Lookup(vrfId, ipv6Address.bytes, &valueIds[ipv6Address_i]);
+				continue;
+			}
 
 			for (unsigned int step = 0;
 			     step < 8;
@@ -924,6 +980,7 @@ public:
 	                   const unsigned int& count) const
 	{
 		ipv6_address_t ipv6Addresses[CONFIG_YADECAP_MBUFS_BURST_SIZE];
+		tVrfId vrfIds[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 
 		for (unsigned int mbuf_i = 0;
 		     mbuf_i < count;
@@ -935,19 +992,21 @@ public:
 			memcpy(ipv6Addresses[mbuf_i].bytes,
 			       rte_pktmbuf_mtod_offset(mbuf, const void*, metadata->network_headerOffset + TOffset),
 			       16);
+			vrfIds[mbuf_i] = metadata->vrfId;
 		}
 
-		lookup(ipv6Addresses, valueIds, count);
+		lookup(ipv6Addresses, vrfIds, valueIds, count);
 	}
 
 	inline bool lookup(const std::array<uint8_t, 16>& ipv6Address,
+					   tVrfId vrfId,
 	                   uint32_t* valueId = nullptr) const
 	{
 		ipv6_address_t lipv6Address;
 		uint32_t lvalueId;
 
 		memcpy(lipv6Address.bytes, ipv6Address.data(), 16);
-		lookup(&lipv6Address, &lvalueId, 1);
+		lookup(&lipv6Address, &vrfId, &lvalueId, 1);
 
 		if (valueId)
 		{
@@ -963,13 +1022,14 @@ public:
 	}
 
 	inline bool lookup(const uint8_t* ipv6_address,
+					   tVrfId vrfId,
 	                   uint32_t* value_id = nullptr) const
 	{
 		ipv6_address_t lipv6Address;
 		uint32_t lvalueId;
 
 		memcpy(lipv6Address.bytes, ipv6_address, 16);
-		lookup(&lipv6Address, &lvalueId, 1);
+		lookup(&lipv6Address, &vrfId, &lvalueId, 1);
 
 		if (value_id)
 		{
@@ -1477,6 +1537,7 @@ protected:
 	}
 
 public:
+	VrfIpv6 vrf_ipv6;
 	tChunk rootChunk;
 	tChunk extendedChunks[];
 };

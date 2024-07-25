@@ -93,7 +93,8 @@ public:
 
 	eResult insert(const uint32_t& ip_address,
 	               const uint8_t& mask,
-	               const uint32_t& value_id)
+	               const uint32_t& value_id,
+				   tVrfId vrfId)
 	{
 		if (stats.extended_chunks_size - stats.extended_chunks_count < object_type::extended_chunks_size_min)
 		{
@@ -104,11 +105,12 @@ public:
 			}
 		}
 
-		return pointer->insert(stats, ip_address, mask, value_id);
+		return pointer->insert(stats, ip_address, mask, value_id, vrfId);
 	}
 
 	eResult remove(const uint32_t& ip_address,
-	               const uint8_t& mask)
+	               const uint8_t& mask,
+				   tVrfId vrfId)
 	{
 		eResult result = eResult::success;
 		if (stats.extended_chunks_size - stats.extended_chunks_count < object_type::extended_chunks_size_min)
@@ -120,7 +122,7 @@ public:
 			}
 		}
 
-		result = pointer->remove(stats, ip_address, mask);
+		result = pointer->remove(stats, ip_address, mask, vrfId);
 		if (result != eResult::success)
 		{
 			return result;
@@ -232,7 +234,8 @@ public:
 
 	eResult insert(const std::array<uint8_t, 16>& ip_address,
 	               const uint8_t& mask,
-	               const uint32_t& value_id)
+	               const uint32_t& value_id,
+				   tVrfId vrfId)
 	{
 		if (stats.extended_chunks_size - stats.extended_chunks_count < object_type::extended_chunks_size_min)
 		{
@@ -243,11 +246,12 @@ public:
 			}
 		}
 
-		return pointer->insert(stats, ip_address, mask, value_id);
+		return pointer->insert(stats, ip_address, mask, value_id, vrfId);
 	}
 
 	eResult remove(const std::array<uint8_t, 16>& ip_address,
-	               const uint8_t& mask)
+	               const uint8_t& mask,
+				   tVrfId vrfId)
 	{
 		eResult result = eResult::success;
 		if (stats.extended_chunks_size - stats.extended_chunks_count < object_type::extended_chunks_size_min)
@@ -259,7 +263,7 @@ public:
 			}
 		}
 
-		result = pointer->remove(stats, ip_address, mask);
+		result = pointer->remove(stats, ip_address, mask, vrfId);
 		if (result != eResult::success)
 		{
 			return result;

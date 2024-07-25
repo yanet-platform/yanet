@@ -2223,11 +2223,12 @@ inline void cWorker::route_handle4()
 		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 
 		route_ipv4_keys[mbuf_i] = ipv4Header->dst_addr;
+		route_vrf_ids[mbuf_i] = metadata->vrfId;
 
 		calcHash(mbuf);
 	}
 
-	base.globalBase->route_lpm4->lookup(route_ipv4_keys, route_ipv4_values, route_stack4.mbufsCount);
+	base.globalBase->route_lpm4->lookup(route_ipv4_keys, route_vrf_ids, route_ipv4_values, route_stack4.mbufsCount);
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_stack4.mbufsCount;
 	     mbuf_i++)
@@ -2348,11 +2349,12 @@ inline void cWorker::route_handle6()
 		rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
 
 		rte_memcpy(route_ipv6_keys[mbuf_i].bytes, ipv6Header->dst_addr, 16);
+		route_vrf_ids[mbuf_i] = metadata->vrfId;
 
 		calcHash(mbuf);
 	}
 
-	base.globalBase->route_lpm6->lookup(route_ipv6_keys, route_ipv6_values, route_stack6.mbufsCount);
+	base.globalBase->route_lpm6->lookup(route_ipv6_keys, route_vrf_ids, route_ipv6_values, route_stack6.mbufsCount);
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_stack6.mbufsCount;
 	     mbuf_i++)
@@ -2553,12 +2555,13 @@ inline void cWorker::route_tunnel_handle4()
 		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 
 		route_ipv4_keys[mbuf_i] = ipv4Header->dst_addr;
+		route_vrf_ids[mbuf_i] = metadata->vrfId;
 
 		calcHash(mbuf);
 		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
 	}
 
-	base.globalBase->route_tunnel_lpm4->lookup(route_ipv4_keys, route_ipv4_values, route_tunnel_stack4.mbufsCount);
+	base.globalBase->route_tunnel_lpm4->lookup(route_ipv4_keys, route_vrf_ids, route_ipv4_values, route_tunnel_stack4.mbufsCount);
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_tunnel_stack4.mbufsCount;
 	     mbuf_i++)
@@ -2684,12 +2687,13 @@ inline void cWorker::route_tunnel_handle6()
 		rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
 
 		rte_memcpy(route_ipv6_keys[mbuf_i].bytes, ipv6Header->dst_addr, 16);
+		route_vrf_ids[mbuf_i] = metadata->vrfId;
 
 		calcHash(mbuf);
 		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
 	}
 
-	base.globalBase->route_tunnel_lpm6->lookup(route_ipv6_keys, route_ipv6_values, route_tunnel_stack6.mbufsCount);
+	base.globalBase->route_tunnel_lpm6->lookup(route_ipv6_keys, route_vrf_ids, route_ipv6_values, route_tunnel_stack6.mbufsCount);
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_tunnel_stack6.mbufsCount;
 	     mbuf_i++)

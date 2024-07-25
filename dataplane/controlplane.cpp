@@ -836,7 +836,7 @@ common::idp::lpm4LookupAddress::response cControlPlane::lpm4LookupAddress(const 
 		const auto* globalBase = iter.second[dataPlane->currentGlobalBaseId];
 
 		uint32_t valueId;
-		if (globalBase->route_lpm4->lookup(ipAddress, &valueId))
+		if (globalBase->route_lpm4->lookup(ipAddress, 0, &valueId))
 		{
 			response[socketId] = {true,
 			                      valueId,
@@ -868,7 +868,7 @@ common::idp::lpm6LookupAddress::response cControlPlane::lpm6LookupAddress(const 
 		const auto* globalBase = iter.second[dataPlane->currentGlobalBaseId];
 
 		uint32_t valueId;
-		if (globalBase->route_lpm6->lookup(request, &valueId))
+		if (globalBase->route_lpm6->lookup(request, 0, &valueId))
 		{
 			response[socketId] = {true,
 			                      valueId,

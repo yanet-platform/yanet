@@ -116,9 +116,10 @@ using remove = std::vector<ip_prefix_t>;
 
 using clear = std::tuple<>;
 
-using request = std::vector<std::variant<insert,
-                                         remove,
-                                         clear>>;
+using request = std::vector<std::tuple<tVrfId,
+                                       std::variant<insert,
+                                                    remove,
+                                                    clear>>>;
 }
 
 namespace updateGlobalBase
