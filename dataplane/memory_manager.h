@@ -63,21 +63,21 @@ public:
 	template<typename T>
 	using unique_ptr = std::unique_ptr<T, Deleter>;
 
-	template<typename type,
-	         typename... args_t>
-	unique_ptr<type> create_unique(const char* name,
-	                               const tSocketId socket_id,
-	                               const uint64_t size,
-	                               args_t&&... args)
+	template<typename T,
+	         typename... Args>
+	unique_ptr<T> create_unique(const char* name,
+	                            const tSocketId socket_id,
+	                            const uint64_t size,
+	                            Args&&... args)
 	{
 		void* pointer = alloc(name,
 		                      socket_id,
 		                      size,
 		                      [](void* pointer) {
-			                      reinterpret_cast<type*>(pointer)->~type();
+			                      reinterpret_cast<T*>(pointer)->~T();
 		                      });
-		return std::unique_ptr<type, Deleter>{
-		        new (pointer) type(std::forward<args_t>(args)...),
+		return std::unique_ptr<T, Deleter>{
+		        new (pointer) T(std::forward<Args>(args)...),
 		        Deleter{this}};
 	}
 
