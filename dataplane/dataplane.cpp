@@ -45,7 +45,6 @@ cDataPlane::cDataPlane() :
         currentGlobalBaseId(0),
         globalBaseSerial(0),
         report(this),
-        controlPlane(new cControlPlane(this)),
         bus(this),
         memory_manager(this)
 {
@@ -102,6 +101,12 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		return result;
 	}
 
+	result = InitControlPlane();
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
 	result = initPorts();
 	if (result != eResult::success)
 	{
@@ -129,10 +134,10 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	{
 		auto pool = rte_mempool_create(("cp-" + std::to_string(socket)).c_str(),
 		                               CONFIG_YADECAP_MBUFS_COUNT +
-		                                       configValues.fragmentation_size +
-		                                       configValues.master_mempool_size +
+		                                       config_values_.fragmentation.size +
+		                                       config_values_.master_mempool_size +
 		                                       4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE +
-		                                       4 * ports.size() * configValues.kernel_interface_queue_size,
+		                                       4 * ports.size() * config_values_.kernel_interface_queue_size,
 		                               CONFIG_YADECAP_MBUF_SIZE,
 		                               0,
 		                               sizeof(struct rte_pktmbuf_pool_private),
@@ -626,6 +631,12 @@ void cDataPlane::InitPortsBarrier()
 	{
 		StartInterfaces();
 	}
+}
+
+eResult cDataPlane::InitControlPlane()
+{
+	controlPlane = std::make_unique<cControlPlane>(this);
+	return eResult::success;
 }
 
 eResult cDataPlane::init_kernel_interfaces()
@@ -1839,7 +1850,7 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 
 eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
 {
-	configValues = json;
+	config_values_ = json;
 	return eResult::success;
 }
 
