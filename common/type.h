@@ -2429,6 +2429,19 @@ struct stats_t
 	uint64_t intersect_packets;
 	uint64_t unknown_network_type_packets;
 	uint64_t timeout_packets;
+
+	stats_t& operator+=(const stats_t& other)
+	{
+		current_count_packets += other.current_count_packets;
+		total_overflow_packets += other.total_overflow_packets;
+		not_fragment_packets += other.not_fragment_packets;
+		empty_packets += other.empty_packets;
+		flow_overflow_packets += other.flow_overflow_packets;
+		intersect_packets += other.intersect_packets;
+		unknown_network_type_packets += other.unknown_network_type_packets;
+		timeout_packets += other.timeout_packets;
+		return *this;
+	}
 };
 
 }
@@ -2480,6 +2493,25 @@ struct stats_t
 	uint64_t tcp_ok;
 	uint64_t tcp_timeout_sessions;
 	uint64_t tcp_unknown_sessions;
+
+	stats_t& operator+=(const stats_t& other)
+	{
+		bad_decap_transport += other.bad_decap_transport;
+		fragment += other.fragment;
+		bad_transport += other.bad_transport;
+		lookup_miss += other.lookup_miss;
+		local += other.local;
+		tcp_syn += other.tcp_syn;
+		tcp_unknown_option += other.tcp_unknown_option;
+		tcp_no_option += other.tcp_no_option;
+		tcp_insert_sessions += other.tcp_insert_sessions;
+		tcp_close_sessions += other.tcp_close_sessions;
+		tcp_retransmission += other.tcp_retransmission;
+		tcp_ok += other.tcp_ok;
+		tcp_timeout_sessions += other.tcp_timeout_sessions;
+		tcp_unknown_sessions += other.tcp_unknown_sessions;
+		return *this;
+	}
 };
 
 using value_t = std::tuple<common::ip_address_t, ///< nexthop
