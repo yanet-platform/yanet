@@ -41,10 +41,10 @@ namespace dataplane
 template<typename Address, typename ObjectType>
 class updater_lpm
 {
-	[[nodiscard]] dataplane::memory_manager::unique_ptr<ObjectType> Allocate(std::size_t size)
+	[[nodiscard]] memory_manager::unique_ptr<ObjectType> Allocate(std::size_t size)
 	{
-		return memory_manager->create_unique<ObjectType>(name.c_str(),
-		                                                  socket_id,
+		return memory_manager_->create_unique<ObjectType>(name_.c_str(),
+		                                                  socket_id_,
 		                                                  ObjectType::calculate_sizeof(size));
 	}
 
@@ -53,14 +53,14 @@ public:
 	updater_lpm(const char* name,
 	            dataplane::memory_manager* memory_manager,
 	            tSocketId socket_id) :
-	        name(name),
-	        memory_manager(memory_manager),
-	        socket_id(socket_id),
-	        pointer_{nullptr, memory_manager->deleter()}
+	        name_(name),
+	        memory_manager_(memory_manager),
+	        socket_id_(socket_id),
+	        pointer_{nullptr, memory_manager_->deleter()}
 	{
-		stats.extended_chunks_count = 0;
-		stats.max_used_chunk_id = 0;
-		stats.free_chunk_cache.flags = 0;
+		stats_.extended_chunks_count = 0;
+		stats_.max_used_chunk_id = 0;
+		stats_.free_chunk_cache.flags = 0;
 	}
 
 	eResult init()
@@ -69,13 +69,10 @@ public:
 		pointer_ = Allocate(default_chunks_size);
 		if (!pointer_)
 		{
-			stats.extended_chunks_size = default_chunks_size;
-			return eResult::success;
-		}
-		else
-		{
 			return eResult::errorAllocatingMemory;
 		}
+		stats_.extended_chunks_size = default_chunks_size;
+		return eResult::success;
 	}
 
 	eResult insert(const Address& ip_address,
@@ -91,7 +88,7 @@ public:
 			}
 		}
 
-		return pointer_->insert(stats, ip_address, mask, value_id);
+		return pointer_->insert(stats_, ip_address, mask, value_id);
 	}
 
 	eResult remove(const Address& ip_address,
@@ -106,7 +103,7 @@ public:
 			}
 		}
 
-		eResult result = pointer_->remove(stats, ip_address, mask);
+		eResult result = pointer_->remove(stats_, ip_address, mask);
 		if (result != eResult::success)
 		{
 			return result;
@@ -129,7 +126,7 @@ public:
 		if (pointer_)
 		{
 			pointer_->clear();
-			stats.clear();
+			stats_.clear();
 			if (NeedToShrink())
 			{
 				Resize(2 * ObjectType::extended_chunks_size_min);
@@ -139,17 +136,17 @@ public:
 
 	void limits(common::idp::limits::response& limits) const
 	{
-		limits.emplace_back(name + ".extended_chunks",
-		                    socket_id,
-		                    stats.extended_chunks_count,
-		                    stats.extended_chunks_size);
+		limits.emplace_back(name_ + ".extended_chunks",
+		                    socket_id_,
+		                    stats_.extended_chunks_count,
+		                    stats_.extended_chunks_size);
 	}
 
 	void report(nlohmann::json& report) const
 	{
 		report["pointer"] = to_hex(pointer_.get());
-		report["extended_chunks_count"] = stats.extended_chunks_count;
-		report["extended_chunks_size"] = stats.extended_chunks_size;
+		report["extended_chunks_count"] = stats_.extended_chunks_count;
+		report["extended_chunks_size"] = stats_.extended_chunks_size;
 	}
 
 	ObjectType* pointer()
@@ -158,10 +155,10 @@ public:
 	}
 
 private:
-	std::string name;
-	dataplane::memory_manager* memory_manager;
-	tSocketId socket_id;
-	stats_t stats;
+	std::string name_;
+	dataplane::memory_manager* memory_manager_;
+	tSocketId socket_id_;
+	stats_t stats_;
 	dataplane::memory_manager::unique_ptr<ObjectType> pointer_;
 
 	eResult Resize(const std::size_t size)
@@ -178,25 +175,25 @@ private:
 		next_stats.max_used_chunk_id = 0;
 		next_stats.free_chunk_cache.flags = 0;
 
-		next->copy(next_stats, stats, *pointer_);
-		stats = next_stats;
+		next->copy(next_stats, stats_, *pointer_);
+		stats_ = next_stats;
 		std::swap(pointer_, next);
 		return eResult::success;
 	}
 
 	bool NeedToGrow() const
 	{
-		return stats.extended_chunks_size - stats.extended_chunks_count < ObjectType::extended_chunks_size_min;
+		return stats_.extended_chunks_size - stats_.extended_chunks_count < ObjectType::extended_chunks_size_min;
 	}
 
 	std::size_t GrowSize() const
 	{
-		return stats.extended_chunks_size * 2;
+		return stats_.extended_chunks_size * 2;
 	}
 
 	std::size_t ShrinkSize() const
 	{
-		return stats.extended_chunks_size / 2;
+		return stats_.extended_chunks_size / 2;
 	}
 
 	bool NeedToShrink() const
