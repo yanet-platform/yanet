@@ -15,13 +15,13 @@
 
 cBus::cBus(cDataPlane* dataPlane) :
         dataPlane(dataPlane),
-        controlPlane(dataPlane->controlPlane.get()),
         serverSocket(-1)
 {
 }
 
 eResult cBus::init()
 {
+	controlPlane = dataPlane->controlPlane.get();
 	serverSocket = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (serverSocket < 0)
 	{

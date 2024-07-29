@@ -25,7 +25,11 @@
 
 cControlPlane::cControlPlane(cDataPlane* dataPlane) :
         dataPlane(dataPlane),
-        fragmentation(this, dataPlane),
+        fragmentation_(
+                [this](rte_mbuf* pkt, const common::globalBase::tFlow& flow) {
+	                sendPacketToSlowWorker(pkt, flow);
+                },
+                dataPlane->getConfigValues().fragmentation),
         dregress(this, dataPlane),
         mempool(nullptr),
         use_kernel_interface(false),
@@ -487,7 +491,7 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 
 common::idp::getFragmentationStats::response cControlPlane::getFragmentationStats()
 {
-	return fragmentation.getStats();
+	return fragmentation_.getStats();
 }
 
 common::idp::getFWState::response cControlPlane::getFWState()
@@ -1453,7 +1457,7 @@ void cControlPlane::mainThread()
 			}
 		}
 
-		fragmentation.handle();
+		fragmentation_.handle();
 		dregress.handle();
 
 		if (use_kernel_interface)
@@ -2265,7 +2269,7 @@ void cControlPlane::handlePacket_fragment(rte_mbuf* mbuf)
 
 	if (nat64stateless.defrag_farm_prefix.empty() || metadata->network_headerType != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4) || nat64stateless.farm)
 	{
-		fragmentation.insert(mbuf);
+		fragmentation_.insert(mbuf);
 		return;
 	}
 

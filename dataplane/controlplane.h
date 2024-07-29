@@ -119,7 +119,7 @@ protected:
 
 	cDataPlane* dataPlane;
 
-	fragmentation_t fragmentation;
+	fragmentation::Fragmentation fragmentation_;
 	dregress_t dregress;
 
 	std::mutex mutex;
