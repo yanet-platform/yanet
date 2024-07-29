@@ -92,7 +92,7 @@ public:
 	void start();
 	void join();
 
-	const ConfigValues& getConfigValues() const { return configValues; }
+	const ConfigValues& getConfigValues() const { return config_values_; }
 	std::map<std::string, common::uint64> getPortStats(const tPortId& portId) const;
 	std::optional<tPortId> interface_name_to_port_id(const std::string& interface_name);
 	const std::set<tSocketId>& get_socket_ids() const;
@@ -123,6 +123,7 @@ public:
 	void InitPortsBarrier();
 
 protected:
+	eResult InitControlPlane();
 	eResult init_kernel_interfaces();
 	bool KNIAddTxQueue(tQueueId queue, tSocketId socket);
 	bool KNIAddRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool);
@@ -151,6 +152,7 @@ protected:
 	friend class worker_gc_t;
 
 	tDataPlaneConfig config;
+	ConfigValues config_values_;
 
 	struct KniHandleBundle
 	{
@@ -179,8 +181,6 @@ protected:
 	size_t numaNodesInUse;
 	std::map<tSocketId, std::array<dataplane::globalBase::generation*, 2>> globalBases;
 	uint32_t globalBaseSerial;
-
-	ConfigValues configValues;
 
 	std::map<std::string,
 	         std::tuple<int, ///< socket
