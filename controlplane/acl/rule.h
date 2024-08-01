@@ -1369,40 +1369,47 @@ struct hash<acl::rule_t>
 	size_t operator()(const acl::rule_t& r) const noexcept
 	{
 		size_t h = 0;
-		if (std::holds_alternative<int64_t>(r.action))
-		{
-			const auto& act = std::get<int64_t>(r.action);
-			hash_combine(h, act);
-		}
-		else if (std::holds_alternative<common::globalBase::tFlow>(r.action))
-		{
-			auto flow = std::get<common::globalBase::tFlow>(r.action);
-			hash_combine(h, 1, (uint64_t(flow.type) << 32) & flow.data.atomic);
-		}
-		else if (std::holds_alternative<common::acl::check_state_t>(r.action))
-		{
-			// Since check_state_t acts as a marker (either present or not),
-			// it doesn't have specific members to hash.
-			// To uniquely identify its presence in the hash, we use a
-			// predefined static constant as a unique identifier.
-			hash_combine(h, common::acl::check_state_t::HASH_IDENTIFIER);
-		}
-		else if (std::holds_alternative<common::acl::state_timeout_t>(r.action))
-		{
-			auto action = std::get<common::acl::state_timeout_t>(r.action);
-			hash_combine(h, action.timeout);
-		}
-		else
-		{
-			auto action = std::get<common::acl::dump_t>(r.action);
-			hash_combine(h, action.dump_id);
-		}
+		// value to hash based on the type of action
+		size_t action_value = 0;
+
+		std::visit([&action_value](const auto& action) {
+			using T = std::decay_t<decltype(action)>;
+
+			if constexpr (std::is_same_v<T, int64_t>)
+			{
+				action_value = action;
+			}
+			else if constexpr (std::is_same_v<T, common::globalBase::tFlow>)
+			{
+				uint64_t high_part = static_cast<uint64_t>(action.type) << 32;
+				uint64_t low_part = static_cast<uint32_t>(action.data.atomic);
+				action_value = high_part | low_part;
+			}
+			else if constexpr (std::is_same_v<T, common::acl::check_state_t>)
+			{
+				// Since check_state_t acts as a marker (either present or not),
+				// it doesn't have specific members to hash.
+				// To uniquely identify its presence in the hash, we use a
+				// predefined static constant as a unique identifier.
+				action_value = common::acl::check_state_t::HASH_IDENTIFIER;
+			}
+			else if constexpr (std::is_same_v<T, common::acl::dump_t>)
+			{
+				action_value = action.dump_id;
+			}
+			else if constexpr (std::is_same_v<T, common::acl::state_timeout_t>)
+			{
+				action_value = action.timeout;
+			}
+		},
+		           r.action);
 
 		if (r.filter)
 		{
 			hash_combine(h, **r.filter);
 		}
-		hash_combine(h, r.log);
+
+		hash_combine(h, action_value, r.log);
 
 		return h;
 	}
