@@ -464,56 +464,33 @@ static bool unwind(int64_t start_from, firewall_rules_t& fw, const dispatcher_ru
 			ids.insert(ids.end(), rule.ids.begin(), rule.ids.end());
 
 			ACL_DBGMSG("advancing further...");
-			if (std::holds_alternative<int64_t>(rule.action))
-			{
-				// handle skipto && allow action
-				start_from = std::get<int64_t>(rule.action);
-				if (start_from != DISPATCHER)
-				{
-					ACL_DBGMSG("skipto " << start_from);
-					term_rule = unwind(start_from, fw, dispatcher, result_filter, iface, ids, rules, log || rule.log, recursion_limit + 1);
-					// if we have reached DISPATCHER, it will be handled next
-				}
+			std::visit([&](const auto& action) {
+				using T = std::decay_t<decltype(action)>;
 
-				if (start_from == DISPATCHER)
+				if constexpr (std::is_same_v<T, int64_t>)
 				{
-					ACL_DBGMSG("go to dispatcher...");
-					term_rule = unwind_dispatcher(dispatcher, result_filter, iface, ids, rules, log || rule.log);
+					// handle skipto && allow action
+					start_from = action;
+					if (start_from != DISPATCHER)
+					{
+						ACL_DBGMSG("skipto " << start_from);
+						term_rule = unwind(start_from, fw, dispatcher, result_filter, iface, ids, rules, log || rule.log, recursion_limit + 1);
+						// if we have reached DISPATCHER, it will be handled next
+					}
+					if (start_from == DISPATCHER)
+					{
+						ACL_DBGMSG("go to dispatcher...");
+						term_rule = unwind_dispatcher(dispatcher, result_filter, iface, ids, rules, log || rule.log);
+					}
 				}
-			}
-			else if (std::holds_alternative<common::globalBase::tFlow>(rule.action))
-			{
-				// handle tFlows
-				rules.emplace_back(std::move(result_filter),
-				                   std::get<common::globalBase::tFlow>(rule.action),
-				                   ids,
-				                   log || rule.log);
-				ACL_DBGMSG("tFlow gathered...");
-			}
-			else if (std::holds_alternative<common::acl::check_state_t>(rule.action))
-			{
-				rules.emplace_back(std::move(result_filter),
-				                   std::get<common::acl::check_state_t>(rule.action),
-				                   ids,
-				                   log || rule.log);
-				ACL_DBGMSG("check_state gathered...");
-			}
-			else if (std::holds_alternative<common::acl::state_timeout_t>(rule.action))
-			{
-				rules.emplace_back(std::move(result_filter),
-				                   std::get<common::acl::state_timeout_t>(rule.action),
-				                   ids,
-				                   log || rule.log);
-				ACL_DBGMSG("state_timeout gathered...");
-			}
-			else
-			{
-				rules.emplace_back(std::move(result_filter),
-				                   std::get<common::acl::dump_t>(rule.action),
-				                   ids,
-				                   log || rule.log);
-				ACL_DBGMSG("dump_t gathered...");
-			}
+				else
+				{
+					// Handle other types by emplacing them directly into rules
+					rules.emplace_back(std::move(result_filter), action, ids, log || rule.log);
+					ACL_DBGMSG(typeid(T).name() << " gathered...");
+				}
+			},
+			           rule.action);
 
 			ids.resize(idSize);
 			if (is_term_filter(rule.filter) && (rule.is_term() || rule.is_skipto()))
