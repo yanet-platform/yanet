@@ -85,8 +85,6 @@ struct check_state_t
 
 /**
  * @brief Represents an action that dumps packets to a specified ring.
- *
- * Only one DumpAction is allowed in an Actions object.
  */
 struct DumpAction final
 {
@@ -167,8 +165,6 @@ struct FlowAction final
  *
  * This class doesn't have any specific info to store,
  * because check-state rule doesn't need anything.
- *
- * Only one CheckStateAction is allowed in an Actions object.
  */
 struct CheckStateAction final
 {
