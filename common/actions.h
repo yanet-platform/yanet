@@ -194,12 +194,15 @@ struct CheckStateAction final
 	}
 };
 
+using RawAction = std::variant<FlowAction, DumpAction, CheckStateAction>;
+
+
 /**
  * @brief Represents a generic action.
  */
 struct Action
 {
-	std::variant<FlowAction, DumpAction, CheckStateAction> raw_action;
+	RawAction raw_action;
 
 	Action() :
 	        raw_action(FlowAction()) {}
@@ -240,7 +243,7 @@ namespace acl
 struct Actions
 {
 	std::vector<Action> path{};
-	std::array<size_t, std::variant_size_v<decltype(Action::raw_action)>> action_counts = {0};
+	std::array<size_t, std::variant_size_v<RawAction>> action_counts = {0};
 	std::optional<size_t> check_state_index{};
 
 	Actions() = default;
