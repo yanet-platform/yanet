@@ -482,9 +482,9 @@ add 200 deny ip from any to any
 
 namespace
 {
-const auto FlowIndex = common::variant::get_index<common::FlowAction, decltype(common::Action::raw_action)>::value;
-const auto DumpIndex = common::variant::get_index<common::DumpAction, decltype(common::Action::raw_action)>::value;
-const auto CheckStateIndex = common::variant::get_index<common::CheckStateAction, decltype(common::Action::raw_action)>::value;
+const auto FlowIndex = common::variant::get_index<common::FlowAction, common::RawAction>::value;
+const auto DumpIndex = common::variant::get_index<common::DumpAction, common::RawAction>::value;
+const auto CheckStateIndex = common::variant::get_index<common::CheckStateAction, common::RawAction>::value;
 }
 
 TEST(ACL, 019_CheckStateBasic)
