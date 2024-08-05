@@ -1035,7 +1035,7 @@ const int64_t DISPATCHER = -1;
 // sense.
 //
 // Additionally, we might have another variant for representing rules that are suitable for execution in the dataplane.
-using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::dump_t, common::acl::check_state_t>;
+using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::dump_t, common::acl::check_state_t, common::acl::state_timeout_t>;
 
 struct rule_t
 {
@@ -1063,6 +1063,10 @@ public:
 	{}
 
 	rule_t(const ref_t<filter_t>& _filter, common::acl::check_state_t action, const ids_t& ids, bool log) :
+	        rule_t(_filter, rule_action(action), ids, log)
+	{}
+
+	rule_t(const ref_t<filter_t>& _filter, common::acl::state_timeout_t action, const ids_t& ids, bool log) :
 	        rule_t(_filter, rule_action(action), ids, log)
 	{}
 
@@ -1112,6 +1116,9 @@ public:
 				break;
 			case ipfw::rule_action_t::DUMP:
 				action = common::acl::dump_t(std::get<std::string>(rulep->action_arg));
+				break;
+			case ipfw::rule_action_t::STATETIMEOUT:
+				action = common::acl::state_timeout_t(std::get<int64_t>(rulep->action_arg));
 				break;
 			default:
 				YANET_LOG_WARNING("unexpected rule action in rule '%s'\n", rulep->text.data());
@@ -1189,6 +1196,11 @@ public:
 		else if (std::holds_alternative<common::acl::check_state_t>(action))
 		{
 			text = "check-state";
+		}
+		else if (std::holds_alternative<common::acl::state_timeout_t>(action))
+		{
+			auto rule_action = std::get<common::acl::state_timeout_t>(action);
+			text = "state-timeout(" + std::to_string(rule_action.timeout) + ")";
 		}
 		else
 		{
@@ -1375,11 +1387,17 @@ struct hash<acl::rule_t>
 			// predefined static constant as a unique identifier.
 			hash_combine(h, common::acl::check_state_t::HASH_IDENTIFIER);
 		}
+		else if (std::holds_alternative<common::acl::state_timeout_t>(r.action))
+		{
+			auto action = std::get<common::acl::state_timeout_t>(r.action);
+			hash_combine(h, action.timeout);
+		}
 		else
 		{
 			auto action = std::get<common::acl::dump_t>(r.action);
 			hash_combine(h, action.dump_id);
 		}
+
 		if (r.filter)
 		{
 			hash_combine(h, **r.filter);

@@ -170,6 +170,7 @@ enum class rule_action_t
 	SRCPRJID,
 	DSTPRJID,
 	DUMP,
+	STATETIMEOUT,
 };
 
 enum class rule_action_modifier_t

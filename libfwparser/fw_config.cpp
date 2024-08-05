@@ -1147,6 +1147,7 @@ bool fw_config_t::validate_rule(rule_ptr_t rulep)
 		case rule_action_t::SKIPTO:
 		case rule_action_t::DUMP:
 		case rule_action_t::CHECKSTATE:
+		case rule_action_t::STATETIMEOUT:
 			break;
 		default:
 			return true;
