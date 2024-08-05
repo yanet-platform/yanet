@@ -19,7 +19,6 @@ if get_option('buildtype').contains('release')
     compiler_args += '-Ofast'
 endif
 
-compiler_args += '-Og'
 compiler_args += '-g'
 
 compiler_args += [
