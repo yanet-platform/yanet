@@ -1035,7 +1035,7 @@ const int64_t DISPATCHER = -1;
 // sense.
 //
 // Additionally, we might have another variant for representing rules that are suitable for execution in the dataplane.
-using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::dump_t, common::acl::check_state_t>;
+using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::dump_t, common::acl::check_state_t, common::acl::state_timeout_t>;
 
 struct rule_t
 {
@@ -1063,6 +1063,10 @@ public:
 	{}
 
 	rule_t(const ref_t<filter_t>& _filter, common::acl::check_state_t action, const ids_t& ids, bool log) :
+	        rule_t(_filter, rule_action(action), ids, log)
+	{}
+
+	rule_t(const ref_t<filter_t>& _filter, common::acl::state_timeout_t action, const ids_t& ids, bool log) :
 	        rule_t(_filter, rule_action(action), ids, log)
 	{}
 
@@ -1112,6 +1116,9 @@ public:
 				break;
 			case ipfw::rule_action_t::DUMP:
 				action = common::acl::dump_t(std::get<std::string>(rulep->action_arg));
+				break;
+			case ipfw::rule_action_t::STATETIMEOUT:
+				action = common::acl::state_timeout_t(std::get<int64_t>(rulep->action_arg));
 				break;
 			default:
 				YANET_LOG_WARNING("unexpected rule action in rule '%s'\n", rulep->text.data());
@@ -1189,6 +1196,10 @@ public:
 		else if (std::holds_alternative<common::acl::check_state_t>(action))
 		{
 			text = "check-state";
+		}
+		else if (std::holds_alternative<common::acl::state_timeout_t>(action))
+		{
+			text = "state-timeout";
 		}
 		else
 		{
@@ -1368,8 +1379,8 @@ struct hash<acl::rule_t>
 			}
 			else if constexpr (std::is_same_v<ActionType, common::globalBase::tFlow>)
 			{
-				uint64_t high_part = static_cast<uint64_t>(action.type) << 32;
-				uint64_t low_part = static_cast<uint32_t>(action.data.atomic);
+				auto high_part = static_cast<uint64_t>(action.type) << 32;
+				uint64_t low_part = action.data.atomic;
 				action_value = high_part | low_part;
 			}
 			else if constexpr (std::is_same_v<ActionType, common::acl::check_state_t>)
@@ -1383,6 +1394,10 @@ struct hash<acl::rule_t>
 			else if constexpr (std::is_same_v<ActionType, common::acl::dump_t>)
 			{
 				action_value = action.dump_id;
+			}
+			else if constexpr (std::is_same_v<ActionType, common::acl::state_timeout_t>)
+			{
+				action_value = action.timeout;
 			}
 		},
 		           r.action);

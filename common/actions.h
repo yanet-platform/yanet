@@ -75,6 +75,44 @@ struct check_state_t
 	}
 };
 
+struct state_timeout_t
+{
+	state_timeout_t() :
+	        timeout(0)
+	{}
+
+	state_timeout_t(uint32_t timeout) :
+	        timeout(timeout)
+	{}
+
+	bool operator==(const state_timeout_t& o) const
+	{
+		return timeout == o.timeout;
+	}
+
+	inline bool operator!=(const state_timeout_t& o) const
+	{
+		return !operator==(o);
+	}
+
+	constexpr bool operator<(const state_timeout_t& o) const
+	{
+		return timeout < o.timeout;
+	}
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(timeout);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(timeout);
+	}
+
+	uint32_t timeout;
+};
+
 } // namespace acl
 
 // TODO: When rewriting the current ACL library into LibFilter, we could consider using inheritance.
@@ -191,8 +229,43 @@ struct CheckStateAction final
 	}
 };
 
-using RawAction = std::variant<FlowAction, DumpAction, CheckStateAction>;
+/**
+ * @brief Represents an action that sets timeout for the dynamic firewall rule.
+ */
+struct StateTimeoutAction final
+{
+	// Maximum count of StateTimeoutActions objects allowed.
+	static constexpr size_t MAX_COUNT = YANET_CONFIG_MAX_TIMEOUTS_RULES;
+	// Timeout in FIXME: (milliseconds)?
+	uint32_t timeout;
 
+	StateTimeoutAction(const acl::state_timeout_t& timeout_action) :
+	        timeout(timeout_action.timeout){};
+
+	StateTimeoutAction() :
+	        timeout(0){};
+
+	[[nodiscard]] bool terminating() const { return false; }
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(timeout);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(timeout);
+	}
+
+	[[nodiscard]] std::string to_string() const
+	{
+		std::ostringstream oss;
+		oss << "StateTimeoutAction(timeout=" << timeout << ")";
+		return oss.str();
+	}
+};
+
+using RawAction = std::variant<FlowAction, DumpAction, CheckStateAction, StateTimeoutAction>;
 
 /**
  * @brief Represents a generic action.

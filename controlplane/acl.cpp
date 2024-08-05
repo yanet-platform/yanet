@@ -325,6 +325,7 @@ struct firewall_rules_t
 					case ipfw::rule_action_t::DUMP:
 					case ipfw::rule_action_t::DENY:
 					case ipfw::rule_action_t::CHECKSTATE:
+					case ipfw::rule_action_t::STATETIMEOUT:
 					{
 						// handle only meaning rules
 						auto& ruleref = yanet_rules.emplace_back(rulep, configp);

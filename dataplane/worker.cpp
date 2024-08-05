@@ -1,5 +1,6 @@
 #include <netinet/icmp6.h>
 #include <netinet/ip_icmp.h>
+jkfdljsdlfkdjsfldksjflkfjsdk
 
 #include <optional>
 #include <string>
@@ -5929,6 +5930,8 @@ YANET_NEVER_INLINE void cWorker::slowWorkerFarmHandleFragment(rte_mbuf* mbuf)
 	slowWorker_entry_normalPriority(mbuf, common::globalBase::eFlowType::slowWorker_repeat);
 }
 
+//перегружаем, в flow смотрим на std::ooptinal, который заполняем на value compile этапе таймаутом.
+//реального правила не надо (как с чекстейтом)
 inline void cWorker::acl_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value)
 {
 	value->last_seen = basePermanently.globalBaseAtomic->currentTime;

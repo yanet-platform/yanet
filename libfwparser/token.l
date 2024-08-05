@@ -110,6 +110,7 @@ permit			return ipfw::fw_parser_t::make_ALLOW(*ploc);
 deny_in			return ipfw::fw_parser_t::make_DENY_IN(*ploc);
 deny|drop		return ipfw::fw_parser_t::make_DENY(*ploc);
 dump			return ipfw::fw_parser_t::make_DUMP(*ploc);
+state-timeout	return ipfw::fw_parser_t::make_STATETIMEOUT(*ploc);
 reject			return ipfw::fw_parser_t::make_T_REJECT(*ploc);
 unreach			return ipfw::fw_parser_t::make_UNREACH(*ploc);
 unreach6		return ipfw::fw_parser_t::make_UNREACH6(*ploc);
