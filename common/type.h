@@ -2273,7 +2273,7 @@ inline const char* eFlowType_toString(eFlowType t)
 
 enum class eFlowFlags : uint8_t
 {
-	keepstate = 1,
+	recordstate = 1,
 	log = 2,
 };
 
@@ -2388,6 +2388,17 @@ public:
 	void push(stream_out_t& stream) const
 	{
 		stream.push((char*)this, sizeof(*this));
+	}
+
+	[[nodiscard]] std::string to_string() const
+	{
+		std::ostringstream oss;
+		oss << "tFlow { type: " << eFlowType_toString(type)
+		    << ", flags: " << static_cast<int>(flags)
+		    << ", counter_id: " << counter_id
+		    << ", data: { atomic: " << data.atomic
+		    << " } }";
+		return oss.str();
 	}
 
 public:

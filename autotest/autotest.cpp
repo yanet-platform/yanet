@@ -1354,7 +1354,12 @@ void tAutotest::mainThread()
 			{
 				bool result = true;
 
-				if (yamlStep["ipv4Update"])
+				if (yamlStep["subtest"])
+				{
+					auto test_name = yamlStep["subtest"].as<std::string>();
+					YANET_LOG_PRINT(ANSI_COLOR_BLUE "Running subtest: '%s'\n" ANSI_COLOR_RESET, test_name.c_str());
+				}
+				else if (yamlStep["ipv4Update"])
 				{
 					YANET_LOG_DEBUG("step: ipv4Update\n");
 
@@ -1505,8 +1510,8 @@ void tAutotest::mainThread()
 			fflush(stdout);
 			fflush(stderr);
 
-			std::ofstream out("/tmp/yanet-dp.report");
-			out << dataPlane.getReport();
+			/* std::ofstream out("/tmp/yanet-dp.report"); */
+			/* out << dataPlane.getReport(); */
 
 			std::abort();
 		}
@@ -1516,8 +1521,8 @@ void tAutotest::mainThread()
 		fflush(stderr);
 	}
 
-	std::ofstream out("/tmp/yanet-dp.report");
-	out << dataPlane.getReport();
+	/* std::ofstream out("/tmp/yanet-dp.report"); */
+	/* out << dataPlane.getReport(); */
 }
 
 void tAutotest::convert_ipv4Update(const std::string& string)

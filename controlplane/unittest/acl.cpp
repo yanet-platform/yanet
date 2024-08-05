@@ -152,8 +152,8 @@ add 7 deny ip from any to any
 		(void)total_table_key;
 
 		const auto& value = result.acl_values[total_table_value];
-		EXPECT_THAT(value.flow.counter_id, ::testing::Ge(1));
-		EXPECT_THAT(value.flow.counter_id, ::testing::Lt(5));
+		std::visit([&](const auto& actions) { EXPECT_THAT(actions.get_flow().counter_id, ::testing::Ge(1)); }, value);
+		std::visit([&](const auto& actions) { EXPECT_THAT(actions.get_flow().counter_id, ::testing::Lt(5)); }, value);
 	}
 	EXPECT_THAT(ids_map[0], ::testing::ElementsAre());
 	EXPECT_THAT(ids_map[1], ::testing::ElementsAre(1, 2, 5));
@@ -182,7 +182,10 @@ add 2 allow ip from { 1.2.3.4 } to any in
 		(void)total_table_key;
 
 		const auto& value = result.acl_values[total_table_value];
-		EXPECT_THAT(value.flow.type, ::testing::Eq(common::globalBase::eFlowType::drop));
+		std::visit([&](const auto& actions) {
+			EXPECT_THAT(actions.get_flow().type, ::testing::Eq(common::globalBase::eFlowType::drop));
+		},
+		           value);
 	}
 	EXPECT_THAT(ids_map[0], ::testing::ElementsAre());
 	EXPECT_THAT(ids_map[1], ::testing::ElementsAre(1));
@@ -357,7 +360,10 @@ add 300 deny ip from any to any
 	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
 	{
 		(void)total_table_key;
-		EXPECT_THAT(result.acl_values[total_table_value].flow.flags, ::testing::Eq((uint8_t)common::globalBase::eFlowFlags::log));
+		std::visit([&](const auto& actions) {
+			EXPECT_THAT(actions.get_flow().flags, ::testing::Eq((uint8_t)common::globalBase::eFlowFlags::log));
+		},
+		           result.acl_values[total_table_value]);
 	}
 
 	auto& ids_map = result.ids_map;
@@ -472,6 +478,233 @@ add 200 deny ip from any to any
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 	// we expect that after validation rule 100 will be omitted and only one rule will remain
 	EXPECT_THAT(std::get<1>(result.rules[200].front()), ::testing::Eq("deny"));
+}
+
+namespace
+{
+const auto FlowIndex = common::variant::get_index<common::FlowAction, common::RawAction>::value;
+const auto DumpIndex = common::variant::get_index<common::DumpAction, common::RawAction>::value;
+const auto CheckStateIndex = common::variant::get_index<common::CheckStateAction, common::RawAction>::value;
+}
+
+TEST(ACL, 019_CheckStateBasic)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add 100 check-state
+add 200 allow ip from { 1.2.3.4 } to any
+add 300 deny ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
+	{
+		(void)total_table_key;
+
+		const auto& value = result.acl_values[total_table_value];
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path does not include the check-state action
+				EXPECT_THAT(actions.get_actions().size(), 1);
+				EXPECT_THAT(actions.get_actions()[0].raw_action.index(), ::testing::Ne(CheckStateIndex));
+
+				// Check that the check-state path includes the check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_THAT(actions.get_check_state_actions().back().raw_action.index(), ::testing::Eq(CheckStateIndex));
+			}
+		},
+		           value);
+	}
+}
+
+TEST(ACL, 020_ManyCheckStates)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add 100 check-state
+add 200 dump ring1 ip from { 1.2.3.4 } to any
+add 300 check-state
+add 400 deny ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	// We're interested in second group, i.e the group where src ip is { 1.2.3.4 }
+	auto total_table_value = std::get<1>(result.acl_total_table[1]);
+
+	const auto& value = result.acl_values[total_table_value];
+	std::visit([&](const auto& actions) {
+		if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+		{
+			// Check that the regular path includes the actions after the first and second check-states
+			EXPECT_THAT(actions.get_actions().size(), 2);
+			EXPECT_THAT(actions.get_actions()[0].raw_action.index(), ::testing::Eq(DumpIndex));
+			EXPECT_THAT(actions.get_actions()[1].raw_action.index(), ::testing::Eq(FlowIndex));
+
+			// Check that the check-state path includes the first check-state action and no other actions
+			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+			EXPECT_THAT(actions.get_check_state_actions().back().raw_action.index(), ::testing::Eq(CheckStateIndex));
+		}
+	},
+	           value);
+}
+
+TEST(ACL, 021_CheckStateComplex)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add 100 dump ring1 ip from { 1.2.3.4 } to any
+add 200 check-state
+add 300 dump ring2 ip from { 1.2.3.4 } to any
+add 500 check-state
+add 500 deny ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	// We're interested in second group, i.e the group where src ip is { 1.2.3.4 }
+	auto total_table_value = std::get<1>(result.acl_total_table[1]);
+
+	const auto& value = result.acl_values[total_table_value];
+	std::visit([&](const auto& actions) {
+		if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+		{
+			// Check that the regular path includes actions before and after the check-state
+			EXPECT_THAT(actions.get_actions().size(), 3);
+			EXPECT_THAT(actions.get_actions()[0].raw_action.index(), ::testing::Eq(DumpIndex));
+			EXPECT_THAT(actions.get_actions()[1].raw_action.index(), ::testing::Eq(DumpIndex));
+			EXPECT_THAT(actions.get_actions()[2].raw_action.index(), ::testing::Eq(FlowIndex));
+
+			// Check that the check-state path includes actions up to and including the check-state action
+			EXPECT_THAT(actions.get_check_state_actions().size(), 2);
+			EXPECT_THAT(actions.get_check_state_actions()[0].raw_action.index(), ::testing::Eq(DumpIndex));
+			EXPECT_THAT(actions.get_check_state_actions()[1].raw_action.index(), ::testing::Eq(CheckStateIndex));
+		}
+	},
+	           value);
+}
+
+TEST(ACL, KeepState_Basic)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add allow ip from any to any keep-state
+add deny ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 1);
+
+	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
+	{
+		(void)total_table_key;
+
+		const auto& value = result.acl_values[total_table_value];
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path includes the allow action
+				EXPECT_THAT(actions.get_actions().size(), 1);
+				EXPECT_THAT(actions.get_actions()[0].raw_action.index(), ::testing::Eq(FlowIndex));
+
+				// Check that the check-state path includes the check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_THAT(actions.get_check_state_actions().back().raw_action.index(), ::testing::Eq(CheckStateIndex));
+			}
+		},
+		           value);
+	}
+}
+
+TEST(ACL, KeepState_MultipleRules)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add allow ip from { 1.2.3.4 } to any keep-state
+add allow ip from any to any 22 keep-state
+add deny ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
+	{
+		(void)total_table_key;
+
+		const auto& value = result.acl_values[total_table_value];
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path includes the allow action
+				EXPECT_THAT(actions.get_actions().size(), 1);
+				EXPECT_THAT(actions.get_actions()[0].raw_action.index(), ::testing::Eq(FlowIndex));
+
+				// Check that the check-state path includes the check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_THAT(actions.get_check_state_actions().back().raw_action.index(), ::testing::Eq(CheckStateIndex));
+			}
+		},
+		           value);
+	}
+}
+
+TEST(ACL, KeepState_WithSkipTo)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add skipto :IN ip from { 1.2.3.4 } to any in
+add deny ip from any to any
+
+:IN
+add allow ip from any to any keep-state
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
+	{
+		(void)total_table_key;
+
+		const auto& value = result.acl_values[total_table_value];
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path includes the allow action
+				EXPECT_THAT(actions.get_actions().size(), 1);
+				EXPECT_THAT(actions.get_actions()[0].raw_action.index(), ::testing::Eq(FlowIndex));
+
+				// Check that the check-state path includes the check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_THAT(actions.get_check_state_actions().back().raw_action.index(), ::testing::Eq(CheckStateIndex));
+			}
+		},
+		           value);
+	}
 }
 
 } // namespace

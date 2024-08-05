@@ -77,6 +77,7 @@ public:
 
 	void prepare()
 	{
+		YANET_LOG_DEBUG("Preparing filter_id_group_ids, size: %lu\n", filter_ids.size());
 		filter_id_group_ids.resize(filter_ids.size());
 	}
 
@@ -86,11 +87,13 @@ public:
 		     filter_id < filters.size();
 		     filter_id++)
 		{
+			YANET_LOG_DEBUG("Compiling filter_id: %u\n", filter_id);
 			remap_group_ids.clear();
 			remap_group_ids.resize(group_id, 0);
 
 			for (const auto& range : filters[filter_id].vector)
 			{
+				YANET_LOG_DEBUG("Processing range: from %u to %u\n", range.from(), range.to());
 				if (range.from() == 0 &&
 				    range.to() == (1u << bits) - 1)
 				{
@@ -129,6 +132,7 @@ public:
 
 			for (const auto& range : filters[filter_id].vector)
 			{
+				YANET_LOG_DEBUG("Populating filter_id: %u range: from %u to %u\n", filter_id, range.from(), range.to());
 				if (range.from() == 0 &&
 				    range.to() == (1u << bits) - 1)
 				{
@@ -151,6 +155,7 @@ public:
 
 			for (const auto group_id : group_ids)
 			{
+				YANET_LOG_DEBUG("filter_id: %u, adding group_id: %u\n", filter_id, group_id);
 				filter_id_group_ids[filter_id].emplace_back(group_id);
 				used_group_ids_set.emplace(group_id);
 			}
@@ -159,6 +164,7 @@ public:
 		for (const auto group_id : used_group_ids_set)
 		{
 			used_group_ids_vec.emplace_back(group_id);
+			YANET_LOG_DEBUG("Adding used group_id: %u\n", group_id);
 		}
 	}
 
@@ -189,6 +195,7 @@ public:
 protected:
 	void remap()
 	{
+		YANET_LOG_DEBUG("Starting remap, initial group_id: %u\n", group_id);
 		remap_group_ids.clear();
 		remap_group_ids.resize(group_id, 0);
 
@@ -208,6 +215,7 @@ protected:
 			values[i] = remap_group_ip;
 		}
 
+		YANET_LOG_DEBUG("Remap completed, final group_id: %u\n", group_id);
 		if (group_id > (1u << bits))
 		{
 			throw std::runtime_error("overflow group_id");

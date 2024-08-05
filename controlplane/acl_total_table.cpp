@@ -12,97 +12,84 @@ total_table_t::total_table_t(compiler_t* compiler) :
 void total_table_t::clear()
 {
 	table.clear();
-	remap_group_ids.clear();
-	group_id = 1;
-	filters.clear();
-	filter_ids.clear();
-	filter_id_by_rule_id.clear();
-	filter_id_group_ids.clear();
-	bitmask.clear();
-	map.clear();
-	reverse_map.clear();
-	reverse_map_next.clear();
 }
 
-unsigned int total_table_t::collect(const unsigned int rule_id, const filter& filter)
+void total_table_t::collect(const unsigned int rule_id, const filter& filter)
 {
-	(void)rule_id;
-
-	auto it = filter_ids.find(filter);
-	if (it == filter_ids.end())
-	{
-		filters.emplace_back(filter);
-		it = filter_ids.emplace_hint(it, filter, filter_ids.size());
-	}
-
-	filter_id_by_rule_id.emplace_back(it->second);
-	return it->second;
+	auto [via_filter_id, transport_table_filter_id] = filter;
+	acl_rules_by_filter_id[transport_table_filter_id].emplace_back(rule_id, via_filter_id);
 }
 
 void total_table_t::prepare()
 {
-	filter_id_group_ids.resize(filter_ids.size());
-}
-
-void total_table_t::compile()
-{
-	common::acl::total_key_t key;
-	memset(&key, 0, sizeof(key));
-
-	for (const auto& rule : compiler->rules)
+	for (auto& thread : compiler->transport_table.threads)
 	{
-		const auto filter_id = rule.total_table_filter_id;
-		const auto group_id = rule.value_filter_id;
-
-		if (!filter_id_group_ids[filter_id].empty())
+		for (auto group : thread.all_groups)
 		{
-			continue;
-		}
-
-		const auto& [acl_id, transport_table_filter_id] = filters[filter_id];
-		/// @todo: acl_id -> via_filter_id
-
-		key.acl_id = acl_id;
-		bool used = false;
-		for (const auto& thread : compiler->transport_table.threads)
-		{
-			for (const auto transport_table_group_id : thread.transport_table_filter_id_group_ids[transport_table_filter_id])
+			for (auto filter_id : thread.group_id_filter_ids[group])
 			{
-				key.transport_id = transport_table_group_id;
-				auto it = table.find(key);
-				if (it == table.end())
+				for (const auto& [rule_id, acl_id] : acl_rules_by_filter_id[filter_id])
 				{
-					// If there is no such key in table, then we save [key, group_id]
-					// without any additional checks.
-					it = table.emplace_hint(it, key, group_id);
-					used = true;
-				}
-				else
-				{
-					// If table already has such key, then we are trying to collect
-					// new combination of the previous group_id and the current group_id.
-					// If new_group_id differs from the current group_id, then we replace
-					// the previous group_id with the new one. Otherwise we don't do anything.
-					const auto new_group_id = compiler->value.collect(it->second, group_id);
-					if (new_group_id != it->second)
-					{
-						it->second = new_group_id;
-						used = true;
-					}
-				}
-
-				if (rule.terminating && used)
-				{
-					// If the rule is termineting and has been used, then we mark filter_id
-					// as filled in to prevent further additional checks.
-					filter_id_group_ids[filter_id].emplace(it->second);
+					group_to_acl_rule_map[group][acl_id].insert(rule_id);
 				}
 			}
 		}
+	}
+}
 
-		if (used)
+/**
+ * @brief Compiles the total table by processing groups and their associated ACL rules.
+ *
+ * This function iterates through all threads, groups, and their respective ACL rules,
+ * and fills the total table with rules. The rules are processed until a terminating rule
+ * is encountered or all rules have been processed. If no terminating rule is found, a
+ * default "drop" action is appended at the end (see `value_t::compile()`).
+ */
+void total_table_t::compile()
+{
+	YANET_LOG_DEBUG("Compiling total table\n");
+
+	for (auto& thread : compiler->transport_table.threads)
+	{
+		for (auto group : thread.all_groups)
 		{
-			compiler->used_rules.emplace_back(rule.rule_id);
+			YANET_LOG_DEBUG("Processing group %u:\n", group);
+
+			auto& acl_rules_map = group_to_acl_rule_map[group];
+			for (auto& [acl_id, rule_ids] : acl_rules_map)
+			{
+				common::acl::total_key_t key{acl_id, group};
+
+				YANET_LOG_DEBUG("\tFilling key {%u, %u}\n", key.transport_id, key.acl_id);
+
+				// At this point there's nothing in this group hence we should add at least one rule.
+				// Do it here, cause there are a decent chance that there will be only one rule or it
+				// will be terminating, so the following loop will be unnecessary.
+				auto rule_iter = rule_ids.begin();
+				const auto& first_rule = compiler->rules[*rule_iter];
+				YANET_LOG_DEBUG("\t\tAdding rule %u\n", first_rule.rule_id);
+				table[key] = compiler->value.collect(first_rule.value_filter_id);
+				compiler->used_rules.push_back(first_rule.rule_id);
+
+				if (first_rule.terminating)
+					continue;
+
+				YANET_LOG_DEBUG("\t\tThat rule was not terminating, so continue\n");
+
+				for (++rule_iter; rule_iter != rule_ids.end(); ++rule_iter)
+				{
+					const auto& rule = compiler->rules[*rule_iter];
+					compiler->value.append_to_last(rule.value_filter_id);
+					compiler->used_rules.push_back(rule.rule_id);
+					YANET_LOG_DEBUG("\t\tAppending rule %u\n", rule.rule_id);
+
+					if (rule.terminating)
+					{
+						YANET_LOG_DEBUG("\t\tThat rule was terminating, so break from processing for this acl_id and group\n");
+						break;
+					}
+				}
+			}
 		}
 	}
 }
