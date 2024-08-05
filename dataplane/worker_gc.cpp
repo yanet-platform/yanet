@@ -439,7 +439,7 @@ void worker_gc_t::handle_balancer_gc()
 
 					dataplane::globalBase::balancer_state_value_t* ht_value;
 					dataplane::spinlock_nonrecursive_t* locker;
-					uint32_t old_real_id;
+					uint32_t old_real_id = 0;
 
 					uint32_t hash = globalbase_atomic_other->balancer_state->lookup(*iter.key(), ht_value, locker);
 					if (ht_value)

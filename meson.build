@@ -3,8 +3,7 @@ project('yanet', 'cpp',
         default_options: ['cpp_std=c++17',
                           'buildtype=release',
                           'warning_level=2',
-                          'werror=true',
-                          'b_lto=true'])
+                          'werror=true'])
 
 yanet_rootdir = include_directories('.')
 
@@ -19,6 +18,9 @@ compiler_args = []
 if get_option('buildtype').contains('release')
     compiler_args += '-Ofast'
 endif
+
+compiler_args += '-Og'
+compiler_args += '-g'
 
 compiler_args += [
     '-DYANET_VERSION_MAJOR=' + get_option('version_major').to_string(),
