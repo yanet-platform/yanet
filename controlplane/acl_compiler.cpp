@@ -287,6 +287,10 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 			{
 				rule.value_filter_id = value.collect_initial_rule(*check_state);
 			}
+			else if (auto state_timeout = std::get_if<common::acl::state_timeout_t>(&unwind_rule.action))
+			{
+				rule.value_filter_id = value.collect_initial_rule(*state_timeout);
+			}
 		}
 
 		/// terminating

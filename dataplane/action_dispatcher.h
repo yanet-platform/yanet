@@ -89,6 +89,12 @@ struct ActionDispatcher
 		ring.write(args.mbuf, flow.type);
 	}
 
+	// FIXME: temporary
+	static void execute(const common::StateTimeoutAction& action, const common::globalBase::tFlow& flow, const ActionDispatcherArgs& args)
+	{
+		YANET_LOG_DEBUG("Timeout specified is %d\n", action.timeout);
+	}
+
 	static void execute(const common::FlowAction& action, [[maybe_unused]] const common::globalBase::tFlow& flow, const ActionDispatcherArgs& args)
 	{
 		auto worker = args.worker;

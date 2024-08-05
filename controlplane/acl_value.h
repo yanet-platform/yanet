@@ -18,7 +18,8 @@ public:
 	{
 		static_assert(std::is_same_v<std::decay_t<T>, common::globalBase::tFlow> ||
 		                      std::is_same_v<std::decay_t<T>, common::acl::dump_t> ||
-		                      std::is_same_v<std::decay_t<T>, common::acl::check_state_t>,
+		                      std::is_same_v<std::decay_t<T>, common::acl::check_state_t> ||
+		                      std::is_same_v<std::decay_t<T>, common::acl::state_timeout_t>,
 		              "Unsupported type in rule_action");
 
 		rule_actions.emplace_back(std::forward<T>(rule));

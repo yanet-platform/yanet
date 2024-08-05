@@ -74,6 +74,44 @@ struct check_state_t
 	}
 };
 
+struct state_timeout_t
+{
+	state_timeout_t() :
+	        timeout(0)
+	{}
+
+	state_timeout_t(uint32_t timeout) :
+	        timeout(timeout)
+	{}
+
+	bool operator==(const state_timeout_t& o) const
+	{
+		return timeout == o.timeout;
+	}
+
+	bool operator!=(const state_timeout_t& o) const
+	{
+		return !operator==(o);
+	}
+
+	constexpr bool operator<(const state_timeout_t& o) const
+	{
+		return timeout < o.timeout;
+	}
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(timeout);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(timeout);
+	}
+
+	uint32_t timeout;
+};
+
 } // namespace acl
 
 // TODO: When rewriting the current ACL library into LibFilter, we could consider using inheritance.
@@ -194,8 +232,44 @@ struct CheckStateAction final
 	}
 };
 
-using RawAction = std::variant<FlowAction, DumpAction, CheckStateAction>;
+/**
+ * @brief Represents an action that sets timeout for the dynamic firewall rule.
+ */
+struct StateTimeoutAction final
+{
+	// Maximum count of StateTimeoutActions objects allowed.
+	// We have one here since only the last timeout matters.
+	static constexpr size_t MAX_COUNT = 1;
+	// Timeout in seconds
+	uint32_t timeout;
 
+	StateTimeoutAction(const acl::state_timeout_t& timeout_action) :
+	        timeout(timeout_action.timeout){};
+
+	StateTimeoutAction() :
+	        timeout(0){};
+
+	[[nodiscard]] bool terminating() const { return false; }
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(timeout);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(timeout);
+	}
+
+	[[nodiscard]] std::string to_string() const
+	{
+		std::ostringstream oss;
+		oss << "StateTimeoutAction(timeout=" << timeout << ")";
+		return oss.str();
+	}
+};
+
+using RawAction = std::variant<FlowAction, DumpAction, CheckStateAction, StateTimeoutAction>;
 
 /**
  * @brief Represents a generic action.
@@ -238,13 +312,16 @@ namespace acl
  * will have slightly different representation of the internal vector based on whether we have
  * a "check-state" action or not. This way we can reduce a number of branching in the dataplane and
  * also reduce the size of the object since we will use std::variant to hold either a "check-state"-object,
- * or a regular one (see common::Actions definition below)
+ * or a regular one (see common::Actions definition below).
+ * Also, it manages the StateTimeoutActions to reduce number of actions in the dataplane by saving only the
+ * last timeout action.
  */
 struct Actions
 {
 	std::vector<Action> path{};
 	std::array<size_t, std::variant_size_v<RawAction>> action_counts = {0};
 	std::optional<size_t> check_state_index{};
+	std::optional<size_t> state_timeout_index{};
 
 	Actions() = default;
 	Actions(const Action& action) { add(action); };
