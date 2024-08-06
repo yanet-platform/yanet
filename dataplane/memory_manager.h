@@ -42,6 +42,45 @@ public:
 	        const uint64_t size,
 	        const std::function<void(void*)>& destructor = [](void*) {});
 
+	class Deleter
+	{
+		memory_manager* manager_;
+
+	public:
+		Deleter(memory_manager* const manager) :
+		        manager_{manager} {}
+		Deleter(Deleter&& other) = default;
+		Deleter(const Deleter& other) = default;
+		Deleter& operator=(Deleter&& other) = default;
+		Deleter& operator=(const Deleter& other) = default;
+		template<typename T>
+		void operator()(T* ptr)
+		{
+			manager_->destroy(ptr);
+		}
+	};
+
+	template<typename T>
+	using unique_ptr = std::unique_ptr<T, Deleter>;
+
+	template<typename T,
+	         typename... Args>
+	unique_ptr<T> create_unique(const char* name,
+	                            const tSocketId socket_id,
+	                            const uint64_t size,
+	                            Args&&... args)
+	{
+		void* pointer = alloc(name,
+		                      socket_id,
+		                      size,
+		                      [](void* pointer) {
+			                      reinterpret_cast<T*>(pointer)->~T();
+		                      });
+		return std::unique_ptr<T, Deleter>{
+		        new (pointer) T(std::forward(args)...),
+		        Deleter{this}};
+	}
+
 	template<typename type,
 	         typename... args_t>
 	type* create(const char* name,
@@ -114,6 +153,7 @@ public:
 	void destroy(void* pointer);
 	void debug(tSocketId socket_id);
 	bool check_memory_limit(const std::string& name, const uint64_t size);
+	Deleter deleter() { return Deleter{this}; }
 
 protected:
 	cDataPlane* dataplane;
