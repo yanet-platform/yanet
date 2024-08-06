@@ -304,7 +304,10 @@ inline void stream_in_t::pop(char* buffer, uint64_t bufferSize)
 		return;
 	}
 
-	memcpy(buffer, &this->inBuffer[inPosition], bufferSize);
+	if (bufferSize != 0)
+	{
+		memcpy(buffer, &this->inBuffer[inPosition], bufferSize);
+	}
 
 	inPosition += bufferSize;
 }
