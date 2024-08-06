@@ -88,8 +88,8 @@ struct ref_t
 	/*
 	inline ref_t(ref_t&& _ref)
 	{
-		filter = _ref.filter;
-		_ref.filter = nullptr;
+	        filter = _ref.filter;
+	        _ref.filter = nullptr;
 	}
 */
 
@@ -1228,7 +1228,7 @@ struct rule_t
 	}
 };
 
-} //namespace acl
+} // namespace acl
 
 namespace
 {
