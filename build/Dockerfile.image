@@ -54,13 +54,14 @@ FROM --platform=linux/amd64 ubuntu:${RELEASE}
 
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        libnuma1 \
-        libpcap0.8 \
+        iproute2 \
+        jq \
+        libatomic1 \
         libibverbs1 \
         libmlx5-1 \
-        libatomic1 \
-        jq \
-        iproute2
+        libnuma1 \
+        libpcap0.8 \
+        netbase
 
 COPY --from=builder /opt/yanet/build/controlplane/yanet-controlplane /usr/bin/
 COPY --from=builder /opt/yanet/build/dataplane/yanet-dataplane /usr/bin/
