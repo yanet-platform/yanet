@@ -1,7 +1,6 @@
 #pragma once
 
 #include <inttypes.h>
-#include <string.h>
 
 #include <map>
 #include <memory>
@@ -28,12 +27,18 @@ public:
 	template<typename TType>
 	inline void pop(TType& value);
 
+private:
 	inline void pop(char* buffer, uint64_t bufferSize);
+
+public:
 	inline void pop(std::string& value);
 	inline void pop(std::vector<uint8_t>& value);
 
 	template<typename TFirst, typename TSecond>
 	inline void pop(std::pair<TFirst, TSecond>& pair);
+
+	template<typename T, std::size_t Size>
+	inline void pop(T (&value)[Size]);
 
 	template<typename TType, std::size_t TSize>
 	inline void pop(std::array<TType, TSize>& array);
@@ -93,7 +98,10 @@ public:
 	template<typename TType>
 	inline void push(const TType& value);
 
+private:
 	inline void push(const char* buffer, uint64_t bufferSize);
+
+public:
 	inline void push(const std::string& value);
 	inline void push(const std::vector<uint8_t>& value);
 
@@ -103,6 +111,15 @@ public:
 	{
 		push(pair.first);
 		push(pair.second);
+	}
+
+	template<typename T, std::size_t Size>
+	inline void push(const T (&array)[Size])
+	{
+		for (const auto& e : array)
+		{
+			push(e);
+		}
 	}
 
 	template<typename TType, std::size_t TSize>
@@ -273,19 +290,17 @@ inline stream_in_t::stream_in_t(const std::vector<uint8_t>& buffer) :
 template<typename TType>
 inline void stream_in_t::pop(TType& value)
 {
-	if constexpr (std::is_trivial_v<TType> &&
-	              !(std::is_pointer_v<TType> ||
-	                std::is_reference_v<TType>))
+	if constexpr (std::is_trivially_copyable_v<TType>)
 	{
 		if (inBuffer.size() - inPosition < sizeof(TType))
 		{
-			memset(&value, 0, sizeof(TType));
+			value = TType{};
 			inPosition = this->inBuffer.size();
 			failed = true;
 			return;
 		}
 
-		memcpy(&value, &inBuffer[inPosition], sizeof(TType));
+		value = reinterpret_cast<const TType&>(inBuffer[inPosition]);
 
 		inPosition += sizeof(TType);
 	}
@@ -304,21 +319,36 @@ inline void stream_in_t::pop(char* buffer, uint64_t bufferSize)
 		return;
 	}
 
-	memcpy(buffer, &this->inBuffer[inPosition], bufferSize);
+	if (bufferSize == 0)
+	{
+		return;
+	}
 
+	auto bufferStart = inBuffer.begin() + inPosition;
+
+	std::copy(bufferStart, bufferStart + bufferSize, buffer);
 	inPosition += bufferSize;
 }
 
 inline void stream_in_t::pop(std::string& value)
 {
-	integer_t size = 0;
-
+	std::string::size_type size;
 	pop(size);
 
-	value.reserve(size + 1);
-	value.resize(size);
-	pop(&value[0], size);
-	value[size] = 0;
+	if (this->inBuffer.size() - inPosition < size)
+	{
+		inPosition = this->inBuffer.size();
+		failed = true;
+		return;
+	}
+
+	if (size == 0)
+	{
+		return;
+	}
+
+	value.assign(reinterpret_cast<const char*>(&this->inBuffer[inPosition]), size);
+	inPosition += size;
 }
 
 inline void stream_in_t::pop(std::vector<uint8_t>& value)
@@ -337,6 +367,15 @@ inline void stream_in_t::pop(std::pair<TFirst, TSecond>& pair)
 {
 	pop(pair.first);
 	pop(pair.second);
+}
+
+template<typename T, std::size_t Size>
+inline void stream_in_t::pop(T (&array)[Size])
+{
+	for (auto& e : array)
+	{
+		pop(e);
+	}
 }
 
 template<typename TType, std::size_t TSize>
@@ -522,13 +561,11 @@ inline stream_out_t::stream_out_t()
 template<typename TType>
 inline void stream_out_t::push(const TType& value)
 {
-	if constexpr (std::is_trivial_v<TType> &&
-	              !(std::is_pointer_v<TType> ||
-	                std::is_reference_v<TType>))
+	using ByteArray = const uint8_t(&)[sizeof(TType)];
+	if constexpr (std::is_trivially_copyable_v<TType>)
 	{
-		integer_t size = outBuffer.size();
-		outBuffer.resize(size + sizeof(TType));
-		memcpy(&outBuffer[size], &value, sizeof(TType));
+		auto& data = reinterpret_cast<ByteArray>(value);
+		outBuffer.insert(outBuffer.end(), std::begin(data), std::end(data));
 	}
 	else
 	{
@@ -542,16 +579,13 @@ inline void stream_out_t::push(const char* buffer, uint64_t bufferSize)
 	{
 		return;
 	}
-	integer_t size = outBuffer.size();
-	outBuffer.resize(size + bufferSize);
-	memcpy(&outBuffer[size], buffer, bufferSize);
+	outBuffer.insert(outBuffer.end(), buffer, buffer + bufferSize);
 }
 
 inline void stream_out_t::push(const std::string& value)
 {
-	integer_t size = value.length();
-	push(size);
-	push(value.c_str(), size);
+	push(value.length());
+	push(value.c_str(), value.length());
 }
 
 inline void stream_out_t::push(const std::vector<uint8_t>& value)
