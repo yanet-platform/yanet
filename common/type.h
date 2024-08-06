@@ -100,16 +100,6 @@ public:
 		return *this;
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(value);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(value);
-	}
-
 public:
 	type_t value;
 };
@@ -2052,23 +2042,8 @@ struct common
 
 struct port
 {
-	port()
-	{
-		memset(this, 0, sizeof(*this));
-	}
-
-	void pop(stream_in_t& stream)
-	{
-		stream.pop((char*)this, sizeof(*this));
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push((char*)this, sizeof(*this));
-	}
-
-	uint64_t physicalPort_egress_drops;
-	uint64_t controlPlane_drops; ///< @todo: DELETE
+	uint64_t physicalPort_egress_drops = 0;
+	uint64_t controlPlane_drops = 0; ///< @todo: DELETE
 };
 }
 }
@@ -2382,12 +2357,12 @@ public:
 
 	void pop(stream_in_t& stream)
 	{
-		stream.pop((char*)this, sizeof(*this));
+		stream.pop(reinterpret_cast<uint8_t(&)[sizeof(*this)]>(*this));
 	}
 
 	void push(stream_out_t& stream) const
 	{
-		stream.push((char*)this, sizeof(*this));
+		stream.push(reinterpret_cast<const uint8_t(&)[sizeof(*this)]>(*this));
 	}
 
 public:

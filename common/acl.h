@@ -64,12 +64,12 @@ public:
 
 	inline void pop(common::stream_in_t& stream)
 	{
-		stream.pop((char*)values, sizeof(values));
+		stream.pop(values);
 	}
 
 	inline void push(common::stream_out_t& stream) const
 	{
-		stream.push((const char*)values, sizeof(values));
+		stream.push(values);
 	}
 
 	uint8_t is_multirefs;
@@ -94,16 +94,6 @@ struct transport_key_t
 		                second.group2,
 		                second.group3,
 		                second.network_flags);
-	}
-
-	void pop(stream_in_t& stream)
-	{
-		stream.pop((char*)this, sizeof(*this));
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push((char*)this, sizeof(*this));
 	}
 
 	tAclGroupId network_id : 32;
@@ -168,16 +158,6 @@ struct total_key_t
 	{
 		return std::tie(acl_id, transport_id) <
 		       std::tie(second.acl_id, second.transport_id);
-	}
-
-	void pop(stream_in_t& stream)
-	{
-		stream.pop((char*)this, sizeof(*this));
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push((char*)this, sizeof(*this));
 	}
 
 	tAclGroupId acl_id;
