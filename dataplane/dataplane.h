@@ -25,6 +25,7 @@
 #include "memory_manager.h"
 #include "neighbor.h"
 #include "report.h"
+#include "sdpserver.h"
 #include "type.h"
 #include "worker_gc.h"
 
@@ -119,12 +120,12 @@ protected:
 	eResult initGlobalBases();
 	eResult initWorkers();
 	eResult initQueues();
+	eResult initSharedMemory();
 	void init_worker_base();
 
 	eResult allocateSharedMemory();
 	eResult splitSharedMemoryPerWorkers();
 
-	std::optional<uint64_t> getCounterValueByName(const std::string& counter_name, uint32_t coreId);
 	common::idp::get_shm_info::response getShmInfo();
 	common::idp::get_shm_tsc_info::response getShmTscInfo();
 
@@ -135,7 +136,6 @@ protected:
 	friend class cWorker;
 	friend class cReport;
 	friend class cControlPlane;
-	friend class cBus;
 	friend class dataplane::globalBase::generation;
 	friend class worker_gc_t;
 
@@ -178,9 +178,6 @@ protected:
 
 	common::idp::get_shm_tsc_info::response tscs_meta;
 
-	// array instead of the table - how many coreIds can be there?
-	std::unordered_map<uint32_t, std::unordered_map<std::string, uint64_t*>> coreId_to_stats_tables;
-
 	std::map<tSocketId, std::tuple<key_t, void*>> shm_by_socket_id;
 
 	std::set<tSocketId> socket_ids;
@@ -193,6 +190,8 @@ protected:
 	std::vector<std::thread> threads;
 
 	mutable std::mutex dpdk_mutex;
+
+	common::sdp::DataPlaneInSharedMemory sdp_data;
 
 public: ///< modules
 	cReport report;

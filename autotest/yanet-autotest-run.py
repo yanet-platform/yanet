@@ -86,6 +86,7 @@ class Autotest:
         os.makedirs("/run/yanet", exist_ok=True)
 
         self.run_dataplane(dataplane_conf_path)
+        time.sleep(5)
         self.run_controlplane()
         self.run_autotest(units)
 

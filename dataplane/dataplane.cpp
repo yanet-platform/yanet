@@ -116,6 +116,12 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		return result;
 	}
 
+	result = initSharedMemory();
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
 	result = initWorkers();
 	if (result != eResult::success)
 	{
@@ -185,6 +191,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	{
 		return result;
 	}
+	bus.SetBufferForCounters(sdp_data.dataplane_data, sdp_data.metadata_bus);
 
 	result = neighbor.init(this);
 	if (result != eResult::success)
@@ -713,6 +720,8 @@ eResult cDataPlane::initWorkers()
 			return eResult::errorAllocatingMemory;
 		}
 
+		worker->SetBufferForCounters(sdp_data.workers[coreId].buffer, sdp_data.metadata_worker);
+
 		dataplane::base::permanently basePermanently;
 		basePermanently.globalBaseAtomic = globalBaseAtomics[socket_id];
 		basePermanently.outQueueId = outQueueId; ///< 0
@@ -735,8 +744,6 @@ eResult cDataPlane::initWorkers()
 			return result;
 		}
 
-		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[coreId]);
-
 		workers[coreId] = worker;
 		controlPlane->slowWorker = worker;
 		workers_vector.emplace_back(worker);
@@ -758,6 +765,8 @@ eResult cDataPlane::initWorkers()
 		{
 			return eResult::errorAllocatingMemory;
 		}
+
+		worker->SetBufferForCounters(sdp_data.workers[coreId].buffer, sdp_data.metadata_worker);
 
 		dataplane::base::permanently basePermanently;
 		{
@@ -891,7 +900,6 @@ eResult cDataPlane::initWorkers()
 			return result;
 		}
 
-		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[coreId]);
 		workers[coreId] = worker;
 		workers_vector.emplace_back(worker);
 
@@ -912,6 +920,8 @@ eResult cDataPlane::initWorkers()
 		{
 			return eResult::errorAllocatingMemory;
 		}
+
+		worker->SetBufferForCounters(sdp_data.workers_gc[core_id].buffer, sdp_data.metadata_worker_gc);
 
 		dataplane::base::permanently basePermanently;
 		{
@@ -972,30 +982,11 @@ eResult cDataPlane::initWorkers()
 			return result;
 		}
 
-		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[core_id]);
 		worker_gcs[core_id] = worker;
 		socket_worker_gcs[socket_id] = worker;
 	}
 
 	return eResult::success;
-}
-
-std::optional<uint64_t> cDataPlane::getCounterValueByName(const std::string& counter_name, uint32_t coreId)
-{
-	if (coreId_to_stats_tables.count(coreId) == 0)
-	{
-		return std::optional<uint64_t>();
-	}
-
-	const auto& specific_core_table = coreId_to_stats_tables[coreId];
-
-	if (specific_core_table.count(counter_name) == 0)
-	{
-		return std::optional<uint64_t>();
-	}
-
-	uint64_t counter_value = *(specific_core_table.at(counter_name));
-	return std::optional<uint64_t>(counter_value);
 }
 
 eResult cDataPlane::initQueues()
@@ -1132,6 +1123,27 @@ void cDataPlane::run_on_worker_gc(const tSocketId socket_id,
                                   const std::function<bool()>& callback)
 {
 	socket_worker_gcs.find(socket_id)->second->run_on_this_thread(callback);
+}
+
+eResult cDataPlane::initSharedMemory()
+{
+	std::vector<tCoreId> workers_id;
+	std::vector<tCoreId> workers_gc_id;
+
+	// workers
+	for (const auto& worker : config.workers)
+	{
+		workers_id.push_back(worker.first);
+	}
+	// slow worker
+	workers_id.push_back(config.controlPlaneCoreId);
+	// workers gc
+	for (const auto& coreId : config.workerGCs)
+	{
+		workers_gc_id.push_back(coreId);
+	}
+
+	return common::sdp::PrepareSharedMemoryData(sdp_data, workers_id, workers_gc_id, config.useHugeMem);
 }
 
 eResult cDataPlane::allocateSharedMemory()

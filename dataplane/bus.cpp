@@ -55,6 +55,20 @@ void cBus::join()
 	}
 }
 
+void cBus::FillMetadataBusCounters(common::sdp::MetadataBusCounters& metadata, uint64_t& size)
+{
+	metadata.start_bus_errors = common::sdp::GetStartData((uint32_t)common::idp::errorType::size * sizeof(uint64_t), size);
+	metadata.start_bus_requests = common::sdp::GetStartData((uint32_t)common::idp::requestType::size * sizeof(uint64_t), size);
+	metadata.start_bus_durations = common::sdp::GetStartData((uint32_t)common::idp::requestType::size * sizeof(uint64_t), size);
+}
+
+void cBus::SetBufferForCounters(void* buffer, const common::sdp::MetadataBusCounters& metadata)
+{
+	stats.requests = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_bus_requests);
+	stats.errors = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_bus_errors);
+	stats.durations = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_bus_durations);
+}
+
 static bool recvAll(int clientSocket,
                     char* buffer,
                     uint64_t size)
@@ -254,14 +268,6 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::clearFWState, request);
 		}
-		else if (type == common::idp::requestType::getCounters)
-		{
-			response = callWithResponse(&cControlPlane::getCounters, request);
-		}
-		else if (type == common::idp::requestType::getOtherStats)
-		{
-			response = callWithResponse(&cControlPlane::getOtherStats, request);
-		}
 		else if (type == common::idp::requestType::getConfig)
 		{
 			response = callWithResponse(&cControlPlane::getConfig, request);
@@ -285,10 +291,6 @@ void cBus::clientThread(int clientSocket)
 		else if (type == common::idp::requestType::limits)
 		{
 			response = callWithResponse(&cControlPlane::limits, request);
-		}
-		else if (type == common::idp::requestType::getAclCounters)
-		{
-			response = callWithResponse(&cControlPlane::getAclCounters, request);
 		}
 		else if (type == common::idp::requestType::balancer_connection)
 		{
@@ -321,10 +323,6 @@ void cBus::clientThread(int clientSocket)
 		else if (type == common::idp::requestType::version)
 		{
 			response = callWithResponse(&cControlPlane::version, request);
-		}
-		else if (type == common::idp::requestType::get_counter_by_name)
-		{
-			response = callWithResponse(&cControlPlane::get_counter_by_name, request);
 		}
 		else if (type == common::idp::requestType::nat64stateful_state)
 		{
@@ -406,6 +404,8 @@ void cBus::clientThread(int clientSocket)
 
 		std::chrono::duration<double> duration = std::chrono::system_clock::now() - startTime;
 
+		// The duration time is measured in milliseconds
+		stats.durations[(uint32_t)type] += static_cast<uint64_t>(1000 * duration.count());
 		YANET_LOG_DEBUG("request type %d processed - %.3f sec\n",
 		                (int)type,
 		                duration.count());

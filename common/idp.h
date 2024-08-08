@@ -47,13 +47,10 @@ enum class requestType : uint32_t
 	get_ports_stats_extended,
 	getControlPlanePortStats,
 	getPortStatsEx,
-	getCounters,
 	getFragmentationStats,
 	getFWState,
 	getFWStateStats,
 	clearFWState,
-	getAclCounters,
-	getOtherStats,
 	getConfig,
 	getErrors,
 	getReport,
@@ -69,7 +66,6 @@ enum class requestType : uint32_t
 	unrdup_vip_to_balancers,
 	update_vip_vport_proto,
 	version,
-	get_counter_by_name,
 	get_shm_info,
 	get_shm_tsc_info,
 	set_shm_tsc_state,
@@ -662,13 +658,6 @@ namespace getPortStatsEx
 using response = ::common::getPortStatsEx::response;
 }
 
-namespace getCounters
-{
-using request = std::vector<tCounterId>;
-
-using response = std::vector<uint64_t>;
-}
-
 namespace getFragmentationStats
 {
 using response = fragmentation::stats_t;
@@ -700,18 +689,6 @@ using response = std::map<
 namespace getFWStateStats
 {
 using response = fwstate::stats_t;
-}
-
-namespace getAclCounters
-{
-using response = std::vector<uint64_t>;
-}
-
-namespace getOtherStats
-{
-using worker = std::tuple<std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1>>; ///< bursts
-
-using response = std::tuple<std::map<tCoreId, worker>>;
 }
 
 namespace getConfig
@@ -862,13 +839,6 @@ using response = std::tuple<unsigned int, ///< major
                             std::string>; ///< custom
 }
 
-namespace get_counter_by_name
-{
-using request = std::tuple<std::string, std::optional<tCoreId>>;
-
-using response = std::map<tCoreId, uint64_t>;
-}
-
 namespace get_shm_info
 {
 using dump_meta = std::tuple<std::string, ///< ring name
@@ -1001,7 +971,6 @@ using request = std::tuple<requestType,
                                         getGlobalBase::request,
                                         getControlPlanePortStats::request,
                                         getWorkerStats::request,
-                                        getCounters::request,
                                         lpm4LookupAddress::request,
                                         lpm6LookupAddress::request,
                                         nat64stateful_state::request,
@@ -1009,7 +978,6 @@ using request = std::tuple<requestType,
                                         debug_latch_update::request,
                                         unrdup_vip_to_balancers::request,
                                         update_vip_vport_proto::request,
-                                        get_counter_by_name::request,
                                         dump_physical_port::request,
                                         neighbor_insert::request,
                                         neighbor_remove::request,
@@ -1026,11 +994,9 @@ using response = std::variant<std::tuple<>,
                               get_ports_stats::response, ///< + getControlPlanePortStats::response
                               get_ports_stats_extended::response,
                               getPortStatsEx::response,
-                              getOtherStats::response,
                               getFragmentationStats::response,
                               getFWState::response,
                               getFWStateStats::response,
-                              getAclCounters::response, ///< + getCounters::response
                               getConfig::response,
                               getErrors::response,
                               getReport::response,
@@ -1043,7 +1009,6 @@ using response = std::variant<std::tuple<>,
                               version::response,
                               limits::response,
                               samples::response,
-                              get_counter_by_name::response,
                               get_shm_info::response,
                               get_shm_tsc_info::response,
                               neighbor_show::response,

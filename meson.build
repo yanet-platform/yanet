@@ -39,6 +39,8 @@ add_global_arguments('-DGOOGLE_PROTOBUF_NO_RTTI', language: 'cpp')
 
 add_global_arguments('-Wno-unused-parameter', language: 'cpp')
 
+add_project_link_arguments('-lrt', language : 'cpp')
+
 libdpdk = subproject('dpdk', default_options: [
     'platform=generic',
     'cpu_instruction_set=corei7',
