@@ -38,7 +38,7 @@ add deny ip from any to any
 :SKP2
 add allow tcp from f805@2222:898:c00::/40 to { 2222:898:bf00:400::1 } 443
 
-add allow tcp from f805@2222:898:c00::/40 to { 2222:898:bf00:400::2 } 443 keep-state
+add allow tcp from f805@2222:898:c00::/40 to { 2222:898:bf00:400::2 } 443 record-state
 
 add allow ip from any to any frag
 add deny tcp from any to any tcpflags rst

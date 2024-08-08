@@ -1,0 +1,7 @@
+:BEGIN
+add skipto :IN ip from any to any in
+
+:IN
+add allow udp from 10.0.0.0/24 to any 53 keep-state
+add allow udp from any to 2121:bbb8:ff1c:2030::/60 53 keep-state
+add deny ip from any to any

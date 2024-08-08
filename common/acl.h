@@ -114,54 +114,6 @@ struct transport_key_t
 	tAclGroupId network_flags : 8;
 };
 
-// class action_t is used to store all non-terminating rule data that
-// shouldn't be stored in common::globalBase::tFlow
-class action_t
-{
-public:
-	action_t() :
-	        dump_id(0),
-	        dump_tag("")
-	{}
-
-	action_t(std::string dump_tag) :
-	        dump_id(0),
-	        dump_tag(dump_tag)
-	{}
-
-	inline bool operator==(const action_t& o) const
-	{
-		return std::tie(dump_id, dump_tag) ==
-		       std::tie(o.dump_id, o.dump_tag);
-	}
-
-	inline bool operator!=(const action_t& o) const
-	{
-		return !operator==(o);
-	}
-
-	constexpr bool operator<(const action_t& o) const
-	{
-		return std::tie(dump_id, dump_tag) <
-		       std::tie(o.dump_id, o.dump_tag);
-	}
-
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(dump_id);
-		stream.pop(dump_tag);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(dump_id);
-		stream.push(dump_tag);
-	}
-
-	uint64_t dump_id;
-	std::string dump_tag;
-};
-
 struct total_key_t
 {
 	constexpr bool operator<(const total_key_t& second) const
@@ -182,34 +134,6 @@ struct total_key_t
 
 	tAclGroupId acl_id;
 	tAclGroupId transport_id;
-};
-
-struct value_t
-{
-	value_t()
-	{
-		memset(dump_ids, 0, sizeof(dump_ids));
-	}
-
-	constexpr bool operator<(const value_t& second) const
-	{
-		return flow < second.flow;
-	}
-
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(flow);
-		stream.pop(dump_ids);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(flow);
-		stream.push(dump_ids);
-	}
-
-	common::globalBase::tFlow flow;
-	uint32_t dump_ids[YANET_CONFIG_DUMP_ID_SIZE];
 };
 
 template<typename type_t>

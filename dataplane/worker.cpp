@@ -1,6 +1,7 @@
 #include <netinet/icmp6.h>
 #include <netinet/ip_icmp.h>
 
+#include <optional>
 #include <string>
 
 #include <rte_cycles.h>
@@ -20,6 +21,7 @@
 #include "common/fallback.h"
 #include "common/nat46clat.h"
 
+#include "action_dispatcher.h"
 #include "checksum.h"
 #include "common.h"
 #include "dataplane.h"
@@ -1543,44 +1545,7 @@ inline void cWorker::acl_ingress_handle4()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->flow.data.aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->flow.data.aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_ingress_flow(mbuf, value.flow);
+		dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_ingress_stack4.clear();
@@ -1734,44 +1699,7 @@ inline void cWorker::acl_ingress_handle6()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->flow.data.aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->flow.data.aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_ingress_flow(mbuf, value.flow);
+		dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_ingress_stack6.clear();
@@ -4810,7 +4738,7 @@ inline void cWorker::balancer_icmp_forward_handle()
 	balancer_icmp_forward_stack.clear();
 }
 
-inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf)
+inline cWorker::FlowFromState cWorker::acl_checkstate(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -4848,7 +4776,7 @@ inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf)
 		dataplane::spinlock_nonrecursive_t* locker;
 		basePermanently.globalBaseAtomic->fw4_state->lookup(key, value, locker);
 
-		return acl_try_keepstate(mbuf, value, locker);
+		return acl_checkstate(mbuf, value, locker);
 	}
 	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
 	{
@@ -4884,22 +4812,22 @@ inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf)
 		dataplane::spinlock_nonrecursive_t* locker;
 		basePermanently.globalBaseAtomic->fw6_state->lookup(key, value, locker);
 
-		return acl_try_keepstate(mbuf, value, locker);
+		return acl_checkstate(mbuf, value, locker);
 	}
 
-	return false;
+	return std::nullopt;
 }
 
-inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf,
-                                       dataplane::globalBase::fw_state_value_t* value,
-                                       dataplane::spinlock_nonrecursive_t* locker)
+inline cWorker::FlowFromState cWorker::acl_checkstate(rte_mbuf* mbuf,
+                                                      dataplane::globalBase::fw_state_value_t* value,
+                                                      dataplane::spinlock_nonrecursive_t* locker)
 {
 	// Checking both value and locker for non-being-nullptr seems redundant.
 	if (value == nullptr)
 	{
 		// No record found, the caller should continue as usual.
 		locker->unlock();
-		return false;
+		return std::nullopt;
 	}
 
 	uint8_t flags = 0;
@@ -4918,12 +4846,10 @@ inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf,
 	value->tcp.dst_flags |= flags;
 	locker->unlock();
 
-	// Handle the packet according its flow.
-	acl_ingress_flow(mbuf, flow);
-	return true;
+	return {flow};
 }
 
-inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow)
+inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -5311,44 +5237,7 @@ inline void cWorker::acl_egress_handle4()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_egress_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_egress_flow(mbuf, value.flow);
+		dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_egress_stack4.clear();
@@ -5495,44 +5384,7 @@ inline void cWorker::acl_egress_handle6()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_egress_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_egress_flow(mbuf, value.flow);
+		dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_egress_stack6.clear();
@@ -5613,7 +5465,7 @@ void cWorker::acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAc
 	stats.logs_packets++;
 }
 
-inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
+inline cWorker::FlowFromState cWorker::acl_egress_checkstate(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -5651,7 +5503,7 @@ inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
 		dataplane::spinlock_nonrecursive_t* locker;
 		basePermanently.globalBaseAtomic->fw4_state->lookup(key, value, locker);
 
-		return acl_egress_try_keepstate(mbuf, value, locker);
+		return acl_egress_checkstate(mbuf, value, locker);
 	}
 	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
 	{
@@ -5687,22 +5539,22 @@ inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
 		dataplane::spinlock_nonrecursive_t* locker;
 		basePermanently.globalBaseAtomic->fw6_state->lookup(key, value, locker);
 
-		return acl_egress_try_keepstate(mbuf, value, locker);
+		return acl_egress_checkstate(mbuf, value, locker);
 	}
 
-	return false;
+	return std::nullopt;
 }
 
-inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf,
-                                              dataplane::globalBase::fw_state_value_t* value,
-                                              dataplane::spinlock_nonrecursive_t* locker)
+inline cWorker::FlowFromState cWorker::acl_egress_checkstate(rte_mbuf* mbuf,
+                                                             dataplane::globalBase::fw_state_value_t* value,
+                                                             dataplane::spinlock_nonrecursive_t* locker)
 {
 	// Checking both value and locker for non-being-nullptr seems redundant.
 	if (value == nullptr)
 	{
 		// No record found, the caller should continue as usual.
 		locker->unlock();
-		return false;
+		return std::nullopt;
 	}
 
 	uint8_t flags = 0;
@@ -5721,9 +5573,7 @@ inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf,
 	value->tcp.dst_flags |= flags;
 	locker->unlock();
 
-	// Handle the packet according its flow.
-	acl_egress_flow(mbuf, flow);
-	return true;
+	return {flow};
 }
 
 inline void cWorker::acl_egress_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow)

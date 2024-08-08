@@ -18,8 +18,11 @@
 #include "samples.h"
 #include "sharedmemory.h"
 
-class cDataPlane;
-class mControlPlane;
+namespace dataplane
+{
+template<dataplane::FlowDirection Direction>
+struct ActionDispatcher;
+}
 
 namespace worker
 {
@@ -180,11 +183,12 @@ protected:
 	inline void balancer_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::balancer_state_value_t* value);
 
 	/// fw state
-	inline bool acl_try_keepstate(rte_mbuf* mbuf);
-	inline bool acl_try_keepstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
-	inline bool acl_egress_try_keepstate(rte_mbuf* mbuf);
-	inline bool acl_egress_try_keepstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
-	inline void acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow);
+	using FlowFromState = std::optional<common::globalBase::tFlow>;
+	inline FlowFromState acl_checkstate(rte_mbuf* mbuf);
+	inline FlowFromState acl_checkstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
+	inline FlowFromState acl_egress_checkstate(rte_mbuf* mbuf);
+	inline FlowFromState acl_egress_checkstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
+	inline void acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow);
 	inline void acl_state_emit(tAclId aclId, const dataplane::globalBase::fw_state_sync_frame_t& frame);
 
 	inline void acl_egress_entry(rte_mbuf* mbuf, tAclId aclId);
@@ -224,10 +228,11 @@ public:
 	friend class cDataPlane;
 	friend class cReport;
 	friend class cControlPlane;
-	friend class mControlPlane;
 	friend class dregress_t;
 	friend class worker_gc_t;
 	friend class dataplane::globalBase::generation;
+	friend struct dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>;
+	friend struct dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>;
 
 	cDataPlane* dataPlane;
 	tCoreId coreId;

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "common/actions.h"
 #include "libfwparser/fw_parser.h"
 
 #include "network.h"
@@ -88,8 +89,8 @@ struct ref_t
 	/*
 	inline ref_t(ref_t&& _ref)
 	{
-		filter = _ref.filter;
-		_ref.filter = nullptr;
+	        filter = _ref.filter;
+	        _ref.filter = nullptr;
 	}
 */
 
@@ -849,7 +850,7 @@ struct filter_t : filter_base_t
 	ref_t<filter_prm8_t> flags;
 	ref_t<filter_proto_t> proto;
 	ref_t<filter_id_t> dir;
-	ref_t<filter_bool_t> keepstate;
+	ref_t<filter_bool_t> recordstate;
 
 	filter_t(const ref_t<filter_id_t>& _acl_id,
 	         const ref_t<filter_network_t>& _src,
@@ -857,14 +858,14 @@ struct filter_t : filter_base_t
 	         const ref_t<filter_prm8_t>& _flags,
 	         const ref_t<filter_proto_t>& _proto,
 	         const ref_t<filter_id_t>& _dir,
-	         const ref_t<filter_bool_t>& keepstate) :
+	         const ref_t<filter_bool_t>& recordstate) :
 	        acl_id(_acl_id),
 	        src(_src),
 	        dst(_dst),
 	        flags(_flags),
 	        proto(_proto),
 	        dir(_dir),
-	        keepstate(keepstate)
+	        recordstate(recordstate)
 	{}
 
 	filter_t(ipfw::rule_ptr_t rulep)
@@ -918,15 +919,15 @@ struct filter_t : filter_base_t
 				dir = new filter_id_t(1);
 				break;
 		}
-		if (rulep->keepstate)
+		if (rulep->recordstate)
 		{
-			keepstate = new filter_bool_t(true);
+			recordstate = new filter_bool_t(true);
 		}
 	}
 
 	virtual bool is_none() const
 	{
-		return acl_id.is_none() || src.is_none() || dst.is_none() || proto.is_none() || dir.is_none() || keepstate.is_none();
+		return acl_id.is_none() || src.is_none() || dst.is_none() || proto.is_none() || dir.is_none() || recordstate.is_none();
 	}
 
 	virtual std::string to_string() const
@@ -953,9 +954,9 @@ struct filter_t : filter_base_t
 		{
 			ret += " frag " + frag_to_string(flags);
 		}
-		if (keepstate)
+		if (recordstate)
 		{
-			ret += " keepstate";
+			ret += " recordstate";
 		}
 
 		if (acl_id)
@@ -968,7 +969,7 @@ struct filter_t : filter_base_t
 
 	bool operator==(const filter_t& o) const
 	{
-		return src == o.src && dst == o.dst && flags == o.flags && proto == o.proto && dir == o.dir && keepstate == o.keepstate;
+		return src == o.src && dst == o.dst && flags == o.flags && proto == o.proto && dir == o.dir && recordstate == o.recordstate;
 	}
 };
 
@@ -1023,15 +1024,23 @@ inline ref_t<filter_t> and_op(const ref_t<filter_t>& a, const ref_t<filter_t>& b
 	                    a.filter->flags & b.filter->flags,
 	                    a.filter->proto & b.filter->proto,
 	                    a.filter->dir & b.filter->dir,
-	                    a.filter->keepstate & b.filter->keepstate);
+	                    a.filter->recordstate & b.filter->recordstate);
 }
 
 const int64_t DISPATCHER = -1;
 
+// TODO: When rewriting the current ACL library into LibFilter, we should consider not using repetitive variants
+// to represent rule actions. Currently, we have this one, which is not even fully correct since it contains
+// int64_t for representing a line number for the SKIPTO instruction, which is not a rule action in an unwound rule
+// sense.
+//
+// Additionally, we might have another variant for representing rules that are suitable for execution in the dataplane.
+using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::dump_t, common::acl::check_state_t>;
+
 struct rule_t
 {
 	ref_t<filter_t> filter;
-	std::variant<int64_t, common::globalBase::tFlow, common::acl::action_t> action;
+	rule_action action;
 	ids_t ids;
 	int64_t ruleno;
 	mutable std::string text;
@@ -1039,23 +1048,23 @@ struct rule_t
 	std::set<std::string> via;
 	bool log;
 
-	rule_t(const ref_t<filter_t>& _filter, common::globalBase::tFlow flow, const ids_t& ids, bool log) :
-	        filter(_filter),
-	        action(flow),
-	        ids(ids),
-	        log(log)
-	{
-		ruleno = DISPATCHER;
-	}
+private:
+	rule_t(const ref_t<filter_t>& _filter, rule_action _action, ids_t _ids, bool _log) :
+	        filter(_filter), action(std::move(_action)), ids(std::move(_ids)), ruleno(DISPATCHER), log(_log)
+	{}
 
-	rule_t(const ref_t<filter_t>& _filter, common::acl::action_t action, const ids_t& ids, bool log) :
-	        filter(_filter),
-	        action(action),
-	        ids(ids),
-	        log(log)
-	{
-		ruleno = DISPATCHER;
-	}
+public:
+	rule_t(const ref_t<filter_t>& _filter, common::globalBase::tFlow flow, const ids_t& ids, bool log) :
+	        rule_t(_filter, rule_action(flow), ids, log)
+	{}
+
+	rule_t(const ref_t<filter_t>& _filter, common::acl::dump_t action, const ids_t& ids, bool log) :
+	        rule_t(_filter, rule_action(action), ids, log)
+	{}
+
+	rule_t(const ref_t<filter_t>& _filter, common::acl::check_state_t action, const ids_t& ids, bool log) :
+	        rule_t(_filter, rule_action(action), ids, log)
+	{}
 
 	rule_t(const ref_t<filter_t>& _filter, int64_t num, int64_t skipto) :
 	        filter(_filter),
@@ -1098,8 +1107,11 @@ struct rule_t
 			case ipfw::rule_action_t::ALLOW:
 				action = DISPATCHER;
 				break;
+			case ipfw::rule_action_t::CHECKSTATE:
+				action = common::acl::check_state_t{};
+				break;
 			case ipfw::rule_action_t::DUMP:
-				action = common::acl::action_t(std::get<std::string>(rulep->action_arg));
+				action = common::acl::dump_t(std::get<std::string>(rulep->action_arg));
 				break;
 			default:
 				YANET_LOG_WARNING("unexpected rule action in rule '%s'\n", rulep->text.data());
@@ -1166,13 +1178,17 @@ struct rule_t
 				text = "flow " + std::string(eFlowType_toString(flow.type)) + "(" + std::to_string(flow.data.atomic) + ")";
 			}
 		}
-		else if (std::holds_alternative<common::acl::action_t>(action))
+		else if (std::holds_alternative<common::acl::dump_t>(action))
 		{
-			auto rule_action = std::get<common::acl::action_t>(action);
+			auto rule_action = std::get<common::acl::dump_t>(action);
 			if (!rule_action.dump_tag.empty())
 			{
 				text = "dump(" + rule_action.dump_tag + ")";
 			}
+		}
+		else if (std::holds_alternative<common::acl::check_state_t>(action))
+		{
+			text = "check-state";
 		}
 		else
 		{
@@ -1226,9 +1242,19 @@ struct rule_t
 	{
 		return action == o.action && filter == o.filter && log == o.log;
 	}
+
+	bool is_term() const
+	{
+		return std::holds_alternative<common::globalBase::tFlow>(action);
+	}
+
+	bool is_skipto() const
+	{
+		return std::holds_alternative<int64_t>(action);
+	}
 };
 
-} //namespace acl
+} // namespace acl
 
 namespace
 {
@@ -1319,7 +1345,7 @@ struct hash<acl::filter_t>
 	size_t operator()(const acl::filter_t& f) const noexcept
 	{
 		size_t h = 0;
-		hash_combine(h, f.src, f.dst, f.flags, f.proto, f.dir, f.keepstate);
+		hash_combine(h, f.src, f.dst, f.flags, f.proto, f.dir, f.recordstate);
 
 		return h;
 	}
@@ -1341,9 +1367,17 @@ struct hash<acl::rule_t>
 			auto flow = std::get<common::globalBase::tFlow>(r.action);
 			hash_combine(h, 1, (uint64_t(flow.type) << 32) & flow.data.atomic);
 		}
+		else if (std::holds_alternative<common::acl::check_state_t>(r.action))
+		{
+			// Since check_state_t acts as a marker (either present or not),
+			// it doesn't have specific members to hash.
+			// To uniquely identify its presence in the hash, we use a
+			// predefined static constant as a unique identifier.
+			hash_combine(h, common::acl::check_state_t::HASH_IDENTIFIER);
+		}
 		else
 		{
-			auto action = std::get<common::acl::action_t>(r.action);
+			auto action = std::get<common::acl::dump_t>(r.action);
 			hash_combine(h, action.dump_id);
 		}
 		if (r.filter)
