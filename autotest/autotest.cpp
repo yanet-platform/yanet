@@ -163,7 +163,7 @@ eResult tAutotest::initSharedMemory()
 
 	for (const auto& shmInfo : dataPlaneSharedMemory)
 	{
-		std::string tag = std::get<1>(shmInfo);
+		std::string name = std::get<0>(shmInfo);
 		unsigned int unitSize = std::get<2>(shmInfo);
 		unsigned int unitsNumber = std::get<3>(shmInfo);
 		key_t ipcKey = std::get<6>(shmInfo);
@@ -171,7 +171,7 @@ eResult tAutotest::initSharedMemory()
 
 		void* shm = shm_by_key[ipcKey];
 		auto memaddr = (void*)((intptr_t)shm + offset);
-		dumpRings[tag] = common::bufferring(memaddr, unitSize, unitsNumber);
+		dumpRings[name] = common::bufferring(memaddr, unitSize, unitsNumber);
 	}
 
 	return eResult::success;

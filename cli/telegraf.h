@@ -178,11 +178,10 @@ void unsafe()
 		{
 			printf("worker,coreId=%u,physicalPortName=%s "
 			       "physicalPort_egress_drops=%luu,"
-			       "controlPlane_drops=%luu\n",
+			       "controlPlane_drops=0\n", // @todo: DELETE
 			       coreId,
 			       physicalPortName.data(),
-			       stats.physicalPort_egress_drops,
-			       stats.controlPlane_drops);
+			       stats.physicalPort_egress_drops);
 		}
 	}
 

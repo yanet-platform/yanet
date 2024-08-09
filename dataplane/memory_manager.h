@@ -43,11 +43,11 @@ public:
 	        const std::function<void(void*)>& destructor = [](void*) {});
 
 	template<typename type,
-	         typename... args_t>
+	         typename... Args>
 	type* create(const char* name,
 	             const tSocketId socket_id,
 	             const uint64_t size,
-	             const args_t&... args)
+	             Args&&... args)
 	{
 		void* pointer = alloc(name, socket_id, size, [](void* pointer) {
 			reinterpret_cast<type*>(pointer)->~type();
@@ -58,14 +58,14 @@ public:
 			return nullptr;
 		}
 
-		return new (reinterpret_cast<type*>(pointer)) type(args...);
+		return new (reinterpret_cast<type*>(pointer)) type(std::forward<Args>(args)...);
 	}
 
 	template<typename type,
-	         typename... args_t>
+	         typename... Args>
 	type* create_static(const char* name,
 	                    const tSocketId socket_id,
-	                    const args_t&... args)
+	                    Args&&... args)
 	{
 		void* pointer = alloc(name, socket_id, sizeof(type), [](void* pointer) {
 			reinterpret_cast<type*>(pointer)->~type();
@@ -76,15 +76,15 @@ public:
 			return nullptr;
 		}
 
-		return new (reinterpret_cast<type*>(pointer)) type(args...);
+		return new (reinterpret_cast<type*>(pointer)) type(std::forward<Args>(args)...);
 	}
 
 	template<typename type,
-	         typename... args_t>
+	         typename... Args>
 	type* create_static_array(const char* name,
 	                          const uint64_t count,
 	                          const tSocketId socket_id,
-	                          const args_t&... args)
+	                          Args&&... args)
 	{
 		void* pointer = alloc(name, socket_id, count * sizeof(type), [count](void* pointer) {
 			for (uint64_t i = 0;
@@ -105,7 +105,7 @@ public:
 		     i < count;
 		     i++)
 		{
-			new ((reinterpret_cast<type*>(pointer)) + i) type(args...);
+			new ((reinterpret_cast<type*>(pointer)) + i) type(std::forward<Args>(args)...);
 		}
 
 		return reinterpret_cast<type*>(pointer);

@@ -1,0 +1,46 @@
+#pragma once
+
+#include <rte_ethdev.h>
+
+#include "common/type.h"
+
+namespace dataplane
+{
+
+class KernelInterfaceHandle
+{
+	tPortId kni_port_ = INVALID_PORT_ID;
+	std::string vdev_name_;
+	uint16_t queue_size_ = 0;
+
+	KernelInterfaceHandle() noexcept = default;
+
+public:
+	~KernelInterfaceHandle();
+	KernelInterfaceHandle(const KernelInterfaceHandle&) = delete;
+	KernelInterfaceHandle(KernelInterfaceHandle&& other) noexcept;
+	KernelInterfaceHandle& operator=(const KernelInterfaceHandle&) = delete;
+	KernelInterfaceHandle& operator=(KernelInterfaceHandle&& other) noexcept;
+	[[nodiscard]] static std::optional<KernelInterfaceHandle>
+	MakeKernelInterfaceHandle(std::string_view name,
+	                          tPortId port,
+	                          uint16_t queue_size) noexcept;
+	const tPortId& Id() const noexcept { return kni_port_; }
+	bool Start() const noexcept;
+	[[nodiscard]] bool SetUp() const noexcept;
+	bool SetupRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool) noexcept;
+	bool SetupTxQueue(tQueueId queue, tSocketId socket) noexcept;
+
+private:
+	static std::string VdevName(std::string_view name, const tPortId port_id);
+	static std::string VdevArgs(std::string_view name, const tPortId port_id, uint64_t queue_size);
+	bool Add(const std::string& vdev_name, const std::string& args) noexcept;
+	void Remove() noexcept;
+	static rte_eth_conf DefaultConfig() noexcept;
+	bool Configure(const rte_eth_conf& eth_conf) noexcept;
+	bool CloneMTU(const uint16_t) const noexcept;
+	void MarkInvalid() noexcept { kni_port_ = INVALID_PORT_ID; }
+	[[nodiscard]] bool Valid() const { return kni_port_ != INVALID_PORT_ID; }
+};
+
+} // namespace dataplane
