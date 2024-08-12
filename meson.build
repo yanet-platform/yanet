@@ -39,6 +39,12 @@ add_global_arguments('-DGOOGLE_PROTOBUF_NO_RTTI', language: 'cpp')
 
 add_global_arguments('-Wno-unused-parameter', language: 'cpp')
 
+if target_option.contains('librib')
+    libjson = subproject('json')
+    subdir('librib')
+    subdir_done()
+endif
+
 libdpdk = subproject('dpdk', default_options: [
     'platform=generic',
     'cpu_instruction_set=corei7',
