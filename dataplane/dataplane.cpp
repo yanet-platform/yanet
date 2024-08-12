@@ -41,6 +41,11 @@
 
 common::log::LogPriority common::log::logPriority = common::log::TLOG_INFO;
 
+bool StartsWith(const std::string& str, const std::string& prefix)
+{
+	return str.compare(0, prefix.length(), prefix) == 0;
+}
+
 cDataPlane::cDataPlane() :
         currentGlobalBaseId(0),
         globalBaseSerial(0),
@@ -448,9 +453,12 @@ eResult cDataPlane::initPorts()
 		(void)pci;
 
 		tPortId portId;
-		if (strncmp(name.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
+
+		if (StartsWith(name, SOCK_DEV_PREFIX))
 		{
-			portId = sock_dev_create(name.data() + strlen(SOCK_DEV_PREFIX), interfaceName.c_str(), 0);
+			std::string name_part = name.substr(SOCK_DEV_PREFIX.length());
+			YANET_LOG_INFO("Opening sockdev with path %s\n", name_part.data());
+			portId = sock_dev_create(name_part.c_str(), interfaceName.c_str(), 0);
 		}
 		else if (rte_eth_dev_get_port_by_name(name.data(), &portId))
 		{
@@ -2014,7 +2022,7 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 		(void)rss_flags;
 
 		// Do not whitelist sock dev virtual devices
-		if (strncmp(pci.data(), SOCK_DEV_PREFIX, strlen(SOCK_DEV_PREFIX)) == 0)
+		if (StartsWith(name, SOCK_DEV_PREFIX))
 		{
 			continue;
 		}
