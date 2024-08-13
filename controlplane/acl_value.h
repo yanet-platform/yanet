@@ -28,9 +28,13 @@ class value_t
 public:
 	value_t();
 
-public:
 	void clear();
 
+	/**
+	 * Collects an initial rule and stores it for later use.
+	 *
+	 * @return The index of the collected rule in the rule_actions vector.
+	 */
 	template<typename T>
 	unsigned int collect_initial_rule(T&& rule)
 	{
@@ -41,13 +45,27 @@ public:
 		return rule_actions.size() - 1;
 	}
 
+	/**
+	 * Collects an action from the rule_actions vector and stores it in the intermediate vector.
+	 *
+	 * @param rule_actions_id The index of the rule in the rule_actions vector.
+	 * @return The index of the collected action in the intermediate_vector.
+	 */
 	unsigned int collect(unsigned int rule_actions_id);
 
+	/**
+	 * Compiles the collected actions into a final set of executable actions.
+	 *
+	 * The compile process involves:
+	 * 1. Ensuring that the last action in the path is terminating.
+	 *    If not, a default "drop" rule is added.
+	 * 2. Removing StateTimeout action and moving it's timeout value to FlowAction
+	 * 3. Finalizing the actions into a vector of BaseActions objects
+	 */
 	void compile();
 
-public:
 	// FIXME: I don't like this name.. Why was it called like that previously?
-	std::vector<common::acl::IntermediateActions> intermediate_vector;
+	std::vector<IntermediateActions> intermediate_vector;
 
 	// FIXME: I don't like this name.. Why was it called like that previously?
 	std::vector<common::Actions> vector;
@@ -61,5 +79,4 @@ public:
 
 	void append_to_last(unsigned int rule_action_id);
 };
-
 }

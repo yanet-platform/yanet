@@ -71,10 +71,10 @@ void value_t::finalize_actions(IntermediateActions&& actions)
 
 void value_t::compile()
 {
-	for (auto& intermediate_actions : intermediate_vector)
+	for (auto& actions : intermediate_vector)
 	{
-		ensure_termination(intermediate_actions);
-		move_timeout_from_state_timeout_to_flow(intermediate_actions);
-		finalize_actions(std::move(intermediate_actions));
+		ensure_termination(actions);
+		move_timeout_from_state_timeout_to_flow(actions);
+		finalize_actions(std::move(actions));
 	}
 }
