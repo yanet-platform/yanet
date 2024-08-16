@@ -18,12 +18,13 @@
 #include "common/static_vector.h"
 #include "common/type.h"
 
-#include "dregress.h"
 #include "dpdk.h"
+#include "dregress.h"
 #include "fragmentation.h"
 #include "kernel_interface_handle.h"
 #include "slow_worker.h"
 #include "type.h"
+#include "utils.h"
 
 class cControlPlane ///< @todo: move to cDataPlane
 {
@@ -99,6 +100,12 @@ protected:
 	void handlePacket_farm(rte_mbuf* mbuf);
 	void handlePacket_fw_state_sync(rte_mbuf* mbuf);
 	bool handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf);
+	using VipToBalancers = std::vector<std::unordered_map<common::ip_address_t, std::unordered_set<common::ip_address_t>>>;
+	using VipVportProto = std::vector<std::unordered_set<std::tuple<common::ip_address_t, std::optional<uint16_t>, uint8_t>>>;
+	void BalancerICMPForwardCriticalSection(
+	        rte_mbuf* mbuf,
+	        VipToBalancers& vip_to_balancers,
+	        VipVportProto& vip_vport_proto);
 	void handlePacket_balancer_icmp_forward(rte_mbuf* mbuf);
 	void handlePacket_dump(rte_mbuf* mbuf);
 
@@ -128,9 +135,6 @@ protected:
 
 	std::mutex mutex;
 	std::mutex balancer_mutex;
-	std::mutex unrdup_mutex;
-	std::mutex interfaces_ips_mutex;
-	std::mutex vip_vport_proto_mutex;
 
 	rte_mempool* mempool;
 	bool use_kernel_interface;
@@ -172,12 +176,14 @@ protected:
 	                      common::globalBase::tFlow>>
 	        slowWorkerMbufs;
 	std::mutex fw_state_multicast_acl_ids_mutex;
-	std::map<common::ipv6_address_t, tAclId> fw_state_multicast_acl_ids;
+	using FwStateMulticastAclIds = std::map<common::ipv6_address_t, tAclId>;
+	utils::Sequential<FwStateMulticastAclIds> fw_state_multicast_acl_ids;
 
 	// provided by unrdup.cfg, used to clone some icmp packets to neighbor balancers, index is balancer_id
-	std::vector<std::unordered_map<common::ip_address_t, std::unordered_set<common::ip_address_t>>> vip_to_balancers;
+	utils::Sequential<VipToBalancers> vip_to_balancers;
+
 	// check presence prior to cloning
-	std::vector<std::unordered_set<std::tuple<common::ip_address_t, std::optional<uint16_t>, uint8_t>>> vip_vport_proto;
+	utils::Sequential<VipVportProto> vip_vport_proto;
 
 	std::chrono::high_resolution_clock::time_point prevTimePointForSWRateLimiter;
 
