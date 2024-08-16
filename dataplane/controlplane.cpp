@@ -1036,34 +1036,32 @@ common::idp::balancer_real_connections::response cControlPlane::balancer_real_co
 
 eResult cControlPlane::unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request)
 {
-	std::lock_guard<std::mutex> guard(unrdup_mutex);
+	return vip_to_balancers.apply([&](auto& vtb) {
+		uint32_t balancer_id = std::get<0>(request);
 
-	uint32_t balancer_id = std::get<0>(request);
+		if (vtb.size() <= balancer_id)
+		{
+			vtb.resize(balancer_id + 1);
+		}
 
-	if (vip_to_balancers.size() <= balancer_id)
-	{
-		vip_to_balancers.resize(balancer_id + 1);
-	}
-
-	vip_to_balancers[balancer_id] = std::get<1>(request);
-
-	return eResult::success;
+		vtb[balancer_id] = std::get<1>(request);
+		return eResult::success;
+	});
 }
 
 eResult cControlPlane::update_vip_vport_proto(const common::idp::update_vip_vport_proto::request& request)
 {
-	std::lock_guard<std::mutex> guard(vip_vport_proto_mutex);
+	return vip_vport_proto.apply([&](auto& vvp) {
+		uint32_t balancer_id = std::get<0>(request);
 
-	uint32_t balancer_id = std::get<0>(request);
+		if (vvp.size() <= balancer_id)
+		{
+			vvp.resize(balancer_id + 1);
+		}
 
-	if (vip_vport_proto.size() <= balancer_id)
-	{
-		vip_vport_proto.resize(balancer_id + 1);
-	}
-
-	vip_vport_proto[balancer_id] = std::get<1>(request);
-
-	return eResult::success;
+		vvp[balancer_id] = std::get<1>(request);
+		return eResult::success;
+	});
 }
 
 common::idp::version::response cControlPlane::version()
@@ -1865,15 +1863,17 @@ bool cControlPlane::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 	}
 
 	tAclId aclId;
+	if (!dataPlane->controlPlane->fw_state_multicast_acl_ids.apply([&](auto& fw_state_multicast_acl_ids) {
+		    auto it = fw_state_multicast_acl_ids.find(common::ipv6_address_t(ipv6Header->dst_addr));
+		    if (it == fw_state_multicast_acl_ids.end())
+		    {
+			    return false;
+		    }
+		    aclId = it->second;
+		    return true;
+	    }))
 	{
-		std::lock_guard<std::mutex> lock(fw_state_multicast_acl_ids_mutex);
-		auto it = fw_state_multicast_acl_ids.find(common::ipv6_address_t(ipv6Header->dst_addr));
-		if (it == std::end(fw_state_multicast_acl_ids))
-		{
-			return false;
-		}
-
-		aclId = it->second;
+		return false;
 	}
 
 	const auto& base = slowWorker->bases[slowWorker->localBaseId & 1];
@@ -2063,24 +2063,11 @@ bool cControlPlane::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 	return true;
 }
 
-void cControlPlane::handlePacket_balancer_icmp_forward(rte_mbuf* mbuf)
+void cControlPlane::BalancerICMPForwardCriticalSection(
+        rte_mbuf* mbuf,
+        cControlPlane::VipToBalancers& vip_to_balancers,
+        cControlPlane::VipVportProto& vip_vport_proto)
 {
-	if (dataPlane->config.SWICMPOutRateLimit != 0)
-	{
-		if (icmpOutRemainder == 0)
-		{
-			slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_out_rate_limit_reached]++;
-			rte_pktmbuf_free(mbuf);
-			return;
-		}
-
-		--icmpOutRemainder;
-	}
-
-	std::lock_guard<std::mutex> unrdup_guard(unrdup_mutex);
-	std::lock_guard<std::mutex> interfaces_ips_guard(interfaces_ips_mutex);
-	std::lock_guard<std::mutex> services_guard(vip_vport_proto_mutex);
-
 	const auto& base = slowWorker->bases[slowWorker->localBaseId & 1];
 
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
@@ -2314,6 +2301,28 @@ void cControlPlane::handlePacket_balancer_icmp_forward(rte_mbuf* mbuf)
 		slowWorker->preparePacket(mbuf_clone);
 		sendPacketToSlowWorker(mbuf_clone, flow);
 	}
+}
+
+
+void cControlPlane::handlePacket_balancer_icmp_forward(rte_mbuf* mbuf)
+{
+	if (dataPlane->config.SWICMPOutRateLimit != 0)
+	{
+		if (icmpOutRemainder == 0)
+		{
+			slowWorker->counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_out_rate_limit_reached]++;
+			rte_pktmbuf_free(mbuf);
+			return;
+		}
+
+		--icmpOutRemainder;
+	}
+
+	dataPlane->controlPlane->vip_to_balancers.apply([&](auto& vip_to_balancers) {
+		dataPlane->controlPlane->vip_vport_proto.apply([&](auto& vip_vport_proto) {
+			BalancerICMPForwardCriticalSection(mbuf, vip_to_balancers, vip_vport_proto);
+		});
+	});
 
 	// packet itself is not going anywhere, only its clones with prepended header
 	rte_pktmbuf_free(mbuf);

@@ -1,4 +1,6 @@
 #pragma once
+#include <mutex>
+
 #include <rte_mbuf.h>
 
 #include "common/config.h"
@@ -42,6 +44,21 @@ public:
 			curr_ = begin_;
 		}
 		return *this;
+	}
+};
+
+template<typename T>
+class Sequential
+{
+	std::mutex mutex_;
+	T data_;
+
+public:
+	template<typename F>
+	auto apply(F func)
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		return func(data_);
 	}
 };
 
