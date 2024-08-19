@@ -60,6 +60,31 @@ For more information about the autotests run:
 ```
 yanet-builder ./autotest/yanet-autotest-run.py -h
 ```
+
+## Running Unit Tests
+
+To run the unit tests for the project, follow these steps:
+
+Setup the build directory for unittest targeting:
+```sh
+meson setup -Dtarget=unittest build_unittest
+```
+Next, compile the project within the setup build directory:
+
+```sh
+meson compile -C build_unittest
+```
+
+After compilation, run all the unit tests with:
+
+```sh
+meson test -C build_unittest
+```
+- To view more detailed output, you can run the tests with -v flag:
+
+```sh
+meson test -C build_unittest -v
+```
 ## Dependencies
 - [DPDK](https://github.com/DPDK/dpdk)
 - [JSON](https://github.com/nlohmann/json)
