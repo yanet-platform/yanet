@@ -65,6 +65,7 @@ elif target_option.contains('unittest')
     subdir('libfwparser')
     subdir('dataplane/unittest')
     subdir('controlplane/unittest')
+    subdir('common/unittest')
     subdir_done()
 endif
 
