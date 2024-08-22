@@ -2,52 +2,38 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v[0-9]+.[0-9]+'
+    branch:
+      - 'release/*'
 
 jobs:
   build-debian-package-jammy:
-    name: build (Ubuntu 22.04)
+    name: build-image
     runs-on: ubuntu-latest
-    container:
-      image: yanetplatform/builder-lite
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           submodules: recursive
-      - run: |
-          export YANET_VERSION=${{github.ref_name}}
-          export YANET_VERSION=${YANET_VERSION#v}
-          export YANET_VERSION_MAJOR=${YANET_VERSION%.*}
-          export YANET_VERSION_MINOR=${YANET_VERSION#*.}
-          export YANET_VERSION_REVISION=${{github.run_number}}
-          export YANET_VERSION_HASH=${{github.sha}}
-          export YANET_VERSION_CUSTOM=stable
-          dpkg-buildpackage -b
-      - uses: actions/upload-artifact@v3
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          name: target_debian22.04
-          path: /__w/yanet/yanet*.deb
-
-  build-debian-package-bionic:
-    name: build (Ubuntu 18.04)
-    runs-on: ubuntu-latest
-    container:
-      image: yanetplatform/builder_ubuntu18.04-lite
-    steps:
-      - uses: actions/checkout@v1
+          images: yanetplatform/yanet
+      - name: Log in to Docker Hub
+        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
         with:
-          submodules: recursive
-      - run: |
-          export YANET_VERSION=${{github.ref_name}}
-          export YANET_VERSION=${YANET_VERSION#v}
-          export YANET_VERSION_MAJOR=${YANET_VERSION%.*}
-          export YANET_VERSION_MINOR=${YANET_VERSION#*.}
-          export YANET_VERSION_REVISION=${{github.run_number}}
-          export YANET_VERSION_HASH=${{github.sha}}
-          export YANET_VERSION_CUSTOM=stable
-          dpkg-buildpackage -b
-      - uses: actions/upload-artifact@v3
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
         with:
-          name: target_debian18.04
-          path: /__w/yanet/yanet*.deb
+          context: .
+          file: ./build/Dockerfile.image
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
