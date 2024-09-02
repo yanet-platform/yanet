@@ -1173,50 +1173,52 @@ public:
 
 	const std::string& to_string() const
 	{
-		if (std::holds_alternative<common::globalBase::tFlow>(action))
-		{
-			auto flow = std::get<common::globalBase::tFlow>(action);
-			if (flow.type == common::globalBase::eFlowType::drop || flow.type == common::globalBase::eFlowType::controlPlane)
+		std::visit([this](const auto& rule) {
+			using T = std::decay_t<decltype(rule)>;
+			if constexpr (std::is_same_v<T, common::globalBase::tFlow>)
 			{
-				text = "deny";
+				if (rule.type == common::globalBase::eFlowType::drop ||
+				    rule.type == common::globalBase::eFlowType::controlPlane)
+				{
+					text = "deny";
+				}
+				else
+				{
+					text = "flow " + std::string(eFlowType_toString(rule.type)) +
+					       "(" + std::to_string(rule.data.atomic) + ")";
+				}
 			}
-			else
+			else if constexpr (std::is_same_v<T, common::acl::dump_t>)
 			{
-				text = "flow " + std::string(eFlowType_toString(flow.type)) + "(" + std::to_string(flow.data.atomic) + ")";
+				if (!rule.dump_tag.empty())
+				{
+					text = "dump(" + rule.dump_tag + ")";
+				}
 			}
-		}
-		else if (std::holds_alternative<common::acl::dump_t>(action))
-		{
-			auto rule_action = std::get<common::acl::dump_t>(action);
-			if (!rule_action.dump_tag.empty())
+			else if constexpr (std::is_same_v<T, common::acl::check_state_t>)
 			{
-				text = "dump(" + rule_action.dump_tag + ")";
+				text = "check-state";
 			}
-		}
-		else if (std::holds_alternative<common::acl::check_state_t>(action))
-		{
-			text = "check-state";
-		}
-		else if (std::holds_alternative<common::acl::state_timeout_t>(action))
-		{
-			auto rule_action = std::get<common::acl::state_timeout_t>(action);
-			text = "state-timeout(" + std::to_string(rule_action.timeout) + ")";
-		}
-		else
-		{
-			auto arg = std::get<int64_t>(action);
-			switch (arg)
+			else if constexpr (std::is_same_v<T, common::acl::state_timeout_t>)
 			{
-				case DISPATCHER:
-					text = "allow";
-					break;
-				case 0:
-					text = "skipto tablearg";
-					break;
-				default:
-					text = "skipto " + std::to_string(arg);
+				text = "state-timeout(" + std::to_string(rule.timeout) + ")";
 			}
-		}
+			else if constexpr (std::is_same_v<T, int64_t>)
+			{
+				switch (rule)
+				{
+					case DISPATCHER:
+						text = "allow";
+						break;
+					case 0:
+						text = "skipto tablearg";
+						break;
+					default:
+						text = "skipto " + std::to_string(rule);
+				}
+			}
+		},
+		           action);
 
 		if (log)
 		{
