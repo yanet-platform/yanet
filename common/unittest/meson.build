@@ -9,6 +9,8 @@ common_sources = files()
 sources = files('unittest.cpp',
                 'static_vector.cpp',
                 'shared_memory.cpp',
+                'bits.cpp',
+                'blocks_allocator.cpp',
                 )
 
 arch = 'corei7'
@@ -23,4 +25,5 @@ unittest = executable('yanet-common-unittest',
 
 test('common',
      unittest,
-     protocol: 'gtest')
+     protocol: 'gtest',
+     timeout: 300)
