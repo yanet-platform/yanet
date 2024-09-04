@@ -12,6 +12,7 @@ sources = files('unittest.cpp',
                 'sdp.cpp',
                 'random_prefixes.cpp',
                 'vrf_lpm_linear.cpp',
+                'vrf_lpm_binary.cpp',
                 '../vrf.cpp',
                 )
 
