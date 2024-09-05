@@ -357,6 +357,7 @@ namespace getLogicalPorts
 using response = std::map<std::string,
                           std::tuple<std::string, ///< physicalPortName
                                      uint16_t, ///< vlanId
+                                     std::string, ///< vrf
                                      mac_address_t, ///< macAddress
                                      uint8_t>>; ///< promiscuousMode
 }

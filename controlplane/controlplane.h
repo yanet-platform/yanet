@@ -26,6 +26,18 @@
 #include "tun64.h"
 #include "type.h"
 
+class VrfIdStorage
+{
+public:
+	std::optional<tVrfId> Get(const std::string& vrfName);
+	std::optional<tVrfId> GetOrCreate(const std::string& vrfName);
+	tVrfId GetOrCreateOrException(const std::string& vrfName, const std::string& message);
+
+private:
+	std::shared_mutex mutex;
+	std::unordered_map<std::string, std::optional<tVrfId>> vrf_ids;
+};
+
 class cControlPlane
 {
 public:
@@ -94,6 +106,7 @@ public:
 	}
 
 	const common::sdp::DataPlaneInSharedMemory* getSdpData() const;
+	VrfIdStorage& getVrfIdsStorage();
 
 protected: /** commands */
 	common::icp::getPhysicalPorts::response getPhysicalPorts() const;
@@ -196,4 +209,6 @@ private:
 
 	void register_service(google::protobuf::Service* service);
 	std::vector<uint64_t> getAclCounters();
+
+	VrfIdStorage vrfIds;
 };
