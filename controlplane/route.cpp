@@ -49,7 +49,10 @@ eResult route_t::init()
 	return eResult::success;
 }
 
-void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix, const std::vector<rib::pptn_t>& pptns, const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value)
+void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority,
+                            const ip_prefix_t& prefix,
+                            const std::vector<rib::pptn_t>& pptns,
+                            const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value)
 {
 	const auto& [vrf, priority] = vrf_priority;
 
@@ -65,26 +68,14 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 		        interface_destination_next;
 		for (const auto& [pptn_index, path_info_to_nh_ptr] : *nexthops)
 		{
-			const auto& table_name = std::get<2>(pptns[pptn_index]);
-
 			/// @todo: multi route. vrf
-			bool ignore = false;
 			{
+				const auto& table_name = std::get<2>(pptns[pptn_index]);
 				auto current_guard = generations.current_lock_guard();
-				for (const auto& [name, module] : generations.current().routes) ///< @todo: DELETE
+				if (generations.current().is_ignored_table(table_name))
 				{
-					(void)name;
-
-					if (exist(module.ignore_tables, table_name))
-					{
-						ignore = true;
-						break;
-					}
+					continue;
 				}
-			}
-			if (ignore)
-			{
-				continue;
 			}
 
 			for (const auto& [path_info, nh_ptr] : path_info_to_nh_ptr)
@@ -161,7 +152,9 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 	}
 }
 
-void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority_orig, const ip_prefix_t& prefix, const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value)
+void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority_orig,
+                                   const ip_prefix_t& prefix,
+                                   const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value)
 {
 	auto vrf_priority = vrf_priority_orig;
 	auto& [vrf, priority] = vrf_priority;
