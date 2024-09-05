@@ -779,9 +779,10 @@ eResult generation::updateLogicalPort(const common::idp::updateGlobalBase::updat
 	const auto& logicalPortId = std::get<0>(request);
 	const auto& portId = std::get<1>(request);
 	const auto& vlanId = std::get<2>(request);
-	const auto& etherAddress = std::get<3>(request);
-	const auto& promiscuousMode = std::get<4>(request);
-	const auto& flow = std::get<5>(request);
+	const auto& vrfId = std::get<3>(request);
+	const auto& etherAddress = std::get<4>(request);
+	const auto& promiscuousMode = std::get<5>(request);
+	const auto& flow = std::get<6>(request);
 
 	if (logicalPortId >= CONFIG_YADECAP_LOGICALPORTS_SIZE)
 	{
@@ -797,6 +798,11 @@ eResult generation::updateLogicalPort(const common::idp::updateGlobalBase::updat
 	{
 		YADECAP_LOG_ERROR("invalid vlanId: '%u'\n", vlanId);
 		return eResult::invalidVlanId;
+	}
+	if (vrfId >= YANET_RIB_VRF_MAX_NUMBER)
+	{
+		YADECAP_LOG_ERROR("invalid vrfId: '%u'\n", vrfId);
+		return eResult::invalidVrfId;
 	}
 	if (flow.type != common::globalBase::eFlowType::acl_ingress &&
 	    flow.type != common::globalBase::eFlowType::route &&
@@ -815,6 +821,7 @@ eResult generation::updateLogicalPort(const common::idp::updateGlobalBase::updat
 	auto& logicalPort = logicalPorts[logicalPortId];
 	logicalPort.portId = portId;
 	logicalPort.vlanId = rte_cpu_to_be_16(vlanId);
+	logicalPort.vrfId = vrfId;
 	memcpy(logicalPort.etherAddress.addr_bytes, etherAddress.data(), 6); ///< @todo: convert
 
 	logicalPort.flags = 0;

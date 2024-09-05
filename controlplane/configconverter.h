@@ -5,14 +5,15 @@
 #include "base.h"
 #include "common/idp.h"
 #include "common/result.h"
+#include "controlplane.h"
 
 class config_converter_t
 {
 public:
-	config_converter_t(cControlPlane* controlplane,
+	config_converter_t(cControlPlane* controlplane_ptr,
 	                   controlplane::base_t baseNext,
 	                   common::idp::limits::response limits) :
-	        controlplane(controlplane),
+	        controlplane_ptr(controlplane_ptr),
 	        baseNext(std::move(baseNext)),
 	        limits(std::move(limits))
 	{
@@ -68,7 +69,7 @@ protected:
 	void acl_rules_balancer_icmp_forward(controlplane::base::acl_t& acl, const std::string& nextModule) const;
 
 private:
-	cControlPlane* controlplane;
+	cControlPlane* controlplane_ptr;
 
 	controlplane::base_t baseNext;
 	common::idp::updateGlobalBase::request globalbase;

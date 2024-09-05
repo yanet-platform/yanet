@@ -259,6 +259,7 @@ struct tLogicalPort
 
 	tPortId portId;
 	uint16_t vlanId; ///< big endian
+	tVrfId vrfId;
 	rte_ether_addr etherAddress;
 	uint8_t flags;
 	common::globalBase::tFlow flow;
