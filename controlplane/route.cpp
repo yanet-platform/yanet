@@ -909,12 +909,12 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : nat64stateless.nat64_prefixes)
 			{
-				prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				              prefix.get_prefix(),
 				              {}, // TODO: get rid of third parameter
 				              std::monostate());
 
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				                     prefix.get_prefix(),
 				                     std::monostate());
 			}
@@ -926,12 +926,12 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : nat64stateless.nat64_prefixes)
 			{
-				prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				              prefix.get_prefix(),
 				              {}, // TODO: get rid of third parameter
 				              uint32_t(0)); ///< @todo: VIRTUAL_PORT
 
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				                     prefix.get_prefix(),
 				                     uint32_t(0)); ///< @todo: VIRTUAL_PORT
 			}
@@ -943,7 +943,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : config_module.local_prefixes)
 			{
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
 				                     prefix,
 				                     std::monostate());
 			}
@@ -955,7 +955,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : config_module.local_prefixes)
 			{
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
 				                     prefix,
 				                     std::tuple<>());
 			}
@@ -973,7 +973,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 				{
 					if (!ip_prefix.is_host())
 					{
-						prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+						prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 						              ip_prefix.applyMask(ip_prefix.mask()),
 						              {},
 						              std::monostate());
@@ -999,7 +999,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 						route::directly_connected_destination_t directly_connected = {interface.interfaceId,
 						                                                              interface_name};
 
-						prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+						prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 						              ip_prefix.applyMask(ip_prefix.mask()),
 						              {},
 						              directly_connected);
