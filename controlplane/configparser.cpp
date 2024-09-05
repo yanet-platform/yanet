@@ -233,6 +233,8 @@ void config_parser_t::loadConfig_logicalPort(controlplane::base_t& baseNext,
 		}
 	}
 
+	logicalPort.vrf = moduleJson.value("vrf", YANET_RIB_VRF_DEFAULT);
+
 	logicalPort.nextModule = moduleJson.value("nextModule", "");
 
 	//
@@ -299,10 +301,7 @@ void config_parser_t::loadConfig_route(controlplane::base_t& baseNext,
 		}
 	}
 
-	if (exist(moduleJson, "vrf"))
-	{
-		route.vrf = moduleJson["vrf"].get<std::string>();
-	}
+	route.vrf = moduleJson.value("vrf", YANET_RIB_VRF_DEFAULT);
 
 	if (exist(moduleJson, "ignore_tables"))
 	{

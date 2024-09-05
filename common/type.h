@@ -42,6 +42,7 @@ using tun64_id_t = uint32_t;
 using coreId = uint32_t;
 using socketId = uint32_t;
 using counterId = uint32_t;
+using tVrfId = uint16_t;
 
 namespace common
 {

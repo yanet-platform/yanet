@@ -359,6 +359,8 @@ void config_converter_t::processLogicalPorts()
 		{
 			throw error_result_t(eResult::invalidFlow, "invalid flow type for logical port: " + std::to_string(unsigned(logicalPort.flow.type)));
 		}
+
+		logicalPort.vrfId = controlplane_ptr->getVrfIdsStorage().GetOrCreateOrException(logicalPort.vrf, "Can't get id logicalPort.vrf: ");
 	}
 }
 
@@ -372,6 +374,7 @@ void config_converter_t::serializeLogicalPorts()
 		                        common::idp::updateGlobalBase::updateLogicalPort::request{logicalPort.logicalPortId,
 		                                                                                  logicalPort.physicalPortId,
 		                                                                                  logicalPort.vlanId,
+		                                                                                  logicalPort.vrfId,
 		                                                                                  logicalPort.macAddress,
 		                                                                                  logicalPort.promiscuousMode,
 		                                                                                  logicalPort.flow});

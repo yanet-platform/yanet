@@ -1067,6 +1067,7 @@ inline void cWorker::logicalPort_ingress_handle()
 		rte_mbuf* mbuf = logicalPort_ingress_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 		const auto& logicalPort = base.globalBase->logicalPorts[metadata->flow.data.logicalPortId];
+		metadata->vrfId = logicalPort.vrfId;
 
 		generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
 

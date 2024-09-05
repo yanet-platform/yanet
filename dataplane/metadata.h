@@ -34,6 +34,7 @@ struct metadata
 	uint32_t in_logicalport_id;
 	uint32_t out_logicalport_id;
 	common::globalBase::flow_t flow;
+	tVrfId vrfId;
 };
 
 static_assert(sizeof(metadata) + sizeof(rte_ipv6_hdr) ///< encap
