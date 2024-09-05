@@ -39,7 +39,7 @@ eResult rib_t::init()
 
 	{ /// @todo: move to config
 		common::icp::rib_update::insert request_insert = {"static",
-		                                                  "default",
+		                                                  YANET_RIB_VRF_DEFAULT,
 		                                                  YANET_RIB_PRIORITY_DEFAULT,
 		                                                  {}};
 
@@ -49,7 +49,7 @@ eResult rib_t::init()
 		prefixes.emplace_back("fe80::/64", "", std::vector<uint32_t>());
 
 		common::icp::rib_update::eor request_eor = {"static",
-		                                            "default",
+		                                            YANET_RIB_VRF_DEFAULT,
 		                                            YANET_RIB_PRIORITY_DEFAULT,
 		                                            ip_address_t("::"),
 		                                            ""};
@@ -107,7 +107,7 @@ void rib_t::reload([[maybe_unused]] const controlplane::base_t& base_prev,
 	if (base_next.rib.size())
 	{
 		common::icp::rib_update::eor request_eor = {"config",
-		                                            "default",
+		                                            YANET_RIB_VRF_DEFAULT,
 		                                            YANET_RIB_PRIORITY_DEFAULT,
 		                                            ip_address_t("::"),
 		                                            ""};

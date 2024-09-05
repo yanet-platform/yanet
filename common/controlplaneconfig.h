@@ -107,7 +107,11 @@ public:
 class config_t
 {
 public:
-	config_t() = default;
+	config_t() :
+	        vrf(YANET_RIB_VRF_DEFAULT),
+	        tunnel_enabled(false)
+	{
+	}
 
 	/** @todo: tag:CP_MODULES
 	void load(const nlohmann::json& json);

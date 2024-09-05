@@ -980,7 +980,7 @@ bool tAutotest::step_sleep(const YAML::Node& yamlStep)
 
 bool tAutotest::step_rib_insert(const YAML::Node& yaml)
 {
-	common::icp::rib_update::insert request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
+	common::icp::rib_update::insert request = {"autotest", YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_DEFAULT, {}};
 	auto& [protocol, vrf, priority, attribute_tables] = request;
 
 	if (yaml["attribute"].IsDefined())
@@ -1096,7 +1096,7 @@ bool tAutotest::step_rib_insert(const YAML::Node& yaml)
 
 bool tAutotest::step_rib_remove(const YAML::Node& yaml)
 {
-	common::icp::rib_update::remove request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
+	common::icp::rib_update::remove request = {"autotest", YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_DEFAULT, {}};
 	auto& [protocol, vrf, priority, tables] = request;
 
 	if (yaml["attribute"].IsDefined())
@@ -1525,7 +1525,7 @@ void tAutotest::convert_ipv4Update(const std::string& string)
 
 	for (const auto& nexthop : utils::split(nexthops, ' '))
 	{
-		common::icp::rib_update::insert request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
+		common::icp::rib_update::insert request = {"autotest", YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_DEFAULT, {}};
 		std::get<3>(request)[attribute_default]["ipv4"][nexthop].emplace_back(prefix,
 		                                                                      std::to_string(pathInformations_ipv4Update[prefix].size()),
 		                                                                      std::vector<uint32_t>());
@@ -1541,7 +1541,7 @@ void tAutotest::convert_ipv4Remove(const std::string& string)
 {
 	for (const auto& pathInformation : pathInformations_ipv4Update[string])
 	{
-		common::icp::rib_update::remove request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
+		common::icp::rib_update::remove request = {"autotest", YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_DEFAULT, {}};
 		std::get<3>(request)[{}]["ipv4"].emplace_back(ip_prefix_t(string),
 		                                              pathInformation,
 		                                              std::vector<uint32_t>());
@@ -1568,7 +1568,7 @@ void tAutotest::convert_ipv4LabelledUpdate(const std::string& string)
 		std::vector<uint32_t> labels;
 		labels.emplace_back(std::stoll(label, nullptr, 0));
 
-		common::icp::rib_update::insert request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
+		common::icp::rib_update::insert request = {"autotest", YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_DEFAULT, {}};
 		std::get<3>(request)[attribute_default]["ipv4 mpls"][nexthop].emplace_back(prefix,
 		                                                                           std::to_string(pathInformations_ipv4LabelledUpdate[prefix].size()) + ":10001",
 		                                                                           labels);
@@ -1587,7 +1587,7 @@ void tAutotest::convert_ipv4LabelledRemove(const std::string& string)
 
 	for (const auto& pathInformation : pathInformations_ipv4LabelledUpdate[string])
 	{
-		common::icp::rib_update::remove request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
+		common::icp::rib_update::remove request = {"autotest", YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_DEFAULT, {}};
 		std::get<3>(request)[{}]["ipv4 mpls"].emplace_back(ip_prefix_t(string),
 		                                                   pathInformation,
 		                                                   labels);
@@ -1606,7 +1606,7 @@ void tAutotest::convert_ipv6Update(const std::string& string)
 
 	for (const auto& nexthop : utils::split(nexthops, ' '))
 	{
-		common::icp::rib_update::insert request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
+		common::icp::rib_update::insert request = {"autotest", YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_DEFAULT, {}};
 		std::get<3>(request)[attribute_default]["ipv6"][nexthop].emplace_back(prefix,
 		                                                                      nexthop,
 		                                                                      std::vector<uint32_t>());
@@ -1629,7 +1629,7 @@ void tAutotest::convert_ipv6LabelledUpdate(const std::string& string)
 		std::vector<uint32_t> labels;
 		labels.emplace_back(std::stoll(label, nullptr, 0));
 
-		common::icp::rib_update::insert request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
+		common::icp::rib_update::insert request = {"autotest", YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_DEFAULT, {}};
 		std::get<3>(request)[attribute_default]["ipv6 mpls"][nexthop].emplace_back(prefix,
 		                                                                           label + ":10001", ///< @todo: nexthop_label
 		                                                                           labels);
