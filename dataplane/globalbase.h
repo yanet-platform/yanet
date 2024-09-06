@@ -134,8 +134,8 @@ public: ///< @todo
 class generation
 {
 public:
-	using vrf_lpm4 = dataplane::vrflpm::VrfLpm4Linear;
-	using vrf_lpm6 = dataplane::vrflpm::VrfLpm6Linear;
+	using vrf_lpm4 = dataplane::vrflpm::VrfLpm4BinaryTree;
+	using vrf_lpm6 = dataplane::vrflpm::VrfLpm6BinaryTree;
 
 	generation(cDataPlane* dataPlane, const tSocketId& socketId);
 	~generation();
