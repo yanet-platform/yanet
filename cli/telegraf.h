@@ -106,10 +106,13 @@ void unsafe()
 	const auto& [memory_groups, memory_objects] = memory_stats;
 
 	const auto durations = controlplane.controlplane_durations();
+	uint64_t total_acl_ingress_dropPackets = 0, total_acl_egress_dropPackets = 0;
 
 	for (const auto& [coreId, worker] : responseWorkers)
 	{
 		const auto& [iterations, stats, ports_stats] = worker;
+		total_acl_ingress_dropPackets += stats.acl_ingress_dropPackets;
+		total_acl_egress_dropPackets += stats.acl_egress_dropPackets;
 
 		printf("worker,coreId=%u "
 		       "iterations=%luu,"
@@ -173,6 +176,12 @@ void unsafe()
 		       stats.acl_egress_dropPackets,
 		       stats.logs_drops,
 		       stats.logs_packets);
+
+		printf("worker,coreId=all "
+		       "acl_ingress_dropPackets=%luu,"
+		       "acl_egress_dropPackets=%luu\n",
+		       total_acl_ingress_dropPackets,
+		       total_acl_egress_dropPackets);
 
 		for (const auto& [physicalPortName, stats] : ports_stats)
 		{
