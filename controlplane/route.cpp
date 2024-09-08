@@ -6,7 +6,7 @@ eResult route_t::init()
 	{
 		common::idp::updateGlobalBase::request globalbase;
 		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_lpm_update,
-		                        common::idp::lpm::request({common::idp::lpm::clear()}));
+		                        common::idp::lpm::request({{0, common::idp::lpm::clear()}}));
 		dataplane.updateGlobalBase(std::move(globalbase));
 	}
 
@@ -960,7 +960,12 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 
 	for (auto& [vrf, priority_current_update] : prefixes)
 	{
-		(void)vrf; ///< @todo: VRF
+		std::optional<tVrfId> vrfId = controlPlane->getVrfIdsStorage().Get(vrf);
+		if (!vrfId.has_value())
+		{
+			YANET_LOG_WARNING("Not found id for vrf: '%s'\n", vrf.c_str());
+			continue;
+		}
 
 		auto& [priority_current, update] = priority_current_update;
 
@@ -977,7 +982,7 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 
 			if (lpm_remove.size())
 			{
-				lpm_request.emplace_back(lpm_remove);
+				lpm_request.emplace_back(*vrfId, lpm_remove);
 			}
 		}
 
@@ -999,7 +1004,7 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 
 			if (lpm_insert.size())
 			{
-				lpm_request.emplace_back(lpm_insert);
+				lpm_request.emplace_back(*vrfId, lpm_insert);
 			}
 		}
 	}
@@ -1026,7 +1031,12 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 
 	for (auto& [vrf, priority_current_update] : tunnel_prefixes)
 	{
-		(void)vrf; ///< @todo: VRF
+		std::optional<tVrfId> vrfId = controlPlane->getVrfIdsStorage().Get(vrf);
+		if (!vrfId.has_value())
+		{
+			YANET_LOG_WARNING("Not found id for vrf: '%s'\n", vrf.c_str());
+			continue;
+		}
 
 		auto& [priority_current, update] = priority_current_update;
 
@@ -1043,7 +1053,7 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 
 			if (lpm_remove.size())
 			{
-				lpm_request.emplace_back(lpm_remove);
+				lpm_request.emplace_back(*vrfId, lpm_remove);
 			}
 		}
 
@@ -1065,7 +1075,7 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 
 			if (lpm_insert.size())
 			{
-				lpm_request.emplace_back(lpm_insert);
+				lpm_request.emplace_back(*vrfId, lpm_insert);
 			}
 		}
 	}

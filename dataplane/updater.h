@@ -5,11 +5,13 @@
 #include <rte_malloc.h>
 
 #include "common.h"
+#include "common/blocks_allocator.h"
 #include "common/idp.h"
 #include "dynamic_table.h"
 #include "hashtable.h"
 #include "lpm.h"
 #include "memory_manager.h"
+#include "vrf.h"
 
 namespace dataplane
 {
@@ -672,4 +674,143 @@ public:
 	object_type* pointer;
 };
 
+template<typename Address, typename ObjectType>
+class updater_vrf_lpm
+{
+public:
+	using stats_t = dataplane::vrflpm::stats_t;
+	using BlocksAllocator = typename ObjectType::BlocksAllocator;
+
+	updater_vrf_lpm(const char* name,
+	                dataplane::memory_manager* memory_manager,
+	                const tSocketId socket_id) :
+	        name(name),
+	        memory_manager(memory_manager),
+	        socket_id(socket_id),
+	        vrf_lpm_object(allocator)
+	{
+		stats.extended_chunks_count = 0;
+		stats.extended_chunks_size = 0;
+	}
+
+	eResult init()
+	{
+		return create(2 * ObjectType::extended_chunks_size_min, false);
+	}
+
+	eResult insert(tVrfId vrf,
+	               const Address& ip_address,
+	               const uint8_t& mask,
+	               const uint32_t& value_id)
+	{
+		if (stats.extended_chunks_size - stats.extended_chunks_count < ObjectType::extended_chunks_size_min)
+		{
+			eResult result = create(stats.extended_chunks_size * 2, true);
+			if (result != eResult::success)
+			{
+				return result;
+			}
+		}
+
+		return vrf_lpm_object.Insert(stats, vrf, ip_address, mask, value_id);
+	}
+
+	eResult remove(tVrfId vrf,
+	               const Address& ip_address,
+	               const uint8_t& mask)
+	{
+		eResult result = eResult::success;
+		if (stats.extended_chunks_size - stats.extended_chunks_count < ObjectType::extended_chunks_size_min)
+		{
+			result = create(stats.extended_chunks_size * 2, true);
+			if (result != eResult::success)
+			{
+				return result;
+			}
+		}
+
+		result = vrf_lpm_object.Remove(stats, vrf, ip_address, mask);
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		if (stats.extended_chunks_size > 2 * ObjectType::extended_chunks_size_min &&
+		    stats.extended_chunks_count < stats.extended_chunks_size / 4)
+		{
+			result = create(stats.extended_chunks_size / 2, true);
+			if (result != eResult::success)
+			{
+				return result;
+			}
+		}
+
+		return result;
+	}
+
+	eResult clear()
+	{
+		return create(2 * ObjectType::extended_chunks_size_min, false);
+	}
+
+	void limits(common::idp::limits::response& limits) const
+	{
+		limits.emplace_back(name + ".extended_chunks",
+		                    socket_id,
+		                    stats.extended_chunks_count,
+		                    stats.extended_chunks_size);
+	}
+
+	void report(nlohmann::json& report) const
+	{
+		report["pointer"] = to_hex(allocator.GetPointer());
+		report["extended_chunks_count"] = stats.extended_chunks_count;
+		report["extended_chunks_size"] = stats.extended_chunks_size;
+	}
+
+protected:
+	std::string name;
+	dataplane::memory_manager* memory_manager;
+	tSocketId socket_id;
+	stats_t stats;
+	BlocksAllocator allocator;
+
+	eResult create(const uint64_t chunks_size, bool save_old)
+	{
+		size_t buffer_size = BlocksAllocator::GetBufferSize(chunks_size);
+		void* next_pointer = memory_manager->create<void*>(name.data(), socket_id, buffer_size);
+		if (next_pointer == nullptr)
+		{
+			return eResult::errorAllocatingMemory;
+		}
+		BlocksAllocator tmp_allocator;
+		tmp_allocator.Init(next_pointer, buffer_size, YANET_RIB_VRF_MAX_NUMBER);
+		ObjectType tmp_object(tmp_allocator);
+
+		stats_t next_stats;
+		next_stats.extended_chunks_count = 0;
+		next_stats.extended_chunks_size = chunks_size;
+
+		if (save_old)
+		{
+			eResult result = tmp_object.CopyFrom(vrf_lpm_object, next_stats);
+			if (result != eResult::success)
+			{
+				return result;
+			}
+		}
+
+		stats = next_stats;
+		vrf_lpm_object.Swap(tmp_object);
+		if (tmp_allocator.GetPointer() != nullptr)
+		{
+			memory_manager->destroy(tmp_allocator.GetPointer());
+		}
+
+		return eResult::success;
+	}
+
+public:
+	ObjectType vrf_lpm_object;
+};
 }
