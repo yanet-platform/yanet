@@ -1,5 +1,5 @@
 ARG RELEASE=22.04
-FROM --platform=linux/amd64 ubuntu:${RELEASE} as environment
+FROM --platform=linux/amd64 ubuntu:${RELEASE} AS environment
 
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -28,7 +28,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 
 RUN python3 -m pip install meson==0.61.2
 
-FROM environment as builder
+
+FROM environment AS builder
 
 ARG YANET_VERSION_MAJOR=0
 ARG YANET_VERSION_MINOR=0
@@ -50,6 +51,7 @@ RUN meson setup --prefix=/target \
 
 RUN meson compile -C build
 
+
 FROM --platform=linux/amd64 ubuntu:${RELEASE}
 
 RUN apt-get update
@@ -61,8 +63,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libmlx5-1 \
         libnuma1 \
         libpcap0.8 \
-        netbase
+        netbase \
+        python3
 
 COPY --from=builder /opt/yanet/build/controlplane/yanet-controlplane /usr/bin/
 COPY --from=builder /opt/yanet/build/dataplane/yanet-dataplane /usr/bin/
 COPY --from=builder /opt/yanet/build/cli/yanet-cli /usr/bin/
+COPY --from=builder /opt/yanet/yanet-announcer.py /usr/bin/yanet-announcer
