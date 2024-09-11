@@ -9,12 +9,13 @@ namespace
 
 using common::ipv4_address_t;
 using common::globalBase::eFlowType;
+using controlplane::base::acl_t;
 
-auto make_default_acl(const std::string& rules, tAclId aclId = 1) -> controlplane::base::acl_t
+auto make_default_acl(const std::string& rules, tAclId aclId = 1) -> acl_t
 {
-	controlplane::base::acl_t acl;
+	acl_t acl;
 	common::globalBase::tFlow flow{};
-	flow.type = common::globalBase::eFlowType::route;
+	flow.type = eFlowType::route;
 
 	acl.aclId = aclId;
 	acl.nextModules = {"unmatched"};
@@ -76,7 +77,7 @@ add allow tcp from { 2abc:123:ff1c:2030:aabb:5678::/ffff:ffff:ffff:fff0:ffff:fff
 add deny ip from any to any
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 }
@@ -92,7 +93,7 @@ add allow tcp from { 1.2.3.4 } to any dst-port 80
 add deny ip from any to any
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 }
@@ -101,7 +102,7 @@ TEST(ACL, 003_Over500)
 {
 	auto fw = make_default_acl(generate_firewall_conf(500));
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 }
@@ -110,7 +111,7 @@ TEST(ACL, 004_Over1000)
 {
 	auto fw = make_default_acl(generate_firewall_conf(1000));
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 }
@@ -119,7 +120,7 @@ TEST(ACL, 005_Over4000)
 {
 	auto fw = make_default_acl(generate_firewall_conf(4000));
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 }
@@ -141,7 +142,7 @@ add 6 allow tcp from { 1.2.3.5 } to any dst-port 80
 add 7 deny ip from any to any
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
@@ -170,7 +171,7 @@ add 1 deny ip from any to any in
 add 2 allow ip from { 1.2.3.4 } to any in
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
@@ -183,7 +184,7 @@ add 2 allow ip from { 1.2.3.4 } to any in
 
 		const auto& value = result.acl_values[total_table_value];
 		std::visit([&](const auto& actions) {
-			EXPECT_THAT(actions.get_flow().type, ::testing::Eq(common::globalBase::eFlowType::drop));
+			EXPECT_THAT(actions.get_flow().type, ::testing::Eq(eFlowType::drop));
 		},
 		           value);
 	}
@@ -199,7 +200,7 @@ add 1 allow ip from { 1.2.3.4 } to any in
 add 2 deny ip from any to any in
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
@@ -220,7 +221,7 @@ add 1 allow ip from { 1.2.3.4 } to any in via port0
 add 2 deny ip from any to any in
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "port0"}, {true, "port1"}}}}, result);
 
@@ -249,7 +250,7 @@ add allow ip from { 1.2.3.5 } to any out via port1 // id 2
 add deny ip from any to any out // id 3
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{false, "port0"}, {false, "port1"}, {false, "port2"}, {false, "port3"}}}}, result);
 
@@ -281,7 +282,7 @@ add deny ip from any to any out // id 4
 add allow ip from any to any in // id 5
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 
 	auto ret = acl::unwind(acls, {{1, {{false, "port0"}, {false, "port1"}, {false, "port2"}, {false, "port3"}, {true, "port0"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 6);
@@ -311,7 +312,7 @@ TEST(ACL, 013_DefaultAction)
 add 1 allow icmp from { 1.2.3.4 } to any in
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 
 	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}, {false, "vlan1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 3);
@@ -342,7 +343,7 @@ add 200 deny log ip from any to any in
 add 300 deny ip from any to any
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 
 	auto ret = acl::unwind(acls, {{1, {{true, "port0"}, {true, "port1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 3);
@@ -396,7 +397,7 @@ add 200 allow proto tcp dst-addr fc00/23@2abc:123:c00::/40
 add 300 allow proto tcp dst-addr 1234567@2abc:123:c00::/40
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 
 	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 4);
@@ -421,7 +422,7 @@ add 400 allow tcp from any to any tcpflags rst
 add 500 allow tcp from any to any established
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 
 	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 7);
@@ -448,7 +449,7 @@ add 200 deny ip from any to any icmptypes 1,2,3,9,10,13
 add 300 allow ip from any to any icmp6types 133,134,135,136
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 
 	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 4);
@@ -469,7 +470,7 @@ add 100 allow icmp from any to unknown.hostname.tld icmptypes 0,8
 add 200 deny ip from any to any
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 
 	auto ret = acl::unwind(acls, {{1, {{true, "vlan1"}}}}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {});
 	ASSERT_EQ(ret.size(), 1);
@@ -478,6 +479,12 @@ add 200 deny ip from any to any
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 	// we expect that after validation rule 100 will be omitted and only one rule will remain
 	EXPECT_THAT(std::get<1>(result.rules[200].front()), ::testing::Eq("deny"));
+}
+
+template<typename T>
+constexpr bool is_with_check_state()
+{
+	return std::is_same_v<std::decay_t<T>, common::BaseActions<common::ActionsPath::WithCheckState>>;
 }
 
 TEST(ACL, 019_CheckStateBasic)
@@ -489,7 +496,7 @@ add 200 allow ip from { 1.2.3.4 } to any
 add 300 deny ip from any to any
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
@@ -501,7 +508,7 @@ add 300 deny ip from any to any
 
 		const auto& value = result.acl_values[total_table_value];
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
+			if constexpr (is_with_check_state<decltype(actions)>())
 			{
 				// Check that the regular path does not include the check-state action
 				EXPECT_THAT(actions.get_actions().size(), 1);
@@ -526,7 +533,7 @@ add 300 check-state
 add 400 deny ip from any to any
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
@@ -537,7 +544,7 @@ add 400 deny ip from any to any
 
 	const auto& value = result.acl_values[total_table_value];
 	std::visit([&](const auto& actions) {
-		if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
+		if constexpr (is_with_check_state<decltype(actions)>())
 		{
 			// Check that the regular path includes the actions after the first and second check-states
 			EXPECT_THAT(actions.get_actions().size(), 2);
@@ -563,7 +570,7 @@ add 500 check-state
 add 500 deny ip from any to any
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
@@ -574,7 +581,7 @@ add 500 deny ip from any to any
 
 	const auto& value = result.acl_values[total_table_value];
 	std::visit([&](const auto& actions) {
-		if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
+		if constexpr (is_with_check_state<decltype(actions)>())
 		{
 			// Check that the regular path includes actions before and after the check-state
 			EXPECT_THAT(actions.get_actions().size(), 3);
@@ -599,7 +606,7 @@ add allow ip from any to any keep-state
 add deny ip from any to any
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
@@ -611,7 +618,7 @@ add deny ip from any to any
 
 		const auto& value = result.acl_values[total_table_value];
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
+			if constexpr (is_with_check_state<decltype(actions)>())
 			{
 				// Check that the regular path includes the allow action
 				EXPECT_THAT(actions.get_actions().size(), 1);
@@ -635,7 +642,7 @@ add allow ip from any to any 22 keep-state
 add deny ip from any to any
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
@@ -647,7 +654,7 @@ add deny ip from any to any
 
 		const auto& value = result.acl_values[total_table_value];
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
+			if constexpr (is_with_check_state<decltype(actions)>())
 			{
 				// Check that the regular path includes the allow action
 				EXPECT_THAT(actions.get_actions().size(), 1);
@@ -673,7 +680,7 @@ add deny ip from any to any
 add allow ip from any to any keep-state
 )IPFW");
 
-	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 	acl::result_t result;
 	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
 
@@ -685,7 +692,7 @@ add allow ip from any to any keep-state
 
 		const auto& value = result.acl_values[total_table_value];
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
+			if constexpr (is_with_check_state<decltype(actions)>())
 			{
 				// Check that the regular path includes the allow action
 				EXPECT_THAT(actions.get_actions().size(), 1);
@@ -720,7 +727,7 @@ add allow ip from any to any keep-state
 
 		const auto& value = result.acl_values[total_table_value];
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			if constexpr (is_with_check_state<decltype(actions)>())
 			{
 				// Check that the regular path includes the allow action with the correct timeout
 				EXPECT_THAT(actions.get_actions().size(), 1);
@@ -757,7 +764,7 @@ add allow ip from any to any keep-state
 		const auto& value = result.acl_values[total_table_value];
 
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			if constexpr (is_with_check_state<decltype(actions)>())
 			{
 				// Check that the regular path includes the allow action with the correct timeout
 				EXPECT_THAT(actions.get_actions().size(), 1);
@@ -777,7 +784,7 @@ add allow ip from any to any keep-state
 		const auto& value = result.acl_values[total_table_value];
 
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			if constexpr (is_with_check_state<decltype(actions)>())
 			{
 				// Check that the regular path includes the allow action with the correct timeout
 				EXPECT_THAT(actions.get_actions().size(), 1);
