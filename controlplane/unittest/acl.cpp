@@ -1,8 +1,10 @@
+#include <gmock/gmock-matchers.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
 #include "../acl.h"
+#include "common/actions.h"
 
 namespace
 {
@@ -197,11 +199,11 @@ add 1 deny ip from any to any in
 add 2 allow ip from { 1.2.3.4 } to any in
 )IPFW");
 
-	visit_actions([&](const auto& actions) {
-		EXPECT_THAT(actions.get_flow().type, ::testing::Eq(eFlowType::drop));
-	});
-
 	ASSERT_EQ(result.acl_total_table.size(), 1);
+
+	visit_actions([&](const auto& actions) {
+		EXPECT_EQ(eFlowType::drop, actions.get_flow().type);
+	});
 
 	auto& ids_map = result.ids_map;
 	ASSERT_EQ(ids_map.size(), 2);
@@ -217,8 +219,9 @@ add 1 allow ip from { 1.2.3.4 } to any in
 add 2 deny ip from any to any in
 )IPFW");
 
-	auto& ids_map = result.ids_map;
 	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	auto& ids_map = result.ids_map;
 	ASSERT_EQ(ids_map.size(), 3);
 
 	EXPECT_THAT(ids_map[0], ::testing::ElementsAre());
@@ -325,13 +328,13 @@ add 1 allow icmp from { 1.2.3.4 } to any in
 	                       {{1, {{true, "vlan1"}, {false, "vlan1"}}}});
 
 	ASSERT_EQ(unwind_result.size(), 3);
+	ASSERT_EQ(result.acl_total_table.size(), 4);
 
-	EXPECT_THAT(stringify(unwind_result[0]), ::testing::Eq("vlan1 |0|1.2.3.4/255.255.255.255|any|any|1|any|any|any|false|route(0)|1|false|"));
-	EXPECT_THAT(stringify(unwind_result[1]), ::testing::Eq("vlan1 |0|any|any|any|any|any|any|any|false|route(0)||false|"));
-	EXPECT_THAT(stringify(unwind_result[2]), ::testing::Eq("vlan1 |1|any|any|any|any|any|any|any|false|logicalPort_egress(0)||false|"));
+	EXPECT_EQ("vlan1 |0|1.2.3.4/255.255.255.255|any|any|1|any|any|any|false|route(0)|1|false|", stringify(unwind_result[0]));
+	EXPECT_EQ("vlan1 |0|any|any|any|any|any|any|any|false|route(0)||false|", stringify(unwind_result[1]));
+	EXPECT_EQ("vlan1 |1|any|any|any|any|any|any|any|false|logicalPort_egress(0)||false|", stringify(unwind_result[2]));
 
 	auto& ids_map = result.ids_map;
-	ASSERT_EQ(result.acl_total_table.size(), 4);
 	ASSERT_EQ(ids_map.size(), 2);
 
 	EXPECT_THAT(ids_map[0], ::testing::ElementsAre());
@@ -349,16 +352,15 @@ add 300 deny ip from any to any
 	                       {{1, {{true, "port0"}, {true, "port1"}}}});
 
 	ASSERT_EQ(unwind_result.size(), 3);
+	ASSERT_EQ(result.acl_total_table.size(), 4);
 
-	EXPECT_THAT(stringify(unwind_result[0]), ::testing::Eq("port1 |0|any|any|any|any|any|any|any|false|drop(0)|2|true|"));
-	EXPECT_THAT(stringify(unwind_result[1]), ::testing::Eq("port0 |0|1.2.3.4/255.255.255.255|any|any|any|any|any|any|false|route(0)|1|true|"));
-	EXPECT_THAT(stringify(unwind_result[2]), ::testing::Eq("port0 |0|any|any|any|any|any|any|any|false|drop(0)|2|true|"));
+	EXPECT_EQ("port1 |0|any|any|any|any|any|any|any|false|drop(0)|2|true|", stringify(unwind_result[0]));
+	EXPECT_EQ("port0 |0|1.2.3.4/255.255.255.255|any|any|any|any|any|any|false|route(0)|1|true|", stringify(unwind_result[1]));
+	EXPECT_EQ("port0 |0|any|any|any|any|any|any|any|false|drop(0)|2|true|", stringify(unwind_result[2]));
 
 	visit_actions([&](const auto& actions) {
-		EXPECT_THAT(actions.get_flow().flags, ::testing::Eq((uint8_t)common::globalBase::eFlowFlags::log));
+		EXPECT_EQ(actions.get_flow().flags, common::globalBase::eFlowFlags::log);
 	});
-
-	ASSERT_EQ(result.acl_total_table.size(), 4);
 
 	auto& ids_map = result.ids_map;
 	ASSERT_EQ(ids_map.size(), 3);
@@ -376,9 +378,9 @@ add 300 deny ip from any to any
 	EXPECT_THAT(acl_map[1], ::testing::ElementsAre(1, 2));
 
 	ASSERT_EQ(result.rules.size(), 3);
-	EXPECT_THAT(std::get<2>(result.rules[100].front()), ::testing::Eq("allow log ip from { 1.2.3.4 } to any in via port0"));
-	EXPECT_THAT(std::get<2>(result.rules[200].front()), ::testing::Eq("deny log ip from any to any in"));
-	EXPECT_THAT(std::get<2>(result.rules[300].front()), ::testing::Eq("deny ip from any to any"));
+	EXPECT_EQ("allow log ip from { 1.2.3.4 } to any in via port0", std::get<2>(result.rules[100].front()));
+	EXPECT_EQ("deny log ip from any to any in", std::get<2>(result.rules[200].front()));
+	EXPECT_EQ("deny ip from any to any", std::get<2>(result.rules[300].front()));
 }
 
 TEST_F(ACLWithUnwind, 015_GappedMask)
@@ -393,9 +395,9 @@ add 300 allow proto tcp dst-addr 1234567@2abc:123:c00::/40
 	ASSERT_EQ(unwind_result.size(), 4);
 
 	// check that parser correctly expands gapped mask in rules -> compare with generated text
-	EXPECT_THAT(std::get<1>(result.rules[100].front()), ::testing::Eq("allow dst-addr 2abc:123:c00::4242:0:0/ffff:ffff:ff00:0:ffff:ffff:: proto 6"));
-	EXPECT_THAT(std::get<1>(result.rules[200].front()), ::testing::Eq("allow dst-addr 2abc:123:c00::fc00:0:0/ffff:ffff:ff00:0:ffff:fe00:: proto 6"));
-	EXPECT_THAT(std::get<1>(result.rules[300].front()), ::testing::Eq("allow dst-addr 2abc:123:c00:0:123:4567::/ffff:ffff:ff00:0:ffff:ffff:: proto 6"));
+	EXPECT_EQ("allow dst-addr 2abc:123:c00::4242:0:0/ffff:ffff:ff00:0:ffff:ffff:: proto 6", std::get<1>(result.rules[100].front()));
+	EXPECT_EQ("allow dst-addr 2abc:123:c00::fc00:0:0/ffff:ffff:ff00:0:ffff:fe00:: proto 6", std::get<1>(result.rules[200].front()));
+	EXPECT_EQ("allow dst-addr 2abc:123:c00:0:123:4567::/ffff:ffff:ff00:0:ffff:ffff:: proto 6", std::get<1>(result.rules[300].front()));
 }
 
 TEST_F(ACLWithUnwind, 016_TcpFlags)
@@ -412,12 +414,12 @@ add 500 allow tcp from any to any established
 
 	ASSERT_EQ(unwind_result.size(), 7);
 	// check that parser correctly expands tcpflags and then filter correctly formats them
-	EXPECT_THAT(std::get<1>(result.rules[100].front()), ::testing::Eq("deny proto 6 setup"));
-	EXPECT_THAT(std::get<1>(result.rules[150].front()), ::testing::Eq("deny proto 6 setup"));
-	EXPECT_THAT(std::get<1>(result.rules[200].front()), ::testing::Eq("deny proto 6 tcpflags fin,psh,urg"));
-	EXPECT_THAT(std::get<1>(result.rules[300].front()), ::testing::Eq("deny proto 6 tcpflags !fin,!syn,!rst,!psh,!ack,!urg"));
-	EXPECT_THAT(std::get<1>(result.rules[400].front()), ::testing::Eq("allow proto 6 tcpflags rst"));
-	EXPECT_THAT(std::get<1>(result.rules[500].front()), ::testing::Eq("allow proto 6 etsablished"));
+	EXPECT_EQ("deny proto 6 setup", std::get<1>(result.rules[100].front()));
+	EXPECT_EQ("deny proto 6 setup", std::get<1>(result.rules[150].front()));
+	EXPECT_EQ("deny proto 6 tcpflags fin,psh,urg", std::get<1>(result.rules[200].front()));
+	EXPECT_EQ("deny proto 6 tcpflags !fin,!syn,!rst,!psh,!ack,!urg", std::get<1>(result.rules[300].front()));
+	EXPECT_EQ("allow proto 6 tcpflags rst", std::get<1>(result.rules[400].front()));
+	EXPECT_EQ("allow proto 6 etsablished", std::get<1>(result.rules[500].front()));
 }
 
 TEST_F(ACLWithUnwind, 017_IcmpTypes)
@@ -433,9 +435,9 @@ add 300 allow ip from any to any icmp6types 133,134,135,136
 
 	ASSERT_EQ(unwind_result.size(), 4);
 	// check that parser correctly expands icmptypes and then filter correctly formats them
-	EXPECT_THAT(std::get<1>(result.rules[100].front()), ::testing::Eq("allow proto 1 icmptypes 0,3,8,11,12"));
-	EXPECT_THAT(std::get<1>(result.rules[200].front()), ::testing::Eq("deny proto 1 icmptypes 1,2,3,9,10,13"));
-	EXPECT_THAT(std::get<1>(result.rules[300].front()), ::testing::Eq("allow proto 58 icmp6types 133,134,135,136"));
+	EXPECT_EQ("allow proto 1 icmptypes 0,3,8,11,12", std::get<1>(result.rules[100].front()));
+	EXPECT_EQ("deny proto 1 icmptypes 1,2,3,9,10,13", std::get<1>(result.rules[200].front()));
+	EXPECT_EQ("allow proto 58 icmp6types 133,134,135,136", std::get<1>(result.rules[300].front()));
 }
 
 TEST_F(ACLWithUnwind, 018_EmptyDst)
@@ -448,13 +450,76 @@ add 200 deny ip from any to any
 
 	ASSERT_EQ(unwind_result.size(), 1);
 	// we expect that after validation rule 100 will be omitted and only one rule will remain
-	EXPECT_THAT(std::get<1>(result.rules[200].front()), ::testing::Eq("deny"));
+	EXPECT_EQ("deny", std::get<1>(result.rules[200].front()));
 }
+
+// Custom matcher to check if a variant holds a specific type
+template<typename T>
+class HoldsAlternativeMatcher : public ::testing::MatcherInterface<const common::RawAction&>
+{
+public:
+	bool MatchAndExplain(const common::RawAction& v, ::testing::MatchResultListener* listener) const override
+	{
+		return std::holds_alternative<T>(v);
+	}
+
+	void DescribeTo(std::ostream* os) const override
+	{
+		*os << "holds alternative of type " << typeid(T).name();
+	}
+};
+
+template<typename T>
+::testing::Matcher<const common::RawAction&> HoldsAlternative()
+{
+	return ::testing::MakeMatcher(new HoldsAlternativeMatcher<T>());
+}
+
+::testing::Matcher<const common::RawAction&> IsCheckStateAction()
+{
+	return HoldsAlternative<common::CheckStateAction>();
+}
+
+::testing::Matcher<const common::RawAction&> IsFlowAction()
+{
+	return HoldsAlternative<common::FlowAction>();
+}
+
+::testing::Matcher<const common::RawAction&> IsDumpAction()
+{
+	return HoldsAlternative<common::DumpAction>();
+}
+
+using common::ActionsPath;
+using common::BaseActions;
 
 template<typename T>
 constexpr bool is_with_check_state()
 {
-	return std::is_same_v<std::decay_t<T>, common::BaseActions<common::ActionsPath::WithCheckState>>;
+	return std::is_same_v<std::decay_t<T>, BaseActions<ActionsPath::WithCheckState>>;
+}
+
+const common::RawAction& regular_path_action(const common::Actions& actions, size_t idx)
+{
+	return std::visit([idx](const auto& action_variant) -> const common::RawAction& {
+		return action_variant.get_actions()[idx].raw_action;
+	},
+	                  actions);
+}
+
+const common::RawAction& regular_path_first_action(const common::Actions& actions)
+{
+	return regular_path_action(actions, 0);
+}
+
+const common::RawAction& check_state_path_last_action(const common::Actions& actions)
+{
+	if (const auto& check_state_actions = std::get_if<BaseActions<ActionsPath::WithCheckState>>(&actions))
+	{
+		return check_state_actions->get_check_state_actions().back().raw_action;
+	}
+
+	throw std::runtime_error("Attempted to get check-state action from Default path");
 }
 
 TEST_F(ACL, 019_CheckStateBasic)
@@ -473,11 +538,11 @@ add 300 deny ip from any to any
 		{
 			// Check that the regular path does not include the check-state action
 			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_FALSE(std::holds_alternative<common::CheckStateAction>(actions.get_actions()[0].raw_action));
+			EXPECT_THAT(regular_path_first_action(actions), Not(IsCheckStateAction()));
 
 			// Check that the check-state path includes the check-state action
 			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
 		}
 	});
 }
@@ -500,12 +565,12 @@ add 400 deny ip from any to any
 		{
 			// Check that the regular path includes the actions after the first and second check-states
 			EXPECT_THAT(actions.get_actions().size(), 2);
-			EXPECT_TRUE(std::holds_alternative<common::DumpAction>(actions.get_actions()[0].raw_action));
-			EXPECT_TRUE(std::holds_alternative<common::FlowAction>(actions.get_actions()[1].raw_action));
+			EXPECT_THAT(regular_path_action(actions, 0), IsDumpAction());
+			EXPECT_THAT(regular_path_action(actions, 1), IsFlowAction());
 
 			// Check that the check-state path includes the first check-state action and no other actions
 			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
 		}
 	});
 }
@@ -529,14 +594,14 @@ add 500 deny ip from any to any
 		{
 			// Check that the regular path includes actions before and after the check-state
 			EXPECT_THAT(actions.get_actions().size(), 3);
-			EXPECT_TRUE(std::holds_alternative<common::DumpAction>(actions.get_actions()[0].raw_action));
-			EXPECT_TRUE(std::holds_alternative<common::DumpAction>(actions.get_actions()[1].raw_action));
-			EXPECT_TRUE(std::holds_alternative<common::FlowAction>(actions.get_actions()[2].raw_action));
+			EXPECT_THAT(regular_path_action(actions, 0), IsDumpAction());
+			EXPECT_THAT(regular_path_action(actions, 1), IsDumpAction());
+			EXPECT_THAT(regular_path_action(actions, 2), IsFlowAction());
 
 			// Check that the check-state path includes actions up to and including the check-state action
 			EXPECT_THAT(actions.get_check_state_actions().size(), 2);
-			EXPECT_TRUE(std::holds_alternative<common::DumpAction>(actions.get_check_state_actions()[0].raw_action));
-			EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions()[1].raw_action));
+			EXPECT_THAT(actions.get_check_state_actions()[0].raw_action, IsDumpAction());
+			EXPECT_THAT(actions.get_check_state_actions()[1].raw_action, IsCheckStateAction());
 		}
 	});
 }
@@ -556,11 +621,11 @@ add deny ip from any to any
 		{
 			// Check that the regular path includes the allow action
 			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_TRUE(std::holds_alternative<common::FlowAction>(actions.get_actions()[0].raw_action));
+			EXPECT_THAT(regular_path_first_action(actions), IsFlowAction());
 
 			// Check that the check-state path includes the check-state action
 			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
 		}
 	});
 }
@@ -581,11 +646,11 @@ add deny ip from any to any
 		{
 			// Check that the regular path includes the allow action
 			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_TRUE(std::holds_alternative<common::FlowAction>(actions.get_actions()[0].raw_action));
+			EXPECT_THAT(regular_path_first_action(actions), IsFlowAction());
 
 			// Check that the check-state path includes the check-state action
 			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
 		}
 	});
 }
@@ -608,11 +673,11 @@ add allow ip from any to any keep-state
 		{
 			// Check that the regular path includes the allow action
 			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_TRUE(std::holds_alternative<common::FlowAction>(actions.get_actions()[0].raw_action));
+			EXPECT_THAT(regular_path_first_action(actions), IsFlowAction());
 
 			// Check that the check-state path includes the check-state action
 			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
 		}
 	});
 }
