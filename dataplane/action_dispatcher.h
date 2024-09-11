@@ -18,6 +18,9 @@ struct ActionDispatcherArgs
 template<FlowDirection Direction>
 struct ActionDispatcher
 {
+	using Flow = common::globalBase::tFlow;
+	using FlowFlags = common::globalBase::eFlowFlags;
+
 	static void execute(const common::Actions& actions, const ActionDispatcherArgs& args)
 	{
 		std::visit([&](const auto& specific_actions) {
@@ -65,7 +68,7 @@ struct ActionDispatcher
 		execute_path(actions.default_path(), actions.get_flow(), args);
 	}
 
-	static void execute_path(const std::vector<common::Action>& actions, const common::globalBase::tFlow& flow, const ActionDispatcherArgs& args)
+	static void execute_path(const std::vector<common::Action>& actions, const Flow& flow, const ActionDispatcherArgs& args)
 	{
 		for (const auto& action : actions)
 		{
@@ -77,7 +80,7 @@ struct ActionDispatcher
 		}
 	}
 
-	static void execute(const common::DumpAction& action, const common::globalBase::tFlow& flow, const ActionDispatcherArgs& args)
+	static void execute(const common::DumpAction& action, const Flow& flow, const ActionDispatcherArgs& args)
 	{
 		auto ring_id = args.base->globalBase->dump_id_to_tag[action.dump_id];
 		if (ring_id == -1)
@@ -89,12 +92,12 @@ struct ActionDispatcher
 		ring.write(args.mbuf, flow.type);
 	}
 
-	static void execute(const common::StateTimeoutAction& action, const common::globalBase::tFlow& flow, const ActionDispatcherArgs& args)
+	static void execute(const common::StateTimeoutAction& action, const Flow& flow, const ActionDispatcherArgs& args)
 	{
 		YANET_LOG_DEBUG("Asked to execute StateTimeoutAction, which should not occur. Check value_t::compile()\n");
 	}
 
-	static void execute(const common::FlowAction& action, [[maybe_unused]] const common::globalBase::tFlow& flow, const ActionDispatcherArgs& args)
+	static void execute(const common::FlowAction& action, [[maybe_unused]] const Flow& flow, const ActionDispatcherArgs& args)
 	{
 		auto worker = args.worker;
 		auto mbuf = args.mbuf;
@@ -112,11 +115,11 @@ struct ActionDispatcher
 			acl_id = args.meta->flow.data.aclId;
 		}
 
-		if (action.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
+		if (action.flow.flags & (uint8_t)FlowFlags::log)
 		{
 			worker->acl_log(mbuf, action.flow, acl_id);
 		}
-		if (action.flow.flags & (uint8_t)common::globalBase::eFlowFlags::recordstate)
+		if (action.flow.flags & (uint8_t)FlowFlags::recordstate)
 		{
 			worker->acl_create_state(mbuf, acl_id, action.flow, action.timeout);
 		}
@@ -131,7 +134,7 @@ struct ActionDispatcher
 		}
 	}
 
-	static void execute([[maybe_unused]] const common::CheckStateAction& action, const common::globalBase::tFlow& flow, const ActionDispatcherArgs& args)
+	static void execute([[maybe_unused]] const common::CheckStateAction& action, const Flow& flow, const ActionDispatcherArgs& args)
 	{
 		if constexpr (Direction == FlowDirection::Egress)
 		{
