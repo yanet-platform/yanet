@@ -550,11 +550,17 @@ private:
 
 } // namespace acl
 
-template<bool HasCheckState>
+enum class ActionsPath
+{
+	Default,
+	WithCheckState
+};
+
+template<ActionsPath>
 class BaseActions;
 
 template<>
-class BaseActions<false>
+class BaseActions<ActionsPath::Default>
 {
 private:
 	std::vector<Action> path_{};
@@ -611,7 +617,7 @@ public:
 };
 
 template<>
-class BaseActions<true>
+class BaseActions<ActionsPath::WithCheckState>
 {
 private:
 	std::vector<Action> path_{};
@@ -688,8 +694,8 @@ public:
 
 /**
  * The Actions type is defined as a std::variant to efficiently handle two possible states of action sequences:
- * - BaseActions<true>: This specialization is used when the action sequence contains a check-state action.
- * - BaseActions<false>: This specialization is used when the action sequence does not contain a check-state action.
+ * - BaseActions<WithCheckState>: This specialization is used when the action sequence contains a check-state action.
+ * - BaseActions<Default>: This specialization is used when the action sequence does not contain a check-state action.
  *
  * This approach allows us to avoid runtime branching to check for the presence of a check-state action, thereby
  * enhancing performance. Instead, the decision is made once when constructing the Actions object.
@@ -700,6 +706,6 @@ public:
  * that will be only once. Once the result of a check-state is determined, we will choose correct path and execute it
  * without any additional checks.
  */
-using Actions = std::variant<BaseActions<true>, BaseActions<false>>;
+using Actions = std::variant<BaseActions<ActionsPath::Default>, BaseActions<ActionsPath::WithCheckState>>;
 
 } // namespace common

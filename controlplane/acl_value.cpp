@@ -61,11 +61,11 @@ void value_t::finalize_actions(IntermediateActions&& actions)
 {
 	if (actions.indices.get<common::CheckStateAction>().has_value())
 	{
-		vector.emplace_back(common::BaseActions<true>(std::move(actions)));
+		vector.emplace_back(common::BaseActions<common::ActionsPath::WithCheckState>(std::move(actions)));
 	}
 	else
 	{
-		vector.emplace_back(common::BaseActions<false>(std::move(actions)));
+		vector.emplace_back(common::BaseActions<common::ActionsPath::Default>(std::move(actions)));
 	}
 }
 

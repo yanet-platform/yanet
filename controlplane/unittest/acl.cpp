@@ -501,7 +501,7 @@ add 300 deny ip from any to any
 
 		const auto& value = result.acl_values[total_table_value];
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
 			{
 				// Check that the regular path does not include the check-state action
 				EXPECT_THAT(actions.get_actions().size(), 1);
@@ -537,7 +537,7 @@ add 400 deny ip from any to any
 
 	const auto& value = result.acl_values[total_table_value];
 	std::visit([&](const auto& actions) {
-		if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+		if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
 		{
 			// Check that the regular path includes the actions after the first and second check-states
 			EXPECT_THAT(actions.get_actions().size(), 2);
@@ -574,7 +574,7 @@ add 500 deny ip from any to any
 
 	const auto& value = result.acl_values[total_table_value];
 	std::visit([&](const auto& actions) {
-		if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+		if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
 		{
 			// Check that the regular path includes actions before and after the check-state
 			EXPECT_THAT(actions.get_actions().size(), 3);
@@ -611,7 +611,7 @@ add deny ip from any to any
 
 		const auto& value = result.acl_values[total_table_value];
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
 			{
 				// Check that the regular path includes the allow action
 				EXPECT_THAT(actions.get_actions().size(), 1);
@@ -647,7 +647,7 @@ add deny ip from any to any
 
 		const auto& value = result.acl_values[total_table_value];
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
 			{
 				// Check that the regular path includes the allow action
 				EXPECT_THAT(actions.get_actions().size(), 1);
@@ -685,7 +685,7 @@ add allow ip from any to any keep-state
 
 		const auto& value = result.acl_values[total_table_value];
 		std::visit([&](const auto& actions) {
-			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<common::ActionsPath::WithCheckState>>)
 			{
 				// Check that the regular path includes the allow action
 				EXPECT_THAT(actions.get_actions().size(), 1);
