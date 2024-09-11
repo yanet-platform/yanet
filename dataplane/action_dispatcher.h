@@ -34,10 +34,10 @@ struct ActionDispatcher
 	 * Otherwise, it executes the regular path. The egress/ingress flow
 	 * is handled by the CheckStateAction execute method.
 	 */
-	template<bool HasCheckState>
-	static void execute_impl(const common::BaseActions<HasCheckState>& actions, const ActionDispatcherArgs& args)
+	template<common::ActionsPath Path>
+	static void execute_impl(const common::BaseActions<Path>& actions, const ActionDispatcherArgs& args)
 	{
-		if constexpr (HasCheckState)
+		if constexpr (Path == common::ActionsPath::WithCheckState)
 		{
 			auto worker = args.worker;
 			auto mbuf = args.mbuf;
