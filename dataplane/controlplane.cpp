@@ -217,7 +217,7 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 	{
 		for (const auto& coreId : request)
 		{
-			const cWorker* worker;
+			const cWorker* worker{};
 			if (auto it = dataPlane->workers.find(coreId); it != dataPlane->workers.end())
 			{
 				worker = it->second;
