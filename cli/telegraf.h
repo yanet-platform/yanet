@@ -702,4 +702,34 @@ void service()
 
 }
 
+void main_counters()
+{
+	common::sdp::DataPlaneInSharedMemory sdp_data;
+	OpenSharedMemoryDataplaneBuffers(sdp_data, true);
+
+	for (const auto& [coreId, worker_info] : sdp_data.workers)
+	{
+		std::vector<influxdb_format::value_t> values;
+		uint64_t* buffer = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
+		                                                       sdp_data.metadata_worker.start_counters);
+		for (const auto& [name, index] : sdp_data.metadata_worker.counter_positions)
+		{
+			values.emplace_back(name.data(), buffer[index]);
+		}
+		influxdb_format::print("worker", {{"coreId", coreId}}, values);
+	}
+
+	for (const auto& [coreId, worker_info] : sdp_data.workers_gc)
+	{
+		std::vector<influxdb_format::value_t> values;
+		uint64_t* buffer = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
+		                                                       sdp_data.metadata_worker.start_counters);
+		for (const auto& [name, index] : sdp_data.metadata_worker_gc.counter_positions)
+		{
+			values.emplace_back(name.data(), buffer[index]);
+		}
+		influxdb_format::print("worker_gc", {{"coreId", coreId}}, values);
+	}
+}
+
 }

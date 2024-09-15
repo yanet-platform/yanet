@@ -12,6 +12,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "common/sdpclient.h"
 #include "converter.h"
 
 template<typename type>
@@ -466,3 +467,12 @@ protected:
 	std::vector<std::vector<std::string>> table;
 	std::vector<uint32_t> columnLengths;
 };
+
+void OpenSharedMemoryDataplaneBuffers(common::sdp::DataPlaneInSharedMemory& sdp_data, bool open_workers_data)
+{
+	if (common::sdp::SdpClient::ReadSharedMemoryData(sdp_data, open_workers_data) != eResult::success)
+	{
+		YANET_LOG_ERROR("Error openning shared memory dataplane buffers\n");
+		std::exit(1);
+	}
+}

@@ -267,7 +267,12 @@ protected:
 		int ret = connect(clientSocket, (struct sockaddr*)&address, sizeof(address));
 		if (ret == -1)
 		{
-			throw std::string("connect(): ") + strerror(errno);
+			int error = errno;
+			YANET_LOG_ERROR("Error connect to socket %s, error: %d - %s\n",
+			                common::idp::socketPath,
+			                error,
+			                strerror(error));
+			throw std::string("connect(): ") + strerror(error);
 		}
 	}
 

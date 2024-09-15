@@ -5,6 +5,7 @@
 
 #include "acl.h"
 #include "balancer.h"
+#include "bus.h"
 #include "config.h"
 #include "convert.h"
 #include "develop.h"
@@ -127,12 +128,18 @@ std::vector<std::tuple<std::string,
                     {"telegraf balancer service", "", [](const auto& args) { call(telegraf::balancer::service, args); }},
                     {"telegraf other", "", [](const auto& args) { call(telegraf::other, args); }},
                     {"telegraf tun64", "", [](const auto& args) { call(telegraf::mappings, args); }},
+                    {"telegraf counters", "", [](const auto& args) { call(telegraf::main_counters, args); }},
+                    {"telegraf bus", "", [](const auto& args) { call(bus::bus_telegraf, args); }},
                     {},
                     {"reload", "", [](const auto& args) { call(config::reload, args); }},
                     {"version", "", [](const auto& args) { call(show::version, args); }},
                     {"latch update dataplane", "<latch name> <state>", [](const auto& args) { call(latch::dataplane_update, args); }},
                     {"counter", "[counter_name] <core_id>", [](const auto& args) { call(show::counter_by_name, args); }},
                     {"counters stat", "", [](const auto& args) { call(show::counters_stat, args); }},
+
+                    {"bus requests", "", [](const auto& args) { call(bus::bus_requests, args); }},
+                    {"bus errors", "", [](const auto& args) { call(bus::bus_errors, args); }},
+
                     {"latch update dataplane", "<latch name> <state>", [](const auto& args) { call(latch::dataplane_update, args); }},
                     {},
                     {"convert logical_module", "", [](const auto& args) { call(convert::logical_module, args); }}};
