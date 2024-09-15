@@ -55,6 +55,21 @@ void cBus::join()
 	}
 }
 
+uint64_t cBus::GetSizeForCounters()
+{
+	uint32_t count_errors = static_cast<uint32_t>(common::idp::errorType::size);
+	uint32_t count_requests = static_cast<uint32_t>(common::idp::requestType::size);
+	return (count_errors + 2 * count_requests) * sizeof(uint64_t);
+}
+
+void cBus::SetBufferForCounters(const common::sdp::DataPlaneInSharedMemory& sdp_data)
+{
+	auto [requests, errors, durations] = sdp_data.BuffersBus();
+	stats.requests = requests;
+	stats.errors = errors;
+	stats.durations = durations;
+}
+
 static bool recvAll(int clientSocket,
                     char* buffer,
                     uint64_t size)

@@ -12,6 +12,7 @@
 #include "common/idp.h"
 #include "common/result.h"
 
+#include "sdpserver.h"
 #include "type.h"
 
 class cBus
@@ -23,6 +24,9 @@ public:
 	void run();
 	void stop();
 	void join();
+
+	static uint64_t GetSizeForCounters();
+	void SetBufferForCounters(const common::sdp::DataPlaneInSharedMemory& sdp_data);
 
 protected:
 	void mainLoop();
@@ -67,13 +71,9 @@ protected:
 
 	struct sStats
 	{
-		sStats()
-		{
-			memset(this, 0, sizeof(*this));
-		}
-
-		uint64_t requests[(uint32_t)common::idp::requestType::size];
-		uint64_t errors[(uint32_t)common::idp::errorType::size];
+		uint64_t* requests; // common::idp::requestType::size
+		uint64_t* errors; // common::idp::errorType::size
+		uint64_t* durations; // common::idp::requestType::size
 	} stats;
 
 	cDataPlane* dataPlane;
