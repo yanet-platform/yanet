@@ -78,6 +78,11 @@ eResult tAutotest::init(const std::string& binaryPath,
 		return ret;
 	}
 
+	if (auto ret = common::sdp::SdpClient::ReadSharedMemoryData(sdp_data, true); ret != eResult::success)
+	{
+		return ret;
+	}
+
 	return eResult::success;
 }
 
@@ -1746,7 +1751,7 @@ bool tAutotest::step_memorize_counter_value(const YAML::Node& yamlStep)
 
 	uint32_t coreId = std::stoi(yamlStep.as<std::string>().substr(delim_pos + 1));
 
-	const auto response = dataPlane.get_counter_by_name({counter_name, coreId});
+	const auto response = common::sdp::SdpClient::GetCounterByName(sdp_data, counter_name, coreId);
 
 	if (response.empty())
 	{
@@ -1805,7 +1810,7 @@ bool tAutotest::step_diff_with_kept_counter_value(const YAML::Node& yamlStep)
 		return false;
 	}
 
-	const auto response = dataPlane.get_counter_by_name({counter_name, coreId});
+	const auto response = common::sdp::SdpClient::GetCounterByName(sdp_data, counter_name, coreId);
 
 	if (response.empty())
 	{

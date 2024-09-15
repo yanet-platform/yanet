@@ -3,6 +3,7 @@
 #include "common/counters.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
+#include "common/sdpclient.h"
 
 #include "helper.h"
 #include "influxdb_format.h"
@@ -100,7 +101,7 @@ void unsafe()
 	const auto [responseWorkers, responseWorkerGCs, responseSlowWorkerHashtableGC, responseFragmentation, responseFWState, responseTun64, response_nat64stateful, responseControlplane] = controlplane.telegraf_unsafe();
 	const auto& [responseSlowWorker, hashtable_gc] = responseSlowWorkerHashtableGC;
 
-	const auto static_counters = dataplane.getCounters(vector_range(0, (tCounterId)common::globalBase::static_counter_type::size));
+	const auto static_counters = common::sdp::SdpClient::GetCounters(vector_range(0, (tCounterId)common::globalBase::static_counter_type::size));
 	const auto neighbor_stats = dataplane.neighbor_stats();
 	const auto memory_stats = dataplane.memory_manager_stats();
 	const auto& [memory_groups, memory_objects] = memory_stats;

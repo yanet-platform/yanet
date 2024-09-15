@@ -88,7 +88,7 @@ protected:
 
 	bool flagFirst;
 
-	std::map<tCoreId, common::idp::getOtherStats::worker> prevWorkers;
+	std::map<tCoreId, std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1>> prevWorkers;
 
 	std::map<std::tuple<bool, uint32_t, common::ip_address_t>, std::array<common::uint64, 2>> route_tunnel_peer_counters; ///< @todo: gc
 	std::map<route::tunnel_counter_key_t, std::array<uint64_t, 2>> dregress_traffic_counters_prev;

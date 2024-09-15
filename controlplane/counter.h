@@ -9,6 +9,7 @@
 #include "common/icp.h"
 #include "common/idataplane.h"
 #include "common/refarray.h"
+#include "common/sdpclient.h"
 
 class counter_manager_t
 {
@@ -18,6 +19,11 @@ public:
 	counter_manager_t() :
 	        counter_shifts(YANET_CONFIG_COUNTERS_SIZE, 0)
 	{
+	}
+
+	void init(const common::sdp::DataPlaneInSharedMemory* sdp_data)
+	{
+		this->sdp_data = sdp_data;
 	}
 
 	std::tuple<uint64_t, uint64_t> stats() const
@@ -65,7 +71,7 @@ protected:
 	{
 		/// @todo: check counter_ids are reserved
 
-		const auto getCountersResponse = counter_dataplane.getCounters(counter_ids);
+		const auto getCountersResponse = common::sdp::SdpClient::GetCounters(*sdp_data, counter_ids);
 
 		std::lock_guard<std::mutex> guard(counter_mutex);
 		for (unsigned int i = 0;
@@ -82,7 +88,7 @@ protected:
 	{
 		std::vector<uint64_t> result(counter_ids.size());
 
-		const auto getCountersResponse = counter_dataplane.getCounters(counter_ids);
+		const auto getCountersResponse = common::sdp::SdpClient::GetCounters(*sdp_data, counter_ids);
 
 		std::lock_guard<std::mutex> guard(counter_mutex);
 		for (unsigned int i = 0;
@@ -108,9 +114,9 @@ protected:
 	static constexpr uint32_t max_buffer_size = 64;
 
 	mutable std::mutex counter_mutex;
-	interface::dataPlane counter_dataplane;
 	std::vector<uint64_t> counter_shifts;
 	SegmentAllocator<counter_index_begin, YANET_CONFIG_COUNTERS_SIZE, 64 * 64, max_buffer_size, 0> allocator;
+	const common::sdp::DataPlaneInSharedMemory* sdp_data;
 };
 
 template<typename key_T,
