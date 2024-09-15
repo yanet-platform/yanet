@@ -153,21 +153,6 @@ void worker_gc_t::limits(common::idp::limits::response& response) const
 	globalbase_atomic->updater.fw6_state.limits(response, "acl.state.v6.ht");
 }
 
-void worker_gc_t::fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table)
-{
-	table["broken_packets"] = &stats->broken_packets;
-	table["drop_packets"] = &stats->drop_packets;
-	table["ring_to_slowworker_packets"] = &stats->ring_to_slowworker_packets;
-	table["ring_to_slowworker_drops"] = &stats->ring_to_slowworker_drops;
-	table["fwsync_multicast_egress_packets"] = &stats->fwsync_multicast_egress_packets;
-	table["fwsync_multicast_egress_drops"] = &stats->fwsync_multicast_egress_drops;
-	table["fwsync_unicast_egress_packets"] = &stats->fwsync_unicast_egress_packets;
-	table["fwsync_unicast_egress_drops"] = &stats->fwsync_unicast_egress_drops;
-	table["drop_samples"] = &stats->drop_samples;
-	table["balancer_state_insert_failed"] = &stats->balancer_state_insert_failed;
-	table["balancer_state_insert_done"] = &stats->balancer_state_insert_done;
-}
-
 void worker_gc_t::FillMetadataWorkerCounters(common::sdp::MetadataWorkerGc& metadata)
 {
 	metadata.size = 0;

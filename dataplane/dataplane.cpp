@@ -994,7 +994,6 @@ eResult cDataPlane::initWorkers()
 			return result;
 		}
 
-		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[coreId]);
 		workers[coreId] = worker;
 		workers_vector.emplace_back(worker);
 
@@ -1095,7 +1094,6 @@ eResult cDataPlane::initWorkers()
 			return result;
 		}
 
-		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[core_id]);
 		worker_gcs[core_id] = worker;
 		socket_worker_gcs[socket_id] = worker;
 	}
@@ -1140,8 +1138,6 @@ eResult cDataPlane::InitSlowWorker(const tCoreId core, const CPlaneWorkerConfig&
 	{
 		return result;
 	}
-
-	worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[core]);
 
 	workers_vector.emplace_back(worker);
 
@@ -1236,24 +1232,6 @@ eResult cDataPlane::InitSlowWorkers()
 	}
 
 	return eResult::success;
-}
-
-std::optional<uint64_t> cDataPlane::getCounterValueByName(const std::string& counter_name, uint32_t coreId)
-{
-	if (coreId_to_stats_tables.count(coreId) == 0)
-	{
-		return std::optional<uint64_t>();
-	}
-
-	const auto& specific_core_table = coreId_to_stats_tables[coreId];
-
-	if (specific_core_table.count(counter_name) == 0)
-	{
-		return std::optional<uint64_t>();
-	}
-
-	uint64_t counter_value = *(specific_core_table.at(counter_name));
-	return std::optional<uint64_t>(counter_value);
 }
 
 eResult cDataPlane::InitTxQueues()
