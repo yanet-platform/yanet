@@ -405,6 +405,8 @@ void cBus::clientThread(int clientSocket)
 
 		std::chrono::duration<double> duration = std::chrono::system_clock::now() - startTime;
 
+		// The duration time is measured in milliseconds
+		stats.durations[(uint32_t)type] += static_cast<uint64_t>(1000 * duration.count());
 		YANET_LOG_DEBUG("request type %d processed - %.3f sec\n",
 		                (int)type,
 		                duration.count());
