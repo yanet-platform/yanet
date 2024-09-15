@@ -6,6 +6,7 @@
 
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
+#include "common/sdpclient.h"
 #include "common/tsc_deltas.h"
 #include "common/version.h"
 
@@ -800,9 +801,7 @@ inline void version()
 inline void counter_by_name(std::string counter_name,
                             const std::optional<tCoreId>& core_id)
 {
-	interface::dataPlane dataplane;
-
-	const auto response = dataplane.get_counter_by_name({counter_name, core_id});
+	const auto response = common::sdp::SdpClient::GetCounterByName(counter_name, core_id);
 
 	if (response.empty())
 	{

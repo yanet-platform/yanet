@@ -16,6 +16,7 @@
 #include "common/idataplane.h"
 #include "common/idp.h"
 #include "common/result.h"
+#include "common/sdpclient.h"
 #include "libprotobuf/controlplane.pb.h"
 
 #include "balancer.h"
@@ -99,6 +100,8 @@ public:
 			function(socketId);
 		}
 	}
+
+	const common::sdp::DataPlaneInSharedMemory* getSdpData() const;
 
 protected: /** commands */
 	common::icp::getPhysicalPorts::response getPhysicalPorts() const;
@@ -197,6 +200,8 @@ protected:
 private:
 	/// used only in loadConfig()
 	controlplane::base_t base;
+	common::sdp::DataPlaneInSharedMemory sdp_data;
 
 	void register_service(google::protobuf::Service* service);
+	std::vector<uint64_t> getAclCounters();
 };

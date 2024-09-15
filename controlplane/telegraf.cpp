@@ -305,14 +305,20 @@ common::icp::telegraf_other::response telegraf_t::telegraf_other()
 {
 	auto& dataPlane = dataPlaneOther;
 
-	//
+	std::map<tCoreId, std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1>> currWorkers;
+	const common::sdp::DataPlaneInSharedMemory* sdp_data = controlPlane->getSdpData();
+	for (const auto& [coreId, worker_info] : sdp_data->workers)
+	{
+		std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1> bursts;
+		uint64_t* worker_bursts =
+		        common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer, sdp_data->metadata_worker.start_bursts);
+		memcpy(&bursts[0], worker_bursts, sizeof(uint64_t) * (CONFIG_YADECAP_MBUFS_BURST_SIZE + 1));
+		currWorkers[coreId] = bursts;
+	}
 
-	const auto getOtherStatsResponse = dataPlane.getOtherStats();
 	const auto portsStatsExtended = dataPlane.get_ports_stats_extended();
 
 	//
-
-	const auto& [currWorkers] = getOtherStatsResponse;
 
 	common::icp::telegraf_other::response response;
 	auto& [response_flagFirst, response_workers, response_ports] = response;
@@ -323,8 +329,7 @@ common::icp::telegraf_other::response telegraf_t::telegraf_other()
 	{
 		for (const auto& [coreId, workerStats] : currWorkers)
 		{
-			response_workers[coreId] = {calcUsage(std::get<0>(workerStats),
-			                                      std::get<0>(prevWorkers[coreId]))};
+			response_workers[coreId] = {calcUsage(workerStats, prevWorkers[coreId])};
 		}
 	}
 	else
