@@ -1,11 +1,14 @@
 dependencies = []
+dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('threads')
 dependencies += dependency('gtest')
 dependencies += dependency('gtest_main')
 
 common_sources = files()
 
-sources = files('static_vector.cpp',
+sources = files('unittest.cpp',
+                'static_vector.cpp',
+                'shared_memory.cpp',
                 )
 
 arch = 'corei7'

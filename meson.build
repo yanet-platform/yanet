@@ -37,6 +37,8 @@ add_global_arguments(compiler_args, language: 'cpp')
 
 add_global_arguments('-DGOOGLE_PROTOBUF_NO_RTTI', language: 'cpp')
 
+add_project_link_arguments('-lnuma', language : 'cpp')
+
 add_global_arguments('-Wno-unused-parameter', language: 'cpp')
 
 if target_option.contains('librib')
