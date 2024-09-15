@@ -164,6 +164,12 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		socket_cplane_mempools.emplace(socket, pool);
 	}
 
+	result = initSharedMemory();
+	if (result != eResult::success)
+	{
+		return result;
+	}
+
 	result = initWorkers();
 	if (result != eResult::success)
 	{
@@ -246,6 +252,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	{
 		return result;
 	}
+	bus.SetBufferForCounters(sdp_data);
 
 	result = neighbor.init(this);
 	if (result != eResult::success)
@@ -853,6 +860,8 @@ eResult cDataPlane::initWorkers()
 			return eResult::errorAllocatingMemory;
 		}
 
+		worker->SetBufferForCounters(sdp_data.workers[coreId].buffer, sdp_data.metadata_worker);
+
 		dataplane::base::permanently basePermanently;
 		{
 			auto iter = globalBaseAtomics.find(socket_id);
@@ -1025,6 +1034,8 @@ eResult cDataPlane::initWorkers()
 			return eResult::errorAllocatingMemory;
 		}
 
+		worker->SetBufferForCounters(sdp_data.workers_gc[core_id].buffer, sdp_data.metadata_worker_gc);
+
 		dataplane::base::permanently basePermanently;
 		{
 			auto iter = globalBaseAtomics.find(socket_id);
@@ -1105,6 +1116,8 @@ eResult cDataPlane::InitSlowWorker(const tCoreId core, const CPlaneWorkerConfig&
 	{
 		return eResult::errorAllocatingMemory;
 	}
+
+	worker->SetBufferForCounters(sdp_data.workers[core].buffer, sdp_data.metadata_worker);
 
 	dataplane::base::permanently basePermanently;
 	basePermanently.globalBaseAtomic = globalBaseAtomics[socket_id];
@@ -1492,6 +1505,31 @@ void cDataPlane::run_on_worker_gc(const tSocketId socket_id,
                                   const std::function<bool()>& callback)
 {
 	socket_worker_gcs.find(socket_id)->second->run_on_this_thread(callback);
+}
+
+eResult cDataPlane::initSharedMemory()
+{
+	std::vector<tCoreId> workers_id;
+	std::vector<tCoreId> workers_gc_id;
+
+	// workers
+	for (const auto& worker : config.workers)
+	{
+		workers_id.push_back(worker.first);
+	}
+	// slow worker
+	workers_id.push_back(config.controlPlaneCoreId);
+	// workers gc
+	for (const auto& coreId : config.workerGCs)
+	{
+		workers_gc_id.push_back(coreId);
+	}
+
+	cWorker::FillMetadataWorkerCounters(sdp_data.metadata_worker);
+	worker_gc_t::FillMetadataWorkerCounters(sdp_data.metadata_worker_gc);
+	sdp_data.size_bus_section = cBus::GetSizeForCounters();
+
+	return common::sdp::SdrSever::PrepareSharedMemoryData(sdp_data, workers_id, workers_gc_id, config.useHugeMem);
 }
 
 eResult cDataPlane::allocateSharedMemory()

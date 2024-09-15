@@ -24,7 +24,6 @@ worker_gc_t::worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, 
         gc_step{static_cast<uint32_t>(cfg.gc_step)},
         sample_gc_step{static_cast<uint32_t>(cfg.sample_gc_step)}
 {
-	memset(counters, 0, sizeof(counters));
 }
 
 worker_gc_t::~worker_gc_t()
@@ -156,17 +155,50 @@ void worker_gc_t::limits(common::idp::limits::response& response) const
 
 void worker_gc_t::fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table)
 {
-	table["broken_packets"] = &stats.broken_packets;
-	table["drop_packets"] = &stats.drop_packets;
-	table["ring_to_slowworker_packets"] = &stats.ring_to_slowworker_packets;
-	table["ring_to_slowworker_drops"] = &stats.ring_to_slowworker_drops;
-	table["fwsync_multicast_egress_packets"] = &stats.fwsync_multicast_egress_packets;
-	table["fwsync_multicast_egress_drops"] = &stats.fwsync_multicast_egress_drops;
-	table["fwsync_unicast_egress_packets"] = &stats.fwsync_unicast_egress_packets;
-	table["fwsync_unicast_egress_drops"] = &stats.fwsync_unicast_egress_drops;
-	table["drop_samples"] = &stats.drop_samples;
-	table["balancer_state_insert_failed"] = &stats.balancer_state_insert_failed;
-	table["balancer_state_insert_done"] = &stats.balancer_state_insert_done;
+	table["broken_packets"] = &stats->broken_packets;
+	table["drop_packets"] = &stats->drop_packets;
+	table["ring_to_slowworker_packets"] = &stats->ring_to_slowworker_packets;
+	table["ring_to_slowworker_drops"] = &stats->ring_to_slowworker_drops;
+	table["fwsync_multicast_egress_packets"] = &stats->fwsync_multicast_egress_packets;
+	table["fwsync_multicast_egress_drops"] = &stats->fwsync_multicast_egress_drops;
+	table["fwsync_unicast_egress_packets"] = &stats->fwsync_unicast_egress_packets;
+	table["fwsync_unicast_egress_drops"] = &stats->fwsync_unicast_egress_drops;
+	table["drop_samples"] = &stats->drop_samples;
+	table["balancer_state_insert_failed"] = &stats->balancer_state_insert_failed;
+	table["balancer_state_insert_done"] = &stats->balancer_state_insert_done;
+}
+
+void worker_gc_t::FillMetadataWorkerCounters(common::sdp::MetadataWorkerGc& metadata)
+{
+	metadata.size = 0;
+	metadata.start_counters = common::sdp::SdrSever::GetStartData(YANET_CONFIG_COUNTERS_SIZE * sizeof(uint64_t), metadata.size);
+	metadata.start_stats = common::sdp::SdrSever::GetStartData(sizeof(common::worker_gc::stats_t), metadata.size);
+
+	// stats
+	static_assert(std::is_trivially_destructible<common::worker_gc::stats_t>::value, "invalid struct destructible");
+	std::map<std::string, uint64_t> counters_stats;
+	counters_stats["broken_packets"] = offsetof(common::worker_gc::stats_t, broken_packets);
+	counters_stats["drop_packets"] = offsetof(common::worker_gc::stats_t, drop_packets);
+	counters_stats["ring_to_slowworker_packets"] = offsetof(common::worker_gc::stats_t, ring_to_slowworker_packets);
+	counters_stats["ring_to_slowworker_drops"] = offsetof(common::worker_gc::stats_t, ring_to_slowworker_drops);
+	counters_stats["fwsync_multicast_egress_packets"] = offsetof(common::worker_gc::stats_t, fwsync_multicast_egress_packets);
+	counters_stats["fwsync_multicast_egress_drops"] = offsetof(common::worker_gc::stats_t, fwsync_multicast_egress_drops);
+	counters_stats["fwsync_unicast_egress_packets"] = offsetof(common::worker_gc::stats_t, fwsync_unicast_egress_packets);
+	counters_stats["fwsync_unicast_egress_drops"] = offsetof(common::worker_gc::stats_t, fwsync_unicast_egress_drops);
+	counters_stats["drop_samples"] = offsetof(common::worker_gc::stats_t, drop_samples);
+	counters_stats["balancer_state_insert_failed"] = offsetof(common::worker_gc::stats_t, balancer_state_insert_failed);
+	counters_stats["balancer_state_insert_done"] = offsetof(common::worker_gc::stats_t, balancer_state_insert_done);
+
+	for (const auto& iter : counters_stats)
+	{
+		metadata.counter_positions[iter.first] = (metadata.start_stats + iter.second) / sizeof(uint64_t);
+	}
+}
+
+void worker_gc_t::SetBufferForCounters(void* buffer, const common::sdp::MetadataWorkerGc& metadata)
+{
+	counters = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
+	stats = common::sdp::ShiftBuffer<common::worker_gc::stats_t*>(buffer, metadata.start_stats);
 }
 
 YANET_INLINE_NEVER void worker_gc_t::thread()
@@ -452,7 +484,7 @@ void worker_gc_t::handle_balancer_gc()
 
 					if (saved)
 					{
-						stats.balancer_state_insert_done++;
+						stats->balancer_state_insert_done++;
 						const auto& real_from_base = base.globalBase->balancer_reals[value.real_unordered_id];
 						if (updated)
 						{
@@ -470,7 +502,7 @@ void worker_gc_t::handle_balancer_gc()
 					}
 					else
 					{
-						stats.balancer_state_insert_failed++;
+						stats->balancer_state_insert_failed++;
 					}
 				}
 
@@ -812,7 +844,7 @@ void worker_gc_t::handle_acl_sync()
 				rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
 				if (mbuf_clone == nullptr)
 				{
-					stats.fwsync_multicast_egress_drops++;
+					stats->fwsync_multicast_egress_drops++;
 					continue;
 				}
 
@@ -824,7 +856,7 @@ void worker_gc_t::handle_acl_sync()
 				mbuf_clone->data_len = mbuf->data_len;
 				mbuf_clone->pkt_len = mbuf->pkt_len;
 
-				stats.fwsync_multicast_egress_packets++;
+				stats->fwsync_multicast_egress_packets++;
 				utils::SetFlow(mbuf_clone, flow);
 				SendToSlowWorker(mbuf_clone);
 			}
@@ -841,7 +873,7 @@ void worker_gc_t::handle_acl_sync()
 				rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
 				if (mbuf_clone == nullptr)
 				{
-					stats.fwsync_unicast_egress_drops++;
+					stats->fwsync_unicast_egress_drops++;
 				}
 				else
 				{
@@ -853,7 +885,7 @@ void worker_gc_t::handle_acl_sync()
 					mbuf_clone->data_len = mbuf->data_len;
 					mbuf_clone->pkt_len = mbuf->pkt_len;
 
-					stats.fwsync_unicast_egress_packets++;
+					stats->fwsync_unicast_egress_packets++;
 					utils::SetFlow(mbuf_clone, fw_state_config.ingress_flow);
 					SendToSlowWorker(mbuf_clone);
 				}
@@ -969,12 +1001,12 @@ void worker_gc_t::SendToSlowWorker(rte_mbuf* mbuf)
 {
 	if (toSlowWorker_->EnqueueSP(mbuf))
 	{
-		stats.ring_to_slowworker_drops++;
+		stats->ring_to_slowworker_drops++;
 		rte_pktmbuf_free(mbuf);
 	}
 	else
 	{
-		stats.ring_to_slowworker_packets++;
+		stats->ring_to_slowworker_packets++;
 	}
 }
 
@@ -996,7 +1028,7 @@ void worker_gc_t::handle_samples()
 			}
 			else
 			{
-				stats.drop_samples++;
+				stats->drop_samples++;
 			}
 		});
 		sampler->visit4([this](auto& sample) {
@@ -1006,7 +1038,7 @@ void worker_gc_t::handle_samples()
 			}
 			else
 			{
-				stats.drop_samples++;
+				stats->drop_samples++;
 			}
 		});
 		sampler->clear();
@@ -1015,7 +1047,7 @@ void worker_gc_t::handle_samples()
 	if (samples_current_base_id != current_base_id)
 	{
 		// config changed, aclId may be invalid now
-		stats.drop_samples += samples.size();
+		stats->drop_samples += samples.size();
 		samples.clear();
 		samples_current_base_id = current_base_id;
 	}

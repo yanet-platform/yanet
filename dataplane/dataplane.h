@@ -26,6 +26,7 @@
 #include "memory_manager.h"
 #include "neighbor.h"
 #include "report.h"
+#include "sdpserver.h"
 #include "slow_worker.h"
 #include "type.h"
 
@@ -152,6 +153,7 @@ protected:
 	eResult initKniQueues();
 	eResult InitTxQueues();
 	eResult InitRxQueues();
+	eResult initSharedMemory();
 	void init_worker_base();
 
 	eResult allocateSharedMemory();
@@ -241,6 +243,8 @@ protected:
 	std::vector<std::thread> threads;
 
 	mutable std::mutex dpdk_mutex;
+
+	common::sdp::DataPlaneInSharedMemory sdp_data;
 
 public: ///< modules
 	cReport report;

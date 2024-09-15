@@ -16,6 +16,7 @@
 #include "common.h"
 #include "globalbase.h"
 #include "samples.h"
+#include "sdpserver.h"
 #include "sharedmemory.h"
 
 namespace dataplane
@@ -70,6 +71,8 @@ public:
 	void start();
 
 	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
+	static void FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata);
+	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorker& metadata);
 
 	const dataplane::base::generation& current_base() const { return bases[localBaseId & 1]; }
 
@@ -340,16 +343,16 @@ public:
 	rte_ring* ring_lowPriority;
 	dataplane::perf::tsc_deltas* tsc_deltas;
 	rte_ring* ring_toFreePackets;
-	common::worker::stats::common& Stats() { return stats; }
+	common::worker::stats::common& Stats() { return *stats; }
 
 protected:
 	rte_ring* ring_log;
 
-	common::worker::stats::common stats;
-	common::worker::stats::port statsPorts[CONFIG_YADECAP_PORTS_SIZE];
-	uint64_t bursts[CONFIG_YADECAP_MBUFS_BURST_SIZE + 1];
-	uint64_t counters[YANET_CONFIG_COUNTERS_SIZE];
-	uint64_t aclCounters[YANET_CONFIG_ACL_COUNTERS_SIZE];
+	common::worker::stats::common* stats;
+	common::worker::stats::port* statsPorts; // CONFIG_YADECAP_PORTS_SIZE
+	uint64_t* bursts; // CONFIG_YADECAP_MBUFS_BURST_SIZE + 1
+	uint64_t* counters; // YANET_CONFIG_COUNTERS_SIZE
+	uint64_t* aclCounters; // YANET_CONFIG_ACL_COUNTERS_SIZE
 
 	// will decrease with each new packet sent to slow worker, replenishes each N mseconds
 	int32_t packetsToSWNPRemainder;

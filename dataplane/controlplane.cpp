@@ -186,7 +186,7 @@ common::idp::getOtherStats::response cControlPlane::getOtherStats()
 		for (const cWorker* worker : dataPlane->workers_vector)
 		{
 			std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1> bursts;
-			memcpy(&bursts[0], worker->bursts, sizeof(worker->bursts));
+			memcpy(&bursts[0], worker->bursts, (CONFIG_YADECAP_MBUFS_BURST_SIZE + 1) * sizeof(uint64_t));
 
 			response_workers[worker->coreId] = {bursts};
 		}
@@ -209,7 +209,7 @@ common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common
 		}
 
 		response[coreId] = {worker->iteration,
-		                    worker->stats,
+		                    *worker->stats,
 		                    portsStats};
 	};
 
@@ -325,7 +325,7 @@ common::idp::get_worker_gc_stats::response cControlPlane::get_worker_gc_stats()
 	for (const auto& [core_id, worker] : dataPlane->worker_gcs)
 	{
 		response[core_id] = {worker->iteration,
-		                     worker->stats};
+		                     *worker->stats};
 	}
 
 	return response;
