@@ -70,7 +70,6 @@ public:
 	eResult init(const tCoreId& coreId, const dataplane::base::permanently& basePermanently, const dataplane::base::generation& base);
 	void start();
 
-	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
 	static void FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata);
 	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorker& metadata);
 

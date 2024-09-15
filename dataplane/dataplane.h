@@ -159,7 +159,6 @@ protected:
 	eResult allocateSharedMemory();
 	eResult splitSharedMemoryPerWorkers();
 
-	std::optional<uint64_t> getCounterValueByName(const std::string& counter_name, uint32_t coreId);
 	common::idp::get_shm_info::response getShmInfo();
 	common::idp::get_shm_tsc_info::response getShmTscInfo();
 
@@ -171,7 +170,6 @@ protected:
 	friend class cWorker;
 	friend class cReport;
 	friend class cControlPlane;
-	friend class cBus;
 	friend class dataplane::globalBase::generation;
 	friend class worker_gc_t;
 
@@ -225,9 +223,6 @@ protected:
 	std::map<std::string, uint64_t> tag_to_id;
 
 	common::idp::get_shm_tsc_info::response tscs_meta;
-
-	// array instead of the table - how many coreIds can be there?
-	std::unordered_map<uint32_t, std::unordered_map<std::string, uint64_t*>> coreId_to_stats_tables;
 
 	std::map<tSocketId, std::tuple<key_t, void*>> shm_by_socket_id;
 

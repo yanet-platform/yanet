@@ -269,14 +269,6 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::clearFWState, request);
 		}
-		else if (type == common::idp::requestType::getCounters)
-		{
-			response = callWithResponse(&cControlPlane::getCounters, request);
-		}
-		else if (type == common::idp::requestType::getOtherStats)
-		{
-			response = callWithResponse(&cControlPlane::getOtherStats, request);
-		}
 		else if (type == common::idp::requestType::getConfig)
 		{
 			response = callWithResponse(&cControlPlane::getConfig, request);
@@ -300,10 +292,6 @@ void cBus::clientThread(int clientSocket)
 		else if (type == common::idp::requestType::limits)
 		{
 			response = callWithResponse(&cControlPlane::limits, request);
-		}
-		else if (type == common::idp::requestType::getAclCounters)
-		{
-			response = callWithResponse(&cControlPlane::getAclCounters, request);
 		}
 		else if (type == common::idp::requestType::balancer_connection)
 		{
@@ -336,10 +324,6 @@ void cBus::clientThread(int clientSocket)
 		else if (type == common::idp::requestType::version)
 		{
 			response = callWithResponse(&cControlPlane::version, request);
-		}
-		else if (type == common::idp::requestType::get_counter_by_name)
-		{
-			response = callWithResponse(&cControlPlane::get_counter_by_name, request);
 		}
 		else if (type == common::idp::requestType::nat64stateful_state)
 		{

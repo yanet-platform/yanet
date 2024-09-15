@@ -176,25 +176,6 @@ common::idp::getGlobalBase::response cControlPlane::getGlobalBase(const common::
 	return response;
 }
 
-common::idp::getOtherStats::response cControlPlane::getOtherStats()
-{
-	common::idp::getOtherStats::response response;
-	auto& [response_workers] = response;
-
-	/// workers
-	{
-		for (const cWorker* worker : dataPlane->workers_vector)
-		{
-			std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1> bursts;
-			memcpy(&bursts[0], worker->bursts, (CONFIG_YADECAP_MBUFS_BURST_SIZE + 1) * sizeof(uint64_t));
-
-			response_workers[worker->coreId] = {bursts};
-		}
-	}
-
-	return response;
-}
-
 common::idp::getWorkerStats::response cControlPlane::getWorkerStats(const common::idp::getWorkerStats::request& request)
 {
 	/// unsafe
@@ -572,24 +553,6 @@ eResult cControlPlane::clearFWState()
 	return common::result_e::success;
 }
 
-common::idp::getAclCounters::response cControlPlane::getAclCounters()
-{
-	std::lock_guard<std::mutex> guard(mutex);
-
-	common::idp::getAclCounters::response response;
-
-	response.resize(YANET_CONFIG_ACL_COUNTERS_SIZE);
-	for (const cWorker* worker : dataPlane->workers_vector)
-	{
-		for (size_t i = 0; i < YANET_CONFIG_ACL_COUNTERS_SIZE; i++)
-		{
-			response[i] += worker->aclCounters[i];
-		}
-	}
-
-	return response;
-}
-
 common::idp::getPortStatsEx::response cControlPlane::getPortStatsEx()
 {
 	common::idp::getPortStatsEx::response response;
@@ -620,33 +583,6 @@ common::idp::getPortStatsEx::response cControlPlane::getPortStatsEx()
 		std::get<2>(countersOut) = portStats["tx_port_multicast_packets"];
 		std::get<3>(countersOut) = portStats["tx_port_broadcast_packets"];
 		std::get<5>(countersOut) = portStats["tx_errors"];
-	}
-
-	return response;
-}
-
-common::idp::getCounters::response cControlPlane::getCounters(const common::idp::getCounters::request& request)
-{
-	common::idp::getCounters::response response;
-	response.resize(request.size());
-
-	for (size_t i = 0;
-	     i < request.size();
-	     i++)
-	{
-		const auto& counter_id = request[i];
-
-		if (counter_id >= YANET_CONFIG_COUNTERS_SIZE)
-		{
-			std::lock_guard<std::mutex> guard(mutex);
-			++errors["getCounters: invalid counterId"];
-			continue;
-		}
-
-		response[i] = accumulateWorkerStats(
-		        [counter_id](cWorker* worker) {
-			        return worker->counters[counter_id];
-		        });
 	}
 
 	return response;
@@ -1090,47 +1026,6 @@ common::idp::version::response cControlPlane::version()
 	        version_revision(),
 	        version_hash(),
 	        version_custom()};
-}
-
-common::idp::get_counter_by_name::response cControlPlane::get_counter_by_name(const common::idp::get_counter_by_name::request& request)
-{
-	common::idp::get_counter_by_name::response response;
-
-	const auto& [counter_name, optional_core_id] = request;
-
-	if (optional_core_id.has_value())
-	{
-		std::optional<uint64_t> counter_val = dataPlane->getCounterValueByName(counter_name, optional_core_id.value());
-		if (counter_val.has_value())
-		{
-			response[optional_core_id.value()] = counter_val.value();
-		}
-
-		// if counter with provided name does not exist, empty map will be returned, and its emptiness should be checked on another end
-		return response;
-	}
-
-	// core_id was not specified, return counter for each core_id
-	for (const cWorker* worker : dataPlane->workers_vector)
-	{
-		std::optional<uint64_t> counter_val = dataPlane->getCounterValueByName(counter_name, worker->coreId);
-		if (counter_val.has_value())
-		{
-			response[worker->coreId] = counter_val.value();
-		}
-	}
-
-	for (const auto& [core_id, worker_gc] : dataPlane->worker_gcs)
-	{
-		(void)worker_gc;
-		std::optional<uint64_t> counter_val = dataPlane->getCounterValueByName(counter_name, core_id);
-		if (counter_val.has_value())
-		{
-			response[core_id] = counter_val.value();
-		}
-	}
-
-	return response;
 }
 
 common::idp::get_shm_info::response cControlPlane::get_shm_info()
