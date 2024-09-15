@@ -8,7 +8,8 @@ dependencies += dependency('gtest_main')
 
 sources = files('unittest.cpp',
                 'ip_address.cpp',
-                'hashtable.cpp')
+                'hashtable.cpp',
+                'sdp.cpp')
 
 arch = 'corei7'
 cpp_args_append = ['-march=' + arch]
