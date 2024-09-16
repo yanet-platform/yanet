@@ -22,13 +22,13 @@ public:
 	        dump_tag(std::move(dump_tag))
 	{}
 
-	inline bool operator==(const dump_t& o) const
+	bool operator==(const dump_t& o) const
 	{
 		return std::tie(dump_id, dump_tag) ==
 		       std::tie(o.dump_id, o.dump_tag);
 	}
 
-	inline bool operator!=(const dump_t& o) const
+	bool operator!=(const dump_t& o) const
 	{
 		return !operator==(o);
 	}
