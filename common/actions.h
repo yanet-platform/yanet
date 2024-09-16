@@ -1,11 +1,8 @@
 #pragma once
 
-#include <utility>
-#include <variant>
-
 #include "common/type.h"
-#include "config.release.h"
-#include "stream.h"
+#include "common/utils.h"
+#include "common/variant_trait_map.h"
 
 namespace common
 {
@@ -318,39 +315,175 @@ namespace acl
  */
 struct Actions
 {
+	template<typename T>
+	struct has_max_count_one
+	{
+		static constexpr bool value = (T::MAX_COUNT == 1);
+	};
+
+	/**
+	 * Trait to check if we should store the first occurrence
+	 *
+	 * Define first-matters actions here.
+	 */
+	template<typename T>
+	struct is_first_matters
+	{
+		static constexpr bool value = std::is_same_v<T, CheckStateAction>;
+	};
+
+	/**
+	 * Trait to check if we should store the last occurrence
+	 *
+	 * Define last-matters actions here.
+	 */
+	template<typename T>
+	struct is_last_matters
+	{
+		static constexpr bool value = std::is_same_v<T, StateTimeoutAction>;
+	};
+
 	std::vector<Action> path{};
 	std::array<size_t, std::variant_size_v<RawAction>> action_counts = {0};
-	std::optional<size_t> check_state_index{};
-	std::optional<size_t> state_timeout_index{};
+	// Using VariantTraitMap to store indices of actions with MAX_COUNT=1.
+	using OptionalIndexMap = utils::VariantTraitMap<RawAction, has_max_count_one, std::optional<std::ptrdiff_t>>;
+	OptionalIndexMap indices{};
 
 	Actions() = default;
-	Actions(const Action& action) { add(action); };
+	Actions(const Action& action) { add(action); }
 
+	/**
+	 * @brief Adds an action to the current path while adhering to the following:
+	 *
+	 * Either:
+	 * - Only the first occurrence of an action is kept.
+	 * - Only the last occurrence of an action is kept (previous occurrences are removed).
+	 * - Actions are added as long as they don't exceed their defined `MAX_COUNT`.
+	 *
+	 * Adding a new action type is as simple as placing the action type in the corresponding group.
+	 */
 	void add(const Action& action)
 	{
-		size_t index = action.raw_action.index();
+		size_t variant_index = action.raw_action.index();
 
-		if (std::holds_alternative<FlowAction>(action.raw_action))
+		// Extract the type info at the beginning.
+		std::visit([&](auto&& actual_action) {
+			using T = std::decay_t<decltype(actual_action)>;
+
+			if constexpr (has_max_count_one<T>::value)
+			{
+				handle_unique_action<T>(action, variant_index);
+			}
+			else if (action_counts[variant_index] < T::MAX_COUNT)
+			{
+				add_to_path(action, variant_index);
+			}
+		},
+		           action.raw_action);
+	}
+
+private:
+	// Add the action to the path and increment its count
+	void add_to_path(const Action& action, size_t variant_index)
+	{
+		path.push_back(action);
+		action_counts[variant_index]++;
+	}
+
+	// We're interested in storing only the first or last occurrence
+	template<typename T>
+	void handle_unique_action(const Action& action, size_t variant_index)
+	{
+		if constexpr (is_first_matters<T>::value)
 		{
-			assert(action_counts[index] == 0 && "Incorrectly requested to add more than one FlowAction");
+			handle_first_matters_action<T>(action, variant_index);
+		}
+		else if constexpr (is_last_matters<T>::value)
+		{
+			handle_last_matters_action<T>(action, variant_index);
+		}
+		else if constexpr (std::is_same_v<T, FlowAction>)
+		{
+			/*
+			 * FlowAction should only appear once in the `path`. If a second
+			 * FlowAction is added, this indicates an error in YANET's
+			 * `total_table_t::compile()`. Ideally, this should not happen,
+			 * but if it does, we log an error rather than crashing the application.
+			 * In that case, we will use the last occurrence of FlowAction and proceed.
+			 */
+			if (indices.get<T>().has_value())
+			{
+				YANET_LOG_ERROR("Multiple FlowAction instances detected in the "
+				                "path. Check total_table_t::compile(). Will use "
+				                "the last occurrence.\n");
+			}
+
+			handle_last_matters_action<T>(action, variant_index);
 		}
 		else
 		{
-			size_t max_count = std::visit([](auto&& arg) { return std::decay_t<decltype(arg)>::MAX_COUNT; },
-			                              action.raw_action);
-			if (action_counts[index] >= max_count)
-			{
-				return;
-			}
+			static_assert(utils::always_false<T>::value, "Not all unique actions with MAX_COUNT = 1 are properly categorized. "
+			                                             "Please add the missing actions to either `is_first_matters` or `is_last_matters` "
+			                                             "to ensure their index is tracked. Tracking the index of such actions could "
+			                                             "enhance dataplane performance if this information is utilized in "
+			                                             "`value_t::compile()`.");
 		}
+	}
 
-		if (std::holds_alternative<CheckStateAction>(action.raw_action))
+	// Only store the first occurrence.
+	template<typename T>
+	void handle_first_matters_action(const Action& action, size_t variant_index)
+	{
+		auto& path_index = indices.get<T>();
+
+		if (!path_index.has_value())
 		{
-			check_state_index = path.size();
+			add_to_path(action, variant_index);
+			path_index = path.size() - 1;
+		}
+		// Ignore subsequent occurrences as we're only interested in the first.
+	}
+
+	// Only store the last occurrence.
+	template<typename T>
+	void handle_last_matters_action(const Action& action, size_t variant_index)
+	{
+		auto& path_index = indices.get<T>();
+
+		if (path_index.has_value())
+		{
+			// Remove the previous occurrence
+			remove_action_at(path_index.value());
+			adjust_indices_after_removal(path_index.value());
 		}
 
-		action_counts[index]++;
-		path.push_back(action);
+		// Add the new occurrence
+		add_to_path(action, variant_index);
+		path_index = path.size() - 1;
+	}
+
+	void remove_action_at(std::ptrdiff_t path_index)
+	{
+		path.erase(path.begin() + path_index);
+	}
+
+	// Loop through each type in FilteredTypes and adjust the corresponding index
+	void adjust_indices_after_removal(std::ptrdiff_t removed_index)
+	{
+		std::apply([&](auto&&... types) {
+			(adjust_index<std::decay_t<decltype(types)>>(removed_index), ...);
+		},
+		           OptionalIndexMap::Types{});
+	}
+
+	template<typename T>
+	void adjust_index(std::ptrdiff_t removed_index)
+	{
+		auto& path_index = indices.get<T>();
+		if (path_index && *path_index > removed_index)
+		{
+			*path_index -= 1;
+		}
 	}
 };
 

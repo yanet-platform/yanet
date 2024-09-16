@@ -63,6 +63,8 @@ private:
 	Storage storage_;
 
 public:
+	using Types = FilteredTypes;
+
 	VariantTraitMap() = default;
 
 	/**
