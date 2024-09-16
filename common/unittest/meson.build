@@ -10,6 +10,7 @@ sources = files('unittest.cpp',
                 'static_vector.cpp',
                 'shared_memory.cpp',
                 'tuple.cpp',
+                'variant_trait_map.cpp',
                 )
 
 arch = 'corei7'
