@@ -37,9 +37,11 @@ public:
 	// FIXME: I don't like this name.. Why was it called like that previously?
 	std::vector<common::Actions> vector;
 
-	// FIXME: The initial objects are created using collect_inintial_rule and stored here.
-	// Then we create copies in vector. I've tried to use shared pointers and/or real pointers,
-	// but then a bunch of issues arise when serializing a `vector` with stream.push/pop
+	// FIXME:
+	// The initial objects are created using collect_inintial_rule and stored here.
+	// Then we create copies in intermediate_vector.
+	// I've tried to use shared pointers and/or real pointers, but then a bunch
+	// of issues arise when serializing a `vector` with stream.push/pop
 	std::vector<common::Action> rule_actions;
 
 	void append_to_last(unsigned int rule_action_id);
