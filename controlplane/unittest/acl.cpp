@@ -700,4 +700,120 @@ add allow ip from any to any keep-state
 	}
 }
 
+TEST(ACL, StateTimeout_Basic)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add state-timeout 5000 ip from any to any
+add allow ip from any to any keep-state
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 1);
+
+	for (const auto& [total_table_key, total_table_value] : result.acl_total_table)
+	{
+		(void)total_table_key;
+
+		const auto& value = result.acl_values[total_table_value];
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path includes the allow action with the correct timeout
+				EXPECT_THAT(actions.get_actions().size(), 1);
+				const auto& flow_action = std::get<common::FlowAction>(actions.get_actions()[0].raw_action);
+				EXPECT_EQ(flow_action.timeout, 5000);
+
+				// Check that the check-state path includes only check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			}
+		},
+		           value);
+	}
+}
+
+TEST(ACL, StateTimeout_RestrictiveSubset)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add state-timeout 8000 ip from any to any
+add state-timeout 3000 ip from 192.168.1.0/24 to any
+add allow ip from any to any keep-state
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 2);
+
+	{
+		// First group, ip not in 192.168.1.0/24
+		auto total_table_value = std::get<1>(result.acl_total_table[0]);
+		const auto& value = result.acl_values[total_table_value];
+
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path includes the allow action with the correct timeout
+				EXPECT_THAT(actions.get_actions().size(), 1);
+				const auto& flow_action = std::get<common::FlowAction>(actions.get_actions()[0].raw_action);
+				EXPECT_EQ(flow_action.timeout, 8000);
+
+				// Check that the check-state path includes only check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			}
+		},
+		           value);
+	}
+	{
+		// Second group, ip is in 192.168.1.0/24
+		auto total_table_value = std::get<1>(result.acl_total_table[1]);
+		const auto& value = result.acl_values[total_table_value];
+
+		std::visit([&](const auto& actions) {
+			if constexpr (std::is_same_v<std::decay_t<decltype(actions)>, common::BaseActions<true>>)
+			{
+				// Check that the regular path includes the allow action with the correct timeout
+				EXPECT_THAT(actions.get_actions().size(), 1);
+
+				const auto& flow_action = std::get<common::FlowAction>(actions.get_actions()[0].raw_action);
+				EXPECT_EQ(flow_action.timeout, 3000); // Verify that the timeout for 192.168.1.0/24 is 3000
+
+				// Check that the check-state path includes only check-state action
+				EXPECT_THAT(actions.get_check_state_actions().size(), 1);
+				EXPECT_TRUE(std::holds_alternative<common::CheckStateAction>(actions.get_check_state_actions().back().raw_action));
+			}
+		},
+		           value);
+	}
+}
+
+TEST(ACL, StateTimeout_NoTimeout)
+{
+	auto fw = make_default_acl(R"IPFW(
+:BEGIN
+add allow ip from any to any
+)IPFW");
+
+	std::map<std::string, controlplane::base::acl_t> acls{{"acl0", std::move(fw)}};
+	acl::result_t result;
+	acl::compile(acls, {{1, {{true, "vlan1"}}}}, result);
+
+	ASSERT_EQ(result.acl_total_table.size(), 1);
+
+	auto total_table_value = std::get<1>(result.acl_total_table[0]);
+	const auto& value = result.acl_values[total_table_value];
+
+	const auto& last_action = std::visit([&](const auto& actions) { return actions.get_last(); }, value);
+	const auto& flow_action = std::get<common::FlowAction>(last_action.raw_action);
+	// Check that by default timeout in flow_action is std::nullopt
+	EXPECT_EQ(flow_action.timeout, std::nullopt);
+}
+
 } // namespace
