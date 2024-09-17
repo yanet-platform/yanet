@@ -28,7 +28,6 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 
 RUN python3 -m pip install meson==0.61.2
 
-
 FROM environment AS builder
 
 ARG YANET_VERSION_MAJOR=0

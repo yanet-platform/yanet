@@ -59,7 +59,11 @@ inline std::string version_custom()
 inline std::string version_to_string(const unsigned int major = YANET_VERSION_MAJOR,
                                      const unsigned int minor = YANET_VERSION_MINOR)
 {
-	std::string version(std::to_string(major) + "." + std::to_string(minor));
+	std::string version(std::to_string(major) + "." + std::to_string(minor & 0xffff));
+	if (minor & 0xffff0000)
+	{
+		version += "." + std::to_string(minor >> 16);
+	}
 	return version;
 }
 
