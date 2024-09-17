@@ -4876,10 +4876,11 @@ inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common
 			key.src_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t value;
+		dataplane::globalBase::fw_state_value_t value{};
 		value.type = static_cast<dataplane::globalBase::fw_state_type>(metadata->transport_headerType);
 		value.owner = dataplane::globalBase::fw_state_owner_e::internal;
 		acl_touch_state(mbuf, metadata, &value);
+		acl_fill_state_timeout(mbuf, metadata, &value);
 		value.flow = flow;
 		value.acl_id = aclId;
 		value.last_sync = basePermanently.globalBaseAtomic->currentTime;
@@ -4973,10 +4974,11 @@ inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common
 			key.src_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t value;
+		dataplane::globalBase::fw_state_value_t value{};
 		value.type = static_cast<dataplane::globalBase::fw_state_type>(metadata->transport_headerType);
 		value.owner = dataplane::globalBase::fw_state_owner_e::internal;
 		acl_touch_state(mbuf, metadata, &value);
+		acl_fill_state_timeout(mbuf, metadata, &value);
 		value.flow = flow;
 		value.acl_id = aclId;
 		value.last_sync = basePermanently.globalBaseAtomic->currentTime;
@@ -5908,6 +5910,10 @@ YANET_NEVER_INLINE void cWorker::slowWorkerFarmHandleFragment(rte_mbuf* mbuf)
 inline void cWorker::acl_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value)
 {
 	value->last_seen = basePermanently.globalBaseAtomic->currentTime;
+}
+
+inline void cWorker::acl_fill_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value)
+{
 	value->state_timeout = get_state_timeout(mbuf, metadata, acl_state_config);
 }
 
