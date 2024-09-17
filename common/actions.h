@@ -382,14 +382,60 @@ struct IntermediateActions
 		           action.raw_action);
 	}
 
-private:
-	// Add the action to the path and increment its count
-	void add_to_path(const Action& action, size_t variant_index)
+	/**
+	 * @brief Retrieves a pointer to a unique action of type T from the path.
+	 *
+	 * This method returns a pointer of type T if it exists in the path.
+	 * The action type T must have MAX_COUNT == 1.
+	 *
+	 * @tparam T The action type to retrieve.
+	 * @return Pointer to the action of type T.
+	 */
+	template<typename T>
+	T* get()
 	{
-		path.push_back(action);
-		action_counts[variant_index]++;
+		static_assert(has_max_count_one<T>::value, "Can get only unique actions from path");
+
+		return indices.get<T>().has_value() ? &get_action<T>() : nullptr;
 	}
 
+	/**
+	 * @brief Retrieves a const reference to a unique action of type T from the path.
+	 *
+	 * This method returns a const pointer to the action of type T
+	 * if it exists in the path. The action type T must have MAX_COUNT == 1.
+	 *
+	 * @tparam T The action type to retrieve.
+	 * @return A const pointer to the action of type T.
+	 */
+	template<typename T>
+	[[nodiscard]] const T* get() const
+	{
+		static_assert(has_max_count_one<T>::value, "Can get only unique actions from path");
+
+		return indices.get<T>().has_value() ? &get_action<T>() : nullptr;
+	}
+
+	/**
+	 * @brief Removes a unique action of type T from the path.
+	 *
+	 * This method removes the action of type T from the path if it exists.
+	 * The action type T must have MAX_COUNT == 1.
+	 *
+	 * @tparam T The action type to remove.
+	 */
+	template<typename T>
+	void remove()
+	{
+		static_assert(has_max_count_one<T>::value, "Can remove only unique actions from path");
+
+		if (auto& path_index = indices.get<T>())
+		{
+			remove_action_at(path_index.value());
+		}
+	}
+
+private:
 	// We're interested in storing only the first or last occurrence
 	template<typename T>
 	void handle_unique_action(const Action& action, size_t variant_index)
@@ -448,23 +494,36 @@ private:
 	template<typename T>
 	void handle_last_matters_action(const Action& action, size_t variant_index)
 	{
-		auto& path_index = indices.get<T>();
-
-		if (path_index.has_value())
-		{
-			// Remove the previous occurrence
-			remove_action_at(path_index.value());
-			adjust_indices_after_removal(path_index.value());
-		}
+		// Remove the previous occurrence
+		remove<T>();
 
 		// Add the new occurrence
+		auto& path_index = indices.get<T>();
+
 		add_to_path(action, variant_index);
 		path_index = path.size() - 1;
 	}
 
+	// Add the action to the path and increment its count.
+	void add_to_path(const Action& action, size_t variant_index)
+	{
+		path.push_back(action);
+		action_counts[variant_index]++;
+	}
+
+	// Retrieves reference to an action of type T. Action should exist.
+	template<typename T>
+	T& get_action()
+	{
+		size_t path_index = indices.get<T>().value();
+		return std::get<T>(path[path_index].raw_action);
+	}
+
+	// Remove action at index and adjust saved indices
 	void remove_action_at(std::ptrdiff_t path_index)
 	{
 		path.erase(path.begin() + path_index);
+		adjust_indices_after_removal(path_index);
 	}
 
 	// Loop through each type in FilteredTypes and adjust the corresponding index
