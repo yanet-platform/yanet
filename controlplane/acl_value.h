@@ -7,6 +7,18 @@ namespace acl::compiler
 
 class value_t
 {
+	using IntermediateActions = common::acl::IntermediateActions;
+
+	/**
+	 * Ensures that the last action in each path is terminating. If not, a default "drop" rule is added.
+	 */
+	void ensure_termination(IntermediateActions& actions);
+
+	/**
+	 * Finalizes the intermediate actions into a vector of BaseActions objects.
+	 */
+	void finalize_actions(IntermediateActions&& actions);
+
 public:
 	value_t();
 
