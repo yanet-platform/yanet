@@ -203,6 +203,7 @@ protected:
 	inline void acl_egress_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 	inline void acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAclId aclId);
 	inline void acl_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value);
+	inline void acl_fill_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value);
 
 	inline void dregress_entry(rte_mbuf* mbuf);
 
