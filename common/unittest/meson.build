@@ -9,6 +9,7 @@ common_sources = files()
 sources = files('unittest.cpp',
                 'static_vector.cpp',
                 'shared_memory.cpp',
+                'tuple.cpp',
                 )
 
 arch = 'corei7'
