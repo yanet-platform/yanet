@@ -1,0 +1,41 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 10.0.0.2"
+
+- clearFWState: 1 # to make sure we have no states
+- sleep: 2 # to make sure clearFwState finished
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+- cli_check: |
+    fw list states
+    id        ruleno    label  rule
+    --------  --------  -----  ------------------------------------------------------------------------------------------------
+    16777215  16777215         allow tcp from 10.0.0.1 80 to 192.168.1.10 12345 [own, last seen: 2s ago flags S:][packets: 0/0]
+    16777216  16777215         allow tcp from 10.0.0.1 80 to 192.168.2.20 12346 [own, last seen: 2s ago flags S:][packets: 0/0]
+
+- sleep: 3  # Wait, states should still be present
+
+- cli_check: |
+    fw list states
+    id        ruleno    label  rule
+    --------  --------  -----  ------------------------------------------------------------------------------------------------
+    16777215  16777215         allow tcp from 10.0.0.1 80 to 192.168.1.10 12345 [own, last seen: 5s ago flags S:][packets: 0/0]
+    16777216  16777215         allow tcp from 10.0.0.1 80 to 192.168.2.20 12346 [own, last seen: 5s ago flags S:][packets: 0/0]
+
+- sleep: 3  # Wait for first state to expire (total sleep 6s)
+
+- cli_check: |
+    fw list states
+    id        ruleno    label  rule
+    --------  --------  -----  ------------------------------------------------------------------------------------------------
+    16777215  16777215         allow tcp from 10.0.0.1 80 to 192.168.2.20 12346 [own, last seen: 8s ago flags S:][packets: 0/0]
+
+- sleep: 3  # Wait for second state to expire (total sleep 9s)
+
+- cli_check: |
+    fw list states
+    id  ruleno  label  rule
+    --  ------  -----  ----
