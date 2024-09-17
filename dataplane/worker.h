@@ -194,7 +194,7 @@ protected:
 	inline FlowFromState acl_checkstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
 	inline FlowFromState acl_egress_checkstate(rte_mbuf* mbuf);
 	inline FlowFromState acl_egress_checkstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
-	inline void acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow);
+	inline void acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow, std::optional<uint32_t> timeout);
 	inline void acl_state_emit(tAclId aclId, const dataplane::globalBase::fw_state_sync_frame_t& frame);
 
 	inline void acl_egress_entry(rte_mbuf* mbuf, tAclId aclId);
@@ -203,7 +203,7 @@ protected:
 	inline void acl_egress_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 	inline void acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAclId aclId);
 	inline void acl_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value);
-	inline void acl_fill_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value);
+	inline void acl_fill_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value, std::optional<uint32_t> timeout);
 
 	inline void dregress_entry(rte_mbuf* mbuf);
 

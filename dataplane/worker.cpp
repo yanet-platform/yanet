@@ -4833,7 +4833,7 @@ inline cWorker::FlowFromState cWorker::acl_checkstate(rte_mbuf* mbuf,
 	return {flow};
 }
 
-inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow)
+inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow, std::optional<uint32_t> timeout)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -4880,7 +4880,7 @@ inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common
 		value.type = static_cast<dataplane::globalBase::fw_state_type>(metadata->transport_headerType);
 		value.owner = dataplane::globalBase::fw_state_owner_e::internal;
 		acl_touch_state(mbuf, metadata, &value);
-		acl_fill_state_timeout(mbuf, metadata, &value);
+		acl_fill_state_timeout(mbuf, metadata, &value, timeout);
 		value.flow = flow;
 		value.acl_id = aclId;
 		value.last_sync = basePermanently.globalBaseAtomic->currentTime;
@@ -4978,7 +4978,7 @@ inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common
 		value.type = static_cast<dataplane::globalBase::fw_state_type>(metadata->transport_headerType);
 		value.owner = dataplane::globalBase::fw_state_owner_e::internal;
 		acl_touch_state(mbuf, metadata, &value);
-		acl_fill_state_timeout(mbuf, metadata, &value);
+		acl_fill_state_timeout(mbuf, metadata, &value, timeout);
 		value.flow = flow;
 		value.acl_id = aclId;
 		value.last_sync = basePermanently.globalBaseAtomic->currentTime;
@@ -5912,9 +5912,9 @@ inline void cWorker::acl_touch_state(rte_mbuf* mbuf, dataplane::metadata* metada
 	value->last_seen = basePermanently.globalBaseAtomic->currentTime;
 }
 
-inline void cWorker::acl_fill_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value)
+inline void cWorker::acl_fill_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value, std::optional<uint32_t> timeout)
 {
-	value->state_timeout = get_state_timeout(mbuf, metadata, acl_state_config);
+	value->state_timeout = timeout.has_value() ? timeout.value() : get_state_timeout(mbuf, metadata, acl_state_config);
 }
 
 inline void cWorker::balancer_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::balancer_state_value_t* value)
