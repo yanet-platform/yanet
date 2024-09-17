@@ -15,6 +15,12 @@ class value_t
 	void ensure_termination(IntermediateActions& actions);
 
 	/**
+	 * Removes the StateTimeoutAction to reduce dataplane load
+	 * by moving the timeout value directly into the FlowAction.
+	 */
+	void move_timeout_from_state_timeout_to_flow(IntermediateActions& actions);
+
+	/**
 	 * Finalizes the intermediate actions into a vector of BaseActions objects.
 	 */
 	void finalize_actions(IntermediateActions&& actions);

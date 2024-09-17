@@ -166,6 +166,8 @@ struct FlowAction final
 	static constexpr size_t MAX_COUNT = 1;
 	// The flow associated with this action.
 	globalBase::tFlow flow;
+	// Timeout for the state
+	std::optional<uint32_t> timeout;
 
 	FlowAction(const globalBase::tFlow& flow) :
 	        flow(flow){};
@@ -181,17 +183,21 @@ struct FlowAction final
 	void pop(stream_in_t& stream)
 	{
 		stream.pop(flow);
+		stream.pop(timeout);
 	}
 
 	void push(stream_out_t& stream) const
 	{
 		stream.push(flow);
+		stream.push(timeout);
 	}
 
 	[[nodiscard]] std::string to_string() const
 	{
 		std::ostringstream oss;
-		oss << "FlowAction(flow=" << flow.to_string() << ")";
+		oss << "FlowAction(flow=" << flow.to_string() << ", timeout = "
+		    << (timeout.has_value() ? std::to_string(timeout.value()) : "not specified")
+		    << ")";
 		return oss.str();
 	}
 };
