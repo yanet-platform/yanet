@@ -313,7 +313,7 @@ namespace acl
  * Also, it manages the StateTimeoutActions to reduce number of actions in the dataplane by saving only the
  * last timeout action.
  */
-struct Actions
+struct IntermediateActions
 {
 	template<typename T>
 	struct has_max_count_one
@@ -349,8 +349,8 @@ struct Actions
 	using OptionalIndexMap = utils::VariantTraitMap<RawAction, has_max_count_one, std::optional<std::ptrdiff_t>>;
 	OptionalIndexMap indices{};
 
-	Actions() = default;
-	Actions(const Action& action) { add(action); }
+	IntermediateActions() = default;
+	IntermediateActions(const Action& action) { add(action); }
 
 	/**
 	 * @brief Adds an action to the current path while adhering to the following:
@@ -501,7 +501,7 @@ private:
 public:
 	BaseActions() = default;
 
-	BaseActions(acl::Actions&& actions) :
+	BaseActions(acl::IntermediateActions&& actions) :
 	        path_(std::move(actions.path)) {}
 
 	[[nodiscard]] const Action& get_last() const
@@ -559,7 +559,7 @@ private:
 
 public:
 	BaseActions() = default;
-	BaseActions(acl::Actions&& actions)
+	BaseActions(acl::IntermediateActions&& actions)
 	{
 		assert(actions.check_state_index.has_value());
 		auto check_state_index = static_cast<std::ptrdiff_t>(actions.check_state_index.value());
