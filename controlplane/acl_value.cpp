@@ -45,6 +45,18 @@ void value_t::ensure_termination(IntermediateActions& actions)
 	}
 }
 
+void value_t::move_timeout_from_state_timeout_to_flow(IntermediateActions& actions)
+{
+	if (const auto* state_timeout_action = actions.get<common::StateTimeoutAction>())
+	{
+		// Flow action should exist at this point
+		auto* flow_action = actions.get<common::FlowAction>();
+		flow_action->timeout = state_timeout_action->timeout;
+
+		actions.remove<common::StateTimeoutAction>();
+	}
+}
+
 void value_t::finalize_actions(IntermediateActions&& actions)
 {
 	if (actions.indices.get<common::CheckStateAction>().has_value())
@@ -62,6 +74,7 @@ void value_t::compile()
 	for (auto& intermediate_actions : intermediate_vector)
 	{
 		ensure_termination(intermediate_actions);
+		move_timeout_from_state_timeout_to_flow(intermediate_actions);
 		finalize_actions(std::move(intermediate_actions));
 	}
 }
