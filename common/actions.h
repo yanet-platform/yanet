@@ -620,8 +620,8 @@ public:
 	BaseActions() = default;
 	BaseActions(acl::IntermediateActions&& actions)
 	{
-		assert(actions.check_state_index.has_value());
-		auto check_state_index = static_cast<std::ptrdiff_t>(actions.check_state_index.value());
+		assert(actions.indices.get<common::CheckStateAction>().has_value());
+		auto check_state_index = actions.indices.get<common::CheckStateAction>().value();
 
 		path_ = std::move(actions.path);
 
