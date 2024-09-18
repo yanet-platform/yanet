@@ -1,9 +1,6 @@
 steps:
 - ipv4Update: "0.0.0.0/0 -> 10.0.0.2"
 
-- clearFWState: 1 # to make sure we have no states
-- sleep: 2 # to make sure clearFwState finished
-
 - sendPackets:
   - port: kni0
     send: 001-send.pcap
