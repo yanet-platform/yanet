@@ -26,3 +26,4 @@ steps:
   - port: kni0
     send: 002-send.pcap
     expect: 002-expect.pcap
+- clearFWState: 1
