@@ -621,6 +621,22 @@ void worker_gc_t::handle_acl_gc()
 
 			iter.unlock();
 		}
+		else
+		{
+			// The entry is invalid, likely due to a call to clearFWState().
+			iter.lock();
+			auto key = *iter.key();
+			iter.unlock();
+
+			common::idp::getFWState::key_t fw_key(
+			        std::uint8_t(key.proto),
+			        {rte_be_to_cpu_32(key.src_addr.address)},
+			        {rte_be_to_cpu_32(key.dst_addr.address)},
+			        key.src_port,
+			        key.dst_port);
+
+			fw_state_remove_stack.emplace_back(fw_key);
+		}
 	}
 
 	if (fw4_state_gc.offset == 0)
@@ -728,6 +744,22 @@ void worker_gc_t::handle_acl_gc()
 			}
 
 			iter.unlock();
+		}
+		else
+		{
+			// The entry is invalid, likely due to a call to clearFWState().
+			iter.lock();
+			auto key = *iter.key();
+			iter.unlock();
+
+			common::idp::getFWState::key_t fw_key(
+			        std::uint8_t(key.proto),
+			        {key.src_addr.bytes},
+			        {key.dst_addr.bytes},
+			        key.src_port,
+			        key.dst_port);
+
+			fw_state_remove_stack.emplace_back(fw_key);
 		}
 	}
 
