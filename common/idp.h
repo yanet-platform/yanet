@@ -381,6 +381,7 @@ using request = lpm::request;
 namespace route_value_update
 {
 using interface = std::vector<std::tuple<tInterfaceId, ///< interface_id
+                                         tCounterId, ///< counter_id
                                          std::vector<uint32_t>, ///< labels
                                          ip_address_t, ///< neighbor_address
                                          uint16_t>>; ///< nexthop_flags
