@@ -2845,7 +2845,7 @@ using nexthop_stuff_t = std::tuple<ip_address_t, ///< nexthop
                                    uint32_t ///< local_preference
                                    >;
 
-using nexthop_map_t = std::unordered_map<uint32_t,
+using nexthop_map_t = std::unordered_map<uint32_t, ///< pptn_index -> protocol, peer, table_name
                                          std::unordered_map<std::string, ///< path_info
                                                             const rib::nexthop_stuff_t*>>;
 
