@@ -732,4 +732,25 @@ void main_counters()
 	}
 }
 
+void route()
+{
+	interface::controlPlane controlplane;
+	auto response = controlplane.route_counters();
+
+	for (const auto& [link, nexthop, prefix, counts, size] : response)
+	{
+		influxdb_format::print("route_counters", {{"link", link}, {"nexthop", nexthop}, {"prefix", prefix}}, {{"counts", counts}, {"size", size}});
+	}
+}
+
+void route_tunnel()
+{
+	interface::controlPlane controlplane;
+	auto response = controlplane.route_tunnel_counters();
+
+	for (const auto& [link, nexthop, counts, size] : response)
+	{
+		influxdb_format::print("route_tunnel_counters", {{"link", link}, {"nexthop", nexthop}}, {{"counts", counts}, {"size", size}});
+	}
+}
 }
