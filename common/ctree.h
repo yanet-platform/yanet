@@ -183,7 +183,8 @@ struct ctree
 			{
 				if constexpr (sizeof...(next_counters_T) != 0)
 				{
-					next.emplace(key, new node_t{*static_cast<node_t*>(value)});
+					using child_t = node_t<next_counters_T...>;
+					next.emplace(key, new child_t{*static_cast<child_t*>(value)});
 				}
 				else
 				{
@@ -363,8 +364,8 @@ struct ctree
 				{
 					if constexpr (sizeof...(next_counters_T) != 0)
 					{
-						using actual = node_t<next_counters_T...>;
-						next.emplace(key, new actual(*static_cast<actual*>(node)));
+						using child_t = node_t<next_counters_T...>;
+						next.emplace(key, new child_t(*static_cast<child_t*>(node)));
 					}
 					else
 					{
