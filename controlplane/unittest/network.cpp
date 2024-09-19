@@ -74,8 +74,8 @@ TEST(network_t, IPv6MaskGapped)
 
 TEST(network_t, IPWithoutMaskAfterSlash)
 {
-	EXPECT_THROW(network_t("1.2.3.4/"), std::string); // todo: WUT? Make normal exception type.
-	EXPECT_THROW(network_t("::1/"), std::string);
+	EXPECT_THROW(network_t("1.2.3.4/"), std::runtime_error);
+	EXPECT_THROW(network_t("::1/"), std::runtime_error);
 }
 
 } // namespace

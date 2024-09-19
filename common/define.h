@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <map>
 #include <optional>
 #include <set>
+#include <string_view>
 #include <vector>
 
 #include <inttypes.h>
@@ -90,13 +92,13 @@ extern LogPriority logPriority;
 #define CALCULATE_LOGICALPORT_ID(portId, vlanId) ((portId << 13) | ((vlanId & 0xFFF) << 1) | 1)
 
 #if __cpp_exceptions
-#define YANET_THROW(string) throw string
+#define YANET_THROW(message) throw std::runtime_error(std::string(message))
 #else // __cpp_exceptions
-#define YANET_THROW(string)                             \
-	do                                              \
-	{                                               \
-		YANET_LOG_ERROR("%s\n", string.data()); \
-		std::abort();                           \
+#define YANET_THROW(message)                                               \
+	do                                                                 \
+	{                                                                  \
+		YANET_LOG_ERROR("%s\n", std::string_view(message).data()); \
+		std::abort();                                              \
 	} while (0)
 #endif // __cpp_exceptions
 
