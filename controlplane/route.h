@@ -18,8 +18,14 @@ namespace route
 using directly_connected_destination_t = std::tuple<tInterfaceId, ///< interface_id
                                                     std::string>; ///< interface_name
 
-using destination_t = std::variant<std::set<std::tuple<ip_address_t,
-                                                       std::vector<uint32_t>>>,
+using destination_interface_t = std::set<
+        std::tuple<
+                ip_address_t, ///< nexthop
+                uint32_t, ///< peer_id
+                ip_prefix_t, ///< prefix
+                std::vector<uint32_t>>>; ///< labels
+
+using destination_t = std::variant<destination_interface_t,
                                    directly_connected_destination_t, ///< via interface
                                    uint32_t>; ///< virtual_port_id
 
@@ -32,11 +38,16 @@ using value_interface_t = std::tuple<ip_address_t,
                                      tInterfaceId,
                                      std::string,
                                      std::vector<uint32_t>,
-                                     ip_address_t>; ///< neighbor_address
+                                     ip_address_t, ///< neighbor_address
+                                     uint32_t, ///< peer_id
+                                     ip_prefix_t>; ///< prefix
 
 using lookup_t = std::tuple<ip_address_t, ///< nexthop
                             std::string,
                             std::vector<uint32_t>>; ///< labels
+using route_counter_key_t = std::tuple<uint32_t, ///< peer_id
+                                       ip_address_t, ///< nexthop
+                                       ip_prefix_t>; ///< prefix
 
 using tunnel_destination_interface_t = std::set<
         std::tuple<
@@ -218,6 +229,8 @@ public:
 	common::icp::route_summary::response route_summary() const;
 	common::icp::route_lookup::response route_lookup(const common::icp::route_lookup::request& request);
 	common::icp::route_get::response route_get(const common::icp::route_get::request& request);
+	common::icp::route_counters::response route_counters();
+	common::icp::route_tunnel_counters::response route_tunnel_counters();
 	common::icp::route_interface::response route_interface() const;
 	common::icp::route_tunnel_lookup::response route_tunnel_lookup(const common::icp::route_tunnel_lookup::request& request);
 	common::icp::route_tunnel_get::response route_tunnel_get(const common::icp::route_tunnel_get::request& request);
@@ -297,4 +310,5 @@ protected:
 
 	friend class telegraf_t;
 	counter_t<route::tunnel_counter_key_t, 2> tunnel_counter;
+	counter_t<route::route_counter_key_t, 2> route_counter;
 };

@@ -177,6 +177,16 @@ public:
 		return get<common::icp::requestType::route_get, common::icp::route_get::response>(request);
 	}
 
+	auto route_counters() const
+	{
+		return get<common::icp::requestType::route_counters, common::icp::route_counters::response>();
+	}
+
+	auto route_tunnel_counters() const
+	{
+		return get<common::icp::requestType::route_tunnel_counters, common::icp::route_tunnel_counters::response>();
+	}
+
 	auto route_tunnel_lookup(const common::icp::route_tunnel_lookup::request& request) const
 	{
 		return get<common::icp::requestType::route_tunnel_lookup, common::icp::route_tunnel_lookup::response>(request);
