@@ -21,8 +21,6 @@
 namespace rib
 {
 
-using nexthop_t = common::rib::nexthop_t;
-
 using vrf_priority_t = common::rib::vrf_priority_t;
 
 using pptn_t = common::rib::pptn_t;
@@ -92,8 +90,8 @@ protected:
 	                              std::string, ///< protocol
 	                              ip_address_t, ///< peer
 	                              std::string>, ///< table_name
-	                   std::tuple<common::uint64,
-	                              common::uint64,
-	                              common::uint8>>
+	                   std::tuple<common::uint64, ///< prefixes
+	                              common::uint64, ///< paths
+	                              common::uint8>> ///< eor
 	        summary;
 };
