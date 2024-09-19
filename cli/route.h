@@ -113,6 +113,26 @@ void get(const std::string& route_name,
 	table.print();
 }
 
+void counters()
+{
+	interface::controlPlane controlplane;
+	auto response = controlplane.route_counters();
+
+	table_t table;
+	table.insert("link",
+	             "nexthop",
+	             "prefix",
+	             "counts",
+	             "size");
+
+	for (const auto& [link, nexthop, prefix, counts, size] : response)
+	{
+		table.insert(link, nexthop, prefix, counts, size);
+	}
+
+	table.print();
+}
+
 namespace tunnel
 {
 
@@ -189,6 +209,24 @@ void get(const std::string& route_name,
 	table.print();
 }
 
+void counters()
+{
+	interface::controlPlane controlplane;
+	auto response = controlplane.route_tunnel_counters();
+
+	table_t table;
+	table.insert("link",
+	             "nexthop",
+	             "counts",
+	             "size");
+
+	for (const auto& [link, nexthop, counts, size] : response)
+	{
+		table.insert(link, nexthop, counts, size);
+	}
+
+	table.print();
+}
 }
 
 }
