@@ -64,6 +64,43 @@ add deny ip from any to any
 	return rules;
 }
 
+// Custom matcher to check if a variant holds a specific type
+template<typename T>
+class HoldsAlternativeMatcher : public ::testing::MatcherInterface<const common::RawAction&>
+{
+public:
+	bool MatchAndExplain(const common::RawAction& v, ::testing::MatchResultListener* listener) const override
+	{
+		return std::holds_alternative<T>(v);
+	}
+
+	void DescribeTo(std::ostream* os) const override
+	{
+		*os << "holds alternative of type " << typeid(T).name();
+	}
+};
+
+template<typename T>
+::testing::Matcher<const common::RawAction&> HoldsAlternative()
+{
+	return ::testing::MakeMatcher(new HoldsAlternativeMatcher<T>());
+}
+
+::testing::Matcher<const common::RawAction&> IsCheckStateAction()
+{
+	return HoldsAlternative<common::CheckStateAction>();
+}
+
+::testing::Matcher<const common::RawAction&> IsFlowAction()
+{
+	return HoldsAlternative<common::FlowAction>();
+}
+
+::testing::Matcher<const common::RawAction&> IsDumpAction()
+{
+	return HoldsAlternative<common::DumpAction>();
+}
+
 class ACL : public ::testing::Test
 {
 protected:
@@ -76,6 +113,8 @@ protected:
 		std::map<std::string, acl_t> acls{{"acl0", std::move(fw)}};
 
 		acl::compile(acls, iface_map, result);
+
+		validate_paths();
 	}
 
 	// Helper function to visit a specific group based on its index
@@ -97,6 +136,26 @@ protected:
 		{
 			visit_action_group(group_index, std::forward<Func>(func));
 		}
+	}
+
+	template<typename T>
+	static constexpr bool is_with_check_state()
+	{
+		return std::is_same_v<std::decay_t<T>, common::BaseActions<common::ActionsPath::WithCheckState>>;
+	}
+
+	void validate_paths()
+	{
+		visit_actions([&](const auto& actions) {
+			// Default path should always end with a FlowAction
+			EXPECT_THAT(actions.default_path_last_raw_action(), IsFlowAction());
+
+			if constexpr (is_with_check_state<decltype(actions)>())
+			{
+				// Check-state path should always end with CheckStateAction
+				EXPECT_THAT(actions.check_state_path_last_raw_action(), IsCheckStateAction());
+			}
+		});
 	}
 };
 
@@ -359,7 +418,7 @@ add 300 deny ip from any to any
 	EXPECT_EQ("port0 |0|any|any|any|any|any|any|any|false|drop(0)|2|true|", stringify(unwind_result[2]));
 
 	visit_actions([&](const auto& actions) {
-		EXPECT_EQ(actions.get_flow().flags, common::globalBase::eFlowFlags::log);
+		EXPECT_EQ(actions.get_flow().flags, static_cast<int>(common::globalBase::eFlowFlags::log));
 	});
 
 	auto& ids_map = result.ids_map;
@@ -453,75 +512,6 @@ add 200 deny ip from any to any
 	EXPECT_EQ("deny", std::get<1>(result.rules[200].front()));
 }
 
-// Custom matcher to check if a variant holds a specific type
-template<typename T>
-class HoldsAlternativeMatcher : public ::testing::MatcherInterface<const common::RawAction&>
-{
-public:
-	bool MatchAndExplain(const common::RawAction& v, ::testing::MatchResultListener* listener) const override
-	{
-		return std::holds_alternative<T>(v);
-	}
-
-	void DescribeTo(std::ostream* os) const override
-	{
-		*os << "holds alternative of type " << typeid(T).name();
-	}
-};
-
-template<typename T>
-::testing::Matcher<const common::RawAction&> HoldsAlternative()
-{
-	return ::testing::MakeMatcher(new HoldsAlternativeMatcher<T>());
-}
-
-::testing::Matcher<const common::RawAction&> IsCheckStateAction()
-{
-	return HoldsAlternative<common::CheckStateAction>();
-}
-
-::testing::Matcher<const common::RawAction&> IsFlowAction()
-{
-	return HoldsAlternative<common::FlowAction>();
-}
-
-::testing::Matcher<const common::RawAction&> IsDumpAction()
-{
-	return HoldsAlternative<common::DumpAction>();
-}
-
-using common::ActionsPath;
-using common::BaseActions;
-
-template<typename T>
-constexpr bool is_with_check_state()
-{
-	return std::is_same_v<std::decay_t<T>, BaseActions<ActionsPath::WithCheckState>>;
-}
-
-const common::RawAction& regular_path_action(const common::Actions& actions, size_t idx)
-{
-	return std::visit([idx](const auto& action_variant) -> const common::RawAction& {
-		return action_variant.get_actions()[idx].raw_action;
-	},
-	                  actions);
-}
-
-const common::RawAction& regular_path_first_action(const common::Actions& actions)
-{
-	return regular_path_action(actions, 0);
-}
-
-const common::RawAction& check_state_path_last_action(const common::Actions& actions)
-{
-	if (const auto& check_state_actions = std::get_if<BaseActions<ActionsPath::WithCheckState>>(&actions))
-	{
-		return check_state_actions->get_check_state_actions().back().raw_action;
-	}
-
-	throw std::runtime_error("Attempted to get check-state action from Default path");
-}
-
 TEST_F(ACL, 019_CheckStateBasic)
 {
 	compile_acl(R"IPFW(
@@ -532,19 +522,6 @@ add 300 deny ip from any to any
 )IPFW");
 
 	ASSERT_EQ(result.acl_total_table.size(), 2);
-
-	visit_actions([&](const auto& actions) {
-		if constexpr (is_with_check_state<decltype(actions)>())
-		{
-			// Check that the regular path does not include the check-state action
-			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_THAT(regular_path_first_action(actions), Not(IsCheckStateAction()));
-
-			// Check that the check-state path includes the check-state action
-			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
-		}
-	});
 }
 
 TEST_F(ACL, 020_ManyCheckStates)
@@ -563,14 +540,10 @@ add 400 deny ip from any to any
 	visit_action_group(1, [&](const auto& actions) {
 		if constexpr (is_with_check_state<decltype(actions)>())
 		{
-			// Check that the regular path includes the actions after the first and second check-states
-			EXPECT_THAT(actions.get_actions().size(), 2);
-			EXPECT_THAT(regular_path_action(actions, 0), IsDumpAction());
-			EXPECT_THAT(regular_path_action(actions, 1), IsFlowAction());
-
-			// Check that the check-state path includes the first check-state action and no other actions
-			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
+			// Check that the default path includes the actions after the first and second check-states
+			EXPECT_THAT(actions.default_path_size(), 2);
+			EXPECT_THAT(actions.default_path_raw_action(0), IsDumpAction());
+			EXPECT_THAT(actions.default_path_raw_action(1), IsFlowAction());
 		}
 	});
 }
@@ -592,16 +565,16 @@ add 500 deny ip from any to any
 	visit_action_group(1, [&](const auto& actions) {
 		if constexpr (is_with_check_state<decltype(actions)>())
 		{
-			// Check that the regular path includes actions before and after the check-state
-			EXPECT_THAT(actions.get_actions().size(), 3);
-			EXPECT_THAT(regular_path_action(actions, 0), IsDumpAction());
-			EXPECT_THAT(regular_path_action(actions, 1), IsDumpAction());
-			EXPECT_THAT(regular_path_action(actions, 2), IsFlowAction());
+			// Check that the default path includes actions before and after the check-state
+			EXPECT_THAT(actions.default_path_size(), 3);
+			EXPECT_THAT(actions.default_path_raw_action(0), IsDumpAction());
+			EXPECT_THAT(actions.default_path_raw_action(1), IsDumpAction());
+			EXPECT_THAT(actions.default_path_raw_action(2), IsFlowAction());
 
 			// Check that the check-state path includes actions up to and including the check-state action
-			EXPECT_THAT(actions.get_check_state_actions().size(), 2);
-			EXPECT_THAT(actions.get_check_state_actions()[0].raw_action, IsDumpAction());
-			EXPECT_THAT(actions.get_check_state_actions()[1].raw_action, IsCheckStateAction());
+			EXPECT_THAT(actions.check_state_path_size(), 2);
+			EXPECT_THAT(actions.check_state_path_raw_action(0), IsDumpAction());
+			EXPECT_THAT(actions.check_state_path_raw_action(1), IsCheckStateAction());
 		}
 	});
 }
@@ -615,19 +588,6 @@ add deny ip from any to any
 )IPFW");
 
 	ASSERT_EQ(result.acl_total_table.size(), 1);
-
-	visit_actions([&](const auto& actions) {
-		if constexpr (is_with_check_state<decltype(actions)>())
-		{
-			// Check that the regular path includes the allow action
-			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_THAT(regular_path_first_action(actions), IsFlowAction());
-
-			// Check that the check-state path includes the check-state action
-			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
-		}
-	});
 }
 
 TEST_F(ACL, KeepState_MultipleRules)
@@ -640,19 +600,6 @@ add deny ip from any to any
 )IPFW");
 
 	ASSERT_EQ(result.acl_total_table.size(), 2);
-
-	visit_actions([&](const auto& actions) {
-		if constexpr (is_with_check_state<decltype(actions)>())
-		{
-			// Check that the regular path includes the allow action
-			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_THAT(regular_path_first_action(actions), IsFlowAction());
-
-			// Check that the check-state path includes the check-state action
-			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
-		}
-	});
 }
 
 TEST_F(ACL, KeepState_WithSkipTo)
@@ -667,19 +614,6 @@ add allow ip from any to any keep-state
 )IPFW");
 
 	ASSERT_EQ(result.acl_total_table.size(), 2);
-
-	visit_actions([&](const auto& actions) {
-		if constexpr (is_with_check_state<decltype(actions)>())
-		{
-			// Check that the regular path includes the allow action
-			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_THAT(regular_path_first_action(actions), IsFlowAction());
-
-			// Check that the check-state path includes the check-state action
-			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
-		}
-	});
 }
 
 TEST_F(ACL, StateTimeout_Basic)
@@ -693,18 +627,8 @@ add allow ip from any to any keep-state
 	ASSERT_EQ(result.acl_total_table.size(), 1);
 
 	visit_actions([&](const auto& actions) {
-		if constexpr (is_with_check_state<decltype(actions)>())
-		{
-			// Check that the regular path includes the allow action with the correct timeout
-			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_THAT(regular_path_first_action(actions), IsFlowAction());
-			const auto& flow_action = std::get<common::FlowAction>(regular_path_first_action(actions));
-			EXPECT_EQ(flow_action.timeout, 5000);
-
-			// Check that the check-state path includes only check-state action
-			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
-		}
+		const auto& flow_action = std::get<common::FlowAction>(actions.default_path_last_raw_action());
+		EXPECT_EQ(flow_action.timeout, 5000);
 	});
 }
 
@@ -721,34 +645,14 @@ add allow ip from any to any keep-state
 
 	// First group, ip not in 192.168.1.0/24
 	visit_action_group(0, [&](const auto& actions) {
-		if constexpr (is_with_check_state<decltype(actions)>())
-		{
-			// Check that the regular path includes the allow action with the correct timeout
-			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_THAT(regular_path_first_action(actions), IsFlowAction());
-			const auto& flow_action = std::get<common::FlowAction>(regular_path_first_action(actions));
-			EXPECT_EQ(flow_action.timeout, 8000);
-
-			// Check that the check-state path includes only check-state action
-			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
-		}
+		const auto& flow_action = std::get<common::FlowAction>(actions.default_path_last_raw_action());
+		EXPECT_EQ(flow_action.timeout, 8000);
 	});
 
 	// Second group, ip is in 192.168.1.0/24
 	visit_action_group(1, [&](const auto& actions) {
-		if constexpr (is_with_check_state<decltype(actions)>())
-		{
-			// Check that the regular path includes the allow action with the correct timeout
-			EXPECT_THAT(actions.get_actions().size(), 1);
-			EXPECT_THAT(regular_path_first_action(actions), IsFlowAction());
-			const auto& flow_action = std::get<common::FlowAction>(regular_path_first_action(actions));
-			EXPECT_EQ(flow_action.timeout, 3000); // Verify that the timeout for 192.168.1.0/24 is 3000
-
-			// Check that the check-state path includes only check-state action
-			EXPECT_THAT(actions.get_check_state_actions().size(), 1);
-			EXPECT_THAT(check_state_path_last_action(actions), IsCheckStateAction());
-		}
+		const auto& flow_action = std::get<common::FlowAction>(actions.default_path_last_raw_action());
+		EXPECT_EQ(flow_action.timeout, 3000); // Verify that the timeout for 192.168.1.0/24 is 3000
 	});
 }
 
@@ -762,8 +666,7 @@ add allow ip from any to any
 	ASSERT_EQ(result.acl_total_table.size(), 1);
 
 	visit_actions([&](const auto& actions) {
-		EXPECT_THAT(regular_path_first_action(actions), IsFlowAction());
-		const auto& flow_action = std::get<common::FlowAction>(regular_path_first_action(actions));
+		const auto& flow_action = std::get<common::FlowAction>(actions.default_path_last_raw_action());
 		// Check that by default timeout in flow_action is std::nullopt
 		EXPECT_EQ(flow_action.timeout, std::nullopt);
 	});
