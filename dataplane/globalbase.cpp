@@ -1824,7 +1824,7 @@ eResult generation::route_value_update(const common::idp::updateGlobalBase::rout
 		     ecmp_i < request_interface.size();
 		     ecmp_i++)
 		{
-			const auto& [interface_id, labels, neighbor_address, nexthop_flags] = request_interface[ecmp_i];
+			const auto& [interface_id, counter_id, labels, neighbor_address, nexthop_flags] = request_interface[ecmp_i];
 
 			if (interface_id >= CONFIG_YADECAP_INTERFACES_SIZE)
 			{
@@ -1834,6 +1834,7 @@ eResult generation::route_value_update(const common::idp::updateGlobalBase::rout
 
 			route_value.interface.nexthops[ecmp_i].interfaceId = interface_id;
 			route_value.interface.nexthops[ecmp_i].flags = nexthop_flags;
+			route_value.interface.nexthops[ecmp_i].counter_id = counter_id;
 			route_value.interface.nexthops[ecmp_i].neighbor_address = ipv6_address_t::convert(neighbor_address);
 			route_value.interface.nexthops[ecmp_i].is_ipv6 = neighbor_address.is_ipv6();
 
