@@ -1388,6 +1388,9 @@ inline void cWorker::acl_ingress_entry(rte_mbuf* mbuf)
 	}
 }
 
+using ActionsIngress = dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>;
+using ActionsEgress = dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>;
+
 inline void cWorker::acl_ingress_handle4()
 {
 	const auto& base = bases[localBaseId & 1];
@@ -1529,7 +1532,7 @@ inline void cWorker::acl_ingress_handle4()
 
 		const auto& value = acl.values[total_value];
 
-		dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>::execute(value, {this, mbuf, metadata, &base});
+		ActionsIngress::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_ingress_stack4.clear();
@@ -1683,7 +1686,7 @@ inline void cWorker::acl_ingress_handle6()
 
 		const auto& value = acl.values[total_value];
 
-		dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>::execute(value, {this, mbuf, metadata, &base});
+		ActionsIngress::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_ingress_stack6.clear();
@@ -5229,7 +5232,7 @@ inline void cWorker::acl_egress_handle4()
 
 		const auto& value = acl.values[total_value];
 
-		dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>::execute(value, {this, mbuf, metadata, &base});
+		ActionsEgress::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_egress_stack4.clear();
@@ -5376,7 +5379,7 @@ inline void cWorker::acl_egress_handle6()
 
 		const auto& value = acl.values[total_value];
 
-		dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>::execute(value, {this, mbuf, metadata, &base});
+		ActionsEgress::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_egress_stack6.clear();
