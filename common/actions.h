@@ -562,42 +562,48 @@ class BaseActions;
 template<>
 class BaseActions<ActionsPath::Default>
 {
-private:
+protected:
 	std::vector<Action> path_{};
 
 public:
 	BaseActions() = default;
 
 	BaseActions(acl::IntermediateActions&& actions) :
-	        path_(std::move(actions.path)) {}
-
-	[[nodiscard]] const Action& get_last() const
+	        path_(std::move(actions.path))
 	{
-		assert(!path_.empty());
-		return path_.back();
+		if (path_.empty())
+		{
+			YANET_THROW("Path cannot be empty");
+		}
+		if (!std::holds_alternative<FlowAction>(default_path_last_raw_action()))
+		{
+			YANET_THROW("Last action in the default path must be a FlowAction");
+		}
 	}
 
-	Action& get_last()
-	{
-		assert(!path_.empty());
-		return path_.back();
-	}
-
-	[[nodiscard]] const std::vector<Action>& get_actions() const
+	[[nodiscard]] const std::vector<Action>& default_path() const
 	{
 		return path_;
 	}
 
-	[[nodiscard]] const common::globalBase::tFlow& get_flow() const
+	[[nodiscard]] size_t default_path_size() const
 	{
-		assert(std::holds_alternative<FlowAction>(get_last().raw_action));
-		return std::get<FlowAction>(get_last().raw_action).flow;
+		return path_.size();
 	}
 
-	[[nodiscard]] common::globalBase::tFlow& get_flow()
+	[[nodiscard]] const RawAction& default_path_raw_action(size_t idx) const
 	{
-		assert(std::holds_alternative<FlowAction>(get_last().raw_action));
-		return std::get<FlowAction>(get_last().raw_action).flow;
+		return path_[idx].raw_action;
+	}
+
+	[[nodiscard]] const RawAction& default_path_last_raw_action() const
+	{
+		return path_.back().raw_action;
+	}
+
+	[[nodiscard]] const common::globalBase::tFlow& get_flow() const
+	{
+		return std::get<FlowAction>(default_path_last_raw_action()).flow;
 	}
 
 	bool operator<(const BaseActions& second) const
@@ -617,18 +623,22 @@ public:
 };
 
 template<>
-class BaseActions<ActionsPath::WithCheckState>
+class BaseActions<ActionsPath::WithCheckState> : public BaseActions<ActionsPath::Default>
 {
 private:
-	std::vector<Action> path_{};
 	// TODO: This is a prefix of a path_, in C++-20 I would use std::span to avoid extra copying
 	std::vector<Action> check_state_path_{};
 
 public:
 	BaseActions() = default;
+
 	BaseActions(acl::IntermediateActions&& actions)
 	{
-		assert(actions.indices.get<common::CheckStateAction>().has_value());
+		if (!actions.indices.get<common::CheckStateAction>().has_value())
+		{
+			YANET_THROW("Check-state index should be provided");
+		}
+
 		auto check_state_index = actions.indices.get<common::CheckStateAction>().value();
 
 		path_ = std::move(actions.path);
@@ -640,43 +650,24 @@ public:
 		path_.erase(path_.begin() + check_state_index);
 	}
 
-	[[nodiscard]] const std::vector<Action>& get_actions() const
-	{
-		return path_;
-	}
-
-	[[nodiscard]] const std::vector<Action>& get_check_state_actions() const
+	[[nodiscard]] const std::vector<Action>& check_state_path() const
 	{
 		return check_state_path_;
 	}
 
-	[[nodiscard]] const Action& get_last() const
+	[[nodiscard]] size_t check_state_path_size() const
 	{
-		assert(!path_.empty());
-		return path_.back();
+		return check_state_path_.size();
 	}
 
-	Action& get_last()
+	[[nodiscard]] const RawAction& check_state_path_raw_action(size_t idx) const
 	{
-		assert(!path_.empty());
-		return path_.back();
+		return check_state_path_[idx].raw_action;
 	}
 
-	[[nodiscard]] const common::globalBase::tFlow& get_flow() const
+	[[nodiscard]] const RawAction& check_state_path_last_raw_action() const
 	{
-		assert(std::holds_alternative<FlowAction>(get_last().raw_action));
-		return std::get<FlowAction>(get_last().raw_action).flow;
-	}
-
-	[[nodiscard]] common::globalBase::tFlow& get_flow()
-	{
-		assert(std::holds_alternative<FlowAction>(get_last().raw_action));
-		return std::get<FlowAction>(get_last().raw_action).flow;
-	}
-
-	bool operator<(const BaseActions& second) const
-	{
-		return get_flow() < second.get_flow();
+		return check_state_path_.back().raw_action;
 	}
 
 	void pop(stream_in_t& stream)

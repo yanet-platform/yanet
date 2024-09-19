@@ -31,7 +31,7 @@ struct ActionDispatcher
 	 *
 	 * If HasCheckState is true and the state check succeeds,
 	 * it executes the check_state_path_ and then returns.
-	 * Otherwise, it executes the regular path. The egress/ingress flow
+	 * Otherwise, it executes the default path. The egress/ingress flow
 	 * is handled by the CheckStateAction execute method.
 	 */
 	template<common::ActionsPath Path>
@@ -56,13 +56,13 @@ struct ActionDispatcher
 
 			if (flow)
 			{
-				execute_path(actions.get_check_state_actions(), flow.value(), args);
+				execute_path(actions.check_state_path(), flow.value(), args);
 				return;
 			}
 		}
 
-		// Execute regular path
-		execute_path(actions.get_actions(), actions.get_flow(), args);
+		// Execute default path
+		execute_path(actions.default_path(), actions.get_flow(), args);
 	}
 
 	static void execute_path(const std::vector<common::Action>& actions, const common::globalBase::tFlow& flow, const ActionDispatcherArgs& args)
