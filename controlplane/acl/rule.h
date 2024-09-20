@@ -1048,28 +1048,14 @@ struct rule_t
 	std::set<std::string> via;
 	bool log;
 
-private:
-	rule_t(const ref_t<filter_t>& _filter, rule_action _action, ids_t _ids, bool _log) :
-	        filter(_filter), action(std::move(_action)), ids(std::move(_ids)), ruleno(DISPATCHER), log(_log)
-	{}
-
 public:
-	rule_t(const ref_t<filter_t>& _filter, common::globalBase::tFlow flow, const ids_t& ids, bool log) :
-	        rule_t(_filter, rule_action(flow), ids, log)
+	// Templated constructor to handle all variants of rule_action
+	template<typename T>
+	rule_t(const ref_t<filter_t>& _filter, T action, ids_t ids, bool log) :
+	        filter(_filter), action(rule_action(action)), ids(std::move(ids)), ruleno(DISPATCHER), log(log)
 	{}
 
-	rule_t(const ref_t<filter_t>& _filter, common::acl::dump_t action, const ids_t& ids, bool log) :
-	        rule_t(_filter, rule_action(action), ids, log)
-	{}
-
-	rule_t(const ref_t<filter_t>& _filter, common::acl::check_state_t action, const ids_t& ids, bool log) :
-	        rule_t(_filter, rule_action(action), ids, log)
-	{}
-
-	rule_t(const ref_t<filter_t>& _filter, common::acl::state_timeout_t action, const ids_t& ids, bool log) :
-	        rule_t(_filter, rule_action(action), ids, log)
-	{}
-
+	// Specialized constructor for skipto
 	rule_t(const ref_t<filter_t>& _filter, int64_t num, int64_t skipto) :
 	        filter(_filter),
 	        action(skipto),
