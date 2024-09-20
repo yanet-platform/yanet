@@ -38,7 +38,7 @@ class cControlPlane
 {
 public:
 	cControlPlane();
-	~cControlPlane();
+	~cControlPlane() = default;
 
 	eResult init(const std::string& jsonFilePath);
 	void start();

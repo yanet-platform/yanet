@@ -36,8 +36,8 @@ using path_info_to_nexthop_stuff_ptr_t = common::rib::path_info_to_nexthop_stuff
 class rib_t : public cModule
 {
 public:
-	rib_t();
-	~rib_t() override;
+	rib_t() = default;
+	~rib_t() override = default;
 
 	eResult init() override;
 	void reload(const controlplane::base_t& base_prev, const controlplane::base_t& base_next, common::idp::updateGlobalBase::request& globalbase) override;

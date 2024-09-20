@@ -30,10 +30,6 @@ atomic::atomic(cDataPlane* dataPlane,
 	memset(gc_counter_shifts, 0, sizeof(gc_counter_shifts));
 }
 
-atomic::~atomic()
-{
-}
-
 generation::generation(cDataPlane* dataPlane,
                        const tSocketId& socketId) :
         dataPlane(dataPlane),
@@ -46,10 +42,6 @@ generation::generation(cDataPlane* dataPlane,
 	std::fill(balancer_real_states,
 	          balancer_real_states + YANET_CONFIG_BALANCER_REALS_SIZE,
 	          balancer_real_state_t());
-}
-
-generation::~generation()
-{
 }
 
 eResult generation::init()

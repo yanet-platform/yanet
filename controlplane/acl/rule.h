@@ -45,7 +45,7 @@ struct filter_base_t
 	inline constexpr filter_base_t() :
 	        ref_count(0) {}
 	virtual bool is_none() const = 0;
-	virtual ~filter_base_t() {}
+	virtual ~filter_base_t() = default;
 	virtual std::string to_string() const = 0;
 };
 
@@ -182,7 +182,7 @@ struct filter_network_t : filter_base_t
 {
 	std::vector<network_t> networks;
 
-	inline filter_network_t() {}
+	inline filter_network_t() = default;
 
 	filter_network_t(const ipfw::rule_t::address_t& target)
 	{
@@ -270,7 +270,7 @@ struct filter_prm_t : filter_base_t
 {
 	std::vector<range_t<uint_t>> ranges;
 
-	inline filter_prm_t() {}
+	inline filter_prm_t() = default;
 
 	filter_prm_t(const common::ranges_t& _ranges)
 	{

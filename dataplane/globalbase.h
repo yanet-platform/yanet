@@ -88,7 +88,7 @@ class atomic
 {
 public:
 	atomic(cDataPlane* dataPlane, const tSocketId& socketId);
-	~atomic();
+	~atomic() = default;
 
 public: ///< @todo
 	cDataPlane* dataPlane;
@@ -134,7 +134,7 @@ class generation
 {
 public:
 	generation(cDataPlane* dataPlane, const tSocketId& socketId);
-	~generation();
+	~generation() = default;
 
 public:
 	eResult init();

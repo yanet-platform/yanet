@@ -97,9 +97,7 @@ using tunnel_counter_key_t = std::tuple<bool, ///< is_ipv4
 class generation_t
 {
 public:
-	generation_t()
-	{
-	}
+	generation_t() = default;
 
 	void update(const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)

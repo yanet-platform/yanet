@@ -20,7 +20,7 @@ class cModule
 {
 public:
 	cModule();
-	virtual ~cModule();
+	virtual ~cModule() = default;
 
 	eResult moduleInit(cControlPlane* controlPlane);
 	void moduleStart();

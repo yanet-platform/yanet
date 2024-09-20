@@ -11,7 +11,7 @@ class RpcController : public google::protobuf::RpcController
 {
 public:
 	RpcController() { _reset(); }
-	virtual ~RpcController() {}
+	 ~RpcController() override = default;
 
 	virtual void Reset()
 	{

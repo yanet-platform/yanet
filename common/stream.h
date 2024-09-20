@@ -99,7 +99,7 @@ public:
 	using integer_t = uint64_t;
 
 public:
-	stream_out_t();
+	stream_out_t() = default;
 
 	template<typename TType>
 	inline void push(const TType& value);
@@ -559,10 +559,6 @@ inline void stream_in_t::popVariant(std::variant<TArgs...>& variant,
 }
 
 //
-
-inline stream_out_t::stream_out_t()
-{
-}
 
 template<typename TType>
 inline void stream_out_t::push(const TType& value)

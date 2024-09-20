@@ -550,9 +550,7 @@ protected:
 class ip_address_t
 {
 public:
-	constexpr ip_address_t()
-	{
-	}
+	constexpr ip_address_t() = default;
 
 	ip_address_t(const uint8_t ip_version, const uint8_t* bytes)
 	{
@@ -853,9 +851,7 @@ protected:
 class ipv4_prefix_with_announces_t
 {
 public:
-	ipv4_prefix_with_announces_t()
-	{
-	}
+	ipv4_prefix_with_announces_t() = default;
 
 	ipv4_prefix_with_announces_t(const nlohmann::json& prefixJson)
 	{
@@ -1200,9 +1196,7 @@ public:
 class ip_prefix_t
 {
 public:
-	constexpr ip_prefix_t()
-	{
-	}
+	constexpr ip_prefix_t() = default;
 
 	constexpr ip_prefix_t(const ipv4_prefix_t& prefix) :
 	        prefix(prefix)
@@ -1433,9 +1427,7 @@ class ip_prefix_with_announces_t
 public:
 	using variant_t = std::variant<ipv4_prefix_with_announces_t, ipv6_prefix_with_announces_t>;
 
-	ip_prefix_with_announces_t()
-	{
-	}
+	ip_prefix_with_announces_t() = default;
 
 	ip_prefix_with_announces_t(const nlohmann::json& prefixJson)
 	{
@@ -1679,9 +1671,7 @@ public:
 class values_t
 {
 public:
-	values_t()
-	{
-	}
+	values_t() = default;
 
 	template<typename... args_T>
 	values_t(const args_T&... args)
@@ -1729,9 +1719,7 @@ protected:
 class range_t
 {
 public:
-	constexpr range_t()
-	{
-	}
+	constexpr range_t() = default;
 
 	constexpr range_t(const uint64_t& value) :
 	        range(value, value)
@@ -1849,9 +1837,7 @@ protected:
 class ranges_t ///< @todo: rename filter_t
 {
 public:
-	ranges_t()
-	{
-	}
+	ranges_t() = default;
 
 	ranges_t(const uint64_t& value)
 	{

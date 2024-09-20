@@ -38,8 +38,8 @@ public:
 class tun64_t : public module_t
 {
 public:
-	tun64_t();
-	~tun64_t();
+	tun64_t() = default;
+	~tun64_t() override = default;
 
 	eResult init() override;
 	void reload_before() override;
