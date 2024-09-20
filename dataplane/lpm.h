@@ -304,11 +304,9 @@ protected:
 
 		YADECAP_MEMORY_BARRIER_COMPILE;
 
-		for (unsigned int entry_i = 0;
-		     entry_i < 256;
-		     entry_i++)
+		for (auto& entrie : chunk.entries)
 		{
-			chunk.entries[entry_i].atomic = newEntry.atomic;
+			entrie.atomic = newEntry.atomic;
 		}
 
 		chunk.entries[0].flags |= flag;
@@ -346,12 +344,10 @@ protected:
 				}
 
 				bool merge = true;
-				for (unsigned int next_entry_i = 0;
-				     next_entry_i < 256;
-				     next_entry_i++)
+				for (auto& entrie : extendedChunks[extendedChunkId].entries)
 				{
-					if (!(extendedChunks[extendedChunkId].entries[next_entry_i].flags & flagValid &&
-					      extendedChunks[extendedChunkId].entries[next_entry_i].valueId == valueId))
+					if (!(entrie.flags & flagValid &&
+					      entrie.valueId == valueId))
 					{
 						merge = false;
 						break;
@@ -502,11 +498,9 @@ protected:
 				}
 
 				bool isEmpty = true;
-				for (unsigned int next_entry_i = 0;
-				     next_entry_i < 256;
-				     next_entry_i++)
+				for (auto& entrie : extendedChunks[extendedChunkId].entries)
 				{
-					if (extendedChunks[extendedChunkId].entries[next_entry_i].flags & (flagExtended | flagValid))
+					if (entrie.flags & (flagExtended | flagValid))
 					{
 						isEmpty = false;
 						break;
@@ -637,12 +631,8 @@ protected:
 		memcpy(rootChunk.entries, from_chunk.entries, sizeof(from_chunk.entries));
 		std::vector<std::tuple<unsigned int, unsigned int>> nexts;
 
-		for (uint32_t i = 0;
-		     i < (1u << 24);
-		     i++)
+		for (auto& chunk_value : rootChunk.entries)
 		{
-			auto& chunk_value = rootChunk.entries[i];
-
 			if (chunk_value.flags & flagExtended)
 			{
 				auto& chunk_id = remap_chunks[chunk_value.extendedChunkId];
@@ -1043,13 +1033,11 @@ protected:
 			return;
 		}
 
-		for (unsigned int entry_i = 0;
-		     entry_i < 256 * 256;
-		     entry_i++)
+		for (auto& entrie : extendedChunk.entries)
 		{
-			if (extendedChunk.entries[entry_i].flags & flagExtended)
+			if (entrie.flags & flagExtended)
 			{
-				freeExtendedChunk(stats, extendedChunk.entries[entry_i].extendedChunkId);
+				freeExtendedChunk(stats, entrie.extendedChunkId);
 			}
 		}
 
@@ -1088,11 +1076,9 @@ protected:
 
 		YADECAP_MEMORY_BARRIER_COMPILE;
 
-		for (unsigned int entry_i = 0;
-		     entry_i < 256 * 256;
-		     entry_i++)
+		for (auto& entrie : chunk.entries)
 		{
-			chunk.entries[entry_i].atomic = newEntry.atomic;
+			entrie.atomic = newEntry.atomic;
 		}
 
 		chunk.entries[0].flags |= flag;
@@ -1153,12 +1139,10 @@ protected:
 				}
 
 				bool merge = true;
-				for (unsigned int next_entry_i = 0;
-				     next_entry_i < 256 * 256;
-				     next_entry_i++)
+				for (auto& entrie : extendedChunks[extendedChunkId].entries)
 				{
-					if (!(extendedChunks[extendedChunkId].entries[next_entry_i].flags & flagValid &&
-					      extendedChunks[extendedChunkId].entries[next_entry_i].valueId == valueId))
+					if (!(entrie.flags & flagValid &&
+					      entrie.valueId == valueId))
 					{
 						merge = false;
 						break;
@@ -1288,11 +1272,9 @@ protected:
 				}
 
 				bool isEmpty = true;
-				for (unsigned int next_entry_i = 0;
-				     next_entry_i < 256 * 256;
-				     next_entry_i++)
+				for (auto& entrie : extendedChunks[extendedChunkId].entries)
 				{
-					if (extendedChunks[extendedChunkId].entries[next_entry_i].flags & (flagExtended | flagValid))
+					if (entrie.flags & (flagExtended | flagValid))
 					{
 						isEmpty = false;
 						break;
@@ -1402,12 +1384,8 @@ protected:
 		memcpy(rootChunk.entries, from_chunk.entries, sizeof(from_chunk.entries));
 		std::vector<std::tuple<unsigned int, unsigned int>> nexts;
 
-		for (uint32_t i = 0;
-		     i < (1u << 16);
-		     i++)
+		for (auto& chunk_value : rootChunk.entries)
 		{
-			auto& chunk_value = rootChunk.entries[i];
-
 			if (chunk_value.flags & flagExtended)
 			{
 				auto& chunk_id = remap_chunks[chunk_value.extendedChunkId];
@@ -1449,12 +1427,8 @@ protected:
 		memcpy(chunk.entries, from_chunk.entries, sizeof(from_chunk.entries));
 		std::vector<std::tuple<unsigned int, unsigned int>> nexts;
 
-		for (uint32_t i = 0;
-		     i < (1u << 16);
-		     i++)
+		for (auto& chunk_value : chunk.entries)
 		{
-			auto& chunk_value = chunk.entries[i];
-
 			if (chunk_value.flags & flagExtended)
 			{
 				auto& chunk_id = remap_chunks[chunk_value.extendedChunkId];
@@ -2305,12 +2279,8 @@ public:
 
 			std::vector<std::tuple<unsigned int, unsigned int>> nexts;
 
-			for (uint32_t i = 0;
-			     i < (1u << bits);
-			     i++)
+			for (auto& chunk_value : chunk.values)
 			{
-				auto& chunk_value = chunk.values[i];
-
 				if (chunk_value.id & 0x80000000u) ///< is_chunk_id
 				{
 					auto& chunk_id = remap_chunks[chunk_value.id ^ 0x80000000u];
@@ -2622,12 +2592,8 @@ protected:
 
 		std::vector<std::tuple<unsigned int, unsigned int>> nexts;
 
-		for (uint32_t i = 0;
-		     i < (1u << bits);
-		     i++)
+		for (auto& chunk_value : chunk.values)
 		{
-			auto& chunk_value = chunk.values[i];
-
 			if (chunk_value.id & 0x80000000u) ///< is_chunk_id
 			{
 				auto& chunk_id = stats.remap_chunks[chunk_value.id ^ 0x80000000u];

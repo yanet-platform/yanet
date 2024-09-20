@@ -246,11 +246,8 @@ void worker_gc_t::handle_nat64stateful_gc()
 		const auto& nat64stateful = base.globalBase->nat64statefuls[wan_key.nat64stateful_id];
 
 		/// check other wan tables
-		for (unsigned int numa_i = 0;
-		     numa_i < YANET_CONFIG_NUMA_SIZE;
-		     numa_i++)
+		for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 		{
-			auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 			if (globalbase_atomic == base_permanently.globalBaseAtomic)
 			{
 				continue;
@@ -282,12 +279,9 @@ void worker_gc_t::handle_nat64stateful_gc()
 		lan_key.port_destination = wan_key.port_source;
 
 		/// check lan tables
-		for (unsigned int numa_i = 0;
-		     numa_i < YANET_CONFIG_NUMA_SIZE;
-		     numa_i++)
+		for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 		{
-			auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
-			if (globalbase_atomic == nullptr)
+				if (globalbase_atomic == nullptr)
 			{
 				break;
 			}
@@ -431,12 +425,9 @@ void worker_gc_t::handle_balancer_gc()
 				auto value = *iter.value();
 				iter.unlock();
 
-				for (unsigned int numa_i = 0;
-				     numa_i < YANET_CONFIG_NUMA_SIZE;
-				     numa_i++)
+				for (auto globalbase_atomic_other : base_permanently.globalBaseAtomics)
 				{
-					dataplane::globalBase::atomic* globalbase_atomic_other = base_permanently.globalBaseAtomics[numa_i];
-					if (globalbase_atomic_other == nullptr)
+						if (globalbase_atomic_other == nullptr)
 					{
 						break;
 					}
@@ -988,12 +979,9 @@ void worker_gc_t::nat64stateful_remove_state(const dataplane::globalBase::nat64s
                                              const dataplane::globalBase::nat64stateful_wan_key& wan_key)
 {
 	/// remove on other numas
-	for (unsigned int numa_i = 0;
-	     numa_i < YANET_CONFIG_NUMA_SIZE;
-	     numa_i++)
+	for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 	{
-		auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
-		if (globalbase_atomic == base_permanently.globalBaseAtomic)
+			if (globalbase_atomic == base_permanently.globalBaseAtomic)
 		{
 			continue;
 		}
@@ -1110,11 +1098,8 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 			uint16_t wan_last_seen = calc_last_seen(wan_value.timestamp_last_packet);
 
 			/// check other wan tables
-			for (unsigned int numa_i = 0;
-			     numa_i < YANET_CONFIG_NUMA_SIZE;
-			     numa_i++)
+			for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 			{
-				auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 				if (globalbase_atomic == base_permanently.globalBaseAtomic)
 				{
 					continue;
@@ -1145,12 +1130,9 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 			lan_key.port_destination = wan_key.port_source;
 
 			/// check lan tables
-			for (unsigned int numa_i = 0;
-			     numa_i < YANET_CONFIG_NUMA_SIZE;
-			     numa_i++)
+			for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 			{
-				auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
-				if (globalbase_atomic == nullptr)
+					if (globalbase_atomic == nullptr)
 				{
 					break;
 				}
