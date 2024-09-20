@@ -375,7 +375,7 @@ yanet_open(void)
 	{
 		std::cerr << __func__ << " failed" << std::endl;
 	}
-	return (NULL);
+	return (nullptr);
 }
 
 extern "C" void

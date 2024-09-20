@@ -141,10 +141,10 @@ eResult tAutotest::initSharedMemory()
 			return eResult::errorInitSharedMemory;
 		}
 
-		shmaddr = shmat(shmid, NULL, 0);
+		shmaddr = shmat(shmid, nullptr, 0);
 		if (shmaddr == (void*)-1)
 		{
-			YANET_LOG_ERROR("shmat(%d, NULL, 0) = %d\n", shmid, errno);
+			YANET_LOG_ERROR("shmat(%d, nullptr, 0) = %d\n", shmid, errno);
 			return eResult::errorInitSharedMemory;
 		}
 
@@ -720,7 +720,7 @@ void tAutotest::recvThread(std::string interfaceName,
 
 			auto packetSize = tmp_pcap_packetHeader.len;
 			YANET_LOG_DEBUG("unexpected %u\n", packetSize);
-			dumper.dump(NULL, NULL, buffer, buffer + packetSize);
+			dumper.dump(nullptr, nullptr, buffer, buffer + packetSize);
 		}
 
 		success = false;
@@ -1864,7 +1864,7 @@ std::string exec(const char* cmd)
 
 	try
 	{
-		while (fgets(buffer, sizeof buffer, pipe) != NULL)
+		while (fgets(buffer, sizeof buffer, pipe) != nullptr)
 		{
 			result += buffer;
 		}
@@ -1998,7 +1998,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 			if (dumpPackets)
 			{
 				YANET_LOG_DEBUG("dump [%s]: unexpected %u\n", tag.data(), shm_packet->header.size);
-				dumper.dump(NULL, NULL, shm_packet->memory, shm_packet->memory + header.len);
+				dumper.dump(nullptr, nullptr, shm_packet->memory, shm_packet->memory + header.len);
 			}
 		}
 

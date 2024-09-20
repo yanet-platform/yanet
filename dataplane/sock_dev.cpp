@@ -261,7 +261,7 @@ sock_dev_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 
 	if (sq->internals->conFd < 0)
 	{
-		sq->internals->conFd = accept4(sq->internals->fd, NULL, NULL, SOCK_NONBLOCK);
+		sq->internals->conFd = accept4(sq->internals->fd, nullptr, nullptr, SOCK_NONBLOCK);
 	}
 
 	if (sq->internals->conFd < 0)
@@ -299,7 +299,7 @@ sock_dev_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 
 	struct rte_mbuf* mbuf;
 	mbuf = rte_pktmbuf_alloc(sq->mb_pool);
-	if (unlikely(mbuf == NULL))
+	if (unlikely(mbuf == nullptr))
 	{
 		sq->internals->eth_stats.ierrors++;
 		return 0;
@@ -415,7 +415,7 @@ int sock_dev_create(const char* path, const char* name, uint8_t numa_node)
 {
 	struct sock_internals* internals = (struct sock_internals*)
 	        rte_zmalloc_socket(path, sizeof(struct sock_internals), 0, numa_node);
-	if (internals == NULL)
+	if (internals == nullptr)
 		return ENOSPC;
 
 	internals->pci_id.device_id = 0xBEEF;
@@ -452,9 +452,9 @@ int sock_dev_create(const char* path, const char* name, uint8_t numa_node)
 	listen(internals->fd, 1);
 	internals->conFd = -1;
 
-	struct rte_eth_dev* eth_dev = NULL;
+	struct rte_eth_dev* eth_dev = nullptr;
 	eth_dev = rte_eth_dev_allocate(name);
-	if (eth_dev == NULL)
+	if (eth_dev == nullptr)
 	{
 		close(internals->fd);
 		unlink(internals->sockaddr.sun_path);
