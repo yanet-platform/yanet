@@ -129,16 +129,9 @@ protected:
 
 struct hashtable_gc_t
 {
-	hashtable_gc_t() :
-	        offset(0),
-	        valid_keys(0),
-	        iterations(0)
-	{
-	}
-
-	uint32_t offset;
-	uint64_t valid_keys;
-	uint64_t iterations;
+	uint32_t offset{};
+	uint64_t valid_keys{};
+	uint64_t iterations{};
 };
 
 template<typename TKey,
@@ -649,8 +642,7 @@ public:
 	using hashtable_t = hashtable_chain_spinlock_t<key_T, value_T, size_T, extendedSize_T, pairsPerChunk_T, pairsPerExtendedChunk_T>;
 
 public:
-	hashtable_chain_spinlock_t() :
-	        gcIndex(0)
+	hashtable_chain_spinlock_t()
 	{
 		for (uint32_t id = 0; id < extendedSize_T - 1; ++id)
 		{
@@ -1166,8 +1158,7 @@ public:
 			iterator_t(hashtable_t* hashtable,
 			           const uint32_t& chunk_i) :
 			        hashtable(hashtable),
-			        chunk_i(chunk_i),
-			        key_i(0)
+			        chunk_i(chunk_i)
 			{
 			}
 
@@ -1175,7 +1166,7 @@ public:
 			hashtable_t* hashtable;
 
 			uint32_t chunk_i;
-			uint32_t key_i;
+			uint32_t key_i{};
 		};
 
 		iterator_t begin() const
@@ -1453,7 +1444,7 @@ public:
 
 protected:
 	spinlock_t extendedChunkLocker;
-	uint32_t gcIndex;
+	uint32_t gcIndex{};
 	uint32_t freeExtendedChunkId;
 
 	YADECAP_CACHE_ALIGNED(align1);

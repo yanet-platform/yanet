@@ -126,10 +126,7 @@ class counter_t
 public:
 	static_assert(size_T <= YANET_CONFIG_COUNTER_FALLBACK_SIZE);
 
-	counter_t() :
-	        manager(nullptr)
-	{
-	}
+	counter_t() = default;
 
 	void init(counter_manager_t* manager)
 	{
@@ -352,7 +349,7 @@ public:
 	}
 
 protected:
-	counter_manager_t* manager;
+	counter_manager_t* manager{};
 
 	mutable std::mutex mutex;
 

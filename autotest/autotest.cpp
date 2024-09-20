@@ -475,7 +475,7 @@ class pcap_expectation
 {
 public:
 	pcap_expectation(std::string filename) :
-	        filename(filename), has_packet(true), packetsCount(0), buffer(MAX_PACK_LEN, 0)
+	        filename(filename), buffer(MAX_PACK_LEN, 0)
 	{
 		char pcap_errbuf[PCAP_ERRBUF_SIZE];
 		pcap = pcap_open_offline(filename.c_str(), pcap_errbuf);
@@ -567,9 +567,9 @@ public:
 
 private:
 	std::string filename;
-	bool has_packet;
+	bool has_packet{true};
 	struct pcap_pkthdr header;
-	uint64_t packetsCount;
+	uint64_t packetsCount{};
 	pcap_t* pcap;
 	std::vector<u_char> buffer;
 };

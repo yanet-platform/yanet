@@ -14,10 +14,7 @@ namespace interface
 class dataPlane
 {
 public:
-	dataPlane() :
-	        clientSocket(-1)
-	{
-	}
+	dataPlane() = default;
 
 	~dataPlane()
 	{
@@ -305,7 +302,7 @@ protected:
 	}
 
 protected:
-	mutable int clientSocket;
+	mutable int clientSocket{-1};
 	mutable std::mutex mutex;
 };
 

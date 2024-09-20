@@ -301,8 +301,7 @@ struct tInterface
 
 struct nat64stateful_t
 {
-	nat64stateful_t() :
-	        pool_size(0)
+	nat64stateful_t()
 	{
 		state_timeout.tcp_syn = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
 		state_timeout.tcp_ack = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
@@ -315,7 +314,7 @@ struct nat64stateful_t
 	/// @todo: uint8_t enabled;
 
 	uint32_t pool_start;
-	uint32_t pool_size;
+	uint32_t pool_size{};
 	tCounterId counter_id;
 	uint8_t ipv4_dscp_flags;
 	struct
@@ -405,12 +404,9 @@ static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid YANET_CONFIG_COUN
 
 struct route_value_t
 {
-	route_value_t() :
-	        type(common::globalBase::eNexthopType::controlPlane)
-	{
-	}
+	route_value_t() = default;
 
-	common::globalBase::eNexthopType type; ///< @todo: DELETE
+	common::globalBase::eNexthopType type{common::globalBase::eNexthopType::controlPlane}; ///< @todo: DELETE
 
 	union
 	{
@@ -425,12 +421,9 @@ struct route_value_t
 
 struct route_tunnel_value_t
 {
-	route_tunnel_value_t() :
-	        type(common::globalBase::eNexthopType::controlPlane)
-	{
-	}
+	route_tunnel_value_t() = default;
 
-	common::globalBase::eNexthopType type; ///< @todo: DELETE
+	common::globalBase::eNexthopType type{common::globalBase::eNexthopType::controlPlane}; ///< @todo: DELETE
 
 	union
 	{

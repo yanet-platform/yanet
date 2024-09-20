@@ -21,20 +21,16 @@ namespace base
 class logical_port_t
 {
 public:
-	logical_port_t() :
-	        vlanId(0),
-	        promiscuousMode(0)
-	{
-	}
+	logical_port_t() = default;
 
 public:
 	tLogicalPortId logicalPortId;
 
 	std::string physicalPort;
 	tPortId physicalPortId;
-	uint16_t vlanId;
+	uint16_t vlanId{};
 	mac_address_t macAddress;
-	uint8_t promiscuousMode;
+	uint8_t promiscuousMode{};
 	std::string nextModule;
 	common::globalBase::tFlow flow;
 };
@@ -42,11 +38,7 @@ public:
 class decap_t
 {
 public:
-	decap_t() :
-	        dscpMarkType(common::eDscpMarkType::never),
-	        dscp(0)
-	{
-	}
+	decap_t() = default;
 
 	std::set<ipv6_prefix_t> prefixes() const
 	{
@@ -62,8 +54,8 @@ public:
 	tDecapId decapId;
 
 	std::set<ipv6_prefix_with_announces_t> ipv6DestinationPrefixes;
-	common::eDscpMarkType dscpMarkType;
-	uint8_t dscp;
+	common::eDscpMarkType dscpMarkType{common::eDscpMarkType::never};
+	uint8_t dscp{};
 	uint8_t ipv6_enabled;
 	std::string nextModule;
 	common::globalBase::tFlow flow;
@@ -72,19 +64,13 @@ public:
 class nat64stateless_t
 {
 public:
-	nat64stateless_t() :
-	        dscpMarkType(common::eDscpMarkType::never),
-	        dscp(0),
-	        firewall(1),
-	        farm(0)
-	{
-	}
+	nat64stateless_t() = default;
 
 public:
 	tNat64statelessId nat64statelessId;
 
-	common::eDscpMarkType dscpMarkType;
-	uint8_t dscp;
+	common::eDscpMarkType dscpMarkType{common::eDscpMarkType::never};
+	uint8_t dscp{};
 
 	std::map<std::tuple<ipv6_address_t, ///< ipv6Address
 	                    ipv6_address_t, ///< ipv6DestinationAddress
@@ -94,7 +80,7 @@ public:
 	                    tNat64statelessTranslationId>>
 	        translations;
 
-	uint8_t firewall;
+	uint8_t firewall{1};
 	std::optional<ipv6_prefix_t> nat64_wkp_prefix;
 	std::optional<ipv6_prefix_t> nat64_src_prefix;
 
@@ -105,7 +91,7 @@ public:
 
 	std::optional<ipv6_address_t> defrag_farm_prefix;
 	std::optional<ipv6_address_t> defrag_source_prefix;
-	uint8_t farm;
+	uint8_t farm{};
 
 	/// @todo: ingressFlow;
 	/// @todo: egressFlow;
@@ -416,26 +402,18 @@ public:
 class base_t
 {
 public:
-	base_t() :
-	        interfacesCount(0),
-	        nat64statelessTranslationsCount(0),
-	        services_count(0),
-	        reals_count(0),
-	        tun64MappingsCount(0),
-	        storeSamples(false),
-	        serial(0),
-	        nat64stateful_pool_size(0)
+	base_t()
 	{
 		variables["balancer_real_timeout"] = 900;
 	}
 
 public:
 	std::map<std::string, std::string> moduleTypes;
-	tInterfaceId interfacesCount;
-	tNat64statelessTranslationId nat64statelessTranslationsCount;
-	balancer_service_id_t services_count;
-	balancer_real_id_t reals_count;
-	tun64_id_t tun64MappingsCount;
+	tInterfaceId interfacesCount{};
+	tNat64statelessTranslationId nat64statelessTranslationsCount{};
+	balancer_service_id_t services_count{};
+	balancer_real_id_t reals_count{};
+	tun64_id_t tun64MappingsCount{};
 	std::map<tInterfaceId, std::string> interfaceNames; ///< @todo: per route
 	std::map<tSocketId, std::set<tInterfaceId>> socket_interfaces; ///< @todo: per route
 
@@ -456,8 +434,8 @@ public:
 	acl::iface_map_t result_iface_map;
 	std::vector<std::string> dump_id_to_tag;
 	std::map<unsigned int, std::string> logicalport_id_to_name;
-	bool storeSamples;
-	uint32_t serial;
+	bool storeSamples{};
+	uint32_t serial{};
 
 	std::map<std::string, common::uint64> variables;
 	std::map<std::string, ///< vrf
@@ -465,7 +443,7 @@ public:
 	                  std::vector<std::string>>>
 	        vrf_fqdns;
 
-	uint32_t nat64stateful_pool_size;
+	uint32_t nat64stateful_pool_size{};
 
 	std::map<std::string, ///< vrf_name
 	         std::vector<base_rib>>
