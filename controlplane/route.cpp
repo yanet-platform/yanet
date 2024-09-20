@@ -1,5 +1,7 @@
 #include "route.h"
+#include "common/icp.h"
 #include "controlplane.h"
+#include "controlplane/route.h"
 
 uint32_t ExtractPeerIdFromPathInformation(const std::string& path_information)
 {

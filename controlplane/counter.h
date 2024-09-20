@@ -1,15 +1,10 @@
 #pragma once
 
 #include <mutex>
-#include <set>
-
-#include "segment_allocator.h"
-#include "type.h"
-
 #include "common/icp.h"
-#include "common/idataplane.h"
-#include "common/refarray.h"
+#include "common/sdpcommon.h"
 #include "common/sdpclient.h"
+#include "segment_allocator.h"
 
 class counter_manager_t
 {

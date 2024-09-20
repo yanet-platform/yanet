@@ -1,22 +1,8 @@
 #pragma once
 
-#include <array>
-#include <atomic>
-#include <functional>
-#include <map>
-#include <mutex>
-#include <set>
-#include <tuple>
-#include <unordered_map>
-#include <unordered_set>
-
-#include "common/icp.h"
-#include "common/idataplane.h"
-#include "common/idp.h"
-
-#include "isystem.h"
 #include "module.h"
-#include "type.h"
+#include <mutex>
+#include <atomic>
 
 namespace rib
 {

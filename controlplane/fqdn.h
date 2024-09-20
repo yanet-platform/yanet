@@ -1,7 +1,6 @@
 #pragma once
 
 #include "base.h"
-#include "counter.h"
 #include "module.h"
 #include "type.h"
 

@@ -11,7 +11,6 @@
 
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
-#include "common/result.h"
 #include "common/type.h"
 
 #include "dataplane/samples.h"

@@ -12,11 +12,11 @@
 #include <memory.h>
 #include <nlohmann/json.hpp>
 
-#include "config.h"
 #include "ctree.h"
 #include "define.h"
 #include "stream.h"
 #include "uint128.h"
+#include "config.release.h"
 
 using tCoreId = uint32_t;
 using tSocketId = uint32_t;

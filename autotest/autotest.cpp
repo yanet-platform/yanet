@@ -11,7 +11,6 @@
 
 #include <experimental/filesystem>
 #include <fstream>
-#include <iostream>
 #include <thread>
 #include <utility>
 
@@ -19,6 +18,8 @@
 
 #include "autotest.h"
 #include "common.h"
+
+#include "common/sdpclient.h"
 
 #define MAX_PACK_LEN 16384
 #define SOCK_DEV_PREFIX "sock_dev:"

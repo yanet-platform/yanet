@@ -1,6 +1,10 @@
 #pragma once
 
-#include "acl/bitset.h"
+#include <map>
+#include <set>
+#include <tuple>
+#include <vector>
+
 #include "acl_base.h"
 
 namespace acl::compiler

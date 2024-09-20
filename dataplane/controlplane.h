@@ -15,14 +15,10 @@
 
 #include "common/idp.h"
 #include "common/result.h"
-#include "common/static_vector.h"
-#include "common/type.h"
 
-#include "dpdk.h"
-#include "dregress.h"
-#include "fragmentation.h"
+#include "dataplane/dregress.h"
+#include "dataplane/kernel_interface_handler.h"
 #include "kernel_interface_handle.h"
-#include "slow_worker.h"
 #include "type.h"
 #include "utils.h"
 

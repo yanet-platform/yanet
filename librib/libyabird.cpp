@@ -7,7 +7,6 @@
 
 #include "common/define.h"
 #include "common/icontrolplane.h"
-#include "common/result.h"
 #include "common/type.h"
 
 #include "libyabird.h"

@@ -1,10 +1,8 @@
 #pragma once
 
-#include <rte_byteorder.h>
 #include <rte_ether.h>
 
 #include "common/balancer.h"
-#include "common/config.h"
 #include "common/scheduler.h"
 #include "common/type.h"
 

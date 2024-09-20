@@ -21,6 +21,8 @@
 #include "common/fallback.h"
 #include "common/nat46clat.h"
 
+#include "dataplane/sdpserver.h"
+
 #include "action_dispatcher.h"
 #include "checksum.h"
 #include "common.h"

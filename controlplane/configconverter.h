@@ -3,6 +3,8 @@
 #include <utility>
 
 #include "base.h"
+#include "common/idp.h"
+#include "common/result.h"
 
 class config_converter_t
 {

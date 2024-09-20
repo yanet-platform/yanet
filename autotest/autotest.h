@@ -11,7 +11,7 @@
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
 #include "common/result.h"
-#include "common/sdpclient.h"
+#include "common/sdpcommon.h"
 
 namespace nAutotest
 {

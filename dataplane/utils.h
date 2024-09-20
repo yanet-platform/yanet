@@ -3,10 +3,6 @@
 
 #include <rte_mbuf.h>
 
-#include "common/config.h"
-#include "common/define.h"
-#include "common/type.h"
-#include "dpdk.h"
 #include "metadata.h"
 
 namespace utils

@@ -26,7 +26,6 @@
 #include "memory_manager.h"
 #include "neighbor.h"
 #include "report.h"
-#include "sdpserver.h"
 #include "slow_worker.h"
 #include "type.h"
 
