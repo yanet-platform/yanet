@@ -72,9 +72,8 @@ transport_table::thread_t::thread_t(transport_table_t* transport_table,
                                     const unsigned int threads_count) :
         transport_table(transport_table),
         thread_id(thread_id),
-        threads_count(threads_count)
+        threads_count(threads_count), group_id(1 + thread_id)
 {
-	group_id = 1 + thread_id;
 }
 
 void transport_table::thread_t::start()

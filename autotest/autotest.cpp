@@ -412,9 +412,9 @@ class PcapDumper
 {
 public:
 	PcapDumper(const std::string& path, int capsize = MAX_PACK_LEN) :
-	        tmpFilePath(path)
+	        tmpFilePath(path), pcap(pcap_open_dead(DLT_EN10MB, capsize))
 	{
-		pcap = pcap_open_dead(DLT_EN10MB, capsize);
+
 		if (!pcap)
 		{
 			YANET_LOG_ERROR("error: pcap_open_dead()\n");

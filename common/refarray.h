@@ -17,10 +17,9 @@ public:
 	using id_t = uint64_t;
 
 public:
-	refarray_t() ///< @todo: fallback value?
+	refarray_t() :
+	        ids_unused_size(size_T) ///< @todo: fallback value?
 	{
-		ids_unused_size = size_T;
-		ids_unused_watermark = 0;
 	}
 
 	bool exist_id(const id_t& id)
@@ -203,7 +202,7 @@ public:
 
 protected:
 	std::vector<id_t> ids_unused;
-	std::atomic<id_t> ids_unused_watermark;
+	std::atomic<id_t> ids_unused_watermark{0};
 
 	std::map<value_T,
 	         std::tuple<uint64_t, ///< refcount

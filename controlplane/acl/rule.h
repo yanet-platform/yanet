@@ -80,9 +80,9 @@ struct ref_t
 		ref_inc();
 	}
 
-	inline ref_t(const ref_t& _ref)
+	inline ref_t(const ref_t& _ref) :
+	        filter(_ref.filter)
 	{
-		filter = _ref.filter;
 		ref_inc();
 	}
 
@@ -1063,9 +1063,9 @@ public:
 	        log(false)
 	{}
 
-	rule_t(ipfw::rule_ptr_t rulep, ipfw::fw_config_ptr_t configp)
+	rule_t(ipfw::rule_ptr_t rulep, ipfw::fw_config_ptr_t configp) :
+	        text(rulep->text)
 	{
-		text = rulep->text;
 		switch (rulep->action)
 		{
 			case ipfw::rule_action_t::SKIPTO:

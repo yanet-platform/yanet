@@ -121,9 +121,9 @@ constexpr inline uint32_t unlabelled = 3;
 class uint
 {
 public:
-	uint(const std::string& string)
+	uint(const std::string& string) :
+	        value(std::stoull(string, nullptr, 0))
 	{
-		value = std::stoull(string, nullptr, 0);
 	}
 
 	constexpr operator const uint64_t&() const
