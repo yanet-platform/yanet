@@ -1,12 +1,11 @@
 #pragma once
 
-#include <array>
 #include <map>
 #include <utility>
 #include <vector>
 
 #include "common/controlplaneconfig.h"
-#include "common/idp.h"
+#include "common/memory_manager.h"
 #include "common/nat46clat.h"
 #include "common/type.h"
 #include "libfwparser/fw_parser.h"

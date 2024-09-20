@@ -1,6 +1,5 @@
 #pragma once
 
-#include "libprotobuf/controlplane.pb.h"
 
 namespace common::icp_proto
 {

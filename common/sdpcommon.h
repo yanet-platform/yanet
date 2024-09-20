@@ -6,9 +6,6 @@
 
 #include "define.h"
 #include "idp.h"
-#include "shared_memory.h"
-#include "stream.h"
-#include "type.h"
 
 // #define YANET_USE_POSIX_SHARED_MEMORY
 

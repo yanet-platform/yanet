@@ -2,6 +2,7 @@
 
 #include "base.h"
 #include "counter.h"
+#include "isystem.h"
 #include "module.h"
 #include "rib.h"
 #include "type.h"

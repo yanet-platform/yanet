@@ -1,19 +1,7 @@
 #pragma once
 
-#include <arpa/inet.h>
-
-#include <array>
-#include <thread>
-#include <variant>
-#include <vector>
-
-#include <rte_ether.h>
-
-#include "common/idp.h"
-#include "common/result.h"
-
-#include "sdpserver.h"
-#include "type.h"
+#include "common/sdpcommon.h"
+#include "controlplane.h"
 
 class cBus
 {

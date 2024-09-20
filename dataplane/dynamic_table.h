@@ -1,8 +1,6 @@
 #pragma once
 
-#include <cinttypes>
-
-#include "common/config.h"
+#include "common/config.release.h"
 #include "common/define.h"
 #include "common/result.h"
 

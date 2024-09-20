@@ -1,11 +1,7 @@
 #pragma once
 
-#include <functional>
-
-#include "acl/bitset.h"
 #include "acl_base.h"
-
-#include "common/acl.h"
+#include "common/define.h"
 
 namespace acl::compiler
 {

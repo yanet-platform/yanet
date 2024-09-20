@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <ifaddrs.h>
 #include <linux/sockios.h>
 #include <net/if.h>

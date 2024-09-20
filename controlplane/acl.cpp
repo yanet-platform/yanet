@@ -7,7 +7,6 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #ifdef ACL_DEBUG
@@ -23,13 +22,9 @@
 	}
 
 #include "acl.h"
-#include "acl/bitset.h"
 #include "acl/dict.h"
-#include "acl/network.h"
 #include "acl/rule.h"
 #include "acl_compiler.h"
-
-#include "common/acl.h"
 
 namespace acl
 {

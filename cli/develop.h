@@ -7,7 +7,6 @@
 #include <thread>
 #include <vector>
 
-#include "common/icontrolplane.h"
 #include "common/idataplane.h"
 #include "common/sdpclient.h"
 #include "common/tsc_deltas.h"

@@ -1,4 +1,5 @@
 #include "kernel_interface_handler.h"
+#include "metadata.h"
 
 namespace dataplane
 {

@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include "common/type.h"
 #include "libfwparser/fw_parser.h"
 
 namespace

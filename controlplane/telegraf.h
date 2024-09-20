@@ -1,7 +1,6 @@
 #pragma once
 
 #include <map>
-#include <mutex>
 
 #include "common/icp.h"
 #include "common/idataplane.h"

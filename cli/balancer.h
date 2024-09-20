@@ -1,7 +1,6 @@
 #pragma once
 
 #include "common/icontrolplane.h"
-#include "common/icp_proto.h"
 #include "common/idataplane.h"
 #include "common/iproto_controlplane.h"
 #include "common/type.h"

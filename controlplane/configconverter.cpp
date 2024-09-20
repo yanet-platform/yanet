@@ -6,10 +6,8 @@
 #include <netinet/ip_icmp.h>
 
 #include "acl.h"
-#include "configconverter.h"
-#include "controlplane.h"
 #include "errors.h"
-#include "isystem.h"
+#include "configconverter.h"
 
 eResult config_converter_t::process(uint32_t serial)
 {

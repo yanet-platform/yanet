@@ -15,7 +15,6 @@
 #include "acl.h"
 #include "balancer.h"
 #include "common/actions.h"
-#include "config.h"
 #include "memory_manager.h"
 #include "neighbor.h"
 #include "result.h"

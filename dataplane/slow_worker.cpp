@@ -1,5 +1,6 @@
 #include "slow_worker.h"
 
+#include "checksum.h"
 #include "common/fallback.h"
 #include "dataplane.h"
 #include "icmp_translations.h"

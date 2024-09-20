@@ -9,6 +9,7 @@
 #include <rte_ring.h>
 
 #include "common/result.h"
+#include "common/sdpcommon.h"
 #include "common/tsc_deltas.h"
 #include "common/type.h"
 
@@ -16,7 +17,6 @@
 #include "common.h"
 #include "globalbase.h"
 #include "samples.h"
-#include "sdpserver.h"
 #include "sharedmemory.h"
 
 namespace dataplane
