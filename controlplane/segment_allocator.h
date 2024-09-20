@@ -27,10 +27,9 @@ public:
 		uint32_t used_segments = 0;
 	};
 
-	SegmentAllocator()
+	SegmentAllocator() :
+	        free_cells_(IndexEnd - IndexBegin)
 	{
-		free_cells_ = IndexEnd - IndexBegin;
-
 		// Initialize blocks in main list of free blocks and set size of each block
 		for (uint32_t index = 0; index < total_blocks_; ++index)
 		{

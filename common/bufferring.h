@@ -26,9 +26,8 @@ public:
 	}
 	bufferring(void* memory, int unit_size, int units_number) :
 	        unit_size(unit_size),
-	        units_number(units_number)
+	        units_number(units_number), ring((ring_t*)memory)
 	{
-		ring = (ring_t*)memory;
 	}
 
 	struct ring_header_t
