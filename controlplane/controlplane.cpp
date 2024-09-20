@@ -319,6 +319,7 @@ common::icp::getLogicalPorts::response cControlPlane::getLogicalPorts() const
 		{
 			response[logicalPortName] = {logicalPort.physicalPort,
 			                             logicalPort.vlanId,
+			                             logicalPort.vrf,
 			                             logicalPort.macAddress,
 			                             logicalPort.promiscuousMode};
 		}
@@ -1016,4 +1017,55 @@ std::vector<uint64_t> cControlPlane::getAclCounters()
 	}
 
 	return response;
+}
+
+VrfIdStorage& cControlPlane::getVrfIdsStorage()
+{
+	return vrfIds;
+}
+
+std::optional<tVrfId> VrfIdStorage::Get(const std::string& vrfName)
+{
+	if (vrfName.empty() || vrfName == YANET_RIB_VRF_DEFAULT)
+	{
+		return 0;
+	}
+
+	std::shared_lock lock(mutex);
+
+	auto iter = vrf_ids.find(vrfName);
+	if (iter != vrf_ids.end())
+	{
+		return iter->second;
+	}
+
+	return std::nullopt;
+}
+
+std::optional<tVrfId> VrfIdStorage::GetOrCreate(const std::string& vrfName)
+{
+	std::optional<tVrfId> result = Get(vrfName);
+	if (result.has_value())
+	{
+		return result;
+	}
+
+	std::unique_lock lock(mutex);
+
+	auto iter = vrf_ids.find(vrfName);
+	if (iter != vrf_ids.end())
+	{
+		return iter->second;
+	}
+
+	if (vrf_ids.size() + 1 >= YANET_RIB_VRF_MAX_NUMBER)
+	{
+		vrf_ids[vrfName] = std::nullopt;
+		YANET_LOG_ERROR("Error get id for vrf: '%s'. The number of different values has been exceeded: %d", vrfName.c_str(), YANET_RIB_VRF_MAX_NUMBER);
+		return std::nullopt;
+	}
+
+	tVrfId new_id = vrf_ids.size() + 1;
+	vrf_ids[vrfName] = new_id;
+	return new_id;
 }

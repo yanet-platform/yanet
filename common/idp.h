@@ -113,9 +113,10 @@ using remove = std::vector<ip_prefix_t>;
 
 using clear = std::tuple<>;
 
-using request = std::vector<std::variant<insert,
-                                         remove,
-                                         clear>>;
+using request = std::vector<std::tuple<tVrfId,
+                                       std::variant<insert,
+                                                    remove,
+                                                    clear>>>;
 }
 
 namespace updateGlobalBase
@@ -173,6 +174,7 @@ namespace updateLogicalPort
 using request = std::tuple<tLogicalPortId, ///< @todo: DELETE
                            tPortId,
                            uint16_t, ///< vlanId
+                           tVrfId, ///< vrfId
                            std::array<uint8_t, 6>, ///< etherAddress
                            uint8_t, ///< promiscuous mode
                            common::globalBase::tFlow>;

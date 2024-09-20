@@ -145,7 +145,7 @@ class config_t
 {
 public:
 	config_t() :
-	        vrf("default"),
+	        vrf(YANET_RIB_VRF_DEFAULT),
 	        tunnel_enabled(false)
 	{
 	}

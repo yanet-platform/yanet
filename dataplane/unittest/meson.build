@@ -9,7 +9,12 @@ dependencies += dependency('gtest_main')
 sources = files('unittest.cpp',
                 'ip_address.cpp',
                 'hashtable.cpp',
-                'sdp.cpp')
+                'sdp.cpp',
+                'random_prefixes.cpp',
+                'vrf_lpm_linear.cpp',
+                'vrf_lpm_binary.cpp',
+                '../vrf.cpp',
+                )
 
 arch = 'corei7'
 cpp_args_append = ['-march=' + arch]
