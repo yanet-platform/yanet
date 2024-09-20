@@ -158,14 +158,11 @@ void transport_table::thread_t::compile()
 	std::array<size_t, dimension> table_indexes;
 	table_indexes.fill(0);
 
-	for (unsigned int filter_id = 0;
-	     filter_id < transport_table->filters.size();
-	     filter_id++)
+	for (auto [network_table_filter_id, network_flags_filter_id, transport_filter_id] : transport_table->filters)
 	{
 		remap_group_ids.clear();
 		remap_group_ids.resize(group_id, 0);
 
-		const auto& [network_table_filter_id, network_flags_filter_id, transport_filter_id] = transport_table->filters[filter_id];
 		const auto& network_table_group_ids_orig = transport_table->compiler->network_table.filter_id_group_ids[network_table_filter_id];
 		const auto& network_flags_group_ids = transport_table->compiler->network_flags.filter_id_group_ids[network_flags_filter_id];
 

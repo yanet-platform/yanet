@@ -295,9 +295,9 @@ int main(int argc,
 	args.push_back(masterLcoreId.data());
 
 	YANET_LOG_DEBUG("eal args:\n");
-	for (uint32_t i = 0; i < args.size(); ++i)
+	for (auto& arg : args)
 	{
-		YANET_LOG_DEBUG("%s\n", args[i]);
+		YANET_LOG_DEBUG("%s\n", arg);
 	}
 
 	ret = rte_eal_init(args.size(), (char**)args.data());
