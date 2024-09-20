@@ -52,10 +52,6 @@ telegraf_t::telegraf_t() :
 {
 }
 
-telegraf_t::~telegraf_t()
-{
-}
-
 eResult telegraf_t::init()
 {
 	controlPlane->register_command(common::icp::requestType::telegraf_unsafe, [this]() {

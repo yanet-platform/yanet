@@ -68,9 +68,7 @@ public:
 	}
 
 public:
-	lpm4_24bit_8bit_atomic()
-	{
-	}
+	lpm4_24bit_8bit_atomic() = default;
 
 	eResult insert(stats_t& stats,
 	               const uint32_t& ipAddress,
@@ -741,9 +739,7 @@ public:
 	}
 
 public:
-	lpm6_8x16bit_atomic()
-	{
-	}
+	lpm6_8x16bit_atomic() = default;
 
 	static std::array<uint8_t, 16> createMask(uint8_t ones)
 	{

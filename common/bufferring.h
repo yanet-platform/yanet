@@ -21,9 +21,7 @@ namespace common
 class bufferring
 {
 public:
-	bufferring()
-	{
-	}
+	bufferring() = default;
 	bufferring(void* memory, int unit_size, int units_number) :
 	        unit_size(unit_size),
 	        units_number(units_number), ring((ring_t*)memory)

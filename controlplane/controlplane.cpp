@@ -21,10 +21,6 @@ cControlPlane::cControlPlane() :
 {
 }
 
-cControlPlane::~cControlPlane()
-{
-}
-
 eResult cControlPlane::init(const std::string& jsonFilePath)
 {
 	eResult result = eResult::success;

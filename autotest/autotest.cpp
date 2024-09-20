@@ -56,10 +56,6 @@ tAutotest::tAutotest() :
 	::testing::GTEST_FLAG(throw_on_failure) = true;
 }
 
-tAutotest::~tAutotest()
-{
-}
-
 eResult tAutotest::init(const std::string& binaryPath,
                         bool dumpPackets,
                         const std::vector<std::string>& configFilePaths)

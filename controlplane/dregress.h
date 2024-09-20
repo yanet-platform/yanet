@@ -26,9 +26,7 @@ using value_key_t = std::tuple<std::tuple<std::string, ///< vrf
 class generation_t
 {
 public:
-	generation_t()
-	{
-	}
+	generation_t() = default;
 
 	void update(const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)

@@ -3,14 +3,6 @@
 
 using namespace controlplane::module;
 
-rib_t::rib_t()
-{
-}
-
-rib_t::~rib_t()
-{
-}
-
 eResult rib_t::init()
 {
 	controlPlane->register_command(common::icp::requestType::rib_update, [this](const common::icp::request& request) {
