@@ -131,7 +131,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		}
 	}
 
-	mempool_log = rte_mempool_create("log", YANET_CONFIG_SAMPLES_SIZE, sizeof(samples::sample_t), 0, 0, NULL, NULL, NULL, NULL, SOCKET_ID_ANY, MEMPOOL_F_NO_IOVA_CONTIG);
+	mempool_log = rte_mempool_create("log", YANET_CONFIG_SAMPLES_SIZE, sizeof(samples::sample_t), 0, 0, nullptr, nullptr, nullptr, nullptr, SOCKET_ID_ANY, MEMPOOL_F_NO_IOVA_CONTIG);
 
 	result = initGlobalBases();
 	if (result != eResult::success)
@@ -1660,9 +1660,9 @@ eResult cDataPlane::allocateSharedMemory()
 		int shmid = shmget(key, 0, 0);
 		if (shmid != -1)
 		{
-			if (shmctl(shmid, IPC_RMID, NULL) < 0)
+			if (shmctl(shmid, IPC_RMID, nullptr) < 0)
 			{
-				YADECAP_LOG_ERROR("shmctl(%d, IPC_RMID, NULL): %s\n", shmid, strerror(errno));
+				YADECAP_LOG_ERROR("shmctl(%d, IPC_RMID, nullptr): %s\n", shmid, strerror(errno));
 				return eResult::errorInitSharedMemory;
 			}
 		}
@@ -1680,10 +1680,10 @@ eResult cDataPlane::allocateSharedMemory()
 			return eResult::errorInitSharedMemory;
 		}
 
-		void* shmaddr = shmat(shmid, NULL, 0);
+		void* shmaddr = shmat(shmid, nullptr, 0);
 		if (shmaddr == (void*)-1)
 		{
-			YADECAP_LOG_ERROR("shmat(%d, NULL, %d): %s\n", shmid, 0, strerror(errno));
+			YADECAP_LOG_ERROR("shmat(%d, nullptr, %d): %s\n", shmid, 0, strerror(errno));
 			return eResult::errorInitSharedMemory;
 		}
 
