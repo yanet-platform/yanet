@@ -189,10 +189,10 @@ public:
 				{
 					throw std::string("shmget(") + std::to_string(ipc_key) + ", 0, 0) = " + std::strerror(errno);
 				}
-				auto shmaddr = shmat(shmid, NULL, SHM_RDONLY);
+				auto shmaddr = shmat(shmid, nullptr, SHM_RDONLY);
 				if (shmaddr == (void*)-1)
 				{
-					throw std::string("shmat(") + std::to_string(ipc_key) + ", NULL, 0) = " + std::strerror(errno);
+					throw std::string("shmat(") + std::to_string(ipc_key) + ", nullptr, 0) = " + std::strerror(errno);
 				}
 
 				ipc_cache[ipc_key] = shmaddr;

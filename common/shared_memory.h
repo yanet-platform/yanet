@@ -33,7 +33,7 @@ public:
 		const char* str_hugetlb = "Hugetlb:";
 
 		FILE* fd = fopen(path_meminfo, "r");
-		if (fd == NULL)
+		if (fd == nullptr)
 		{
 			YANET_LOG_ERROR("Cannot open %s, error %d: %s\n", path_meminfo, errno, strerror(errno));
 			return false;

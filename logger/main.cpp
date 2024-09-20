@@ -46,7 +46,7 @@ int initLogger()
 	{
 		auto coreId = it.first;
 		auto ring = rte_ring_lookup(("r_log_" + std::to_string(coreId)).c_str());
-		if (ring != NULL)
+		if (ring != nullptr)
 		{
 			YANET_LOG_DEBUG("found log ring on #%u core\n", coreId);
 
