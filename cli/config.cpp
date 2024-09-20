@@ -139,16 +139,16 @@ bool allowPrefix(nlohmann::json& prefixes,
 			}
 
 			// check whether current announces includes announceRaw
-			for (auto announceIt = announces->begin(); announceIt != announces->end(); ++announceIt)
+			for (auto& announceIt : *announces)
 			{
 				// sanity check that announce has string type
-				if (!announceIt->is_string())
+				if (!announceIt.is_string())
 				{
 					throw std::string{"invalid type of prefix item announce. Should be string"};
 				}
 
 				// announce already presented within the prefix
-				if (announceIt->get_ref<const std::string&>() == announceRaw)
+				if (announceIt.get_ref<const std::string&>() == announceRaw)
 				{
 					return false;
 				}

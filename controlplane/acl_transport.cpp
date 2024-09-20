@@ -105,12 +105,8 @@ void transport_t::distribute()
 
 void transport_t::compile()
 {
-	for (unsigned int layer_id = 0;
-	     layer_id < layers.size();
-	     layer_id++)
+	for (auto& layer : layers)
 	{
-		auto& layer = layers[layer_id];
-
 		for (const auto filter_id : layer.filter_ids_set)
 		{
 			const auto& filter = filters[filter_id];
@@ -144,12 +140,8 @@ void transport_t::compile()
 		layer.icmp_identifier.prepare();
 	}
 
-	for (unsigned int layer_id = 0;
-	     layer_id < layers.size();
-	     layer_id++)
+	for (auto& layer : layers)
 	{
-		auto& layer = layers[layer_id];
-
 		layer.protocol.compile();
 		layer.tcp_source.compile();
 		layer.tcp_destination.compile();
@@ -163,12 +155,8 @@ void transport_t::compile()
 
 void transport_t::populate()
 {
-	for (unsigned int layer_id = 0;
-	     layer_id < layers.size();
-	     layer_id++)
+	for (auto& layer : layers)
 	{
-		auto& layer = layers[layer_id];
-
 		layer.protocol.populate();
 		layer.tcp_source.populate();
 		layer.tcp_destination.populate();

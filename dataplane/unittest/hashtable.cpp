@@ -220,47 +220,37 @@ TEST(hashtable_mod_id32, burst)
 	{
 		const auto mask = ht.lookup(hashes, keys, values, YANET_CONFIG_BURST_SIZE);
 		EXPECT_EQ(0, mask);
-		for (unsigned int i = 0;
-		     i < YANET_CONFIG_BURST_SIZE;
-		     i++)
+		for (unsigned int value : values)
 		{
-			EXPECT_EQ(0x80000000, values[i] & (1u << 31));
+			EXPECT_EQ(0x80000000, value & (1u << 31));
 		}
 	}
 
-	for (unsigned int i = 0;
-	     i < YANET_CONFIG_BURST_SIZE;
-	     i++)
+	for (auto key : keys)
 	{
-		EXPECT_EQ(eResult::success, ht.insert(updater, keys[i], value1));
+		EXPECT_EQ(eResult::success, ht.insert(updater, key, value1));
 	}
 
 	{
 		const auto mask = ht.lookup(hashes, keys, values, YANET_CONFIG_BURST_SIZE);
 		EXPECT_EQ(0xFFFFFFFF, mask);
-		for (unsigned int i = 0;
-		     i < YANET_CONFIG_BURST_SIZE;
-		     i++)
+		for (unsigned int value : values)
 		{
-			EXPECT_EQ(value1, values[i]);
+			EXPECT_EQ(value1, value);
 		}
 	}
 
-	for (unsigned int i = 0;
-	     i < YANET_CONFIG_BURST_SIZE;
-	     i++)
+	for (auto key : keys)
 	{
-		EXPECT_EQ(eResult::success, ht.insert(updater, keys[i], value2));
+		EXPECT_EQ(eResult::success, ht.insert(updater, key, value2));
 	}
 
 	{
 		const auto mask = ht.lookup(hashes, keys, values, YANET_CONFIG_BURST_SIZE);
 		EXPECT_EQ(0xFFFFFFFF, mask);
-		for (unsigned int i = 0;
-		     i < YANET_CONFIG_BURST_SIZE;
-		     i++)
+		for (unsigned int value : values)
 		{
-			EXPECT_EQ(value2, values[i]);
+			EXPECT_EQ(value2, value);
 		}
 	}
 
@@ -269,11 +259,9 @@ TEST(hashtable_mod_id32, burst)
 	{
 		const auto mask = ht.lookup(hashes, keys, values, YANET_CONFIG_BURST_SIZE);
 		EXPECT_EQ(0, mask);
-		for (unsigned int i = 0;
-		     i < YANET_CONFIG_BURST_SIZE;
-		     i++)
+		for (unsigned int value : values)
 		{
-			EXPECT_EQ(0x80000000, values[i] & (1u << 31));
+			EXPECT_EQ(0x80000000, value & (1u << 31));
 		}
 	}
 }

@@ -63,14 +63,12 @@ public:
 
 	void compile()
 	{
-		for (unsigned int filter_id = 0;
-		     filter_id < filters.size();
-		     filter_id++)
+		for (auto& filter : filters)
 		{
 			remap_group_ids.resize(0);
 			remap_group_ids.resize(group_id, 0);
 
-			for (const auto& network : filters[filter_id])
+			for (const auto& network : filter)
 			{
 				tree.insert(network.addr, network.mask, group_id, remap_group_ids);
 			}
