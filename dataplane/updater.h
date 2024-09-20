@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mutex>
 #include <nlohmann/json.hpp>
 #include <rte_malloc.h>
 

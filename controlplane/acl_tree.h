@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cinttypes>
-
 #include "common/acl.h"
 
 namespace acl::compiler

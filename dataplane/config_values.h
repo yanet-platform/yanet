@@ -1,9 +1,9 @@
 #pragma once
 
+#include "common/config.release.h"
 #include <cstdint>
 #include <nlohmann/json.hpp>
 
-#include "common/config.h"
 
 struct FragmentationConfig
 {

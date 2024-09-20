@@ -1,7 +1,6 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
-#include "common/fallback.h"
 
 #include "checksum.h"
 #include "dataplane.h"

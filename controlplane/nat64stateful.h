@@ -10,7 +10,6 @@
 #include "common/generation.h"
 #include "common/icp.h"
 #include "common/idataplane.h"
-#include "common/refarray.h"
 
 namespace nat64stateful
 {

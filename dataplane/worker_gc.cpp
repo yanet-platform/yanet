@@ -1,14 +1,11 @@
-#include <thread>
-
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 
 #include "common/counters.h"
 #include "common/fallback.h"
-
-#include "dataplane.h"
-#include "worker.h"
-#include "worker_gc.h"
+#include "dataplane/globalbase.h"
+#include "dataplane/sdpserver.h"
+#include "dataplane/worker_gc.h"
 
 worker_gc_t::worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, SamplersVector&& samplers) :
         mempool(nullptr),

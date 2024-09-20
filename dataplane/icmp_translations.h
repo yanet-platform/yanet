@@ -1,7 +1,6 @@
 #include <rte_mbuf.h>
 
-#include "globalbase.h"
-#include "icmp.h"
+#include "type.h"
 
 namespace dataplane
 {

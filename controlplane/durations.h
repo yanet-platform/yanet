@@ -2,9 +2,7 @@
 
 #include <mutex>
 
-#include "base.h"
 #include "module.h"
-#include "type.h"
 
 class durations_t : public module_t
 {

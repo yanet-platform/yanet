@@ -5,7 +5,6 @@
 
 #include "base.h"
 #include "dpdk.h"
-#include "metadata.h"
 
 namespace dataplane
 {

@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include "base.h"
+#include "common/idp.h"
 
 namespace acl
 {

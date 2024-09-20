@@ -1,8 +1,5 @@
 #pragma once
 
-#include <atomic>
-#include <functional>
-#include <map>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
@@ -16,12 +13,7 @@
 #include "common/idataplane.h"
 #include "common/idp.h"
 #include "common/result.h"
-#include "common/sdpclient.h"
-#include "libprotobuf/controlplane.pb.h"
-
 #include "balancer.h"
-#include "base.h"
-#include "counter.h"
 #include "dregress.h"
 #include "durations.h"
 #include "fqdn.h"

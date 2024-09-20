@@ -1,7 +1,6 @@
 #include <signal.h>
 #include <systemd/sd-daemon.h>
 
-#include <iostream>
 
 #include "controlplane.h"
 

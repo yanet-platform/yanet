@@ -1,9 +1,6 @@
 #pragma once
 
 #include <memory.h>
-#include <unordered_map>
-#include <unordered_set>
-
 #include <rte_byteorder.h>
 #include <rte_common.h>
 #include <rte_ip.h>

@@ -9,22 +9,11 @@
 #include <rte_lcore.h>
 #include <rte_malloc.h>
 
-#include "common/fallback.h"
-#include "common/idp.h"
-#include "common/type.h"
-#include "common/version.h"
-
-#include "checksum.h"
 #include "common.h"
-#include "controlplane.h"
+#include "common/version.h"
 #include "dataplane.h"
+#include "dataplane/worker_gc.h"
 #include "debug_latch.h"
-#include "icmp.h"
-#include "icmp_translations.h"
-#include "metadata.h"
-#include "prepare.h"
-#include "worker.h"
-#include "worker_gc.h"
 
 cControlPlane::cControlPlane(cDataPlane* dataPlane) :
         dataPlane(dataPlane),
