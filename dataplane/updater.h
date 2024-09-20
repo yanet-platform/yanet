@@ -216,8 +216,7 @@ public:
 	                             const tSocketId socket_id) :
 	        name(name),
 	        memory_manager(memory_manager),
-	        socket_id(socket_id),
-	        pointer(nullptr)
+	        socket_id(socket_id)
 	{
 	}
 
@@ -291,7 +290,7 @@ protected:
 	object_type::stats_t stats;
 
 public:
-	object_type* pointer;
+	object_type* pointer{};
 };
 
 //
@@ -306,8 +305,7 @@ public:
 	                          const tSocketId socket_id) :
 	        name(name),
 	        memory_manager(memory_manager),
-	        socket_id(socket_id),
-	        pointer(nullptr)
+	        socket_id(socket_id)
 	{
 	}
 
@@ -381,7 +379,7 @@ protected:
 	object_type::stats_t stats;
 
 public:
-	object_type* pointer;
+	object_type* pointer{};
 };
 
 //

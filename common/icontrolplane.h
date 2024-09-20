@@ -13,10 +13,7 @@ namespace interface
 class controlPlane
 {
 public:
-	controlPlane() :
-	        clientSocket(-1)
-	{
-	}
+	controlPlane() = default;
 
 	~controlPlane()
 	{
@@ -395,7 +392,7 @@ protected:
 	}
 
 protected:
-	mutable int clientSocket;
+	mutable int clientSocket{-1};
 	mutable std::mutex mutex;
 };
 

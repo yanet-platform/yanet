@@ -40,10 +40,9 @@ struct range_t : std::tuple<uint_t, uint_t>
 
 struct filter_base_t
 {
-	unsigned long ref_count;
+	unsigned long ref_count{};
 
-	inline constexpr filter_base_t() :
-	        ref_count(0) {}
+	inline constexpr filter_base_t() = default;
 	virtual bool is_none() const = 0;
 	virtual ~filter_base_t() = default;
 	virtual std::string to_string() const = 0;

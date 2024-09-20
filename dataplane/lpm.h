@@ -1498,10 +1498,7 @@ public:
 	class updater
 	{
 	public:
-		updater() :
-		        extended_chunks_count(1)
-		{
-		}
+		updater() = default;
 
 		void clear(const unsigned int tree_size)
 		{
@@ -1539,7 +1536,7 @@ public:
 		}
 
 	public:
-		unsigned int extended_chunks_count;
+		unsigned int extended_chunks_count{1};
 		std::vector<unsigned int> remap_chunks;
 	};
 
@@ -1612,12 +1609,9 @@ protected:
 
 	struct value_t
 	{
-		value_t() :
-		        id(0)
-		{
-		}
+		value_t() = default;
 
-		uint32_t id;
+		uint32_t id{};
 	};
 
 	struct chunk_step1_t
@@ -1981,10 +1975,7 @@ public:
 	class updater
 	{
 	public:
-		updater() :
-		        chunks_count(1) ///< 0 is root chunk
-		{
-		}
+		updater() = default;
 
 		void clear(const unsigned int tree_size)
 		{
@@ -2012,7 +2003,7 @@ public:
 		}
 
 	public:
-		unsigned int chunks_count;
+		unsigned int chunks_count{1}; ///< 0 is root chunk
 		std::vector<unsigned int> remap_chunks;
 	};
 
@@ -2139,12 +2130,9 @@ protected:
 
 	struct value_t
 	{
-		value_t() :
-		        id(0)
-		{
-		}
+		value_t() = default;
 
-		uint32_t id;
+		uint32_t id{};
 	};
 
 	struct chunk_t
@@ -2234,11 +2222,7 @@ public:
 	class updater
 	{
 	public:
-		updater() :
-		        lpm(nullptr),
-		        chunks_size(0)
-		{
-		}
+		updater() = default;
 
 		void update_pointer(lpm6_8x16bit_id32_dynamic* lpm,
 		                    const tSocketId socket_id,
@@ -2358,9 +2342,9 @@ public:
 		}
 
 	public:
-		lpm6_8x16bit_id32_dynamic* lpm;
+		lpm6_8x16bit_id32_dynamic* lpm{};
 		tSocketId socket_id;
-		unsigned int chunks_size;
+		unsigned int chunks_size{};
 		unsigned int chunks_count;
 		std::vector<unsigned int> remap_chunks;
 	};
@@ -2466,12 +2450,9 @@ protected:
 
 	struct value_t
 	{
-		value_t() :
-		        id(0)
-		{
-		}
+		value_t() = default;
 
-		uint32_t id;
+		uint32_t id{};
 	};
 
 	struct chunk_t
@@ -2680,12 +2661,9 @@ protected:
 protected:
 	struct value_t
 	{
-		value_t() :
-		        id(0)
-		{
-		}
+		value_t() = default;
 
-		uint32_t id;
+		uint32_t id{};
 	};
 
 	struct chunk_t

@@ -2288,7 +2288,6 @@ class tFlow
 {
 public:
 	tFlow() :
-	        type(eFlowType::controlPlane), ///< @todo: drop
 	        flags(0),
 	        counter_id(0)
 	{
@@ -2369,7 +2368,7 @@ public:
 		uint32_t type_params_atomic;
 		struct
 		{
-			eFlowType type;
+			eFlowType type{eFlowType::controlPlane}; ///< @todo: drop
 			uint8_t flags : 2;
 			uint32_t counter_id : 22;
 		};

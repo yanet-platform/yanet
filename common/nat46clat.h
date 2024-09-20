@@ -18,11 +18,7 @@ enum class module_counter : tCounterId
 class config
 {
 public:
-	config() :
-	        dscp_mark_type(common::eDscpMarkType::never),
-	        dscp(0)
-	{
-	}
+	config() = default;
 
 	void pop(common::stream_in_t& stream)
 	{
@@ -54,8 +50,8 @@ public:
 	nat46clat_id_t nat46clat_id;
 	common::ipv6_address_t ipv6_source;
 	common::ipv6_address_t ipv6_destination;
-	common::eDscpMarkType dscp_mark_type;
-	uint8_t dscp;
+	common::eDscpMarkType dscp_mark_type{common::eDscpMarkType::never};
+	uint8_t dscp{};
 	std::set<common::ipv6_prefix_t> ipv6_prefixes;
 	std::set<common::ipv4_prefix_t> ipv4_prefixes;
 	std::set<common::ip_prefix_t> announces;

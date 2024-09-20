@@ -13,15 +13,7 @@ namespace controlplane
 class state_timeout
 {
 public:
-	state_timeout() :
-	        tcp_syn(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
-	        tcp_ack(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
-	        tcp_fin(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
-	        udp(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
-	        icmp(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
-	        other(YANET_CONFIG_STATE_TIMEOUT_DEFAULT)
-	{
-	}
+	state_timeout() = default;
 
 	operator std::tuple<uint16_t, uint16_t, uint16_t, uint16_t, uint16_t, uint16_t>() const
 	{
@@ -29,12 +21,12 @@ public:
 	}
 
 public:
-	uint16_t tcp_syn;
-	uint16_t tcp_ack;
-	uint16_t tcp_fin;
-	uint16_t udp;
-	uint16_t icmp;
-	uint16_t other;
+	uint16_t tcp_syn{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
+	uint16_t tcp_ack{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
+	uint16_t tcp_fin{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
+	uint16_t udp{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
+	uint16_t icmp{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
+	uint16_t other{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
 };
 
 [[maybe_unused]] static void from_json(const nlohmann::json& json,
@@ -142,11 +134,7 @@ public:
 class config_t
 {
 public:
-	config_t() :
-	        vrf("default"),
-	        tunnel_enabled(false)
-	{
-	}
+	config_t() = default;
 
 	/** @todo: tag:CP_MODULES
 	void load(const nlohmann::json& json);
@@ -186,8 +174,8 @@ public:
 public:
 	tRouteId routeId;
 	std::set<common::ip_prefix_t> to_kernel_prefixes;
-	std::string vrf;
-	bool tunnel_enabled;
+	std::string vrf{"default"};
+	bool tunnel_enabled{};
 	std::set<std::string> ignore_tables;
 	common::ipv4_address_t ipv4_source_address;
 	common::ipv6_address_t ipv6_source_address;
@@ -315,10 +303,7 @@ using service_t = std::tuple<balancer_service_id_t,
 class config_t
 {
 public:
-	config_t() :
-	        reals_count(0)
-	{
-	}
+	config_t() = default;
 
 	/** @todo: tag:CP_MODULES
 	void load(const nlohmann::json& json);
@@ -362,7 +347,7 @@ public:
 	std::string next_module;
 	common::globalBase::tFlow flow;
 
-	uint64_t reals_count;
+	uint64_t reals_count{};
 };
 
 }
@@ -373,12 +358,7 @@ namespace tun64
 class config_t
 {
 public:
-	config_t() :
-	        dscpMarkType(common::eDscpMarkType::never),
-	        dscp(0),
-	        srcRndEnabled(false)
-	{
-	}
+	config_t() = default;
 
 	/** @todo: tag:CP_MODULES
        void load(const nlohmann::json& json);
@@ -412,11 +392,11 @@ public:
 public:
 	tun64_id_t tun64Id;
 
-	common::eDscpMarkType dscpMarkType;
-	uint8_t dscp;
+	common::eDscpMarkType dscpMarkType{common::eDscpMarkType::never};
+	uint8_t dscp{};
 
 	common::ipv6_address_t ipv6SourceAddress;
-	bool srcRndEnabled; /// < IPv6 Source address randomization
+	bool srcRndEnabled{}; /// < IPv6 Source address randomization
 
 	std::set<common::ip_prefix_t> prefixes;
 	std::map<common::ipv4_address_t,
@@ -436,11 +416,7 @@ namespace nat64stateful
 class config_t
 {
 public:
-	config_t() :
-	        dscp_mark_type(common::eDscpMarkType::never),
-	        dscp(0)
-	{
-	}
+	config_t() = default;
 
 	void pop(common::stream_in_t& stream)
 	{
@@ -466,8 +442,8 @@ public:
 
 public:
 	nat64stateful_id_t nat64stateful_id;
-	common::eDscpMarkType dscp_mark_type;
-	uint8_t dscp;
+	common::eDscpMarkType dscp_mark_type{common::eDscpMarkType::never};
+	uint8_t dscp{};
 	std::vector<common::ipv6_prefix_t> ipv6_prefixes;
 	std::vector<common::ipv4_prefix_t> ipv4_prefixes;
 	std::set<common::ip_prefix_t> announces;

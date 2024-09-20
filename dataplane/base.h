@@ -81,11 +81,7 @@ public:
 class permanently
 {
 public:
-	permanently() :
-	        globalBaseAtomic(nullptr),
-	        nat64stateful_numa_mask(0xFFFFu),
-	        nat64stateful_numa_reverse_mask(0),
-	        nat64stateful_numa_id(0)
+	permanently()
 	{
 		memset(globalBaseAtomics, 0, sizeof(globalBaseAtomics));
 
@@ -109,7 +105,7 @@ public:
 		return true;
 	}
 
-	dataplane::globalBase::atomic* globalBaseAtomic;
+	dataplane::globalBase::atomic* globalBaseAtomic{};
 	/// Pointers to all globalBaseAtomic for each CPU socket.
 	///
 	/// Used to distribute firewall states.
@@ -123,22 +119,16 @@ public:
 	uint32_t SWNormalPriorityRateLimitPerWorker;
 	uint8_t transportSizes[256];
 
-	uint16_t nat64stateful_numa_mask;
-	uint16_t nat64stateful_numa_reverse_mask;
-	uint16_t nat64stateful_numa_id;
+	uint16_t nat64stateful_numa_mask{0xFFFFu};
+	uint16_t nat64stateful_numa_reverse_mask{};
+	uint16_t nat64stateful_numa_id{};
 };
 
 class generation
 {
 public:
-	generation() :
-	        globalBase(nullptr),
-	        neighbor_hashtable(nullptr)
-	{
-	}
-
-	dataplane::globalBase::generation* globalBase;
-	dataplane::neighbor::hashtable const* neighbor_hashtable;
+	dataplane::globalBase::generation* globalBase{};
+	dataplane::neighbor::hashtable const* neighbor_hashtable{};
 } __rte_aligned(2 * RTE_CACHE_LINE_SIZE);
 
 }

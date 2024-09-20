@@ -16,10 +16,8 @@ namespace common::proto
 class UnixProtobufRpcChannel : public google::protobuf::RpcChannel
 {
 public:
-	UnixProtobufRpcChannel(const std::string& socketPath) :
-	        clientSocket(-1)
+	UnixProtobufRpcChannel(const std::string& socketPath)
 	{
-
 		connectChannel(socketPath);
 	}
 
@@ -103,7 +101,7 @@ public:
 	}
 
 private:
-	mutable int clientSocket;
+	mutable int clientSocket{-1};
 	mutable std::mutex mutex{};
 	std::vector<uint8_t> buffer;
 };
