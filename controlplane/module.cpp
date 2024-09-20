@@ -6,10 +6,6 @@ cModule::cModule() :
 {
 }
 
-cModule::~cModule()
-{
-}
-
 eResult cModule::moduleInit(cControlPlane* controlPlane)
 {
 	this->controlPlane = controlPlane;

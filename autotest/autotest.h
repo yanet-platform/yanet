@@ -36,7 +36,7 @@ class tAutotest
 {
 public:
 	tAutotest();
-	~tAutotest();
+	~tAutotest() = default;
 
 	eResult init(const std::string& binaryPath,
 	             bool dumpPackets,

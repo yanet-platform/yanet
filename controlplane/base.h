@@ -114,9 +114,7 @@ public:
 class acl_rule_network_ipv4_t
 {
 public:
-	acl_rule_network_ipv4_t()
-	{
-	}
+	acl_rule_network_ipv4_t() = default;
 
 	acl_rule_network_ipv4_t(const std::set<ipv4_prefix_t>& sourcePrefixes,
 	                        const std::set<ipv4_prefix_t>& destinationPrefixes) :
@@ -133,9 +131,7 @@ public:
 class acl_rule_network_ipv6_t
 {
 public:
-	acl_rule_network_ipv6_t()
-	{
-	}
+	acl_rule_network_ipv6_t() = default;
 
 	acl_rule_network_ipv6_t(const std::set<ipv6_prefix_t>& sourcePrefixes,
 	                        const std::set<ipv6_prefix_t>& destinationPrefixes) :
@@ -152,9 +148,7 @@ public:
 class acl_rule_transport_tcp_t
 {
 public:
-	acl_rule_transport_tcp_t()
-	{
-	}
+	acl_rule_transport_tcp_t() = default;
 
 	acl_rule_transport_tcp_t(const ranges_t& sourcePorts,
 	                         const ranges_t& destinationPorts) :
@@ -172,9 +166,7 @@ public:
 class acl_rule_transport_udp_t
 {
 public:
-	acl_rule_transport_udp_t()
-	{
-	}
+	acl_rule_transport_udp_t() = default;
 
 	acl_rule_transport_udp_t(const ranges_t& sourcePorts,
 	                         const ranges_t& destinationPorts) :
@@ -271,9 +263,7 @@ public:
 class acl_rule_transport_other_t
 {
 public:
-	acl_rule_transport_other_t()
-	{
-	}
+	acl_rule_transport_other_t() = default;
 
 	acl_rule_transport_other_t(const ranges_t& protocolTypes) :
 	        protocolTypes(protocolTypes)
@@ -295,9 +285,7 @@ public:
 	};
 
 public:
-	acl_rule_t()
-	{
-	}
+	acl_rule_t() = default;
 
 	template<typename transport_T>
 	acl_rule_t(const std::variant<acl_rule_network_ipv4_t, acl_rule_network_ipv6_t>& network,
@@ -395,9 +383,7 @@ public:
 class acl_t
 {
 public:
-	acl_t()
-	{
-	}
+	acl_t() = default;
 
 public:
 	tAclId aclId;

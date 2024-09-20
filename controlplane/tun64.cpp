@@ -1,14 +1,6 @@
 #include "tun64.h"
 #include "controlplane.h"
 
-tun64_t::tun64_t()
-{
-}
-
-tun64_t::~tun64_t()
-{
-}
-
 eResult tun64_t::init()
 {
 	tunnel_counters.init(&controlPlane->counter_manager);

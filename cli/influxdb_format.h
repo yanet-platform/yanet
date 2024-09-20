@@ -88,9 +88,7 @@ std::string to_string(const char* key,
 class base_t
 {
 public:
-	virtual ~base_t()
-	{
-	}
+	virtual ~base_t() = default;
 
 	const std::string& to_string() const
 	{

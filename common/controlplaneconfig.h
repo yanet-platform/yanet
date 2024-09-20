@@ -90,9 +90,7 @@ namespace route
 class interface_t
 {
 public:
-	interface_t()
-	{
-	}
+	interface_t() = default;
 
 	/** @todo: tag:CP_MODULES
 	void load(const nlohmann::json& json);

@@ -17,9 +17,7 @@ namespace telegraf
 class generation_t
 {
 public:
-	generation_t()
-	{
-	}
+	generation_t() = default;
 
 	void update(const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
@@ -64,7 +62,7 @@ class telegraf_t : public module_t
 {
 public:
 	telegraf_t();
-	~telegraf_t();
+	~telegraf_t() override = default;
 
 	eResult init() override;
 	void reload_before() override;
