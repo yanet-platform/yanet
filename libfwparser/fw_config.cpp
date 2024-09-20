@@ -16,17 +16,13 @@ using namespace ipfw;
 			std::cerr << "DEBUG: " << __func__ << ": " << msg << std::endl; \
 	} while (0)
 
-fw_config_t::fw_config_t(int step)
+fw_config_t::fw_config_t(int step) :
+        m_curr_entity(entity_type::NONE), m_debug(0), m_ruleid_last(0), m_ruleno_last(0)
 {
 	// use limits like in FreeBSD kernel
 	const auto value = std::clamp(step, 1, 1000);
 
-	m_debug = 0;
-	m_ruleid_last = 0;
-	m_ruleno_last = 0;
 	m_ruleno_step = value;
-
-	m_curr_entity = entity_type::NONE;
 	m_curr_rule = std::make_shared<rule_t>();
 	m_prev_rule = nullptr;
 

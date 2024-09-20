@@ -123,17 +123,13 @@ struct network_t
 	}
 
 	network_t(const ipfw::ipv4_prefix_mask_t& pref) :
-	        family(4)
+	        family(4), addr(std::get<0>(pref)), mask(std::get<1>(pref))
 	{
-		addr = std::get<0>(pref);
-		mask = std::get<1>(pref);
 	}
 
 	network_t(const ipfw::ipv6_prefix_mask_t& pref) :
-	        family(6)
+	        family(6), addr(std::get<0>(pref).getAddress128()), mask(std::get<1>(pref).getAddress128())
 	{
-		addr = std::get<0>(pref).getAddress128();
-		mask = std::get<1>(pref).getAddress128();
 	}
 
 	network_t(const common::ip_prefix_t& pref)
