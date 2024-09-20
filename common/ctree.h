@@ -25,8 +25,7 @@ struct ctree
 			root_node = new node_base_t();
 		}
 	}
-	ctree(ctree&& other) :
-	        root_node{}
+	ctree(ctree&& other)
 	{
 		if (this != &other)
 		{
@@ -392,7 +391,7 @@ struct ctree
 		        convert;
 	};
 
-	node_base_t* root_node;
+	node_base_t* root_node{};
 };
 
 } // namespace common

@@ -87,8 +87,8 @@ protected:
 
 protected:
 	const std::vector<uint8_t>& inBuffer;
-	uint64_t inPosition;
-	bool failed;
+	uint64_t inPosition{};
+	bool failed{};
 };
 
 //
@@ -287,9 +287,7 @@ private:
 //
 
 inline stream_in_t::stream_in_t(const std::vector<uint8_t>& buffer) :
-        inBuffer(buffer),
-        inPosition(0),
-        failed(false)
+        inBuffer(buffer)
 {
 }
 

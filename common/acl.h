@@ -9,10 +9,7 @@ namespace common::acl
 class tree_value_t
 {
 public:
-	tree_value_t() :
-	        id(0)
-	{
-	}
+	tree_value_t() = default;
 
 	constexpr bool operator<(const tree_value_t& second) const
 	{
@@ -50,17 +47,14 @@ public:
 	}
 
 protected:
-	uint32_t id; ///< stored group_id or chunk_id
+	uint32_t id{}; ///< stored group_id or chunk_id
 };
 
 template<unsigned int bits = 8>
 class tree_chunk_t
 {
 public:
-	tree_chunk_t() :
-	        is_multirefs(0)
-	{
-	}
+	tree_chunk_t() = default;
 
 	void pop(common::stream_in_t& stream)
 	{
@@ -72,7 +66,7 @@ public:
 		stream.push(values);
 	}
 
-	uint8_t is_multirefs;
+	uint8_t is_multirefs{};
 	tree_value_t values[1u << bits];
 };
 
