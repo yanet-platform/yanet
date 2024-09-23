@@ -123,6 +123,7 @@ public:
 protected:
 	eResult parseConfig(const std::string& configFilePath);
 	eResult parseJsonPorts(const nlohmann::json& json);
+	void ChooseGCs(tCoreId core, CPlaneWorkerConfig& cfg) const;
 	std::optional<std::map<tCoreId, CPlaneWorkerConfig>> parseControlPlaneWorkers(const nlohmann::json& config);
 	std::optional<std::pair<tCoreId, CPlaneWorkerConfig>> parseControlPlaneWorker(const nlohmann::json& cpwj);
 	nlohmann::json makeLegacyControlPlaneWorkerConfig();
@@ -148,7 +149,7 @@ protected:
 	bool KNIAddRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool);
 	eResult initGlobalBases();
 	eResult initWorkers();
-	eResult InitSlowWorker(const tCoreId core, const CPlaneWorkerConfig& ports);
+	eResult InitSlowWorker(tCoreId core, const CPlaneWorkerConfig& ports, tQueueId phy_queue);
 	eResult InitSlowWorkers();
 	eResult initKniQueues();
 	eResult InitTxQueues();
@@ -182,6 +183,13 @@ protected:
 		dataplane::KernelInterfaceHandle in_dump;
 		dataplane::KernelInterfaceHandle out_dump;
 		dataplane::KernelInterfaceHandle drop_dump;
+		bool Start()
+		{
+			return forward.Start() &&
+			       in_dump.Start() &&
+			       out_dump.Start() &&
+			       drop_dump.Start();
+		}
 	};
 	std::map<tPortId, KniHandleBundle> kni_interface_handles;
 

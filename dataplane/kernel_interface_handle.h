@@ -10,6 +10,7 @@ namespace dataplane
 class KernelInterfaceHandle
 {
 	tPortId kni_port_ = INVALID_PORT_ID;
+	std::string name_;
 	std::string vdev_name_;
 	uint16_t queue_size_ = 0;
 
@@ -30,6 +31,7 @@ public:
 	[[nodiscard]] bool SetUp() const noexcept;
 	bool SetupRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool) noexcept;
 	bool SetupTxQueue(tQueueId queue, tSocketId socket) noexcept;
+	bool CloneMTU(const uint16_t) noexcept;
 
 private:
 	static std::string VdevName(std::string_view name, const tPortId port_id);
@@ -38,7 +40,6 @@ private:
 	void Remove() noexcept;
 	static rte_eth_conf DefaultConfig() noexcept;
 	bool Configure(const rte_eth_conf& eth_conf) noexcept;
-	bool CloneMTU(const uint16_t) const noexcept;
 	void MarkInvalid() noexcept { kni_port_ = INVALID_PORT_ID; }
 	[[nodiscard]] bool Valid() const { return kni_port_ != INVALID_PORT_ID; }
 };

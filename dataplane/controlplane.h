@@ -138,14 +138,6 @@ protected:
 
 	bool use_kernel_interface;
 
-	struct KniHandleBundle
-	{
-		dataplane::KernelInterfaceHandle forward;
-		dataplane::KernelInterfaceHandle in_dump;
-		dataplane::KernelInterfaceHandle out_dump;
-		dataplane::KernelInterfaceHandle drop_dump;
-	};
-
 	struct KniPortData
 	{
 		std::string interface_name;
