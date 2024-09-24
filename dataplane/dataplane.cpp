@@ -487,7 +487,7 @@ eResult cDataPlane::initPorts()
 		const auto& [pci, name, symmetric_mode, rss_flags] = configPortIter.second;
 		(void)pci;
 
-		tPortId portId;
+		tPortId portId = 0;
 
 		if (StartsWith(name, SOCK_DEV_PREFIX))
 		{

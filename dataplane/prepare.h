@@ -64,7 +64,7 @@ inline bool prepareL3(rte_mbuf* mbuf, dataplane::metadata* metadata)
 		uint8_t transport_headerType = ipv6Header->proto;
 		uint16_t transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv6_hdr);
 
-		unsigned int extension_i;
+		unsigned int extension_i = 0;
 		for (extension_i = 0;
 		     extension_i < CONFIG_YADECAP_IPV6_EXTENSIONS_MAX + 1;
 		     extension_i++)

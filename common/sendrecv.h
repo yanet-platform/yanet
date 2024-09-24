@@ -122,7 +122,7 @@ static inline Resp recv(int clientSocket) //unsafe
 {
 	std::vector<uint8_t> buffer;
 
-	uint64_t messageSize;
+	uint64_t messageSize = 0;
 	if (auto err = recvAll(clientSocket, (char*)&messageSize, sizeof(messageSize)); err != 0)
 	{
 		throw std::string("recv(): ") + strerror(err);

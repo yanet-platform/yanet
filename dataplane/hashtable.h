@@ -62,7 +62,7 @@ inline uint32_t calculate_hash_crc(const key_t& key)
 template<typename key_t>
 inline uint32_t calculate_hash_murmur3(const key_t& key)
 {
-	uint32_t result;
+	uint32_t result = 0;
 	MurmurHash3_x86_32(&key, sizeof(key), 19, &result);
 	return result;
 }
@@ -1645,7 +1645,7 @@ public:
 
 		for (const auto& [key, value] : keys)
 		{
-			eResult insert_result;
+			eResult insert_result = eResult::success;
 			if constexpr (std::is_same_v<update_key_t, key_t>)
 			{
 				insert_result = insert(updater, key, value);
@@ -2173,8 +2173,8 @@ public:
 	{
 		bool result = true;
 
-		value_t* ht_value;
-		spinlock_nonrecursive_t* locker;
+		value_t* ht_value = nullptr;
+		spinlock_nonrecursive_t* locker = nullptr;
 
 		uint32_t hash = lookup(key, ht_value, locker);
 		if (ht_value)
@@ -2650,8 +2650,8 @@ public:
 	{
 		bool result = true;
 
-		value_t* ht_value;
-		spinlock_nonrecursive_t* locker;
+		value_t* ht_value = nullptr;
+		spinlock_nonrecursive_t* locker = nullptr;
 
 		uint32_t hash = lookup(key, ht_value, locker);
 		if (ht_value)
@@ -3235,7 +3235,7 @@ public:
 	{
 		bool result = true;
 
-		value_t* ht_value;
+		value_t* ht_value = nullptr;
 
 		uint32_t hash = lookup(key, ht_value);
 		if (ht_value)

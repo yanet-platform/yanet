@@ -180,12 +180,12 @@ void libyabird_t::update(yanet_data_t* data)
 		std::set<common::community_t> attribute_communities;
 		std::set<common::large_community_t> attribute_large_communities;
 		std::vector<uint32_t> labels;
-		node* n;
-		yanet_prefix_t* p;
-		yanet_u32_t* uptr;
+		node* n = nullptr;
+		yanet_prefix_t* p = nullptr;
+		yanet_u32_t* uptr = nullptr;
 		uint32_t attribute_local_preference = 0;
 		uint32_t attribute_med = 0;
-		uint32_t i;
+		uint32_t i = 0;
 
 		if (data->flags & YANET_ORIGIN)
 			attribute_origin = std::string(data->origin);
@@ -259,7 +259,7 @@ void libyabird_t::update(yanet_data_t* data)
 				WALK_LIST(n, data->prefixes)
 				{
 					common::ip_prefix_t prefix;
-					size_t pos;
+					size_t pos = 0;
 
 					p = reinterpret_cast<yanet_prefix_t*>(n);
 
@@ -306,7 +306,7 @@ void libyabird_t::update(yanet_data_t* data)
 			WALK_LIST(n, data->withdraw)
 			{
 				common::ip_prefix_t prefix;
-				size_t pos;
+				size_t pos = 0;
 
 				p = reinterpret_cast<yanet_prefix_t*>(n);
 

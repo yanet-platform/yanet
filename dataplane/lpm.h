@@ -195,7 +195,7 @@ public:
 	bool lookup(const uint32_t& ipAddress,
 	            uint32_t* valueId = nullptr) const
 	{
-		uint32_t lvalueId;
+		uint32_t lvalueId = 0;
 
 		lookup(&ipAddress, &lvalueId, 1);
 
@@ -379,7 +379,7 @@ protected:
 					return eResult::success;
 				}
 
-				uint32_t extendedChunkId;
+				uint32_t extendedChunkId = 0;
 				if (!newExtendedChunk(stats, extendedChunkId))
 				{
 					return eResult::isFull;
@@ -526,7 +526,7 @@ protected:
 			{
 				/// valid
 
-				uint32_t extendedChunkId;
+				uint32_t extendedChunkId = 0;
 				if (!newExtendedChunk(stats, extendedChunkId))
 				{
 					return eResult::isFull;
@@ -942,7 +942,7 @@ public:
 	            uint32_t* valueId = nullptr) const
 	{
 		ipv6_address_t lipv6Address;
-		uint32_t lvalueId;
+		uint32_t lvalueId = 0;
 
 		memcpy(lipv6Address.bytes, ipv6Address.data(), 16);
 		lookup(&lipv6Address, &lvalueId, 1);
@@ -964,7 +964,7 @@ public:
 	            uint32_t* value_id = nullptr) const
 	{
 		ipv6_address_t lipv6Address;
-		uint32_t lvalueId;
+		uint32_t lvalueId = 0;
 
 		memcpy(lipv6Address.bytes, ipv6_address, 16);
 		lookup(&lipv6Address, &lvalueId, 1);
@@ -1174,7 +1174,7 @@ protected:
 					return eResult::success;
 				}
 
-				uint32_t extendedChunkId;
+				uint32_t extendedChunkId = 0;
 				if (!newExtendedChunk(stats, extendedChunkId))
 				{
 					YADECAP_LOG_WARNING("lpm6 is full\n");
@@ -1300,7 +1300,7 @@ protected:
 			{
 				/// valid
 
-				uint32_t extendedChunkId;
+				uint32_t extendedChunkId = 0;
 				if (!newExtendedChunk(stats, extendedChunkId))
 				{
 					YADECAP_LOG_WARNING("lpm6 is full\n");
