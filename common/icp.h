@@ -15,9 +15,8 @@
 #include "result.h"
 #include "type.h"
 
-namespace common
-{
-namespace icp
+
+namespace common::icp
 {
 
 constexpr inline char socketPath[] = "/run/yanet/controlplane.sock";
@@ -1021,4 +1020,4 @@ using response = std::variant<std::tuple<>,
                               convert::response,
                               counters_stat::response>;
 }
-}
+

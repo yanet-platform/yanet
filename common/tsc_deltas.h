@@ -13,10 +13,9 @@
 #define YANET_TSC_BINS_SHIFT 2
 #define YANET_TSC_BINS_N 4
 
-namespace dataplane
-{
 
-namespace perf
+
+namespace dataplane::perf
 {
 
 struct tsc_base_values
@@ -112,4 +111,4 @@ static_assert(std::is_pod_v<tsc_deltas> == true,
 
 }
 
-}
+
