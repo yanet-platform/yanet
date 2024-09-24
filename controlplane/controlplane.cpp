@@ -845,7 +845,7 @@ common::icp::convert::response cControlPlane::convert_logical_module()
 
 	for (auto [id, name] : logicalport_id_to_name)
 	{
-		response.push_back({id, name});
+		response.emplace_back(id, name);
 	}
 
 	return response;

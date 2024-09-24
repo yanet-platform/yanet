@@ -268,7 +268,7 @@ struct rdict_t
 		vec.reserve(map.size());
 		for (auto& v : map)
 		{
-			vec.push_back(v);
+			vec.emplace_back(v);
 		}
 
 		return vec;
