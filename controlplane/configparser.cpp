@@ -1136,7 +1136,7 @@ void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,
 
 	if (exist(moduleJson, "macros"))
 	{
-		std::string includePath = moduleJson["macros"].get<std::string>();
+		auto includePath = moduleJson["macros"].get<std::string>();
 		if (includePath.find("/") != 0) ///< relative path
 		{
 			includePath = dirname(rootFilePath) + "/" + includePath;
@@ -1149,7 +1149,7 @@ void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,
 
 	if (exist(moduleJson, "dnscache"))
 	{
-		std::string includePath = moduleJson["dnscache"].get<std::string>();
+		auto includePath = moduleJson["dnscache"].get<std::string>();
 		if (includePath.find("/") != 0) ///< relative path
 		{
 			includePath = dirname(rootFilePath) + "/" + includePath;
@@ -1213,7 +1213,7 @@ void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,
 
 			for (const auto& ipJson : srcPrefixes)
 			{
-				std::string prefix_str = ipJson.get<std::string>();
+				auto prefix_str = ipJson.get<std::string>();
 				ip_prefix_t prefix(prefix_str);
 
 				if (prefix.is_ipv4())
@@ -1231,7 +1231,7 @@ void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,
 		{
 			for (const auto& ipJson : earlyDecapJson["dstAddresses"])
 			{
-				std::string addr_str = ipJson.get<std::string>();
+				auto addr_str = ipJson.get<std::string>();
 				ip_prefix_t addr(addr_str);
 
 				if (addr.is_ipv4())
@@ -1919,7 +1919,7 @@ void config_parser_t::loadConfig_memory_group(common::memory_manager::memory_gro
 	{
 		auto memory_group_next = std::make_shared<common::memory_manager::memory_group>();
 
-		std::string name = json_iter["name"].get<std::string>();
+		auto name = json_iter["name"].get<std::string>();
 		std::string limit = "0";
 		if (exist(json_iter, "limit"))
 		{

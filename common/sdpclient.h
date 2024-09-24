@@ -177,7 +177,7 @@ public:
 			{
 				if (!core_id.has_value() || worker_core_id == core_id)
 				{
-					uint64_t* counters = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
+					auto* counters = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
 					                                                         sdp_data.metadata_worker.start_counters);
 					result[worker_core_id] = counters[index];
 				}
@@ -193,7 +193,7 @@ public:
 			{
 				if (!core_id.has_value() || worker_core_id == core_id)
 				{
-					uint64_t* counters = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
+					auto* counters = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
 					                                                         sdp_data.metadata_worker.start_counters);
 					result[worker_core_id] = counters[index];
 				}
@@ -429,7 +429,7 @@ private:
 
 	static uint64_t ReadValue(void* buffer, uint64_t index)
 	{
-		uint8_t* data = common::sdp::ShiftBuffer<uint8_t*>(buffer, index * sizeof(uint64_t));
+		auto* data = common::sdp::ShiftBuffer<uint8_t*>(buffer, index * sizeof(uint64_t));
 		uint64_t result = 0;
 		for (int i = 0; i < 8; i++)
 		{
