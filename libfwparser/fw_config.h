@@ -431,11 +431,11 @@ public:
 
 	void set_fqdn(const std::string&);
 	void fill_fqdn(const common::ip_address_t&);
-	const auto& resolve_fqdn(const std::string& s) const
+	[[nodiscard]] const auto& resolve_fqdn(const std::string& s) const
 	{
 		return std::get<1>(m_dns_cache.at(s));
 	}
-	const auto& resolve_macro(const std::string& s) const
+	[[nodiscard]] const auto& resolve_macro(const std::string& s) const
 	{
 		return std::get<1>(m_macros.at(s));
 	}
@@ -518,7 +518,7 @@ public:
 	void add_implicit_check_state_rule();
 
 	std::string format_location(const location_history_t& loc);
-	const auto& labels() const
+	[[nodiscard]] const auto& labels() const
 	{
 		return m_labels;
 	}

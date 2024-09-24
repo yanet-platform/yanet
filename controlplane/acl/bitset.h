@@ -30,7 +30,7 @@ public:
 		return (vals[i / 64] & ((uint64_t)(1) << (i % 64))) != 0;
 	}
 
-	bool empty() const
+	[[nodiscard]] bool empty() const
 	{
 		return first_one == size;
 	}
@@ -41,7 +41,7 @@ public:
 		printf("%s", to_string().c_str());
 	}
 
-	std::string to_string() const
+	[[nodiscard]] std::string to_string() const
 	{
 		std::string out;
 		for (size_t i = 0; i < size; ++i)
@@ -120,7 +120,7 @@ public:
 		return !(p1 == p2);
 	}
 
-	std::tuple<size_t, bool> minAnd(const bitset_t& p) const
+	[[nodiscard]] std::tuple<size_t, bool> minAnd(const bitset_t& p) const
 	{
 		for (size_t i = std::max(first_one, p.first_one); i < size; ++i)
 		{
@@ -134,7 +134,7 @@ public:
 		return {0, false};
 	}
 
-	std::tuple<size_t, bool> minAnd(const bitset_t& p1,
+	[[nodiscard]] std::tuple<size_t, bool> minAnd(const bitset_t& p1,
 	                                const bitset_t& p2) const
 	{
 		for (size_t i = std::max(std::max(first_one, p1.first_one), p2.first_one); i < size; ++i)
@@ -149,7 +149,7 @@ public:
 		return {0, false};
 	}
 
-	bool emptyAnd(const bitset_t& p1) const
+	[[nodiscard]] bool emptyAnd(const bitset_t& p1) const
 	{
 		for (size_t i = std::max(first_one, p1.first_one); i < size; ++i)
 		{
@@ -163,7 +163,7 @@ public:
 	}
 
 private:
-	size_t start(const bitset_t& p1) const
+	[[nodiscard]] size_t start(const bitset_t& p1) const
 	{
 		return std::min(first_one, p1.first_one);
 	}

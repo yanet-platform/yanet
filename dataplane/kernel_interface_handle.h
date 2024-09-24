@@ -27,8 +27,8 @@ public:
 	                          tPortId port,
 	                          tQueueId queue_count,
 	                          uint16_t queue_size) noexcept;
-	const tPortId& Id() const noexcept { return kni_port_; }
-	bool Start() const noexcept;
+	[[nodiscard]] const tPortId& Id() const noexcept { return kni_port_; }
+	[[nodiscard]] bool Start() const noexcept;
 	[[nodiscard]] bool SetUp() const noexcept;
 	bool SetupRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool) noexcept;
 	bool SetupTxQueue(tQueueId queue, tSocketId socket) noexcept;

@@ -141,7 +141,7 @@ public:
 		socket_interfaces = base_next.socket_interfaces;
 	}
 
-	std::optional<const std::tuple<tInterfaceId, std::string>*> get_interface_by_neighbor(const ip_address_t& address) const
+	[[nodiscard]] std::optional<const std::tuple<tInterfaceId, std::string>*> get_interface_by_neighbor(const ip_address_t& address) const
 	{
 		for (const auto& [prefix, interface] : interface_by_neighbors)
 		{
@@ -154,7 +154,7 @@ public:
 		return std::nullopt;
 	}
 
-	std::optional<const std::string*> get_vrf(const std::string& route_name) const
+	[[nodiscard]] std::optional<const std::string*> get_vrf(const std::string& route_name) const
 	{
 		auto it = routes.find(route_name);
 		if (it == routes.end())
@@ -165,7 +165,7 @@ public:
 		return &it->second.vrf; ///< read only after update
 	}
 
-	const std::map<uint32_t, std::string>* get_peers() const
+	[[nodiscard]] const std::map<uint32_t, std::string>* get_peers() const
 	{
 		return &peers;
 	}
@@ -188,7 +188,7 @@ public:
 class generation_neighbors_t
 {
 public:
-	std::optional<const common::mac_address_t*> get_mac_address(const std::string& route_name, const std::string& interface_name, const common::ip_address_t& neighbor) const
+	[[nodiscard]] std::optional<const common::mac_address_t*> get_mac_address(const std::string& route_name, const std::string& interface_name, const common::ip_address_t& neighbor) const
 	{
 		auto it = mac_addresses.find({route_name, interface_name, neighbor});
 		if (it == mac_addresses.end())

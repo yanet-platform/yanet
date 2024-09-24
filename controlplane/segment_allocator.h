@@ -149,7 +149,7 @@ public:
 		return true;
 	}
 
-	uint32_t Size() const
+	[[nodiscard]] uint32_t Size() const
 	{
 		return free_cells_;
 	}
@@ -159,7 +159,7 @@ public:
 		return sizes_info_;
 	}
 
-	std::pair<uint64_t, uint64_t> GetErrors() const
+	[[nodiscard]] std::pair<uint64_t, uint64_t> GetErrors() const
 	{
 		return {errors_external_, errors_internal_};
 	}

@@ -47,7 +47,7 @@ public:
 		return *this;
 	}
 
-	uint16_t size() const { return ports_count_; }
+	[[nodiscard]] uint16_t size() const { return ports_count_; }
 
 	[[nodiscard]] std::optional<tPortId> Register(tPortId dpdk_port)
 	{
@@ -72,10 +72,10 @@ public:
 		}
 	}
 
-	tPortId ToDpdk(tPortId logical) const { return dpdk_ports_[logical]; }
-	tPortId ToLogical(tPortId dpdk) const { return logical_ports_[dpdk]; }
-	bool ValidDpdk(tPortId dpdk) const { return logical_ports_[dpdk] != INVALID_PORT_ID; }
-	bool ValidLogical(tPortId logical) const { return logical < INVALID_PORT_ID; }
+	[[nodiscard]] tPortId ToDpdk(tPortId logical) const { return dpdk_ports_[logical]; }
+	[[nodiscard]] tPortId ToLogical(tPortId dpdk) const { return logical_ports_[dpdk]; }
+	[[nodiscard]] bool ValidDpdk(tPortId dpdk) const { return logical_ports_[dpdk] != INVALID_PORT_ID; }
+	[[nodiscard]] bool ValidLogical(tPortId logical) const { return logical < INVALID_PORT_ID; }
 };
 
 class permanently

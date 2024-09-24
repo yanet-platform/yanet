@@ -438,7 +438,7 @@ public:
 		pcap_dump((u_char*)dumper, header, data);
 	}
 
-	std::string path() const
+	[[nodiscard]] std::string path() const
 	{
 		return tmpFilePath;
 	}
@@ -526,7 +526,7 @@ public:
 		}
 	}
 
-	bool has_unmatched_packets() const
+	[[nodiscard]] bool has_unmatched_packets() const
 	{
 		return has_packet;
 	}
@@ -538,22 +538,22 @@ public:
 		       !memcmp(buffer.data(), packet, packetSize);
 	}
 
-	std::string location() const
+	[[nodiscard]] std::string location() const
 	{
 		return filename + ":" + std::to_string(packetsCount);
 	}
 
-	int expected_len() const
+	[[nodiscard]] int expected_len() const
 	{
 		return header.len;
 	}
 
-	const u_char* begin() const
+	[[nodiscard]] const u_char* begin() const
 	{
 		return buffer.data();
 	}
 
-	const u_char* end() const
+	[[nodiscard]] const u_char* end() const
 	{
 		return buffer.data() + header.len;
 	}

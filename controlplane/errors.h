@@ -12,7 +12,7 @@ public:
 	        std::runtime_error(error), code(result)
 	{}
 
-	eResult result() const
+	[[nodiscard]] eResult result() const
 	{
 		return code;
 	}

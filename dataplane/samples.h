@@ -160,7 +160,7 @@ public:
 		free4 = samples4 + sample4_size - 1;
 	}
 
-	uint64_t get_drops() const
+	[[nodiscard]] uint64_t get_drops() const
 	{
 		return drops;
 	}
@@ -209,7 +209,7 @@ private:
 		return (tcpHeader->tcp_flags & (RTE_TCP_SYN_FLAG | RTE_TCP_ACK_FLAG | RTE_TCP_FIN_FLAG | RTE_TCP_RST_FLAG)) == RTE_TCP_SYN_FLAG;
 	}
 
-	bool is_full() const
+	[[nodiscard]] bool is_full() const
 	{
 		return (void*)(free6 + 1) > (void*)free4;
 	}

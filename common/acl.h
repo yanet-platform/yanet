@@ -18,12 +18,12 @@ public:
 		return id < second.id;
 	}
 
-	bool is_empty() const
+	[[nodiscard]] bool is_empty() const
 	{
 		return !id;
 	}
 
-	uint32_t get_group_id() const
+	[[nodiscard]] uint32_t get_group_id() const
 	{
 		return id;
 	}
@@ -33,12 +33,12 @@ public:
 		id = group_id;
 	}
 
-	bool is_chunk_id() const
+	[[nodiscard]] bool is_chunk_id() const
 	{
 		return id & 0x80000000u;
 	}
 
-	uint32_t get_chunk_id() const
+	[[nodiscard]] uint32_t get_chunk_id() const
 	{
 		return id ^ 0x80000000u;
 	}

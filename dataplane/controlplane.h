@@ -51,7 +51,7 @@ public:
 	eResult updateGlobalBaseBalancer(const common::idp::updateGlobalBaseBalancer::request& request);
 	common::idp::getGlobalBase::response getGlobalBase(const common::idp::getGlobalBase::request& request);
 	common::idp::getWorkerStats::response getWorkerStats(const common::idp::getWorkerStats::request& request);
-	common::slowworker::stats_t SlowWorkerStats() const;
+	[[nodiscard]] common::slowworker::stats_t SlowWorkerStats() const;
 	common::idp::getSlowWorkerStats::response SlowWorkerStatsResponse();
 	common::idp::get_worker_gc_stats::response get_worker_gc_stats();
 	common::idp::get_dregress_counters::response get_dregress_counters();
@@ -59,15 +59,15 @@ public:
 	common::idp::get_ports_stats_extended::response get_ports_stats_extended();
 	common::idp::getControlPlanePortStats::response getControlPlanePortStats(const common::idp::getControlPlanePortStats::request& request);
 	common::idp::getPortStatsEx::response getPortStatsEx();
-	common::idp::getFragmentationStats::response getFragmentationStats() const;
-	common::dregress::stats_t DregressStats() const;
-	std::optional<std::reference_wrapper<const dataplane::sKniStats>> KniStats(tPortId) const;
-	dataplane::hashtable_chain_spinlock_stats_t DregressConnectionsStats() const;
-	dregress::LimitsStats DregressLimitsStats() const;
+	[[nodiscard]] common::idp::getFragmentationStats::response getFragmentationStats() const;
+	[[nodiscard]] common::dregress::stats_t DregressStats() const;
+	[[nodiscard]] std::optional<std::reference_wrapper<const dataplane::sKniStats>> KniStats(tPortId) const;
+	[[nodiscard]] dataplane::hashtable_chain_spinlock_stats_t DregressConnectionsStats() const;
+	[[nodiscard]] dregress::LimitsStats DregressLimitsStats() const;
 	common::idp::getFWState::response getFWState();
 	common::idp::getFWStateStats::response getFWStateStats();
 	eResult clearFWState();
-	common::idp::getConfig::response getConfig() const;
+	[[nodiscard]] common::idp::getConfig::response getConfig() const;
 	common::idp::getErrors::response getErrors();
 	common::idp::getReport::response getReport();
 	common::idp::lpm4LookupAddress::response lpm4LookupAddress(const common::idp::lpm4LookupAddress::request& request);
@@ -92,8 +92,8 @@ public:
 	virtual void waitAllWorkers();
 
 private:
-	const std::vector<cWorker*>& workers_vector() const;
-	const std::map<tCoreId, dataplane::SlowWorker*>& slow_workers() const;
+	[[nodiscard]] const std::vector<cWorker*>& workers_vector() const;
+	[[nodiscard]] const std::map<tCoreId, dataplane::SlowWorker*>& slow_workers() const;
 
 	template<typename F>
 	// @brief returns sum of results of applying F to all cWorker*s
