@@ -159,14 +159,14 @@ void balancer_t::Real(
 	request.reserve(req->reals().size());
 	for (const auto& real : req->reals())
 	{
-		request.push_back({real.module(),
+		request.emplace_back(real.module(),
 		                   convert_to_ip_address(real.virtual_ip()),
 		                   real.proto() == common::icp_proto::NetProto::tcp ? IPPROTO_TCP : IPPROTO_UDP,
 		                   real.virtual_port_opt_case() == common::icp_proto::BalancerRealRequest_Real::VirtualPortOptCase::kVirtualPort ? std::make_optional(real.virtual_port()) : std::nullopt,
 		                   convert_to_ip_address(real.real_ip()),
 		                   real.real_port_opt_case() == common::icp_proto::BalancerRealRequest_Real::RealPortOptCase::kRealPort ? std::make_optional(real.real_port()) : std::nullopt,
 		                   real.enable(),
-		                   real.weight_opt_case() == common::icp_proto::BalancerRealRequest_Real::WeightOptCase::kWeight ? std::make_optional(real.weight()) : std::nullopt});
+		                   real.weight_opt_case() == common::icp_proto::BalancerRealRequest_Real::WeightOptCase::kWeight ? std::make_optional(real.weight()) : std::nullopt);
 	}
 
 	balancer_real(request);

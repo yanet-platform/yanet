@@ -785,7 +785,7 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 	ids_map_map.emplace(ids_t(), 0);
 
 	result.ids_map.clear();
-	result.ids_map.push_back(ids_t());
+	result.ids_map.emplace_back();
 	std::set<ids_t> ids_overflow;
 
 #ifdef ACL_DEBUG
