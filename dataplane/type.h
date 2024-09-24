@@ -191,7 +191,7 @@ struct ipv6_address_t
 		return !(*this == second);
 	}
 
-	bool empty() const ///< @todo: is_default()
+	[[nodiscard]] bool empty() const ///< @todo: is_default()
 	{
 		for (auto b : bytes)
 		{
@@ -644,7 +644,7 @@ struct fw_tcp_state_value_t
 	uint8_t src_flags : 4;
 	uint8_t dst_flags : 4;
 
-	uint8_t pack() const
+	[[nodiscard]] uint8_t pack() const
 	{
 		return src_flags | (dst_flags << 4);
 	}

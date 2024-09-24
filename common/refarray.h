@@ -185,7 +185,7 @@ public:
 		ids.clear();
 	}
 
-	std::tuple<uint64_t, uint64_t> stats() const
+	[[nodiscard]] std::tuple<uint64_t, uint64_t> stats() const
 	{
 		return {size_T - ids_unused_size, size_T};
 	}

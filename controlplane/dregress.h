@@ -45,7 +45,7 @@ public:
 		}
 	}
 
-	std::optional<community_t> get_peer_link_community(const std::set<community_t>& communities) const
+	[[nodiscard]] std::optional<community_t> get_peer_link_community(const std::set<community_t>& communities) const
 	{
 		/// @todo: VRF
 		for (const auto& [moduleName, dregress] : dregresses)

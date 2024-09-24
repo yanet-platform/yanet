@@ -72,7 +72,7 @@ public:
 	static void FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata);
 	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorker& metadata);
 
-	const dataplane::base::generation& current_base() const { return bases[localBaseId & 1]; }
+	[[nodiscard]] const dataplane::base::generation& current_base() const { return bases[localBaseId & 1]; }
 
 protected:
 	eResult sanityCheck();
@@ -235,7 +235,7 @@ public:
 	YANET_NEVER_INLINE void slowWorkerTranslation(rte_mbuf* mbuf, const dataplane::globalBase::tNat64stateless& nat64stateless, const dataplane::globalBase::nat64stateless_translation_t& translation, bool direction); /** true: ingress, false: egress */
 	const dataplane::base::generation& CurrentBase() { return bases[localBaseId & 1]; }
 	void IncrementCounter(common::globalBase::static_counter_type type) { counters[(uint32_t)type]++; }
-	uint32_t CurrentTime() const { return basePermanently.globalBaseAtomic->currentTime; }
+	[[nodiscard]] uint32_t CurrentTime() const { return basePermanently.globalBaseAtomic->currentTime; }
 
 	friend class cDataPlane;
 	friend class cReport;

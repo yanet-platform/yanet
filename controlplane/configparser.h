@@ -17,7 +17,7 @@ public:
 	controlplane::base_t loadConfig(const std::string& rootFilePath, const nlohmann::json& rootJson, const std::map<std::string, nlohmann::json>& jsons = {});
 
 protected:
-	tPortId getPhysicalPortId(const std::string& name) const;
+	[[nodiscard]] tPortId getPhysicalPortId(const std::string& name) const;
 	void loadConfig_logicalPort(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson);
 	void loadConfig_route(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_route_peers(controlplane::base_t& baseNext, controlplane::route::config_t& route, const nlohmann::json& json, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);

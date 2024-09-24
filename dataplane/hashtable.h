@@ -409,7 +409,7 @@ protected:
 		}
 
 	public:
-		uint32_t getNextExtendedChunkId() const
+		[[nodiscard]] uint32_t getNextExtendedChunkId() const
 		{
 			return nextExtendedChunkId & 0x00FFFFFFu;
 		}
@@ -419,7 +419,7 @@ protected:
 			nextExtendedChunkId = (nextExtendedChunkId & 0xFF000000u) | (extendedChunkId & 0x00FFFFFFu);
 		}
 
-		bool isValid(const unsigned int& key_i) const
+		[[nodiscard]] bool isValid(const unsigned int& key_i) const
 		{
 			return keyValids & (1 << key_i);
 		}
@@ -485,7 +485,7 @@ protected:
 		}
 
 	public:
-		uint32_t getNextExtendedChunkId() const
+		[[nodiscard]] uint32_t getNextExtendedChunkId() const
 		{
 			return nextExtendedChunkId & 0x00FFFFFFu;
 		}
@@ -495,7 +495,7 @@ protected:
 			nextExtendedChunkId = (nextExtendedChunkId & 0xFF000000u) | (extendedChunkId & 0x00FFFFFFu);
 		}
 
-		bool isValid(const unsigned int& key_i) const
+		[[nodiscard]] bool isValid(const unsigned int& key_i) const
 		{
 			return keyValids & (1 << key_i);
 		}
@@ -1236,7 +1236,7 @@ protected:
 		}
 
 	public:
-		uint32_t getNextExtendedChunkId() const
+		[[nodiscard]] uint32_t getNextExtendedChunkId() const
 		{
 			return nextExtendedChunkId & 0x00FFFFFFu;
 		}
@@ -1246,7 +1246,7 @@ protected:
 			nextExtendedChunkId = (nextExtendedChunkId & 0xFF000000u) | (extendedChunkId & 0x00FFFFFFu);
 		}
 
-		bool isValid(const unsigned int& key_i) const
+		[[nodiscard]] bool isValid(const unsigned int& key_i) const
 		{
 			return keyValids & (1u << key_i);
 		}
@@ -1317,7 +1317,7 @@ protected:
 		}
 
 	public:
-		uint32_t getNextExtendedChunkId() const
+		[[nodiscard]] uint32_t getNextExtendedChunkId() const
 		{
 			return nextExtendedChunkId & 0x00FFFFFFu;
 		}
@@ -1327,7 +1327,7 @@ protected:
 			nextExtendedChunkId = (nextExtendedChunkId & 0xFF000000u) | (extendedChunkId & 0x00FFFFFFu);
 		}
 
-		bool isValid(const unsigned int& key_i) const
+		[[nodiscard]] bool isValid(const unsigned int& key_i) const
 		{
 			return keyValids & (1u << key_i);
 		}
@@ -1437,7 +1437,7 @@ protected:
 	hashtable_chain_spinlock_stats_t stats_;
 
 public:
-	const hashtable_chain_spinlock_stats_t& stats() const
+	[[nodiscard]] const hashtable_chain_spinlock_stats_t& stats() const
 	{
 		return stats_;
 	}
@@ -1745,7 +1745,7 @@ protected:
 	} pairs[total_size];
 
 protected:
-	bool is_valid(const uint32_t index) const
+	[[nodiscard]] bool is_valid(const uint32_t index) const
 	{
 		return (pairs[index].value >> shift_valid) & 1;
 	}
@@ -1982,7 +1982,7 @@ public:
 	}
 
 protected:
-	bool is_valid(const uint32_t index) const
+	[[nodiscard]] bool is_valid(const uint32_t index) const
 	{
 		return (pairs[index].value >> shift_valid) & 1;
 	}

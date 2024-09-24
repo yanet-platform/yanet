@@ -181,22 +181,22 @@ private:
 		return eResult::success;
 	}
 
-	bool NeedToGrow() const
+	[[nodiscard]] bool NeedToGrow() const
 	{
 		return stats_.extended_chunks_size - stats_.extended_chunks_count < ObjectType::extended_chunks_size_min;
 	}
 
-	std::size_t GrowSize() const
+	[[nodiscard]] std::size_t GrowSize() const
 	{
 		return stats_.extended_chunks_size * 2;
 	}
 
-	std::size_t ShrinkSize() const
+	[[nodiscard]] std::size_t ShrinkSize() const
 	{
 		return stats_.extended_chunks_size / 2;
 	}
 
-	bool NeedToShrink() const
+	[[nodiscard]] bool NeedToShrink() const
 	{
 		return ShrinkSize() > std::max(ObjectType::extended_chunks_size_min, GrowSize());
 	}

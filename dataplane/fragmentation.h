@@ -50,7 +50,7 @@ public:
 	Fragmentation& operator=(Fragmentation&& other) = default;
 
 public:
-	common::fragmentation::stats_t getStats() const;
+	[[nodiscard]] common::fragmentation::stats_t getStats() const;
 	OnCollected& Callback() { return callback_; }
 	void Configure(const FragmentationConfig& cfg) { config_ = cfg; }
 
@@ -58,9 +58,9 @@ public:
 	void handle();
 
 protected:
-	bool isTimeout(const value_t& value) const;
-	bool isCollected(const value_t& value) const;
-	bool isIntersect(const value_t& value, const uint32_t& range_from, const uint32_t& range_to) const;
+	[[nodiscard]] bool isTimeout(const value_t& value) const;
+	[[nodiscard]] bool isCollected(const value_t& value) const;
+	[[nodiscard]] bool isIntersect(const value_t& value, const uint32_t& range_from, const uint32_t& range_to) const;
 
 protected:
 	OnCollected callback_;

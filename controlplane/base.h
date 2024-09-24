@@ -41,7 +41,7 @@ class decap_t
 public:
 	decap_t() = default;
 
-	std::set<ipv6_prefix_t> prefixes() const
+	[[nodiscard]] std::set<ipv6_prefix_t> prefixes() const
 	{
 		std::set<ipv6_prefix_t> prefixes;
 		for (const auto& prefix : ipv6DestinationPrefixes)

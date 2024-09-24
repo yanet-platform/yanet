@@ -157,7 +157,7 @@ struct network_t
 	{
 	}
 
-	std::string to_string() const
+	[[nodiscard]] std::string to_string() const
 	{
 		std::stringstream ret;
 		if (family == 4)
@@ -190,7 +190,7 @@ struct network_t
 		return std::tie(family, mask, addr) < std::tie(second.family, second.mask, second.addr);
 	}
 
-	network_t normalize() const
+	[[nodiscard]] network_t normalize() const
 	{
 		return {family, addr & mask, mask};
 	}
