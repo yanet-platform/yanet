@@ -892,7 +892,7 @@ bool tAutotest::step_sendPackets(const YAML::Node& yamlStep,
 
 	for (const auto& yamlPort : yamlStep)
 	{
-		std::string interfaceName = yamlPort["port"].as<std::string>();
+		auto interfaceName = yamlPort["port"].as<std::string>();
 
 		if (yamlPort["send"])
 		{
@@ -1195,9 +1195,9 @@ bool tAutotest::step_rib_clear(const YAML::Node& yaml)
 
 		if (yaml_attribute["peer"].IsDefined() && yaml_attribute["vrf"].IsDefined() && yaml_attribute["priority"].IsDefined())
 		{
-			std::string peer = yaml_attribute["peer"].as<std::string>();
-			std::string vrf = yaml_attribute["vrf"].as<std::string>();
-			uint32_t priority = yaml_attribute["priority"].as<uint32_t>();
+			auto peer = yaml_attribute["peer"].as<std::string>();
+			auto vrf = yaml_attribute["vrf"].as<std::string>();
+			auto priority = yaml_attribute["priority"].as<uint32_t>();
 
 			std::tuple<std::string, uint32_t> vrf_priority_tup(std::move(vrf), std::move(priority));
 			std::tuple<ip_address_t, std::tuple<std::string, uint32_t>> peer_vrf_priority_tup(std::move(peer), std::move(vrf_priority_tup));
@@ -1923,7 +1923,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 	TextDumper dumper;
 	for (const auto& yamlDump : yamlStep)
 	{
-		std::string tag = yamlDump["ringTag"].as<std::string>();
+		auto tag = yamlDump["ringTag"].as<std::string>();
 		std::string expectFilePath = path + "/" + yamlDump["expect"].as<std::string>();
 		bool success = true;
 

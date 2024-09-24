@@ -306,7 +306,7 @@ common::icp::telegraf_other::response telegraf_t::telegraf_other()
 	for (const auto& [coreId, worker_info] : sdp_data->workers)
 	{
 		std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1> bursts;
-		uint64_t* worker_bursts =
+		auto* worker_bursts =
 		        common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer, sdp_data->metadata_worker.start_bursts);
 		memcpy(&bursts[0], worker_bursts, sizeof(uint64_t) * (CONFIG_YADECAP_MBUFS_BURST_SIZE + 1));
 		currWorkers[coreId] = bursts;
