@@ -5,7 +5,9 @@
 
 #include "base.h"
 #include "common.h"
+#include "config_values.h"
 #include "hashtable.h"
+#include "samples.h"
 #include "utils.h"
 
 #include "common/generation.h"
