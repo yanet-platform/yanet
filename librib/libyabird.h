@@ -1,6 +1,7 @@
 #ifndef _LIBYABIRD_H_
 #define _LIBYABIRD_H_
 
+#include <cstdint>
 #ifdef __cplusplus
 /*
  * Simple LIST implementation used in bird2.

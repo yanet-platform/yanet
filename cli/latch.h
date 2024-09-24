@@ -1,7 +1,10 @@
 #pragma once
 
+#include "common/idataplane.h"
+#include "common/idp.h"
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 namespace latch
 {
