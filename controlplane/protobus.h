@@ -4,9 +4,8 @@
 
 #include "module.h"
 
-namespace controlplane
-{
-namespace module
+
+namespace controlplane::module
 {
 
 class protoBus : public cModule
@@ -27,4 +26,4 @@ protected:
 };
 
 }
-}
+

@@ -14,10 +14,9 @@
 
 #include "helper.h"
 
-namespace develop
-{
 
-namespace dataplane
+
+namespace develop::dataplane
 {
 
 static inline void printValue(const common::idp::value& value)
@@ -369,4 +368,4 @@ void tsc_monitoring()
 
 }
 
-}
+
