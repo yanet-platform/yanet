@@ -963,7 +963,7 @@ inline bool worker_gc_t::is_timeout(const uint32_t timestamp,
 inline void worker_gc_t::correct_timestamp(uint16_t& timestamp,
                                            const uint16_t last_seen_max)
 {
-	uint16_t last_seen = (uint16_t)(current_time - timestamp);
+	auto last_seen = (uint16_t)(current_time - timestamp);
 	if (last_seen > last_seen_max)
 	{
 		timestamp = (uint16_t)(current_time - last_seen_max);

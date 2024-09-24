@@ -67,7 +67,7 @@ void transport_t::distribute()
 		(void)size;
 
 		unsigned int best_layer_id = 0;
-		size_t best_filter_ids_count = (size_t)-1;
+		auto best_filter_ids_count = (size_t)-1;
 
 		for (unsigned int layer_id = 0;
 		     layer_id < compiler->transport_layers_size_max;

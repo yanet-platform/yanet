@@ -2634,7 +2634,7 @@ struct hash<common::ipv4_address_t>
 {
 	std::size_t operator()(const common::ipv4_address_t& ip_addr) const
 	{
-		const uint32_t ipv4 = static_cast<uint32_t>(ip_addr);
+		const auto ipv4 = static_cast<uint32_t>(ip_addr);
 		return std::hash<uint32_t>()(ipv4);
 	}
 };

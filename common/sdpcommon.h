@@ -225,8 +225,8 @@ struct DataPlaneInSharedMemory
 
 	[[nodiscard]] std::tuple<uint64_t*, uint64_t*, uint64_t*> BuffersBus() const
 	{
-		uint32_t count_errors = static_cast<uint32_t>(common::idp::errorType::size);
-		uint32_t count_requests = static_cast<uint32_t>(common::idp::requestType::size);
+		auto count_errors = static_cast<uint32_t>(common::idp::errorType::size);
+		auto count_requests = static_cast<uint32_t>(common::idp::requestType::size);
 		uint64_t* requests = common::sdp::ShiftBuffer<uint64_t*>(dataplane_data, start_bus_section);
 		uint64_t* errors = common::sdp::ShiftBuffer<uint64_t*>(dataplane_data, start_bus_section + count_requests * sizeof(uint64_t));
 		uint64_t* durations = common::sdp::ShiftBuffer<uint64_t*>(dataplane_data, start_bus_section + (count_requests + count_errors) * sizeof(uint64_t));

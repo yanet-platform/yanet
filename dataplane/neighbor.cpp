@@ -51,7 +51,7 @@ static void netlink_parse(const std::function<void(const std::string&, const com
 	unsigned int offset = 0;
 	while (offset + sizeof(nlmsghdr) <= buffer_length)
 	{
-		nlmsghdr* nl_message_header = (nlmsghdr*)(buffer + offset);
+		auto* nl_message_header = (nlmsghdr*)(buffer + offset);
 		uint32_t length = nl_message_header->nlmsg_len;
 
 		if (nl_message_header->nlmsg_type == NLMSG_DONE ||
@@ -63,7 +63,7 @@ static void netlink_parse(const std::function<void(const std::string&, const com
 		if (nl_message_header->nlmsg_type == RTM_NEWNEIGH ||
 		    nl_message_header->nlmsg_type == RTM_GETNEIGH)
 		{
-			ndmsg* nl_message = (ndmsg*)NLMSG_DATA(nl_message_header);
+			auto* nl_message = (ndmsg*)NLMSG_DATA(nl_message_header);
 			parse_rt_attributes(rt_attributes,
 			                    NDA_MAX,
 			                    (rtattr*)(((char*)(nl_message)) + NLMSG_ALIGN(sizeof(ndmsg))),

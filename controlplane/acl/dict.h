@@ -44,7 +44,7 @@ bool is_mask_simple(uint128_t mask)
 	bool end_found = false;
 	for (unsigned int i = 1; i <= 16; ++i)
 	{
-		const uint8_t byte = uint8_t((mask >> (128 - i * 8)) & 0xff);
+		const auto byte = uint8_t((mask >> (128 - i * 8)) & 0xff);
 		if (end_found)
 		{
 			if (byte > 0)

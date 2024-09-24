@@ -1913,7 +1913,7 @@ common::bufferring::item_t* read_shm_packet(common::bufferring* buffer, uint64_t
 	{
 		return nullptr;
 	}
-	common::bufferring::item_t* item = (common::bufferring::item_t*)((uintptr_t)buffer->ring->memory + (position * buffer->unit_size));
+	auto* item = (common::bufferring::item_t*)((uintptr_t)buffer->ring->memory + (position * buffer->unit_size));
 	return item;
 }
 
