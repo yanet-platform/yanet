@@ -41,9 +41,9 @@ public:
 		void* buffer = common::sdp::ShiftBuffer<void*>(sdp_data_client.dataplane_data, sdp_data_client.start_bus_section);
 		auto count_errors = static_cast<uint32_t>(common::idp::errorType::size);
 		auto count_requests = static_cast<uint32_t>(common::idp::requestType::size);
-		uint64_t* requests = common::sdp::ShiftBuffer<uint64_t*>(buffer, 0);
-		uint64_t* errors = common::sdp::ShiftBuffer<uint64_t*>(buffer, count_requests * sizeof(uint64_t));
-		uint64_t* durations = common::sdp::ShiftBuffer<uint64_t*>(buffer, (count_requests + count_errors) * sizeof(uint64_t));
+		auto* requests = common::sdp::ShiftBuffer<uint64_t*>(buffer, 0);
+		auto* errors = common::sdp::ShiftBuffer<uint64_t*>(buffer, count_requests * sizeof(uint64_t));
+		auto* durations = common::sdp::ShiftBuffer<uint64_t*>(buffer, (count_requests + count_errors) * sizeof(uint64_t));
 
 		for (uint32_t index = 0; index < static_cast<uint32_t>(common::idp::requestType::size); index++)
 		{
@@ -207,7 +207,7 @@ public:
 		ASSERT_EQ(common::sdp::SdpClient::GetCounterByName(sdp_data_client, "dropPackets", coreId)[coreId], stats->dropPackets);
 
 		// statsPorts
-		common::worker::stats::port* bufStatsPorts = common::sdp::ShiftBuffer<common::worker::stats::port*>(buffer, sdp_data_client.metadata_worker.start_stats_ports);
+		auto* bufStatsPorts = common::sdp::ShiftBuffer<common::worker::stats::port*>(buffer, sdp_data_client.metadata_worker.start_stats_ports);
 		for (uint32_t index = 0; index < CONFIG_YADECAP_PORTS_SIZE + 1; index++)
 		{
 			ASSERT_EQ(statsPorts[index].controlPlane_drops, bufStatsPorts[index].controlPlane_drops);
@@ -215,21 +215,21 @@ public:
 		}
 
 		// bursts
-		uint64_t* bufBursts = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_bursts);
+		auto* bufBursts = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_bursts);
 		for (uint32_t index = 0; index < CONFIG_YADECAP_MBUFS_BURST_SIZE + 1; index++)
 		{
 			ASSERT_EQ(bursts[index], bufBursts[index]);
 		}
 
 		// counters
-		uint64_t* bufCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_counters);
+		auto* bufCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_counters);
 		for (uint32_t index = 0; index < YANET_CONFIG_COUNTERS_SIZE; index++)
 		{
 			ASSERT_EQ(counters[index], bufCounters[index]);
 		}
 
 		// aclCounters
-		uint64_t* bufAclCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_acl_counters);
+		auto* bufAclCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_acl_counters);
 		for (uint32_t index = 0; index < YANET_CONFIG_ACL_COUNTERS_SIZE; index++)
 		{
 			ASSERT_EQ(aclCounters[index], bufAclCounters[index]);
@@ -302,7 +302,7 @@ public:
 		ASSERT_EQ(common::sdp::SdpClient::GetCounterByName(sdp_data_client, "drop_samples", coreId)[coreId], stats->drop_samples);
 
 		// counters
-		uint64_t* bufCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker_gc.start_counters);
+		auto* bufCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker_gc.start_counters);
 		for (uint32_t index = 0; index < YANET_CONFIG_COUNTERS_SIZE; index++)
 		{
 			ASSERT_EQ(counters[index], bufCounters[index]);
