@@ -459,7 +459,7 @@ eResult cDataPlane::initPorts()
 		const auto& [pci, name, symmetric_mode, rss_flags] = configPortIter.second;
 		(void)pci;
 
-		tPortId portId;
+		tPortId portId = 0;
 
 		if (StartsWith(name, SOCK_DEV_PREFIX))
 		{
@@ -1148,7 +1148,7 @@ eResult cDataPlane::InitSlowWorker(const tCoreId core, const CPlaneWorkerConfig&
 	{
 		for (auto& iface : cfg.interfaces)
 		{
-			tPortId port;
+			tPortId port = 0;
 			if (rte_eth_dev_get_port_by_name(iface.data(), &port))
 			{
 				YANET_LOG_ERROR("Failed to get port id by interface name \"%s\"\n", iface.data());

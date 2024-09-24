@@ -257,8 +257,8 @@ void worker_gc_t::handle_nat64stateful_gc()
 				break;
 			}
 
-			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
-			dataplane::spinlock_nonrecursive_t* wan_locker;
+			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup = nullptr;
+			dataplane::spinlock_nonrecursive_t* wan_locker = nullptr;
 			globalbase_atomic->nat64stateful_wan_state->lookup(wan_key, wan_value_lookup, wan_locker);
 			if (wan_value_lookup)
 			{
@@ -286,8 +286,8 @@ void worker_gc_t::handle_nat64stateful_gc()
 				break;
 			}
 
-			dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup;
-			dataplane::spinlock_nonrecursive_t* lan_locker;
+			dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup = nullptr;
+			dataplane::spinlock_nonrecursive_t* lan_locker = nullptr;
 			globalbase_atomic->nat64stateful_lan_state->lookup(lan_key, lan_value_lookup, lan_locker);
 			if (lan_value_lookup)
 			{
@@ -440,9 +440,9 @@ void worker_gc_t::handle_balancer_gc()
 					bool saved = true;
 					bool updated = false;
 
-					dataplane::globalBase::balancer_state_value_t* ht_value;
-					dataplane::spinlock_nonrecursive_t* locker;
-					uint32_t old_real_id;
+					dataplane::globalBase::balancer_state_value_t* ht_value = nullptr;
+					dataplane::spinlock_nonrecursive_t* locker = nullptr;
+					uint32_t old_real_id = 0;
 
 					uint32_t hash = globalbase_atomic_other->balancer_state->lookup(*iter.key(), ht_value, locker);
 					if (ht_value)
@@ -945,7 +945,7 @@ void worker_gc_t::handle_callbacks()
 void worker_gc_t::handle_free_mbuf()
 {
 	rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
-	unsigned int mbufs_count;
+	unsigned int mbufs_count = 0;
 
 	for (auto& ring : toFree_)
 	{
@@ -1109,8 +1109,8 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 					break;
 				}
 
-				dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
-				dataplane::spinlock_nonrecursive_t* wan_locker;
+				dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup = nullptr;
+				dataplane::spinlock_nonrecursive_t* wan_locker = nullptr;
 				globalbase_atomic->nat64stateful_wan_state->lookup(wan_key, wan_value_lookup, wan_locker);
 				if (wan_value_lookup)
 				{
@@ -1137,8 +1137,8 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 					break;
 				}
 
-				dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup;
-				dataplane::spinlock_nonrecursive_t* lan_locker;
+				dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup = nullptr;
+				dataplane::spinlock_nonrecursive_t* lan_locker = nullptr;
 				globalbase_atomic->nat64stateful_lan_state->lookup(lan_key, lan_value_lookup, lan_locker);
 				if (lan_value_lookup)
 				{

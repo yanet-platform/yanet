@@ -153,7 +153,7 @@ bool KernelInterfaceHandle::Configure(const rte_eth_conf& eth_conf)
 
 bool KernelInterfaceHandle::CloneMTU(const uint16_t port_id) const noexcept
 {
-	uint16_t mtu;
+	uint16_t mtu = 0;
 	if (rte_eth_dev_get_mtu(port_id, &mtu) != 0)
 		return false;
 

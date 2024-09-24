@@ -52,7 +52,7 @@ public:
 				{
 					str++;
 				}
-				char* endptr;
+				char* endptr = nullptr;
 				unsigned long long size = strtoull(str, &endptr, 0);
 				// The string still contains kB (or mB, gB), but it only matters to us
 				// whether the value is 0 or not
@@ -282,7 +282,7 @@ private:
 	static std::pair<struct bitmask*, int> SetMemoryPolicy(std::optional<tSocketId> socket_id)
 	{
 		struct bitmask* oldmask = nullptr;
-		int oldpolicy;
+		int oldpolicy = 0;
 		if (socket_id.has_value())
 		{
 			oldmask = numa_allocate_nodemask();

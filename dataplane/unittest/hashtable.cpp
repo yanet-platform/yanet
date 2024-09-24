@@ -10,7 +10,7 @@ TEST(HashtableTest, Basic)
 {
 	dataplane::hashtable_chain_t<int, int, 128, 128, 4, 4> t;
 
-	int* v;
+	int* v = nullptr;
 	int k = 1;
 	t.lookup(&k, &v, 1);
 	EXPECT_EQ(nullptr, v);
@@ -42,8 +42,8 @@ TEST(HashtableTest, Extended)
 
 	for (int k = 0; k < 512; ++k)
 	{
-		int* v;
-		dataplane::spinlock_t* locker;
+		int* v = nullptr;
+		dataplane::spinlock_t* locker = nullptr;
 
 		t.lookup(k, v, locker);
 		if ((k % 7) && (k % 11))
@@ -326,8 +326,8 @@ TEST(hashtable_mod_spinlock, basic)
 	const uint32_t value1 = 12345u;
 	const uint32_t value2 = 12345678u;
 
-	uint32_t* value;
-	dataplane::spinlock_nonrecursive_t* locker;
+	uint32_t* value = nullptr;
+	dataplane::spinlock_nonrecursive_t* locker = nullptr;
 
 	{
 		const uint32_t hash = ht.lookup(key, value, locker);
@@ -403,8 +403,8 @@ TEST(hashtable_mod_spinlock, collision)
 	                                  32>
 	        ht;
 
-	uint32_t* value;
-	dataplane::spinlock_nonrecursive_t* locker;
+	uint32_t* value = nullptr;
+	dataplane::spinlock_nonrecursive_t* locker = nullptr;
 
 	for (unsigned int i = 0;
 	     i < 64;

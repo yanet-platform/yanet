@@ -103,7 +103,7 @@ void bus::clientThread(int clientSocket)
 
 	for (;;)
 	{
-		uint64_t messageSize;
+		uint64_t messageSize = 0;
 		if (auto err = common::recvAll(clientSocket, (char*)&messageSize, sizeof(messageSize)); err != 0)
 		{
 			/// @todo: log

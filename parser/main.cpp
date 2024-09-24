@@ -36,9 +36,9 @@ int main(int argc, char* argv[])
 {
 	std::shared_ptr<ipfw::fw_config_t> config;
 	std::string dname, fname, mname;
-	bool cmd_mode, quiet_mode, test_mode, dump, success, sanity;
+	bool cmd_mode = false, quiet_mode = false, test_mode = false, dump = false, success = false, sanity = false;
 	int verbose_level = 0;
-	char ch;
+	char ch = 0;
 
 	cmd_mode = quiet_mode = test_mode = dump = sanity = false;
 	while (!cmd_mode && (ch = getopt(argc, argv, "d:f:c:m:Dqsvnh")) != -1)

@@ -553,7 +553,7 @@ void rib_t::rib_eor(const common::icp::rib_update::eor& request)
 
 void rib_t::rib_flush(bool force_flush)
 {
-	bool flush;
+	bool flush = false;
 	{
 		std::lock_guard<std::mutex> rib_update_guard(rib_update_mutex);
 		std::lock_guard<std::mutex> prefixes_guard(prefixes_mutex);

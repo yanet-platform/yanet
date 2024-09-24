@@ -2189,7 +2189,7 @@ inline void cWorker::route_handle4()
 				key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
 			}
 
-			dataplane::neighbor::value const* value;
+			dataplane::neighbor::value const* value = nullptr;
 			base.neighbor_hashtable->lookup(key, value);
 			if (value)
 			{
@@ -2313,7 +2313,7 @@ inline void cWorker::route_handle6()
 				memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
 			}
 
-			dataplane::neighbor::value const* value;
+			dataplane::neighbor::value const* value = nullptr;
 			base.neighbor_hashtable->lookup(key, value);
 			if (value)
 			{
@@ -2528,7 +2528,7 @@ inline void cWorker::route_tunnel_handle4()
 				key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
 			}
 
-			dataplane::neighbor::value const* value;
+			dataplane::neighbor::value const* value = nullptr;
 			base.neighbor_hashtable->lookup(key, value);
 			if (value)
 			{
@@ -2655,7 +2655,7 @@ inline void cWorker::route_tunnel_handle6()
 				memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
 			}
 
-			dataplane::neighbor::value const* value;
+			dataplane::neighbor::value const* value = nullptr;
 			base.neighbor_hashtable->lookup(key, value);
 			if (value)
 			{
@@ -2724,7 +2724,7 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		return;
 	}
 
-	uint16_t payload_length;
+	uint16_t payload_length = 0;
 	bool is_ipv4 = metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
 	if (is_ipv4 && !nexthop.is_ipv6)
 	{
@@ -2761,8 +2761,8 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 	}
 	else
 	{
-		uint32_t vtc_flow;
-		uint16_t payload_len;
+		uint32_t vtc_flow = 0;
+		uint16_t payload_len = 0;
 		if (is_ipv4)
 		{
 			rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
@@ -2975,8 +2975,8 @@ inline void cWorker::nat64stateful_lan_handle()
 
 		const auto& nat64stateful = base.globalBase->nat64statefuls[metadata->flow.data.nat64stateful_id];
 
-		dataplane::globalBase::nat64stateful_lan_value* value_lookup;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::nat64stateful_lan_value* value_lookup = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		const uint32_t hash = nat64stateful_lan_state->lookup(key, value_lookup, locker);
 		if (value_lookup)
 		{
@@ -3024,9 +3024,9 @@ inline void cWorker::nat64stateful_lan_handle()
 			wan_key.port_source = key.port_destination;
 			wan_key.port_destination = key.port_source;
 
-			uint32_t wan_hash;
-			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
-			dataplane::spinlock_nonrecursive_t* wan_locker;
+			uint32_t wan_hash = 0;
+			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup = nullptr;
+			dataplane::spinlock_nonrecursive_t* wan_locker = nullptr;
 			for (unsigned int try_i = 0;
 			     try_i < YANET_CONFIG_NAT64STATEFUL_INSERT_TRIES;
 			     try_i++)
@@ -3266,8 +3266,8 @@ inline void cWorker::nat64stateful_wan_handle()
 
 		const auto& nat64stateful = base.globalBase->nat64statefuls[metadata->flow.data.nat64stateful_id];
 
-		dataplane::globalBase::nat64stateful_wan_value* value_lookup;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::nat64stateful_wan_value* value_lookup = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		nat64stateful_wan_state->lookup(key, value_lookup, locker);
 		if (!value_lookup)
 		{
@@ -4059,8 +4059,8 @@ inline void cWorker::balancer_handle()
 
 		/// @todo: BALANCER TCP SYN
 
-		dataplane::globalBase::balancer_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::balancer_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		const uint32_t hash = basePermanently.globalBaseAtomic->balancer_state->lookup(key, value, locker);
 		bool rescheduleReal = false;
 		if (value)
@@ -4328,7 +4328,7 @@ inline void cWorker::balancer_ipv6_source(rte_ipv6_hdr* header,
                                           const rte_ipv4_hdr* ipv4HeaderInner,
                                           const rte_ipv6_hdr* ipv6HeaderInner)
 {
-	uint32_t random_src;
+	uint32_t random_src = 0;
 	if (ipv4HeaderInner)
 	{
 		random_src = ipv4HeaderInner->src_addr;
@@ -4672,8 +4672,8 @@ inline void cWorker::balancer_icmp_forward_handle()
 		const balancer_service_id_t service_id = metadata->flow.data.atomic >> 8;
 		const auto& service = base.globalBase->balancer_services[service_id];
 
-		dataplane::globalBase::balancer_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::balancer_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		basePermanently.globalBaseAtomic->balancer_state->lookup(key, value, locker);
 
 		if (value)
@@ -4759,8 +4759,8 @@ inline cWorker::FlowFromState cWorker::acl_checkstate(rte_mbuf* mbuf)
 			key.dst_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::fw_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		basePermanently.globalBaseAtomic->fw4_state->lookup(key, value, locker);
 
 		return acl_checkstate(mbuf, value, locker);
@@ -4795,8 +4795,8 @@ inline cWorker::FlowFromState cWorker::acl_checkstate(rte_mbuf* mbuf)
 			key.dst_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::fw_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		basePermanently.globalBaseAtomic->fw6_state->lookup(key, value, locker);
 
 		return acl_checkstate(mbuf, value, locker);
@@ -4901,8 +4901,8 @@ inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common
 				break;
 			}
 
-			dataplane::globalBase::fw_state_value_t* lookup_value;
-			dataplane::spinlock_nonrecursive_t* locker;
+			dataplane::globalBase::fw_state_value_t* lookup_value = nullptr;
+			dataplane::spinlock_nonrecursive_t* locker = nullptr;
 			const uint32_t hash = atomic->fw4_state->lookup(key, lookup_value, locker);
 			if (lookup_value)
 			{
@@ -4998,8 +4998,8 @@ inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common
 				break;
 			}
 
-			dataplane::globalBase::fw_state_value_t* lookup_value;
-			dataplane::spinlock_nonrecursive_t* locker;
+			dataplane::globalBase::fw_state_value_t* lookup_value = nullptr;
+			dataplane::spinlock_nonrecursive_t* locker = nullptr;
 			const uint32_t hash = atomic->fw6_state->lookup(key, lookup_value, locker);
 			if (lookup_value)
 			{
@@ -5388,7 +5388,7 @@ void cWorker::acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAc
 	const auto& base = bases[localBaseId & 1];
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-	samples::sample_t* sample;
+	samples::sample_t* sample = nullptr;
 	if (rte_mempool_get(dataPlane->mempool_log, (void**)&sample) != 0)
 	{
 		stats->logs_drops++;
@@ -5486,8 +5486,8 @@ inline cWorker::FlowFromState cWorker::acl_egress_checkstate(rte_mbuf* mbuf)
 			key.dst_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::fw_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		basePermanently.globalBaseAtomic->fw4_state->lookup(key, value, locker);
 
 		return acl_egress_checkstate(mbuf, value, locker);
@@ -5522,8 +5522,8 @@ inline cWorker::FlowFromState cWorker::acl_egress_checkstate(rte_mbuf* mbuf)
 			key.dst_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::fw_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		basePermanently.globalBaseAtomic->fw6_state->lookup(key, value, locker);
 
 		return acl_egress_checkstate(mbuf, value, locker);

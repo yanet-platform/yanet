@@ -336,7 +336,7 @@ inline void stream_in_t::pop(char* buffer, uint64_t bufferSize)
 
 inline void stream_in_t::pop(std::string& value)
 {
-	std::string::size_type size;
+	std::string::size_type size = 0;
 	pop(size);
 
 	if (this->inBuffer.size() - inPosition < size)

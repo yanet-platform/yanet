@@ -1655,7 +1655,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 
 		std::string scheduler_string = service_json["scheduler"];
 
-		balancer::scheduler scheduler;
+		balancer::scheduler scheduler{};
 		balancer::scheduler_params scheduler_params{};
 		if (scheduler_string == "rr")
 		{
@@ -1678,7 +1678,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			throw error_result_t(eResult::invalidConfigurationFile, "unknown scheduler: " + scheduler_string);
 		}
 
-		balancer::forwarding_method forwarding_method;
+		balancer::forwarding_method forwarding_method{};
 
 		if (!exist(service_json, "lvs_method"))
 		{

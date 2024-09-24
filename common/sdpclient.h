@@ -33,7 +33,7 @@ public:
 		{
 			number_of_attempts++;
 			std::string message_error;
-			uint64_t size_mmap;
+			uint64_t size_mmap = 0;
 			result = ReadItAgainMainFileDataplane(sdp_data, size_mmap, message_error);
 			if (result == eResultRead::error)
 			{

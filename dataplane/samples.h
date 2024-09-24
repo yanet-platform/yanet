@@ -97,7 +97,7 @@ public:
 			return;
 		}
 
-		sample_base_t* sample;
+		sample_base_t* sample = nullptr;
 
 		if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
 		{

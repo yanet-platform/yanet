@@ -41,11 +41,11 @@ bool system::getEtherAddress(const uint32_t& ipAddress,
 {
 	/// @todo: try to connect
 
-	int arpSocket;
+	int arpSocket = 0;
 	struct arpreq request;
-	struct sockaddr_in* sin;
-	struct ifaddrs* interfaces;
-	struct ifaddrs* interfaceNext;
+	struct sockaddr_in* sin = nullptr;
+	struct ifaddrs* interfaces = nullptr;
+	struct ifaddrs* interfaceNext = nullptr;
 
 	arpSocket = socket(AF_INET, SOCK_DGRAM, 0);
 	if (arpSocket == -1)
@@ -242,9 +242,9 @@ std::set<uint32_t> system::getLocalIpAddresses()
 {
 	std::set<uint32_t> result;
 
-	struct ifaddrs* ifaddr;
-	struct ifaddrs* ifa;
-	int n;
+	struct ifaddrs* ifaddr = nullptr;
+	struct ifaddrs* ifa = nullptr;
+	int n = 0;
 
 	if (getifaddrs(&ifaddr) == -1)
 	{
@@ -276,9 +276,9 @@ std::set<std::array<uint8_t, 16>> system::getLocalIPv6Addresses()
 {
 	std::set<std::array<uint8_t, 16>> result;
 
-	struct ifaddrs* ifaddr;
-	struct ifaddrs* ifa;
-	int n;
+	struct ifaddrs* ifaddr = nullptr;
+	struct ifaddrs* ifa = nullptr;
+	int n = 0;
 
 	if (getifaddrs(&ifaddr) == -1)
 	{

@@ -160,7 +160,7 @@ void cBus::clientThread(int clientSocket)
 
 	for (;;)
 	{
-		uint64_t messageSize;
+		uint64_t messageSize = 0;
 		if (!recvAll(clientSocket, (char*)&messageSize, sizeof(messageSize)))
 		{
 			stats.errors[(uint32_t)common::idp::errorType::busRead]++;

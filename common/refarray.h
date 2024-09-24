@@ -58,7 +58,7 @@ public:
 			return std::nullopt;
 		}
 
-		id_t id;
+		id_t id = 0;
 		ids_unused_size--;
 		if (ids_unused.size())
 		{
