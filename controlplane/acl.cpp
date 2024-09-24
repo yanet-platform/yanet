@@ -58,8 +58,8 @@ struct dispatcher_rules_t
 			{
 				const auto& network = *item.network;
 
-				filter_network_t* _src = new filter_network_t;
-				filter_network_t* _dst = new filter_network_t;
+				auto* _src = new filter_network_t;
+				auto* _dst = new filter_network_t;
 
 				if (std::holds_alternative<controlplane::base::acl_rule_network_ipv4_t>(network))
 				{
