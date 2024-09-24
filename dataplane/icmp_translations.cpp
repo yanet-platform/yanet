@@ -155,7 +155,7 @@ bool do_icmp_translate_v6_to_v4(rte_mbuf* mbuf,
 		{
 			return false;
 		}
-		tIPv6ExtensionFragment* extension = (tIPv6ExtensionFragment*)(((char*)ipv6PayloadHeader) + ipv6PayloadHeaderSize);
+		auto* extension = (tIPv6ExtensionFragment*)(((char*)ipv6PayloadHeader) + ipv6PayloadHeaderSize);
 		packet_id = static_cast<uint16_t>(extension->identification >> 16);
 		fragment_offset = rte_cpu_to_be_16(rte_be_to_cpu_16(extension->offsetFlagM) >> 3);
 		fragment_offset |= (extension->offsetFlagM & 0x0100) >> 3;
@@ -182,7 +182,7 @@ bool do_icmp_translate_v6_to_v4(rte_mbuf* mbuf,
 		nextPayloadHeader = IPPROTO_ICMP;
 	}
 
-	rte_ipv4_hdr* ipv4PayloadHeader = (rte_ipv4_hdr*)((char*)ipv6PayloadHeader + ipv6PayloadHeaderSize - sizeof(rte_ipv4_hdr));
+	auto* ipv4PayloadHeader = (rte_ipv4_hdr*)((char*)ipv6PayloadHeader + ipv6PayloadHeaderSize - sizeof(rte_ipv4_hdr));
 
 	ipv4PayloadHeader->version_ihl = 0x45;
 	ipv4PayloadHeader->type_of_service = (rte_be_to_cpu_32(ipv6PayloadHeader->vtc_flow) >> 20) & 0xFF;
@@ -223,21 +223,21 @@ bool do_icmp_translate_v6_to_v4(rte_mbuf* mbuf,
 		{
 			/// @todo: check packet size
 
-			rte_tcp_hdr* tcpPayloadHeader = (rte_tcp_hdr*)((char*)ipv4PayloadHeader + sizeof(rte_ipv4_hdr));
+			auto* tcpPayloadHeader = (rte_tcp_hdr*)((char*)ipv4PayloadHeader + sizeof(rte_ipv4_hdr));
 			yanet_tcp_checksum_v6_to_v4(tcpPayloadHeader, checksum6, checksum4);
 		}
 		else if (nextPayloadHeader == IPPROTO_UDP)
 		{
 			/// @todo: check packet size
 
-			rte_udp_hdr* udpPayloadHeader = (rte_udp_hdr*)((char*)ipv4PayloadHeader + sizeof(rte_ipv4_hdr));
+			auto* udpPayloadHeader = (rte_udp_hdr*)((char*)ipv4PayloadHeader + sizeof(rte_ipv4_hdr));
 			yanet_udp_checksum_v6_to_v4(udpPayloadHeader, checksum6, checksum4);
 		}
 		else if (nextPayloadHeader == IPPROTO_ICMP)
 		{
 			/// @todo: check packet size
 
-			icmp_header_t* icmpPayloadHeader = (icmp_header_t*)((char*)ipv4PayloadHeader + sizeof(rte_ipv4_hdr));
+			auto* icmpPayloadHeader = (icmp_header_t*)((char*)ipv4PayloadHeader + sizeof(rte_ipv4_hdr));
 
 			if ((fragment_offset & 0xFF3F) != 0 ||
 			    !yanet_icmp_translate_v6_to_v4(icmpPayloadHeader,
@@ -431,7 +431,7 @@ bool do_icmp_translate_v4_to_v6(rte_mbuf* mbuf,
 
 	if ((fragment_offset & 0xFF3F) != 0)
 	{
-		tIPv6ExtensionFragment* extension = (tIPv6ExtensionFragment*)(((char*)ipv6PayloadHeader) + sizeof(rte_ipv6_hdr));
+		auto* extension = (tIPv6ExtensionFragment*)(((char*)ipv6PayloadHeader) + sizeof(rte_ipv6_hdr));
 		extension->nextHeader = nextPayloadHeader;
 		extension->reserved = 0;
 		extension->offsetFlagM = rte_cpu_to_be_16(rte_be_to_cpu_16(fragment_offset) << 3);
@@ -470,21 +470,21 @@ bool do_icmp_translate_v4_to_v6(rte_mbuf* mbuf,
 		{
 			/// @todo: check packet size
 
-			rte_tcp_hdr* tcpPayloadHeader = (rte_tcp_hdr*)((char*)ipv6PayloadHeader + ipv6PayloadHeaderSize);
+			auto* tcpPayloadHeader = (rte_tcp_hdr*)((char*)ipv6PayloadHeader + ipv6PayloadHeaderSize);
 			yanet_tcp_checksum_v4_to_v6(tcpPayloadHeader, checksum4, checksum6);
 		}
 		else if (nextPayloadHeader == IPPROTO_UDP)
 		{
 			/// @todo: check packet size
 
-			rte_udp_hdr* udpPayloadHeader = (rte_udp_hdr*)((char*)ipv6PayloadHeader + ipv6PayloadHeaderSize);
+			auto* udpPayloadHeader = (rte_udp_hdr*)((char*)ipv6PayloadHeader + ipv6PayloadHeaderSize);
 			yanet_udp_checksum_v4_to_v6(udpPayloadHeader, checksum4, checksum6);
 		}
 		else if (nextPayloadHeader == IPPROTO_ICMPV6)
 		{
 			/// @todo: check packet size
 
-			icmp_header_t* icmpPayloadHeader = (icmp_header_t*)((char*)ipv6PayloadHeader + ipv6PayloadHeaderSize);
+			auto* icmpPayloadHeader = (icmp_header_t*)((char*)ipv6PayloadHeader + ipv6PayloadHeaderSize);
 
 			if ((fragment_offset & 0xFF3F) != 0 ||
 			    !yanet_icmp_translate_v4_to_v6(icmpPayloadHeader,
