@@ -1,16 +1,18 @@
 #pragma once
 
+#include <utility>
+
 #include "base.h"
 
 class config_converter_t
 {
 public:
 	config_converter_t(cControlPlane* controlplane,
-	                   const controlplane::base_t& baseNext,
-	                   const common::idp::limits::response& limits) :
+	                   controlplane::base_t  baseNext,
+	                   common::idp::limits::response  limits) :
 	        controlplane(controlplane),
-	        baseNext(baseNext),
-	        limits(limits)
+	        baseNext(std::move(baseNext)),
+	        limits(std::move(limits))
 	{
 	}
 
