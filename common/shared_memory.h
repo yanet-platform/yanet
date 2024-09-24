@@ -286,7 +286,7 @@ private:
 		if (socket_id.has_value())
 		{
 			oldmask = numa_allocate_nodemask();
-			if (get_mempolicy(&oldpolicy, oldmask->maskp, oldmask->size + 1, 0, 0) < 0)
+			if (get_mempolicy(&oldpolicy, oldmask->maskp, oldmask->size + 1, nullptr, 0) < 0)
 			{
 				YANET_LOG_WARNING("get_mempolicy(): %s, continue with the use of sockets turned off\n", strerror(errno));
 				oldpolicy = MPOL_DEFAULT;
