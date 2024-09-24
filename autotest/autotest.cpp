@@ -123,9 +123,9 @@ eResult tAutotest::initSharedMemory()
 	dataPlaneSharedMemory = dataPlane.get_shm_info();
 
 	std::map<key_t, void*> shm_by_key;
-	key_t ipcKey;
-	int shmid;
-	void* shmaddr;
+	key_t ipcKey = 0;
+	int shmid = 0;
+	void* shmaddr = nullptr;
 
 	for (const auto& shmInfo : dataPlaneSharedMemory)
 	{
@@ -237,8 +237,8 @@ void tAutotest::sendThread(std::string interfaceName,
 		throw "";
 	}
 
-	pcap_pkthdr* header;
-	const u_char* data;
+	pcap_pkthdr* header = nullptr;
+	const u_char* data = nullptr;
 	static u_char zeros[MAX_PACK_LEN];
 
 	auto iface = pcaps[interfaceName];
@@ -1927,7 +1927,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 		std::string expectFilePath = path + "/" + yamlDump["expect"].as<std::string>();
 		bool success = true;
 
-		common::bufferring* ring;
+		common::bufferring* ring = nullptr;
 		{ /// searching memory ring by tag
 			auto it = dumpRings.find(tag);
 			if (it == dumpRings.end())
@@ -1938,7 +1938,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 			ring = &it->second;
 		}
 
-		pcap_t* pcap;
+		pcap_t* pcap = nullptr;
 		{ /// open pcap file with expected data
 			char pcap_errbuf[PCAP_ERRBUF_SIZE];
 			pcap = pcap_open_offline(expectFilePath.data(), pcap_errbuf);
@@ -1950,8 +1950,8 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 		}
 
 		struct pcap_pkthdr header;
-		const u_char* pcap_packet;
-		common::bufferring::item_t* shm_packet;
+		const u_char* pcap_packet = nullptr;
+		common::bufferring::item_t* shm_packet = nullptr;
 		uint64_t position = 0;
 
 		/// read packets from pcap and compare them with packets from memory ring

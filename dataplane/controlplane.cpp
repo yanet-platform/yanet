@@ -713,7 +713,7 @@ common::idp::lpm4LookupAddress::response cControlPlane::lpm4LookupAddress(const 
 		const tSocketId& socketId = iter.first;
 		const auto* globalBase = iter.second[dataPlane->currentGlobalBaseId];
 
-		uint32_t valueId;
+		uint32_t valueId = 0;
 		if (globalBase->route_lpm4->lookup(ipAddress, &valueId))
 		{
 			response[socketId] = {true,
@@ -745,7 +745,7 @@ common::idp::lpm6LookupAddress::response cControlPlane::lpm6LookupAddress(const 
 		const tSocketId& socketId = iter.first;
 		const auto* globalBase = iter.second[dataPlane->currentGlobalBaseId];
 
-		uint32_t valueId;
+		uint32_t valueId = 0;
 		if (globalBase->route_lpm6->lookup(request, &valueId))
 		{
 			response[socketId] = {true,

@@ -297,7 +297,7 @@ sock_dev_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		}
 	} while (rc == 0); /// Repeat if there is no data yet
 
-	struct rte_mbuf* mbuf;
+	struct rte_mbuf* mbuf = nullptr;
 	mbuf = rte_pktmbuf_alloc(sq->mb_pool);
 	if (unlikely(mbuf == nullptr))
 	{

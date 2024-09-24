@@ -16,7 +16,7 @@ std::optional<std::string> GetNameByPort(tPortId pid)
 
 std::optional<tPortId> GetPortByName(const std::string& name)
 {
-	tPortId port;
+	tPortId port = 0;
 	if (int res = rte_eth_dev_get_port_by_name(name.c_str(), &port); res)
 	{
 		YANET_LOG_ERROR("Failed to get port for name %s (%s)\n", name.c_str(), strerror(res));

@@ -110,7 +110,7 @@ fw_lexer_t::make_IP6PRJID(const std::string& s, fw_parser_t::location_type& l)
 	common::ipv6_address_t addr;
 	std::string tmp = s;
 	uint32_t prjid = 0;
-	int prefixlen, prjid_prefixlen = 32;
+	int prefixlen = 0, prjid_prefixlen = 32;
 
 	// handle addresses with holes in masks 1407@2a02:6b8:c00::/40
 	auto pos = tmp.find("@");
