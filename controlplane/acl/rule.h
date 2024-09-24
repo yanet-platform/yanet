@@ -233,7 +233,7 @@ struct filter_network_t : filter_base_t
 
 inline ref_t<filter_network_t> and_op(const ref_t<filter_network_t>& a, const ref_t<filter_network_t>& b)
 {
-	filter_network_t* result = new filter_network_t;
+	auto* result = new filter_network_t;
 
 	for (const auto& a_item : a.filter->networks)
 	{
@@ -371,7 +371,7 @@ struct filter_prm_t : filter_base_t
 template<typename uint_t>
 ref_t<filter_prm_t<uint_t>> and_op(const ref_t<filter_prm_t<uint_t>>& a, const ref_t<filter_prm_t<uint_t>>& b)
 {
-	filter_prm_t<uint_t>* result = new filter_prm_t<uint_t>;
+	auto* result = new filter_prm_t<uint_t>;
 
 	for (const auto& a_item : a.filter->ranges)
 	{
@@ -396,7 +396,7 @@ using filter_prm16_t = filter_prm_t<uint16_t>;
 
 static inline ref_t<filter_prm16_t> icmp_prm1(const common::ranges_t& types, const common::ranges_t& codes)
 {
-	filter_prm16_t* filter = new filter_prm16_t;
+	auto* filter = new filter_prm16_t;
 
 	if (types == ranges_t{common::range_t{0x00, 0xFF}} && codes == ranges_t{common::range_t{0x00, 0xFF}})
 	{
