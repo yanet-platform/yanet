@@ -1984,9 +1984,8 @@ constexpr ipv6_prefix_t ipv6_prefix_default = {ipv6_address_default, 0};
 
 //
 
-namespace worker
-{
-namespace stats
+
+namespace worker::stats
 {
 struct common
 {
@@ -2033,7 +2032,7 @@ struct port
 	uint64_t controlPlane_drops = 0; ///< @todo: DELETE
 };
 }
-}
+
 
 namespace worker_gc
 {
