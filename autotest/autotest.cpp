@@ -505,8 +505,8 @@ public:
 		{
 			return;
 		}
-		pcap_pkthdr* h = 0;
-		const u_char* data = 0;
+		pcap_pkthdr* h = nullptr;
+		const u_char* data = nullptr;
 		if (pcap_next_ex(pcap, &h, &data) >= 0)
 		{
 			memcpy(&header, h, sizeof(struct pcap_pkthdr));
