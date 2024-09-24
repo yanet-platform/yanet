@@ -2,6 +2,7 @@
 
 #include <array>
 #include <map>
+#include <utility>
 #include <vector>
 
 #include "common/controlplaneconfig.h"
@@ -136,10 +137,10 @@ class acl_rule_transport_tcp_t
 public:
 	acl_rule_transport_tcp_t() = default;
 
-	acl_rule_transport_tcp_t(const ranges_t& sourcePorts,
-	                         const ranges_t& destinationPorts) :
-	        sourcePorts(sourcePorts),
-	        destinationPorts(destinationPorts)
+	acl_rule_transport_tcp_t(ranges_t sourcePorts,
+	                         ranges_t destinationPorts) :
+	        sourcePorts(std::move(sourcePorts)),
+	        destinationPorts(std::move(destinationPorts))
 	{
 	}
 
@@ -154,10 +155,10 @@ class acl_rule_transport_udp_t
 public:
 	acl_rule_transport_udp_t() = default;
 
-	acl_rule_transport_udp_t(const ranges_t& sourcePorts,
-	                         const ranges_t& destinationPorts) :
-	        sourcePorts(sourcePorts),
-	        destinationPorts(destinationPorts)
+	acl_rule_transport_udp_t(ranges_t sourcePorts,
+	                         ranges_t destinationPorts) :
+	        sourcePorts(std::move(sourcePorts)),
+	        destinationPorts(std::move(destinationPorts))
 	{
 	}
 
@@ -176,27 +177,27 @@ public:
 	{
 	}
 
-	acl_rule_transport_icmpv4_t(const ranges_t& types) :
-	        types(types),
+	acl_rule_transport_icmpv4_t(ranges_t types) :
+	        types(std::move(types)),
 	        codes(range_t{0x00, 0xFF}),
 	        identifiers(range_t{0x0000, 0xFFFF})
 	{
 	}
 
-	acl_rule_transport_icmpv4_t(const ranges_t& types,
-	                            const ranges_t& codes) :
-	        types(types),
-	        codes(codes),
+	acl_rule_transport_icmpv4_t(ranges_t types,
+	                            ranges_t codes) :
+	        types(std::move(types)),
+	        codes(std::move(codes)),
 	        identifiers(range_t{0x0000, 0xFFFF})
 	{
 	}
 
-	acl_rule_transport_icmpv4_t(const ranges_t& types,
-	                            const ranges_t& codes,
-	                            const ranges_t& identifiers) :
-	        types(types),
-	        codes(codes),
-	        identifiers(identifiers)
+	acl_rule_transport_icmpv4_t(ranges_t types,
+	                            ranges_t codes,
+	                            ranges_t identifiers) :
+	        types(std::move(types)),
+	        codes(std::move(codes)),
+	        identifiers(std::move(identifiers))
 	{
 	}
 
@@ -216,27 +217,27 @@ public:
 	{
 	}
 
-	acl_rule_transport_icmpv6_t(const ranges_t& types) :
-	        types(types),
+	acl_rule_transport_icmpv6_t(ranges_t types) :
+	        types(std::move(types)),
 	        codes(range_t{0x00, 0xFF}),
 	        identifiers(range_t{0x0000, 0xFFFF})
 	{
 	}
 
-	acl_rule_transport_icmpv6_t(const ranges_t& types,
-	                            const ranges_t& codes) :
-	        types(types),
-	        codes(codes),
+	acl_rule_transport_icmpv6_t(ranges_t types,
+	                            ranges_t codes) :
+	        types(std::move(types)),
+	        codes(std::move(codes)),
 	        identifiers(range_t{0x0000, 0xFFFF})
 	{
 	}
 
-	acl_rule_transport_icmpv6_t(const ranges_t& types,
-	                            const ranges_t& codes,
-	                            const ranges_t& identifiers) :
-	        types(types),
-	        codes(codes),
-	        identifiers(identifiers)
+	acl_rule_transport_icmpv6_t(ranges_t types,
+	                            ranges_t codes,
+	                            ranges_t identifiers) :
+	        types(std::move(types)),
+	        codes(std::move(codes)),
+	        identifiers(std::move(identifiers))
 	{
 	}
 
@@ -251,8 +252,8 @@ class acl_rule_transport_other_t
 public:
 	acl_rule_transport_other_t() = default;
 
-	acl_rule_transport_other_t(const ranges_t& protocolTypes) :
-	        protocolTypes(protocolTypes)
+	acl_rule_transport_other_t(ranges_t protocolTypes) :
+	        protocolTypes(std::move(protocolTypes))
 	{
 	}
 

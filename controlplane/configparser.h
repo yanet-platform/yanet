@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
 #include "common/controlplaneconfig.h"
 
@@ -10,7 +11,7 @@ class config_parser_t
 {
 public:
 	config_parser_t(common::idp::getConfig::response dataPlaneConfig) :
-	        dataPlaneConfig(dataPlaneConfig)
+	        dataPlaneConfig(std::move(dataPlaneConfig))
 	{}
 
 	controlplane::base_t loadConfig(const std::string& rootFilePath, const nlohmann::json& rootJson, const std::map<std::string, nlohmann::json>& jsons = {});

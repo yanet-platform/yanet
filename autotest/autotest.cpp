@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include <utility>
 
 #include <gmock/gmock.h>
 
@@ -407,8 +408,8 @@ private:
 class PcapDumper
 {
 public:
-	PcapDumper(const std::string& path, int capsize = MAX_PACK_LEN) :
-	        tmpFilePath(path), pcap(pcap_open_dead(DLT_EN10MB, capsize))
+	PcapDumper(std::string  path, int capsize = MAX_PACK_LEN) :
+	        tmpFilePath(std::move(path)), pcap(pcap_open_dead(DLT_EN10MB, capsize))
 	{
 
 		if (!pcap)
