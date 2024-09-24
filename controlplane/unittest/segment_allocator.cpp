@@ -179,7 +179,7 @@ TEST(SegmentAllocator, BigSize)
 
 	uint8_t data[sizeof(AllocatorBig)];
 	memset((void*)data, -1, sizeof(AllocatorBig));
-	AllocatorBig* allocator = new (data) AllocatorBig();
+	auto* allocator = new (data) AllocatorBig();
 
 	uint16_t size = 4;
 	uint32_t full_size = index_end - index_begin;
