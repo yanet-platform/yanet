@@ -57,8 +57,8 @@ void cBus::join()
 
 uint64_t cBus::GetSizeForCounters()
 {
-	uint32_t count_errors = static_cast<uint32_t>(common::idp::errorType::size);
-	uint32_t count_requests = static_cast<uint32_t>(common::idp::requestType::size);
+	auto count_errors = static_cast<uint32_t>(common::idp::errorType::size);
+	auto count_requests = static_cast<uint32_t>(common::idp::requestType::size);
 	return (count_errors + 2 * count_requests) * sizeof(uint64_t);
 }
 

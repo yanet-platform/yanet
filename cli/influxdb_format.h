@@ -181,7 +181,7 @@ void print_histogram(const char* name,
                      const index_T start,
                      const index_T end)
 {
-	for (unsigned int i = (unsigned int)start;
+	for (auto i = (unsigned int)start;
 	     i <= (unsigned int)end;
 	     i++)
 	{
