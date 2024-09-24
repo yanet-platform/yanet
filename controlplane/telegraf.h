@@ -41,12 +41,12 @@ public:
 		peers[0] = "unknown";
 	}
 
-	const std::map<community_t, std::string>* get_communities() const
+	[[nodiscard]] const std::map<community_t, std::string>* get_communities() const
 	{
 		return &communities;
 	}
 
-	const std::map<uint32_t, std::string>* get_peers() const
+	[[nodiscard]] const std::map<uint32_t, std::string>* get_peers() const
 	{
 		return &peers;
 	}

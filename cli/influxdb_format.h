@@ -90,7 +90,7 @@ class base_t
 public:
 	virtual ~base_t() = default;
 
-	const std::string& to_string() const
+	[[nodiscard]] const std::string& to_string() const
 	{
 		return string;
 	}

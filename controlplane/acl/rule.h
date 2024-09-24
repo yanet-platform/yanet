@@ -27,12 +27,12 @@ struct range_t : std::tuple<uint_t, uint_t>
 	inline range_t(unsigned int val) :
 	        std::tuple<uint_t, uint_t>(val, val) {}
 
-	uint_t from() const
+	[[nodiscard]] uint_t from() const
 	{
 		return std::get<0>(*this);
 	}
 
-	uint_t to() const
+	[[nodiscard]] uint_t to() const
 	{
 		return std::get<1>(*this);
 	}
@@ -43,9 +43,9 @@ struct filter_base_t
 	unsigned long ref_count{};
 
 	inline constexpr filter_base_t() = default;
-	virtual bool is_none() const = 0;
+	[[nodiscard]] virtual bool is_none() const = 0;
 	virtual ~filter_base_t() = default;
-	virtual std::string to_string() const = 0;
+	[[nodiscard]] virtual std::string to_string() const = 0;
 };
 
 template<typename filter_t>
@@ -145,7 +145,7 @@ struct ref_t
 		return filter != nullptr;
 	}
 
-	inline bool is_none() const
+	[[nodiscard]] inline bool is_none() const
 	{
 		return filter ? filter->is_none() : false;
 	}
@@ -199,12 +199,12 @@ struct filter_network_t : filter_base_t
 		networks.emplace_back(std::move(string));
 	}
 
-	virtual bool is_none() const
+	[[nodiscard]] bool is_none() const
 	{
 		return networks.empty();
 	}
 
-	virtual std::string to_string() const
+	[[nodiscard]] virtual std::string to_string() const
 	{
 		if (networks.empty())
 		{
@@ -335,12 +335,12 @@ struct filter_prm_t : filter_base_t
 		}
 	}
 
-	virtual bool is_none() const
+	[[nodiscard]] bool is_none() const
 	{
 		return ranges.empty();
 	}
 
-	virtual std::string to_string() const
+	[[nodiscard]] virtual std::string to_string() const
 	{
 		std::string ret;
 
@@ -593,12 +593,12 @@ struct filter_id_t : filter_base_t
 	inline filter_id_t(int _val) :
 	        val(_val) {}
 
-	virtual bool is_none() const
+	[[nodiscard]] virtual bool is_none() const
 	{
 		return val < 0;
 	}
 
-	virtual std::string to_string() const
+	[[nodiscard]] virtual std::string to_string() const
 	{
 		return std::to_string(val);
 	}
@@ -742,12 +742,12 @@ struct filter_proto_t : filter_base_t
 		}
 	}
 
-	virtual bool is_none() const
+	[[nodiscard]] virtual bool is_none() const
 	{
 		return type.is_none() || prm1.is_none() || prm2.is_none();
 	}
 
-	virtual std::string to_string() const
+	[[nodiscard]] virtual std::string to_string() const
 	{
 		bool has_ports = false, has_icmptypes = false,
 		     has_icmp6types = false, has_flags = false;
@@ -924,12 +924,12 @@ struct filter_t : filter_base_t
 		}
 	}
 
-	virtual bool is_none() const
+	[[nodiscard]] virtual bool is_none() const
 	{
 		return acl_id.is_none() || src.is_none() || dst.is_none() || proto.is_none() || dir.is_none() || recordstate.is_none();
 	}
 
-	virtual std::string to_string() const
+	[[nodiscard]] virtual std::string to_string() const
 	{
 		std::string ret;
 

@@ -34,7 +34,7 @@ public:
 		                second.icmpv6_identifier);
 	}
 
-	inline bool protocol_contain(const uint8_t protocol_value) const
+	[[nodiscard]] inline bool protocol_contain(const uint8_t protocol_value) const
 	{
 		for (const auto& range : protocol.vector)
 		{

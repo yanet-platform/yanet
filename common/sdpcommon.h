@@ -223,7 +223,7 @@ struct DataPlaneInSharedMemory
 		return ((value + 63) / 64) * 64;
 	}
 
-	std::tuple<uint64_t*, uint64_t*, uint64_t*> BuffersBus() const
+	[[nodiscard]] std::tuple<uint64_t*, uint64_t*, uint64_t*> BuffersBus() const
 	{
 		uint32_t count_errors = static_cast<uint32_t>(common::idp::errorType::size);
 		uint32_t count_requests = static_cast<uint32_t>(common::idp::requestType::size);

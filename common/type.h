@@ -215,12 +215,12 @@ public:
 	}
 
 public:
-	bool is_default() const
+	[[nodiscard]] bool is_default() const
 	{
 		return *this == mac_address_t();
 	}
 
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		char buffer[64];
 		snprintf(buffer, 64, "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X", address[0], address[1], address[2], address[3], address[4], address[5]);
@@ -232,7 +232,7 @@ public:
 		return address.data();
 	}
 
-	const uint8_t* data() const
+	[[nodiscard]] const uint8_t* data() const
 	{
 		return address.data();
 	}
@@ -303,14 +303,14 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		char buffer[64];
 		snprintf(buffer, 64, "%u.%u.%u.%u", (address >> 24) & 0xFF, (address >> 16) & 0xFF, (address >> 8) & 0xFF, address & 0xFF);
 		return buffer;
 	}
 
-	constexpr ipv4_address_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] constexpr ipv4_address_t applyMask(const uint8_t& mask) const
 	{
 		if (mask == 0 ||
 		    mask > 32)
@@ -321,7 +321,7 @@ public:
 		return {address & (0xFFFFFFFFu << (32u - mask))};
 	}
 
-	constexpr std::tuple<ipv4_address_t, ipv4_address_t> splitNetwork(const uint8_t& mask) const
+	[[nodiscard]] constexpr std::tuple<ipv4_address_t, ipv4_address_t> splitNetwork(const uint8_t& mask) const
 	{
 		if (mask >= 32)
 		{
@@ -339,7 +339,7 @@ public:
 		address &= ~((!bit) << (31 - index));
 	}
 
-	uint8_t get_bit(const uint32_t& index) const
+	[[nodiscard]] uint8_t get_bit(const uint32_t& index) const
 	{
 		return (address >> (31 - index)) & 1;
 	}
@@ -438,7 +438,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		char buffer[256];
 		inet_ntop(AF_INET6, address.data(), buffer, sizeof(buffer));
@@ -446,7 +446,7 @@ public:
 		return buffer;
 	}
 
-	ipv6_address_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] ipv6_address_t applyMask(const uint8_t& mask) const
 	{
 		if (mask == 0 ||
 		    mask > 128)
@@ -470,12 +470,12 @@ public:
 		return {address0, address64};
 	}
 
-	uint128_t getAddress128() const
+	[[nodiscard]] uint128_t getAddress128() const
 	{
 		return ((uint128_t)(getAddress64(0)) << 64) + ((uint128_t)(getAddress64(64)));
 	}
 
-	uint64_t getAddress64(const uint8_t& offset) const
+	[[nodiscard]] uint64_t getAddress64(const uint8_t& offset) const
 	{
 		if (offset % 8 ||
 		    offset > 128 - 64)
@@ -486,7 +486,7 @@ public:
 		return be64toh(*(uint64_t*)&address[offset / 8]);
 	}
 
-	uint32_t getAddress32(const uint8_t& offset) const
+	[[nodiscard]] uint32_t getAddress32(const uint8_t& offset) const
 	{
 		if (offset % 8 ||
 		    offset > 128 - 32)
@@ -497,12 +497,12 @@ public:
 		return be32toh(*(uint32_t*)&address[offset / 8]);
 	}
 
-	ipv4_address_t get_mapped_ipv4_address() const
+	[[nodiscard]] ipv4_address_t get_mapped_ipv4_address() const
 	{
 		return ipv4_address_t(getAddress32(96));
 	}
 
-	constexpr const uint8_t* data() const
+	[[nodiscard]] constexpr const uint8_t* data() const
 	{
 		return address.data();
 	}
@@ -519,7 +519,7 @@ public:
 		byte &= ~((!bit) << (7 - (index % 8)));
 	}
 
-	uint8_t get_bit(const uint32_t& index) const
+	[[nodiscard]] uint8_t get_bit(const uint32_t& index) const
 	{
 		uint32_t address = getAddress32((index / 32) * 32);
 		return (address >> (31 - (index % 32))) & 1;
@@ -538,7 +538,7 @@ public:
 	/// Returns true if this is a multicast address (ff00::/8).
 	///
 	/// This property is defined by IETF RFC 4291.
-	constexpr bool is_multicast() const
+	[[nodiscard]] constexpr bool is_multicast() const
 	{
 		return (address[0] & 0xff) == 0xff;
 	}
@@ -626,7 +626,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		std::string string;
 
@@ -638,12 +638,12 @@ public:
 		return string;
 	}
 
-	constexpr bool is_ipv4() const
+	[[nodiscard]] constexpr bool is_ipv4() const
 	{
 		return std::holds_alternative<ipv4_address_t>(address);
 	}
 
-	constexpr bool is_ipv6() const
+	[[nodiscard]] constexpr bool is_ipv6() const
 	{
 		return std::holds_alternative<ipv6_address_t>(address);
 	}
@@ -653,7 +653,7 @@ public:
 		return std::get<ipv4_address_t>(address);
 	}
 
-	const ipv4_address_t& get_ipv4() const
+	[[nodiscard]] const ipv4_address_t& get_ipv4() const
 	{
 		return std::get<ipv4_address_t>(address);
 	}
@@ -663,12 +663,12 @@ public:
 		return std::get<ipv6_address_t>(address);
 	}
 
-	const ipv6_address_t& get_ipv6() const
+	[[nodiscard]] const ipv6_address_t& get_ipv6() const
 	{
 		return std::get<ipv6_address_t>(address);
 	}
 
-	bool is_default() const
+	[[nodiscard]] bool is_default() const
 	{
 		if (is_ipv4() &&
 		    get_ipv4() == ipv4_address_t())
@@ -686,7 +686,7 @@ public:
 		}
 	}
 
-	ip_address_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] ip_address_t applyMask(const uint8_t& mask) const
 	{
 		if (is_ipv4())
 		{
@@ -771,7 +771,7 @@ public:
 	}
 
 public:
-	constexpr const ipv4_address_t& address() const
+	[[nodiscard]] constexpr const ipv4_address_t& address() const
 	{
 		return std::get<0>(prefix);
 	}
@@ -781,7 +781,7 @@ public:
 		return std::get<0>(prefix);
 	}
 
-	constexpr const uint8_t& mask() const
+	[[nodiscard]] constexpr const uint8_t& mask() const
 	{
 		return std::get<1>(prefix);
 	}
@@ -791,23 +791,23 @@ public:
 		return std::get<1>(prefix);
 	}
 
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		return address().toString() + "/" + std::to_string(mask());
 	}
 
-	constexpr bool isValid() const
+	[[nodiscard]] constexpr bool isValid() const
 	{
 		return mask() <= 32 &&
 		       address().applyMask(mask()) == address();
 	}
 
-	constexpr ipv4_prefix_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] constexpr ipv4_prefix_t applyMask(const uint8_t& mask) const
 	{
 		return {address().applyMask(mask), mask};
 	}
 
-	constexpr std::tuple<ipv4_prefix_t, ipv4_prefix_t> splitNetwork() const
+	[[nodiscard]] constexpr std::tuple<ipv4_prefix_t, ipv4_prefix_t> splitNetwork() const
 	{
 		if (mask() >= 32)
 		{
@@ -829,7 +829,7 @@ public:
 		stream.push(prefix);
 	}
 
-	bool subnetOf(const ipv4_prefix_t& other) const
+	[[nodiscard]] bool subnetOf(const ipv4_prefix_t& other) const
 	{
 		if (mask() < other.mask())
 		{
@@ -839,7 +839,7 @@ public:
 		return address().applyMask(other.mask()) == other.address();
 	}
 
-	bool subnetFor(const ipv4_address_t& other) const
+	[[nodiscard]] bool subnetFor(const ipv4_address_t& other) const
 	{
 		return other.applyMask(mask()) == address().applyMask(mask());
 	}
@@ -984,7 +984,7 @@ public:
 	}
 
 public:
-	constexpr const ipv6_address_t& address() const
+	[[nodiscard]] constexpr const ipv6_address_t& address() const
 	{
 		return std::get<0>(prefix);
 	}
@@ -994,7 +994,7 @@ public:
 		return std::get<0>(prefix);
 	}
 
-	constexpr const uint8_t& mask() const
+	[[nodiscard]] constexpr const uint8_t& mask() const
 	{
 		return std::get<1>(prefix);
 	}
@@ -1004,12 +1004,12 @@ public:
 		return std::get<1>(prefix);
 	}
 
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		return address().toString() + "/" + std::to_string(mask());
 	}
 
-	bool isValid() const
+	[[nodiscard]] bool isValid() const
 	{
 		if (mask() > 128)
 		{
@@ -1029,22 +1029,22 @@ public:
 		return true;
 	}
 
-	ipv6_prefix_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] ipv6_prefix_t applyMask(const uint8_t& mask) const
 	{
 		return {address().applyMask(mask), mask};
 	}
 
-	uint64_t getAddress64(const uint8_t& offset) const
+	[[nodiscard]] uint64_t getAddress64(const uint8_t& offset) const
 	{
 		return address().getAddress64(offset) & getAddressMask64(offset);
 	}
 
-	uint32_t getAddress32(const uint8_t& offset) const
+	[[nodiscard]] uint32_t getAddress32(const uint8_t& offset) const
 	{
 		return address().getAddress32(offset) & getAddressMask32(offset);
 	}
 
-	uint64_t getAddressMask64(const uint8_t& offset) const
+	[[nodiscard]] uint64_t getAddressMask64(const uint8_t& offset) const
 	{
 		if (offset > 128 - 64)
 		{
@@ -1064,7 +1064,7 @@ public:
 		return 0xFFFFFFFFFFFFFFFFull << (64ull + offset - mask());
 	}
 
-	uint32_t getAddressMask32(const uint8_t& offset) const
+	[[nodiscard]] uint32_t getAddressMask32(const uint8_t& offset) const
 	{
 		if (offset > 128 - 32)
 		{
@@ -1094,12 +1094,12 @@ public:
 		stream.push(prefix);
 	}
 
-	bool subnetFor(const ipv6_address_t& other) const
+	[[nodiscard]] bool subnetFor(const ipv6_address_t& other) const
 	{
 		return other.applyMask(mask()) == address().applyMask(mask());
 	}
 
-	bool subnetOf(const ipv6_prefix_t& other) const
+	[[nodiscard]] bool subnetOf(const ipv6_prefix_t& other) const
 	{
 		if (mask() < other.mask())
 		{
@@ -1263,7 +1263,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		std::string string;
 
@@ -1275,12 +1275,12 @@ public:
 		return string;
 	}
 
-	bool is_ipv4() const
+	[[nodiscard]] bool is_ipv4() const
 	{
 		return std::holds_alternative<ipv4_prefix_t>(prefix);
 	}
 
-	bool is_ipv6() const
+	[[nodiscard]] bool is_ipv6() const
 	{
 		return std::holds_alternative<ipv6_prefix_t>(prefix);
 	}
@@ -1290,7 +1290,7 @@ public:
 		return std::get<ipv4_prefix_t>(prefix);
 	}
 
-	const ipv4_prefix_t& get_ipv4() const
+	[[nodiscard]] const ipv4_prefix_t& get_ipv4() const
 	{
 		return std::get<ipv4_prefix_t>(prefix);
 	}
@@ -1300,7 +1300,7 @@ public:
 		return std::get<ipv6_prefix_t>(prefix);
 	}
 
-	const ipv6_prefix_t& get_ipv6() const
+	[[nodiscard]] const ipv6_prefix_t& get_ipv6() const
 	{
 		return std::get<ipv6_prefix_t>(prefix);
 	}
@@ -1317,7 +1317,7 @@ public:
 		}
 	}
 
-	const uint8_t& mask() const
+	[[nodiscard]] const uint8_t& mask() const
 	{
 		if (is_ipv4())
 		{
@@ -1329,7 +1329,7 @@ public:
 		}
 	}
 
-	bool is_default() const
+	[[nodiscard]] bool is_default() const
 	{
 		if (is_ipv4() &&
 		    get_ipv4() == ipv4_prefix_t())
@@ -1347,7 +1347,7 @@ public:
 		}
 	}
 
-	bool is_host() const
+	[[nodiscard]] bool is_host() const
 	{
 		if (is_ipv4())
 		{
@@ -1359,7 +1359,7 @@ public:
 		}
 	}
 
-	ip_prefix_t get_default() const
+	[[nodiscard]] ip_prefix_t get_default() const
 	{
 		if (is_ipv4())
 		{
@@ -1371,7 +1371,7 @@ public:
 		}
 	}
 
-	ip_address_t address() const
+	[[nodiscard]] ip_address_t address() const
 	{
 		if (is_ipv4())
 		{
@@ -1383,7 +1383,7 @@ public:
 		}
 	}
 
-	ip_prefix_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] ip_prefix_t applyMask(const uint8_t& mask) const
 	{
 		if (is_ipv4())
 		{
@@ -1395,7 +1395,7 @@ public:
 		}
 	}
 
-	bool subnetFor(const ip_address_t& other) const
+	[[nodiscard]] bool subnetFor(const ip_address_t& other) const
 	{
 		if (is_ipv4() && other.is_ipv4())
 		{
@@ -1480,7 +1480,7 @@ public:
 	}
 
 public:
-	ip_prefix_t get_prefix() const
+	[[nodiscard]] ip_prefix_t get_prefix() const
 	{
 		if (std::holds_alternative<ipv4_prefix_with_announces_t>(prefix))
 		{
@@ -1564,7 +1564,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		return std::to_string(value >> 16) + ":" + std::to_string(value & 0xFFFF);
 	}
@@ -1649,7 +1649,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		return std::to_string(value[0]) + ":" + std::to_string(value[1]) + ":" + std::to_string(value[2]);
 	}
@@ -1689,12 +1689,12 @@ public:
 		return values;
 	}
 
-	auto begin() const
+	[[nodiscard]] auto begin() const
 	{
 		return values.begin();
 	}
 
-	auto end() const
+	[[nodiscard]] auto end() const
 	{
 		return values.end();
 	}
@@ -1777,7 +1777,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		return std::to_string(from()) + (from() == to() ? "" : "-" + std::to_string(to()));
 	}
@@ -1787,7 +1787,7 @@ public:
 		return std::get<0>(range);
 	}
 
-	const uint64_t& from() const
+	[[nodiscard]] const uint64_t& from() const
 	{
 		return std::get<0>(range);
 	}
@@ -1797,7 +1797,7 @@ public:
 		return std::get<1>(range);
 	}
 
-	const uint64_t& to() const
+	[[nodiscard]] const uint64_t& to() const
 	{
 		return std::get<1>(range);
 	}
@@ -1883,17 +1883,17 @@ public:
 		return ranges < second.ranges;
 	}
 
-	auto begin() const
+	[[nodiscard]] auto begin() const
 	{
 		return ranges.begin();
 	}
 
-	auto end() const
+	[[nodiscard]] auto end() const
 	{
 		return ranges.end();
 	}
 
-	bool empty() const
+	[[nodiscard]] bool empty() const
 	{
 		return ranges.empty();
 	}
@@ -1945,7 +1945,7 @@ public:
 		ranges = newRanges;
 	}
 
-	bool isIntersect(const ranges_t& second) const
+	[[nodiscard]] bool isIntersect(const ranges_t& second) const
 	{
 		for (const auto& range : ranges)
 		{

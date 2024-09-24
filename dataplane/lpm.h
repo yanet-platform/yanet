@@ -1499,12 +1499,12 @@ public:
 			return remap_chunks[from_chunk_id];
 		}
 
-		unsigned int get_extended_chunks_count() const
+		[[nodiscard]] unsigned int get_extended_chunks_count() const
 		{
 			return extended_chunks_count;
 		}
 
-		unsigned int get_extended_chunks_size() const
+		[[nodiscard]] unsigned int get_extended_chunks_size() const
 		{
 			return extended_chunks_size;
 		}

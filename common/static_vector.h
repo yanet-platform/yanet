@@ -210,7 +210,7 @@ public:
 		return size() == 0;
 	}
 
-	constexpr std::size_t capacity() const { return Cap; }
+	[[nodiscard]] constexpr std::size_t capacity() const { return Cap; }
 
 	void clear()
 	{
@@ -227,8 +227,8 @@ public:
 		}
 	}
 
-	std::size_t size() const { return len_; }
-	bool Full() const { return size() == capacity(); }
+	[[nodiscard]] std::size_t size() const { return len_; }
+	[[nodiscard]] bool Full() const { return size() == capacity(); }
 };
 
 } // namespace utils

@@ -18,16 +18,16 @@ public:
 		_reset();
 	}
 
-	virtual bool Failed() const { return is_failed_; }
+	[[nodiscard]] virtual bool Failed() const { return is_failed_; }
 	virtual void SetFailed(const std::string& reason)
 	{
 		is_failed_ = true;
 		error_code_ = reason;
 	}
-	virtual std::string ErrorText() const { return error_code_; }
-	virtual void StartCancel(){};
-	virtual bool IsCanceled() const { return false; };
-	virtual void NotifyOnCancel(::google::protobuf::Closure* /* callback */){};
+	[[nodiscard]] virtual std::string ErrorText() const { return error_code_; }
+	virtual void StartCancel() {};
+	[[nodiscard]] virtual bool IsCanceled() const { return false; };
+	virtual void NotifyOnCancel(::google::protobuf::Closure* /* callback */) {};
 
 private:
 	bool is_failed_;

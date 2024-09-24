@@ -28,7 +28,7 @@ public:
 		std::fill(std::begin(dpdk_ports_), std::end(dpdk_ports_), INVALID_PORT_ID);
 		std::fill(std::begin(logical_ports_), std::end(logical_ports_), INVALID_PORT_ID);
 	}
-	uint16_t size() const { return ports_count_; }
+	[[nodiscard]] uint16_t size() const { return ports_count_; }
 	[[nodiscard]] std::optional<tPortId> Register(tPortId dpdk_port)
 	{
 		if (ports_count_ < CONFIG_YADECAP_PORTS_SIZE)
@@ -51,10 +51,10 @@ public:
 			return {};
 		}
 	}
-	tPortId ToDpdk(tPortId logical) const { return dpdk_ports_[logical]; }
-	tPortId ToLogical(tPortId dpdk) const { return logical_ports_[dpdk]; }
-	bool ValidDpdk(tPortId dpdk) const { return logical_ports_[dpdk] != INVALID_PORT_ID; }
-	bool ValidLogical(tPortId logical) const { return logical < INVALID_PORT_ID; }
+	[[nodiscard]] tPortId ToDpdk(tPortId logical) const { return dpdk_ports_[logical]; }
+	[[nodiscard]] tPortId ToLogical(tPortId dpdk) const { return logical_ports_[dpdk]; }
+	[[nodiscard]] bool ValidDpdk(tPortId dpdk) const { return logical_ports_[dpdk] != INVALID_PORT_ID; }
+	[[nodiscard]] bool ValidLogical(tPortId logical) const { return logical < INVALID_PORT_ID; }
 };
 
 class permanently
