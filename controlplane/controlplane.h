@@ -60,14 +60,14 @@ public:
 		else if constexpr (std::is_invocable_r_v<common::icp::response, decltype(function)>)
 		{
 			commands[type] = [function](const common::icp::request& request) {
-				(void)request;
+				YANET_GCC_BUG_UNUSED(request);
 				return function();
 			};
 		}
 		else if constexpr (std::is_invocable_r_v<void, decltype(function)>)
 		{
 			commands[type] = [function](const common::icp::request& request) {
-				(void)request;
+				YANET_GCC_BUG_UNUSED(request);
 				function();
 				return std::tuple<>{};
 			};

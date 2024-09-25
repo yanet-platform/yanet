@@ -1518,7 +1518,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 				}
 				for (const auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 				{
-					(void)core_id;
+					YANET_GCC_BUG_UNUSED(core_id);
 					sum_gc += worker_gc->counters[counter_id + i];
 				}
 				for (const auto& item : dataPlane->globalBaseAtomics)
@@ -1610,7 +1610,7 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 	uint64_t sessions_destroyed_gc = 0;
 	for (const auto& [node_id, worker_gc] : dataPlane->worker_gcs)
 	{
-		(void)node_id;
+		YANET_GCC_BUG_UNUSED(node_id);
 		sessions_created_gc += worker_gc->counters[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_created];
 		sessions_destroyed_gc += worker_gc->counters[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_destroyed];
 	}

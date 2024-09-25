@@ -269,7 +269,7 @@ void fw_config_t::set_fqdn(const std::string& s)
 
 		location = {(unsigned int)l.begin.line, m_fileno.top()};
 		addresses.clear();
-		(void)used;
+		YANET_GCC_BUG_UNUSED(used);
 	}
 	else
 	{
@@ -647,7 +647,7 @@ void fw_config_t::add_rule_table(const std::string& name)
 
 	for (const auto& [prefix, label] : std::get<tables::prefix_skipto_t>(table))
 	{
-		(void)label;
+		YANET_GCC_BUG_UNUSED(label);
 		add_rule_addr(prefix);
 	}
 }
@@ -1197,7 +1197,7 @@ bool fw_config_t::validate()
 	}
 	for (auto& [ruleno, rules] : m_rules)
 	{
-		(void)ruleno;
+		YANET_GCC_BUG_UNUSED(ruleno);
 		for (auto rulep : rules)
 		{
 			if (!validate_rule(rulep))

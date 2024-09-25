@@ -10,7 +10,22 @@
 #include <vector>
 
 
-#define YANET_UNUSED [[maybe_unused]]
+/**
+ *  GCC 7.5 version which we have to support for now due to Ubuntu 18 have a bug
+ *  (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81767) where unused variables
+ *  in structured bindings are incorrectly flagged as warnings, even though
+ *  they "can't" be used, cause they are not a real variables.
+ *
+ *  Previously, code used `(void)var;` to suppress these warnings, but this
+ *  approach was ugly and harder to grep.
+ *
+ *  One should use this macro in structured bindings to mark unused bunding.
+ *
+ *  Once we move to a newer GCC version where this bug is fixed,
+ *  we can easily remove this macro as it is much easier to grep and remove
+ *  than those void(var) statements.
+ */
+#define YANET_GCC_BUG_UNUSED(arg) (void)(arg)
 
 #define YANET_LOG_PRINT(msg, args...) fprintf(stdout, msg, ##args)
 

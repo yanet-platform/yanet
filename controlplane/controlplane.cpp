@@ -481,7 +481,7 @@ common::icp::acl_lookup::response cControlPlane::acl_lookup(const common::icp::a
 	std::map<uint32_t, std::string> labels;
 	for (const auto& [module, acl] : acls)
 	{
-		(void)module;
+		YANET_GCC_BUG_UNUSED(module);
 
 		for (const auto& [label, info] : acl.firewall->labels())
 		{
@@ -503,7 +503,7 @@ common::icp::acl_lookup::response cControlPlane::acl_lookup(const common::icp::a
 
 		for (const auto& [id, gen_text, orig_text] : rules)
 		{
-			(void)gen_text;
+			YANET_GCC_BUG_UNUSED(gen_text);
 
 			if (ids.count(id))
 			{
@@ -603,7 +603,7 @@ common::icp::getFwLabels::response cControlPlane::command_getFwLabels()
 	for (const auto& [module, acl] : current.acls)
 	{
 		const auto& fw = acl.firewall;
-		(void)module;
+		YANET_GCC_BUG_UNUSED(module);
 		for (const auto& [label, info] : fw->labels())
 		{
 			auto ruleno = std::get<unsigned int>(info);
@@ -653,7 +653,7 @@ common::icp::getFwList::response cControlPlane::command_getFwList(const common::
 
 		for (const auto& [id, gen_text, unused_text] : current.dispatcher)
 		{
-			(void)unused_text;
+			YANET_GCC_BUG_UNUSED(unused_text);
 			// XXX: if we need accounting for dispatcher rules
 			//      we can prepare id mappings for them.
 			response_rules.emplace_back(id, 0, gen_text);
