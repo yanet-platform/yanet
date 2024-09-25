@@ -4,7 +4,7 @@
 #include <numa.h>
 #include <numaif.h>
 #include <optional>
-#include <string.h>
+#include <cstring>
 #include <sys/mman.h>
 #include <sys/shm.h>
 #include <sys/stat.h>

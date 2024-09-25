@@ -2,7 +2,7 @@
 #include <bitset>
 #include <cstdint>
 #include <limits>
-#include <string.h>
+#include <cstring>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -25,8 +25,8 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <sys/mman.h>
 
 #include "common.h"

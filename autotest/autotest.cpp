@@ -1,6 +1,6 @@
 #include <arpa/inet.h>
 #include <pcap.h>
-#include <string.h>
+#include <cstring>
 #include <sys/shm.h>
 #include <sys/socket.h>
 #include <sys/stat.h>

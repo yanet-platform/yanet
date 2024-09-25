@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
@@ -8,7 +9,6 @@
 #include <set>
 #include <vector>
 
-#include <inttypes.h>
 
 #define YANET_UNUSED [[maybe_unused]]
 
