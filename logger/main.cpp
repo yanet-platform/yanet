@@ -168,14 +168,14 @@ int runLogger()
 				}
 
 				std::cout << "{"
-				          << "\"action\":\"" << common::globalBase::eFlowType_toString(sample->action) << "\","
+				          << R"("action":")" << common::globalBase::eFlowType_toString(sample->action) << "\","
 				          << "\"rule_ids\":[" << rule_ids << "],"
 				          << "\"direction\":" << (direction ? "\"in\"" : "\"out\"") << ","
-				          << "\"iface\":\"" << iface << "\","
+				          << R"("iface":")" << iface << "\","
 				          << "\"proto\":" << (int)sample->proto << ","
-				          << "\"src_addr\":\"" << src_addr.toString() << "\","
+				          << R"("src_addr":")" << src_addr.toString() << "\","
 				          << "\"src_port\":" << sample->src_port << ","
-				          << "\"dst_addr\":\"" << dst_addr.toString() << "\","
+				          << R"("dst_addr":")" << dst_addr.toString() << "\","
 				          << "\"dst_port\":" << sample->dst_port << "}\n";
 
 				rte_mempool_put(mempool, sample);
