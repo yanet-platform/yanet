@@ -153,7 +153,7 @@ void printUsage()
 	printf("usage:\n");
 	for (const auto& [command, args, function] : commands)
 	{
-		(void)function;
+		YANET_GCC_BUG_UNUSED(function);
 
 		if (command.empty())
 		{

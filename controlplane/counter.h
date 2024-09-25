@@ -183,7 +183,7 @@ public:
 		if (counters_it != counters.end())
 		{
 			auto& [counter_id, refcount] = counters_it->second;
-			(void)counter_id;
+			YANET_GCC_BUG_UNUSED(counter_id);
 
 			if (!refcount)
 			{
@@ -265,7 +265,7 @@ public:
 		}
 
 		const auto& [counter_id, refcount] = iter->second;
-		(void)refcount;
+		YANET_GCC_BUG_UNUSED(refcount);
 
 		return counter_id;
 	}
@@ -278,7 +278,7 @@ public:
 		std::vector<tCounterId> manager_counter_ids;
 		for (const auto& [key, counter_id] : counters_allocated)
 		{
-			(void)key;
+			YANET_GCC_BUG_UNUSED(key);
 
 			for (size_t index = 0; index < size_T; index++)
 			{
@@ -293,7 +293,7 @@ public:
 		size_t i = 0;
 		for (const auto& [key, counter_id] : counters_allocated)
 		{
-			(void)counter_id;
+			YANET_GCC_BUG_UNUSED(counter_id);
 
 			std::array<uint64_t, size_T> array;
 			for (size_t array_i = 0;

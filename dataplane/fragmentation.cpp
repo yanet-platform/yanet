@@ -25,14 +25,14 @@ Fragmentation::~Fragmentation()
 {
 	for (const auto& [key, value] : fragments_)
 	{
-		(void)key;
+		YANET_GCC_BUG_UNUSED(key);
 
 		for (const auto& [range_from, range_value] : std::get<0>(value))
 		{
-			(void)range_from;
+			YANET_GCC_BUG_UNUSED(range_from);
 
 			const auto& [range_to, mbuf] = range_value;
-			(void)range_to;
+			YANET_GCC_BUG_UNUSED(range_to);
 
 			rte_pktmbuf_free(mbuf);
 		}
@@ -217,10 +217,10 @@ void Fragmentation::handle()
 
 			for (auto& [range_from, range_value] : std::get<0>(value))
 			{
-				(void)range_from;
+				YANET_GCC_BUG_UNUSED(range_from);
 
 				const auto& [range_to, mbuf] = range_value;
-				(void)range_to;
+				YANET_GCC_BUG_UNUSED(range_to);
 
 				dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 				metadata->flow.data = firstPacket_metadata->flow.data;
@@ -238,10 +238,10 @@ void Fragmentation::handle()
 	{
 		for (auto& [range_from, range_value] : std::get<0>(fragments_[key]))
 		{
-			(void)range_from;
+			YANET_GCC_BUG_UNUSED(range_from);
 
 			const auto& [range_to, mbuf] = range_value;
-			(void)range_to;
+			YANET_GCC_BUG_UNUSED(range_to);
 
 			stats_.timeout_packets++;
 			rte_pktmbuf_free(mbuf);
@@ -276,7 +276,7 @@ bool Fragmentation::isCollected(const fragmentation::value_t& value) const
 	for (const auto& [range_from, range_value] : std::get<0>(value))
 	{
 		const auto& [range_to, mbuf] = range_value;
-		(void)mbuf;
+		YANET_GCC_BUG_UNUSED(mbuf);
 
 		if (range_from != next_range_from)
 		{
@@ -301,7 +301,7 @@ bool Fragmentation::isIntersect(const fragmentation::value_t& value,
 	for (const auto& [range_from, range_value] : std::get<0>(value))
 	{
 		const auto& [range_to, mbuf] = range_value;
-		(void)mbuf;
+		YANET_GCC_BUG_UNUSED(mbuf);
 
 		if (second_range_to < range_from)
 		{

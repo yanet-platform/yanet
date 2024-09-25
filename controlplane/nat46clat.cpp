@@ -55,14 +55,14 @@ void manager::reload(const controlplane::base_t& base_prev,
 
 	for (const auto& [module_name, nat46clat] : base_next.nat46clats)
 	{
-		(void)nat46clat;
+		YANET_GCC_BUG_UNUSED(nat46clat);
 
 		module_counters.insert(module_name);
 	}
 
 	for (const auto& [module_name, nat46clat] : base_prev.nat46clats)
 	{
-		(void)nat46clat;
+		YANET_GCC_BUG_UNUSED(nat46clat);
 
 		module_counters.remove(module_name);
 	}

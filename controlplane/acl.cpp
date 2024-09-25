@@ -527,10 +527,10 @@ iface_map_t ifaceMapping(std::map<std::string, controlplane::base::logical_port_
 
 	for (const auto& [route_name, route] : routes)
 	{
-		(void)route_name;
+		YANET_GCC_BUG_UNUSED(route_name);
 		for (const auto& [name, iface] : route.interfaces)
 		{
-			(void)name;
+			YANET_GCC_BUG_UNUSED(name);
 			ret[iface.aclId].emplace(false, iface.nextModule);
 		}
 	}

@@ -33,14 +33,14 @@ void nat64stateful_t::reload(const controlplane::base_t& base_prev,
 
 	for (const auto& [name, nat64stateful] : base_next.nat64statefuls)
 	{
-		(void)nat64stateful;
+		YANET_GCC_BUG_UNUSED(nat64stateful);
 
 		module_counters.insert(name);
 	}
 
 	for (const auto& [name, nat64stateful] : base_prev.nat64statefuls)
 	{
-		(void)nat64stateful;
+		YANET_GCC_BUG_UNUSED(nat64stateful);
 
 		module_counters.remove(name);
 	}

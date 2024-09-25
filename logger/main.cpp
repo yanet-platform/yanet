@@ -150,7 +150,7 @@ int runLogger()
 				if (aclConfig != nullptr)
 				{
 					auto& [serial, ifaces, rules] = *aclConfig;
-					(void)serial;
+					YANET_GCC_BUG_UNUSED(serial);
 
 					auto it = ifaces.find(sample->acl_id);
 					if (it != ifaces.end())
