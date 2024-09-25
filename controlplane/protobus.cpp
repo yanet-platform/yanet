@@ -1,7 +1,6 @@
 #include <vector>
 
 #include <fcntl.h>
-#include <inttypes.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/stat.h>

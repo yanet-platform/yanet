@@ -8,7 +8,6 @@
 #include <vector>
 
 #include <arpa/inet.h>
-#include <inttypes.h>
 #include <memory.h>
 #include <nlohmann/json.hpp>
 
