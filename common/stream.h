@@ -1,6 +1,5 @@
 #pragma once
 
-#include <inttypes.h>
 
 #include <map>
 #include <memory>

@@ -3,7 +3,7 @@
 #include <string>
 
 #include <google/protobuf/message.h>
-#include <string.h>
+#include <cstring>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>

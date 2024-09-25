@@ -1,5 +1,5 @@
 #include <fstream>
-#include <signal.h>
+#include <csignal>
 #include <systemd/sd-daemon.h>
 #include <thread>
 
