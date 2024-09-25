@@ -693,12 +693,12 @@ inline void samples_dump()
 		}
 		first = false;
 		std::cout << "\n"
-		          << "{\"in_iface\":\"" << in_iface << "\","
-		          << "\"out_iface\":\"" << out_iface << "\","
+		          << R"({"in_iface":")" << in_iface << "\","
+		          << R"("out_iface":")" << out_iface << "\","
 		          << "\"proto\":" << (int)proto << ","
-		          << "\"src_addr\":\"" << src_addr.toString() << "\","
+		          << R"("src_addr":")" << src_addr.toString() << "\","
 		          << "\"src_port\":" << src_port << ","
-		          << "\"dst_addr\":\"" << dst_addr.toString() << "\","
+		          << R"("dst_addr":")" << dst_addr.toString() << "\","
 		          << "\"dst_port\":" << dst_port << "}";
 	}
 
