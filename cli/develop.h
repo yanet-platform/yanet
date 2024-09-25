@@ -179,7 +179,7 @@ public:
 
 		for (const auto& [core, socket, ipc_key, offset] : response)
 		{
-			(void)socket;
+			YANET_GCC_BUG_UNUSED(socket);
 			if (ipc_cache.find(ipc_key) == ipc_cache.end())
 			{
 				auto shmid = shmget(ipc_key, 0, 0);

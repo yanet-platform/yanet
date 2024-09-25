@@ -337,7 +337,7 @@ void config_converter_t::processLogicalPorts()
 {
 	for (auto& [moduleName, logicalPort] : baseNext.logicalPorts)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		if (logicalPort.logicalPortId >= CONFIG_YADECAP_LOGICALPORTS_SIZE)
 		{
@@ -365,7 +365,7 @@ void config_converter_t::serializeLogicalPorts()
 {
 	for (auto& [moduleName, logicalPort] : baseNext.logicalPorts)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::updateLogicalPort,
 		                        common::idp::updateGlobalBase::updateLogicalPort::request{logicalPort.logicalPortId,
@@ -381,7 +381,7 @@ void config_converter_t::processRoutes()
 {
 	for (auto& [module_name, route] : baseNext.routes)
 	{
-		(void)module_name;
+		YANET_GCC_BUG_UNUSED(module_name);
 
 		if (route.routeId >= CONFIG_YADECAP_ROUTES_SIZE)
 		{
@@ -390,7 +390,7 @@ void config_converter_t::processRoutes()
 
 		for (auto& [interface_name, interface] : route.interfaces)
 		{
-			(void)interface_name;
+			YANET_GCC_BUG_UNUSED(interface_name);
 
 			if (interface.interfaceId >= CONFIG_YADECAP_INTERFACES_SIZE)
 			{
@@ -425,7 +425,7 @@ void config_converter_t::serializeRoutes()
 {
 	for (auto& [moduleName, route] : baseNext.routes)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		std::optional<common::idp::updateGlobalBase::update_route::tunnel> tunnel;
 		if (route.tunnel_enabled)
@@ -447,7 +447,7 @@ void config_converter_t::processDecap()
 {
 	for (auto& [moduleName, decap] : baseNext.decaps)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		if (decap.decapId >= CONFIG_YADECAP_DECAPS_SIZE)
 		{
@@ -477,7 +477,7 @@ void config_converter_t::processNat64stateful()
 {
 	for (auto& [name, nat64stateful] : baseNext.nat64statefuls)
 	{
-		(void)name;
+		YANET_GCC_BUG_UNUSED(name);
 
 		if (nat64stateful.nat64stateful_id >= YANET_CONFIG_NAT64STATEFULS_SIZE)
 		{
@@ -502,7 +502,7 @@ void config_converter_t::processTun64()
 {
 	for (auto& [moduleName, tunnel] : baseNext.tunnels)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		if (tunnel.tun64Id >= CONFIG_YADECAP_TUN64_SIZE)
 		{
@@ -526,7 +526,7 @@ void config_converter_t::processNat64()
 {
 	for (auto& [moduleName, nat64stateless] : baseNext.nat64statelesses)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		if (nat64stateless.nat64statelessId >= CONFIG_YADECAP_NAT64STATELESSES_SIZE)
 		{
@@ -585,7 +585,7 @@ void config_converter_t::processNat46clat()
 {
 	for (auto& [module_name, nat46clat] : baseNext.nat46clats)
 	{
-		(void)module_name;
+		YANET_GCC_BUG_UNUSED(module_name);
 
 		if (nat46clat.nat46clat_id >= YANET_CONFIG_NAT46CLATS_SIZE)
 		{
@@ -612,7 +612,7 @@ void config_converter_t::processBalancer()
 
 	for (auto& [moduleName, balancer] : baseNext.balancers)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		if (balancer.balancer_id >= YANET_CONFIG_BALANCERS_SIZE)
 		{
@@ -648,17 +648,17 @@ void config_converter_t::processBalancer()
 		                  reals] : balancer.services)
 		{
 			/// @todo:
-			(void)vip;
-			(void)proto;
-			(void)vport;
-			(void)scheduler;
-			(void)scheduler_params;
-			(void)flags;
-			(void)reals;
-			(void)version;
-			(void)forwarding_method;
-			(void)ipv4_outer_source_network;
-			(void)ipv6_outer_source_network;
+			YANET_GCC_BUG_UNUSED(vip);
+			YANET_GCC_BUG_UNUSED(proto);
+			YANET_GCC_BUG_UNUSED(vport);
+			YANET_GCC_BUG_UNUSED(scheduler);
+			YANET_GCC_BUG_UNUSED(scheduler_params);
+			YANET_GCC_BUG_UNUSED(flags);
+			YANET_GCC_BUG_UNUSED(reals);
+			YANET_GCC_BUG_UNUSED(version);
+			YANET_GCC_BUG_UNUSED(forwarding_method);
+			YANET_GCC_BUG_UNUSED(ipv4_outer_source_network);
+			YANET_GCC_BUG_UNUSED(ipv6_outer_source_network);
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
@@ -686,7 +686,7 @@ void config_converter_t::processDregress()
 {
 	for (auto& [moduleName, dregress] : baseNext.dregresses)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		if (dregress.dregressId >= CONFIG_YADECAP_DREGRESS_SIZE)
 		{
@@ -717,7 +717,7 @@ void config_converter_t::processAcl()
 {
 	for (auto& [moduleName, acl] : baseNext.acls)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		if (acl.synchronization)
 		{
@@ -870,7 +870,7 @@ void config_converter_t::acl_rules_route_local(controlplane::base::acl_t& acl,
 
 	for (const auto& [interfaceName, interface] : route.interfaces)
 	{
-		(void)interfaceName;
+		YANET_GCC_BUG_UNUSED(interfaceName);
 
 		for (const auto& ipAddress : interface.ip_prefixes)
 		{
@@ -1111,8 +1111,8 @@ void config_converter_t::acl_rules_nat64stateless_ingress(controlplane::base::ac
 		const auto& [ipv6Address, ipv6DestinationAddress, ingressPortRange] = key;
 		const auto& [ipv4Address, egressPortRange, translationId] = value;
 
-		(void)ipv4Address;
-		(void)egressPortRange;
+		YANET_GCC_BUG_UNUSED(ipv4Address);
+		YANET_GCC_BUG_UNUSED(egressPortRange);
 
 		flow.data.nat64stateless.translationId = translationId;
 		flow_icmp.data.nat64stateless.translationId = translationId;
@@ -1272,7 +1272,7 @@ void config_converter_t::acl_rules_nat64stateless_egress(controlplane::base::acl
 
 	for (const auto& [key, value] : nat64stateless.translations)
 	{
-		(void)key;
+		YANET_GCC_BUG_UNUSED(key);
 
 		const auto& [ipv4Address, egressPortRange, translationId] = value;
 
@@ -1607,13 +1607,13 @@ void config_converter_t::acl_rules_balancer(controlplane::base::acl_t& acl,
 	                  ipv6_outer_source_network,
 	                  reals] : balancer.services)
 	{
-		(void)scheduler;
-		(void)scheduler_params;
-		(void)version;
-		(void)flags;
-		(void)forwarding_method;
-		(void)ipv4_outer_source_network;
-		(void)ipv6_outer_source_network;
+		YANET_GCC_BUG_UNUSED(scheduler);
+		YANET_GCC_BUG_UNUSED(scheduler_params);
+		YANET_GCC_BUG_UNUSED(version);
+		YANET_GCC_BUG_UNUSED(flags);
+		YANET_GCC_BUG_UNUSED(forwarding_method);
+		YANET_GCC_BUG_UNUSED(ipv4_outer_source_network);
+		YANET_GCC_BUG_UNUSED(ipv6_outer_source_network);
 
 		if (reals.empty())
 		{
@@ -1701,15 +1701,15 @@ void config_converter_t::acl_rules_balancer_icmp_reply(controlplane::base::acl_t
 	                  ipv6_outer_source_network,
 	                  reals] : balancer.services)
 	{
-		(void)scheduler;
-		(void)scheduler_params;
-		(void)flags;
-		(void)proto;
-		(void)vport;
-		(void)version;
-		(void)forwarding_method;
-		(void)ipv4_outer_source_network;
-		(void)ipv6_outer_source_network;
+		YANET_GCC_BUG_UNUSED(scheduler);
+		YANET_GCC_BUG_UNUSED(scheduler_params);
+		YANET_GCC_BUG_UNUSED(flags);
+		YANET_GCC_BUG_UNUSED(proto);
+		YANET_GCC_BUG_UNUSED(vport);
+		YANET_GCC_BUG_UNUSED(version);
+		YANET_GCC_BUG_UNUSED(forwarding_method);
+		YANET_GCC_BUG_UNUSED(ipv4_outer_source_network);
+		YANET_GCC_BUG_UNUSED(ipv6_outer_source_network);
 
 		if (reals.empty())
 		{
@@ -1770,15 +1770,15 @@ void config_converter_t::acl_rules_balancer_icmp_forward(controlplane::base::acl
 	                  ipv6_outer_source_network,
 	                  reals] : balancer.services)
 	{
-		(void)scheduler;
-		(void)scheduler_params;
-		(void)flags;
-		(void)proto;
-		(void)vport;
-		(void)version;
-		(void)forwarding_method;
-		(void)ipv4_outer_source_network;
-		(void)ipv6_outer_source_network;
+		YANET_GCC_BUG_UNUSED(scheduler);
+		YANET_GCC_BUG_UNUSED(scheduler_params);
+		YANET_GCC_BUG_UNUSED(flags);
+		YANET_GCC_BUG_UNUSED(proto);
+		YANET_GCC_BUG_UNUSED(vport);
+		YANET_GCC_BUG_UNUSED(version);
+		YANET_GCC_BUG_UNUSED(forwarding_method);
+		YANET_GCC_BUG_UNUSED(ipv4_outer_source_network);
+		YANET_GCC_BUG_UNUSED(ipv6_outer_source_network);
 
 		if (reals.empty())
 		{
@@ -1810,8 +1810,8 @@ std::string config_converter_t::checkLimit(size_t count, const std::string& name
 	uint64_t limit = 0;
 	for (const auto& [limit_name, socket_id, current, maximum] : limits)
 	{
-		(void)socket_id;
-		(void)current;
+		YANET_GCC_BUG_UNUSED(socket_id);
+		YANET_GCC_BUG_UNUSED(current);
 
 		if (limit_name == name)
 		{
@@ -1857,10 +1857,10 @@ void config_converter_t::buildAcl()
 
 	for (auto& [route_name, route] : baseNext.routes)
 	{
-		(void)route_name;
+		YANET_GCC_BUG_UNUSED(route_name);
 		for (auto& [name, iface] : route.interfaces)
 		{
-			(void)name;
+			YANET_GCC_BUG_UNUSED(name);
 			auto it = result.out_iface_map.find(iface.nextModule);
 			if (it != result.out_iface_map.end())
 			{
@@ -1897,7 +1897,7 @@ void config_converter_t::buildAcl()
 	common::idp::updateGlobalBase::fwstate_synchronization_update::request fwstate_sync_request;
 	for (const auto& [moduleName, acl] : baseNext.acls)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		if (acl.synchronization)
 		{
@@ -1929,7 +1929,7 @@ void config_converter_t::buildAcl()
 	common::idp::updateGlobalBase::update_early_decap_flags::request early_decap_flags_request = false;
 	for (const auto& [moduleName, acl] : baseNext.acls)
 	{
-		(void)moduleName;
+		YANET_GCC_BUG_UNUSED(moduleName);
 
 		// if at least one acl module has early_decap config section, early_decap feature is globally switched on
 		if ((!acl.src4_early_decap.empty() && !acl.dst4_early_decap.empty()) || (!acl.src6_early_decap.empty() && !acl.dst6_early_decap.empty()))

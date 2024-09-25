@@ -41,7 +41,7 @@ public:
 		}
 
 		auto& [refcount, id] = it->second;
-		(void)id;
+		YANET_GCC_BUG_UNUSED(id);
 
 		refcount++;
 
@@ -106,7 +106,7 @@ public:
 
 		const auto& value = it->second;
 		auto& [refcount, values_id] = values[value];
-		(void)values_id;
+		YANET_GCC_BUG_UNUSED(values_id);
 
 		refcount--;
 		if (refcount)
@@ -162,7 +162,7 @@ public:
 
 		auto it = values.find(value);
 		const auto& [refcount, id] = it->second;
-		(void)refcount;
+		YANET_GCC_BUG_UNUSED(refcount);
 
 		return id;
 	}

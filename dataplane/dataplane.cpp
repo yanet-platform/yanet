@@ -231,7 +231,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 
 		for (const auto& [core_id, worker_gc] : worker_gcs)
 		{
-			(void)core_id;
+			YANET_GCC_BUG_UNUSED(core_id);
 			gc_sockets_used.emplace(worker_gc->socket_id);
 		}
 
@@ -483,7 +483,7 @@ eResult cDataPlane::initPorts()
 	{
 		const std::string& interfaceName = configPortIter.first;
 		const auto& [pci, name, symmetric_mode, rss_flags] = configPortIter.second;
-		(void)pci;
+		YANET_GCC_BUG_UNUSED(pci);
 
 		tPortId portId = 0;
 
@@ -936,8 +936,8 @@ eResult cDataPlane::initWorkers()
 		for (const auto& [port_id, port] : ports)
 		{
 			const auto& [interface_name, rx_queues, tx_queues_count, mac_address, pci, symmetric_mode] = port;
-			(void)mac_address;
-			(void)pci;
+			YANET_GCC_BUG_UNUSED(mac_address);
+			YANET_GCC_BUG_UNUSED(pci);
 
 			if (!basePermanently.ports.Register(port_id))
 				return eResult::invalidPortsCount;
@@ -1035,7 +1035,7 @@ eResult cDataPlane::initWorkers()
 	worker_gc_t::PortToSocketArray port_to_socket;
 	for (const auto& [port_id, port] : ports)
 	{
-		(void)port;
+		YANET_GCC_BUG_UNUSED(port);
 		port_to_socket[port_id] = rte_eth_dev_socket_id(port_id);
 	}
 
@@ -1376,7 +1376,7 @@ void cDataPlane::init_worker_base()
 
 	for (auto& [core_id, worker] : worker_gcs)
 	{
-		(void)core_id;
+		YANET_GCC_BUG_UNUSED(core_id);
 
 		auto* base = &worker->bases[worker->current_base_id];
 		auto* base_next = &worker->bases[worker->current_base_id ^ 1];
@@ -1399,7 +1399,7 @@ void cDataPlane::timestamp_thread()
 		{
 			for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
 			{
-				(void)socket_id;
+				YANET_GCC_BUG_UNUSED(socket_id);
 				globalbase_atomic->currentTime = current_time;
 			}
 
@@ -1896,7 +1896,7 @@ void cDataPlane::switch_worker_base()
 
 	for (auto& [core_id, worker] : worker_gcs)
 	{
-		(void)core_id;
+		YANET_GCC_BUG_UNUSED(core_id);
 
 		auto* base_next = &worker->bases[worker->current_base_id ^ 1];
 		base_nexts.emplace_back(worker->socket_id, base_next);
@@ -2286,9 +2286,9 @@ eResult cDataPlane::checkConfig()
 		for (const auto& portIter : config.ports)
 		{
 			const auto& [pci, name, symmetric_mode, rss_flags] = portIter.second;
-			(void)pci;
-			(void)symmetric_mode;
-			(void)rss_flags;
+			YANET_GCC_BUG_UNUSED(pci);
+			YANET_GCC_BUG_UNUSED(symmetric_mode);
+			YANET_GCC_BUG_UNUSED(rss_flags);
 
 			if (exist(names, name))
 			{
@@ -2386,9 +2386,9 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 	for (const auto& port : config.ports)
 	{
 		const auto& [pci, name, symmetric_mode, rss_flags] = port.second;
-		(void)name;
-		(void)symmetric_mode;
-		(void)rss_flags;
+		YANET_GCC_BUG_UNUSED(name);
+		YANET_GCC_BUG_UNUSED(symmetric_mode);
+		YANET_GCC_BUG_UNUSED(rss_flags);
 
 		// Do not whitelist sock dev virtual devices
 		if (StartsWith(name, SOCK_DEV_PREFIX))

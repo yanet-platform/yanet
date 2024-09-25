@@ -578,7 +578,7 @@ static void list_fw_rules(unsigned int mask, bool list)
 			{
 				if (list)
 				{
-					(void)counter;
+					YANET_GCC_BUG_UNUSED(counter);
 					table.insert(id, ruleno, label, text);
 				}
 				else

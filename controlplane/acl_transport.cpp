@@ -63,7 +63,7 @@ void transport_t::distribute()
 	for (const auto& [key, network_table_group_ids] : variation)
 	{
 		const auto& [size, filter_ids] = key;
-		(void)size;
+		YANET_GCC_BUG_UNUSED(size);
 
 		unsigned int best_layer_id = 0;
 		auto best_filter_ids_count = (size_t)-1;

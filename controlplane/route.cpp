@@ -101,7 +101,7 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 				auto current_guard = generations.current_lock_guard();
 				for (const auto& [name, module] : generations.current().routes) ///< @todo: DELETE
 				{
-					(void)name;
+					YANET_GCC_BUG_UNUSED(name);
 
 					if (exist(module.ignore_tables, table_name))
 					{
@@ -120,8 +120,8 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 				uint32_t peer_id = ExtractPeerIdFromPathInformation(path_info);
 
 				const auto& [nexthop, labels, origin, med, aspath, communities, large_communities, local_preference] = *nh_ptr;
-				(void)communities;
-				(void)large_communities;
+				YANET_GCC_BUG_UNUSED(communities);
+				YANET_GCC_BUG_UNUSED(large_communities);
 
 				interface_destination_next[{std::numeric_limits<decltype(local_preference)>::max() - local_preference,
 				                            aspath.size(),
@@ -215,12 +215,12 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 
 		for (const auto& [pptn_index, path_info_to_nh_ptr] : *nexthops)
 		{
-			(void)pptn_index;
+			YANET_GCC_BUG_UNUSED(pptn_index);
 
 			for (const auto& [path_information, nh_ptr] : path_info_to_nh_ptr)
 			{
 				const auto& [nexthop, labels, origin, med, aspath, communities, large_communities, local_preference] = *nh_ptr;
-				(void)communities;
+				YANET_GCC_BUG_UNUSED(communities);
 
 				if ((prefix.is_ipv4() && nexthop.is_ipv4()) ||
 				    (prefix.is_ipv4() && nexthop.is_ipv6()) ||
@@ -459,7 +459,7 @@ common::icp::route_lookup::response route_t::route_lookup(const common::icp::rou
 		if (exist(prefixes, vrf))
 		{
 			const auto& [priority_current, update] = prefixes[vrf];
-			(void)update;
+			YANET_GCC_BUG_UNUSED(update);
 
 			for (auto it = priority_current.rbegin();
 			     it != priority_current.rend();
@@ -519,7 +519,7 @@ common::icp::route_get::response route_t::route_get(const common::icp::route_get
 		if (exist(prefixes, vrf))
 		{
 			const auto& [priority_current, update] = prefixes[vrf];
-			(void)update;
+			YANET_GCC_BUG_UNUSED(update);
 
 			for (auto it = priority_current.rbegin();
 			     it != priority_current.rend();
@@ -584,8 +584,8 @@ common::icp::route_tunnel_counters::response route_t::route_tunnel_counters()
 	for (const auto& [key, counts] : counter_values)
 	{
 		const auto [is_ipv4, link_id, nexthop, origin_as] = key;
-		(void)is_ipv4;
-		(void)origin_as;
+		YANET_GCC_BUG_UNUSED(is_ipv4);
+		YANET_GCC_BUG_UNUSED(origin_as);
 		if (counts[0] != 0 || counts[1] != 0)
 		{
 			result.emplace_back(link_id, nexthop, counts[0], counts[1]);
@@ -667,7 +667,7 @@ common::icp::route_tunnel_lookup::response route_t::route_tunnel_lookup(const co
 		if (exist(tunnel_prefixes, vrf))
 		{
 			const auto& [priority_current, update] = tunnel_prefixes[vrf];
-			(void)update;
+			YANET_GCC_BUG_UNUSED(update);
 
 			for (auto it = priority_current.rbegin();
 			     it != priority_current.rend();
@@ -686,7 +686,7 @@ common::icp::route_tunnel_lookup::response route_t::route_tunnel_lookup(const co
 
 						for (const auto& [nexthop, egress_interface_name, label, peer_id, origin_as, weight_percent] : destinations)
 						{
-							(void)origin_as;
+							YANET_GCC_BUG_UNUSED(origin_as);
 
 							std::optional<uint32_t> result_label;
 							std::optional<std::string> result_peer;
@@ -745,7 +745,7 @@ common::icp::route_tunnel_get::response route_t::route_tunnel_get(const common::
 		if (exist(tunnel_prefixes, vrf))
 		{
 			const auto& [priority_current, update] = tunnel_prefixes[vrf];
-			(void)update;
+			YANET_GCC_BUG_UNUSED(update);
 
 			for (auto it = priority_current.rbegin();
 			     it != priority_current.rend();
@@ -764,7 +764,7 @@ common::icp::route_tunnel_get::response route_t::route_tunnel_get(const common::
 
 						for (const auto& [nexthop, egress_interface_name, label, peer_id, origin_as, weight_percent] : destinations)
 						{
-							(void)origin_as;
+							YANET_GCC_BUG_UNUSED(origin_as);
 
 							std::optional<uint32_t> result_label;
 							std::optional<std::string> result_peer;
@@ -896,7 +896,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 		for (const auto& [module_name, nat64stateless] : base_prev.nat64statelesses)
 		{
-			(void)module_name;
+			YANET_GCC_BUG_UNUSED(module_name);
 
 			for (const auto& prefix : nat64stateless.nat64_prefixes)
 			{
@@ -913,7 +913,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 		for (const auto& [module_name, nat64stateless] : base_next.nat64statelesses)
 		{
-			(void)module_name;
+			YANET_GCC_BUG_UNUSED(module_name);
 
 			for (const auto& prefix : nat64stateless.nat64_prefixes)
 			{
@@ -930,7 +930,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 		for (const auto& [config_module_name, config_module] : base_prev.routes)
 		{
-			(void)config_module_name;
+			YANET_GCC_BUG_UNUSED(config_module_name);
 
 			for (const auto& prefix : config_module.local_prefixes)
 			{
@@ -942,7 +942,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 		for (const auto& [config_module_name, config_module] : base_next.routes)
 		{
-			(void)config_module_name;
+			YANET_GCC_BUG_UNUSED(config_module_name);
 
 			for (const auto& prefix : config_module.local_prefixes)
 			{
@@ -954,11 +954,11 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 		for (const auto& [config_module_name, config_module] : base_prev.routes)
 		{
-			(void)config_module_name;
+			YANET_GCC_BUG_UNUSED(config_module_name);
 
 			for (const auto& [interface_name, interface] : config_module.interfaces)
 			{
-				(void)interface_name;
+				YANET_GCC_BUG_UNUSED(interface_name);
 
 				for (const auto& ip_prefix : interface.ip_prefixes)
 				{
@@ -975,7 +975,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 		for (const auto& [config_module_name, config_module] : base_next.routes)
 		{
-			(void)config_module_name;
+			YANET_GCC_BUG_UNUSED(config_module_name);
 
 			for (const auto& [interface_name, interface] : config_module.interfaces)
 			{
@@ -1027,7 +1027,7 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 
 	for (auto& [vrf, priority_current_update] : prefixes)
 	{
-		(void)vrf; ///< @todo: VRF
+		YANET_GCC_BUG_UNUSED(vrf); ///< @todo: VRF
 
 		auto& [priority_current, update] = priority_current_update;
 
@@ -1053,7 +1053,7 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 
 			for (const auto& [priority, current] : priority_current)
 			{
-				(void)priority;
+				YANET_GCC_BUG_UNUSED(priority);
 
 				for (const auto& update_prefix : update_prefixes)
 				{
@@ -1093,7 +1093,7 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 
 	for (auto& [vrf, priority_current_update] : tunnel_prefixes)
 	{
-		(void)vrf; ///< @todo: VRF
+		YANET_GCC_BUG_UNUSED(vrf); ///< @todo: VRF
 
 		auto& [priority_current, update] = priority_current_update;
 
@@ -1119,7 +1119,7 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 
 			for (const auto& [priority, current] : priority_current)
 			{
-				(void)priority;
+				YANET_GCC_BUG_UNUSED(priority);
 
 				for (const auto& update_prefix : update_prefixes)
 				{
@@ -1173,15 +1173,15 @@ std::optional<uint32_t> route_t::value_insert(const route::value_key_t& value_ke
 	}
 
 	const auto& [vrf_priority, destination, fallback] = value_key;
-	(void)vrf_priority;
-	(void)fallback;
+	YANET_GCC_BUG_UNUSED(vrf_priority);
+	YANET_GCC_BUG_UNUSED(fallback);
 
 	/// counters
 	if (const auto nexthops = std::get_if<route::destination_interface_t>(&destination))
 	{
 		for (const auto& [nexthop, peer_id, prefix, labels] : *nexthops)
 		{
-			(void)labels;
+			YANET_GCC_BUG_UNUSED(labels);
 
 			route_counter.insert({peer_id, nexthop, prefix});
 		}
@@ -1196,15 +1196,15 @@ void route_t::value_remove(const uint32_t& value_id)
 	if (value_key)
 	{
 		const auto& [vrf_priority, destination, fallback] = *value_key;
-		(void)vrf_priority;
-		(void)fallback;
+		YANET_GCC_BUG_UNUSED(vrf_priority);
+		YANET_GCC_BUG_UNUSED(fallback);
 
 		/// counters
 		if (const auto nexthops = std::get_if<route::destination_interface_t>(&destination))
 		{
 			for (const auto& [nexthop, peer_id, prefix, labels] : *nexthops)
 			{
-				(void)labels;
+				YANET_GCC_BUG_UNUSED(labels);
 
 				route_counter.remove({peer_id, nexthop, prefix}, 20);
 			}
@@ -1317,7 +1317,7 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 
 			auto& [priority_current, update] = prefixes[vrf];
 			auto& current = priority_current[priority];
-			(void)update;
+			YANET_GCC_BUG_UNUSED(update);
 
 			const auto value_id_label = current.get(prefix_next);
 			if (value_id_label)
@@ -1340,7 +1340,7 @@ void route_t::value_compile(common::idp::updateGlobalBase::request& globalbase,
 	{
 		auto& [priority_current, update] = prefixes[vrf];
 		auto& current = priority_current[priority];
-		(void)update;
+		YANET_GCC_BUG_UNUSED(update);
 
 		const auto value_id_fallback = current.get(fallback);
 		if (value_id_fallback)
@@ -1449,9 +1449,9 @@ void route_t::value_compile_label(common::idp::updateGlobalBase::request& global
 {
 	const auto& value_key = values.get_value(value_id);
 	const auto& [vrf_priority, destination, fallback] = value_key;
-	(void)globalbase;
-	(void)vrf_priority;
-	(void)fallback;
+	YANET_GCC_BUG_UNUSED(globalbase);
+	YANET_GCC_BUG_UNUSED(vrf_priority);
+	YANET_GCC_BUG_UNUSED(fallback);
 
 	if (const auto virtual_port_id = std::get_if<uint32_t>(&destination))
 	{
@@ -1502,9 +1502,9 @@ void route_t::value_compile_fallback(common::idp::updateGlobalBase::request& glo
 {
 	const auto& value_key = values.get_value(value_id);
 	const auto& [vrf_priority, destination, fallback] = value_key;
-	(void)globalbase;
-	(void)vrf_priority;
-	(void)fallback;
+	YANET_GCC_BUG_UNUSED(globalbase);
+	YANET_GCC_BUG_UNUSED(vrf_priority);
+	YANET_GCC_BUG_UNUSED(fallback);
 
 	if (const auto virtual_port_id = std::get_if<uint32_t>(&destination))
 	{
@@ -1554,15 +1554,15 @@ std::optional<uint32_t> route_t::tunnel_value_insert(const route::tunnel_value_k
 	}
 
 	const auto& [vrf_priority, destination, fallback] = value_key;
-	(void)vrf_priority;
+	YANET_GCC_BUG_UNUSED(vrf_priority);
 
 	/// counters
 	if (const auto nexthops = std::get_if<route::tunnel_destination_interface_t>(&destination))
 	{
 		for (const auto& [nexthop, label, peer_id, origin_as, weight] : *nexthops)
 		{
-			(void)label;
-			(void)weight;
+			YANET_GCC_BUG_UNUSED(label);
+			YANET_GCC_BUG_UNUSED(weight);
 
 			tunnel_counter.insert({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 		}
@@ -1577,15 +1577,15 @@ void route_t::tunnel_value_remove(const uint32_t& value_id)
 	if (value_key)
 	{
 		const auto& [vrf_priority, destination, fallback] = *value_key;
-		(void)vrf_priority;
+		YANET_GCC_BUG_UNUSED(vrf_priority);
 
 		/// counters
 		if (const auto nexthops = std::get_if<route::tunnel_destination_interface_t>(&destination))
 		{
 			for (const auto& [nexthop, label, peer_id, origin_as, weight] : *nexthops)
 			{
-				(void)label;
-				(void)weight;
+				YANET_GCC_BUG_UNUSED(label);
+				YANET_GCC_BUG_UNUSED(weight);
 
 				tunnel_counter.remove({fallback.is_ipv4(), peer_id, nexthop, origin_as}, 20);
 			}
@@ -1601,7 +1601,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 	std::vector<route::tunnel_value_interface_t> request_interface;
 
 	const auto& [vrf_priority, destination, fallback] = value_key;
-	(void)vrf_priority; ///< @todo: VRF
+	YANET_GCC_BUG_UNUSED(vrf_priority); ///< @todo: VRF
 
 	tunnel_value_lookup[value_id].clear();
 
@@ -1812,7 +1812,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		for (const auto& item : request_interface)
 		{
 			const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
-			(void)egress_interface_name;
+			YANET_GCC_BUG_UNUSED(egress_interface_name);
 
 			if (exist(interfaces, egress_interface_id))
 			{
@@ -1844,7 +1844,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 			for (const auto& item : request_interface)
 			{
 				const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
-				(void)egress_interface_name;
+				YANET_GCC_BUG_UNUSED(egress_interface_name);
 
 				const auto counter_id = tunnel_counter.get_id({fallback.is_ipv4(), peer_id, nexthop, origin_as});
 
@@ -1880,12 +1880,12 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 
 		for (auto& [nexthop, egress_interface_name, label, peer_id, origin_as, weight_percent] : tunnel_value_lookup[value_id][socket_id])
 		{
-			(void)socket_id;
-			(void)nexthop;
-			(void)egress_interface_name;
-			(void)label;
-			(void)peer_id;
-			(void)origin_as;
+			YANET_GCC_BUG_UNUSED(socket_id);
+			YANET_GCC_BUG_UNUSED(nexthop);
+			YANET_GCC_BUG_UNUSED(egress_interface_name);
+			YANET_GCC_BUG_UNUSED(label);
+			YANET_GCC_BUG_UNUSED(peer_id);
+			YANET_GCC_BUG_UNUSED(origin_as);
 
 			if (weight_is_fallback)
 			{
@@ -1909,16 +1909,16 @@ std::set<std::string> route_t::get_ingress_physical_ports(const tSocketId& socke
 
 	/// @todo: use function
 	const auto& [dataplane_physicalports, dataplane_workers, dataplane_values] = controlPlane->dataPlaneConfig;
-	(void)dataplane_workers;
-	(void)dataplane_values;
+	YANET_GCC_BUG_UNUSED(dataplane_workers);
+	YANET_GCC_BUG_UNUSED(dataplane_values);
 
 	for (const auto& [dataplane_physicalport_id, dataplane_physicalport] : dataplane_physicalports)
 	{
-		(void)dataplane_physicalport_id;
+		YANET_GCC_BUG_UNUSED(dataplane_physicalport_id);
 
 		const auto& [physicalport_name, dataplane_socket_id, mac_address, pci] = dataplane_physicalport;
-		(void)mac_address;
-		(void)pci;
+		YANET_GCC_BUG_UNUSED(mac_address);
+		YANET_GCC_BUG_UNUSED(pci);
 
 		if (socket_id != dataplane_socket_id)
 		{

@@ -185,7 +185,7 @@ void get(const std::string& vrf,
 			{
 				const auto& [protocol, peer, table_name, path_information] = nexthop_key;
 				const auto& [nexthop, labels, origin, med, aspath, communities, large_communities, local_preference] = nexthop_value;
-				(void)prefix;
+				YANET_GCC_BUG_UNUSED(prefix);
 
 				table.insert(vrf,
 				             priority,
