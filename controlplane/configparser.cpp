@@ -631,7 +631,7 @@ void config_parser_t::loadConfig_tun64(controlplane::base_t& baseNext,
 	}
 	else
 	{
-		tunnel.prefixes.emplace(common::ip_prefix_t(tunnel.ipv6SourceAddress, 128));
+		tunnel.prefixes.emplace(tunnel.ipv6SourceAddress, 128);
 	}
 
 	if (exist(moduleJson, "mappings"))

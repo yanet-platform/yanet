@@ -797,15 +797,12 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 					}
 				}
 
-				req_reals.emplace_back(common::idp::updateGlobalBase::update_balancer_services::real{
-				        real_unordered_id,
-				        real_ip,
-				        counter_id});
+				req_reals.emplace_back(real_unordered_id, real_ip, counter_id);
 				req_binding.emplace_back(real_unordered_id);
 			}
 
 			const auto counter_id = service_counters.get_id({module_name, {virtual_ip, proto, virtual_port}});
-			req_services.emplace_back(common::idp::updateGlobalBase::update_balancer_services::service{
+			req_services.emplace_back(
 			        service_id,
 			        flags,
 			        counter_id,
@@ -815,8 +812,7 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 			        (uint32_t)real_start,
 			        (uint32_t)(req_reals.size() - real_start),
 			        ipv4_outer_source_network,
-			        ipv6_outer_source_network,
-			});
+			        ipv6_outer_source_network);
 		}
 	}
 

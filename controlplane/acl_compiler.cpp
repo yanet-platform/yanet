@@ -172,8 +172,8 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 			}
 			else
 			{
-				network_ipv4_source_filter.emplace(network_t(4, 0, 0));
-				network_ipv6_source_filter.emplace(network_t(6, 0, 0));
+				network_ipv4_source_filter.emplace(4, 0, 0);
+				network_ipv6_source_filter.emplace(6, 0, 0);
 
 				src_family[4] = true;
 				src_family[6] = true;
@@ -198,8 +198,8 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 			}
 			else
 			{
-				network_ipv4_destination_filter.emplace(network_t(4, 0, 0));
-				network_ipv6_destination_filter.emplace(network_t(6, 0, 0));
+				network_ipv4_destination_filter.emplace(4, 0, 0);
+				network_ipv6_destination_filter.emplace(6, 0, 0);
 
 				dst_family[4] = true;
 				dst_family[6] = true;
