@@ -90,8 +90,8 @@ int runLogger()
 
 	interface::controlPlane controlplane;
 
-	uint32_t size = 1024;
-	samples::sample_t* samples[size];
+	constexpr uint32_t size = 1024;
+	std::array<samples::sample_t*, size> samples;
 
 	std::map<uint32_t, common::icp::getAclConfig::response> configs;
 
