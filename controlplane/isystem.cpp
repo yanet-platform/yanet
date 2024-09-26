@@ -178,8 +178,7 @@ void system::updateRoute(const uint32_t& network,
 		snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " nexthop via %s", ipv4_address_t(nexthop).toString().data());
 	}
 
-	int ret = ::system(buffer);
-	(void)ret;
+	[[maybe_unused]] int ret = ::system(buffer);
 }
 
 void system::updateRoute(const ip_prefix_t& prefix,
@@ -220,8 +219,7 @@ void system::removeRoute(const uint32_t& network,
 	char buffer[512];
 	snprintf(buffer, sizeof(buffer), "ip route del %s", prefix.toString().data());
 
-	int ret = ::system(buffer);
-	(void)ret;
+	[[maybe_unused]] int ret = ::system(buffer);
 }
 
 void system::removeRoute(const ip_prefix_t& prefix)
@@ -307,11 +305,9 @@ std::set<std::array<uint8_t, 16>> system::getLocalIPv6Addresses()
 	return result;
 }
 
-std::optional<mac_address_t> system::get_mac_address(const std::string& vrf,
+std::optional<mac_address_t> system::get_mac_address([[maybe_unused]] const std::string& vrf,
                                                      const ip_address_t& address)
 {
-	(void)vrf; ///< @todo: VRF
-
 	if (address.is_ipv4())
 	{
 		std::array<uint8_t, 6> neighborMacAddress;

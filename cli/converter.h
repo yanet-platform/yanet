@@ -101,9 +101,8 @@ std::string to_string(const std::set<arg_T>& set,
 }
 
 std::string to_string(const bool& value,
-                      const config_t config)
+                      [[maybe_unused]] const config_t config)
 {
-	(void)config;
 	if (value)
 	{
 		return "true";
@@ -129,9 +128,8 @@ std::string to_string(const std::string& string,
 
 template<typename arg_T>
 std::string to_string(const arg_T& value,
-                      const config_t config)
+                      [[maybe_unused]] const config_t config)
 {
-	(void)config;
 	if constexpr (std::is_constructible_v<std::string, decltype(value)>)
 	{
 		return value;

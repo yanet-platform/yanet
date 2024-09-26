@@ -153,9 +153,8 @@ void fillValue(std::optional<TArg>& value)
 }
 
 template<typename TArg>
-void fillValue(TArg& value)
+void fillValue([[maybe_unused]] TArg& value)
 {
-	(void)value;
 	throw std::string("invalid arguments count");
 }
 

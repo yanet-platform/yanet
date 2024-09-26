@@ -21,9 +21,8 @@ protected:
 	void clientThread(int clientSocket);
 
 protected:
-	void call(void (cControlPlane::*function)(), const common::idp::request& request)
+	void call(void (cControlPlane::*function)(), [[maybe_unused]] const common::idp::request& request)
 	{
-		(void)request; ///< @todo: [[maybe_unused]]
 		(controlPlane->*function)();
 	}
 
@@ -34,16 +33,14 @@ protected:
 	}
 
 	template<typename TResult>
-	TResult callWithResponse(TResult (cControlPlane::*function)(), const common::idp::request& request)
+	TResult callWithResponse(TResult (cControlPlane::*function)(), [[maybe_unused]] const common::idp::request& request)
 	{
-		(void)request; ///< @todo: [[maybe_unused]]
 		return (controlPlane->*function)();
 	}
 
 	template<typename TResult>
-	TResult callWithResponse(TResult (cControlPlane::*function)() const, const common::idp::request& request) const
+	TResult callWithResponse(TResult (cControlPlane::*function)() const, [[maybe_unused]] const common::idp::request& request) const
 	{
-		(void)request; ///< @todo: [[maybe_unused]]
 		return (controlPlane->*function)();
 	}
 

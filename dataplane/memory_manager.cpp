@@ -218,7 +218,6 @@ bool memory_manager::check_memory_limit(const std::string& name,
 	return result;
 }
 
-void memory_manager::limits(common::idp::limits::response& response)
+void memory_manager::limits([[maybe_unused]] common::idp::limits::response& response)
 {
-	(void)response;
 }
