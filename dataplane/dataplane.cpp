@@ -1768,8 +1768,9 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 		const auto& [key, shm] = it->second;
 
 		auto offset = offsets[shm];
-		worker->tsc_deltas = (dataplane::perf::tsc_deltas*)((intptr_t)shm + offset);
-		memset(worker->tsc_deltas, 0, sizeof(dataplane::perf::tsc_deltas));
+		worker->tsc_deltas = reinterpret_cast<dataplane::perf::tsc_deltas*>(reinterpret_cast<intptr_t>(shm) + offset);
+		// Use value-initialization to reset the object
+		*worker->tsc_deltas = {};
 		offsets[shm] += sizeof(dataplane::perf::tsc_deltas);
 
 		auto meta = common::idp::get_shm_tsc_info::tsc_meta(worker->coreId, socket_id, key, offset);
