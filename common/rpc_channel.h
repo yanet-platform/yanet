@@ -21,7 +21,7 @@ public:
 		connectChannel(socketPath);
 	}
 
-	~UnixProtobufRpcChannel()
+	~UnixProtobufRpcChannel() override
 	{
 		if (clientSocket != -1)
 		{
@@ -58,11 +58,11 @@ public:
 		}
 	}
 
-	virtual void CallMethod(const ::google::protobuf::MethodDescriptor* method,
-	                        ::google::protobuf::RpcController* controller,
-	                        const ::google::protobuf::Message* request,
-	                        ::google::protobuf::Message* response,
-	                        ::google::protobuf::Closure*)
+	void CallMethod(const ::google::protobuf::MethodDescriptor* method,
+	                ::google::protobuf::RpcController* controller,
+	                const ::google::protobuf::Message* request,
+	                ::google::protobuf::Message* response,
+	                ::google::protobuf::Closure*) override
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		// Get the service name method name and fill it into rpc_meta

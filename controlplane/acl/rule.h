@@ -198,12 +198,12 @@ struct filter_network_t : filter_base_t
 		networks.emplace_back(std::move(string));
 	}
 
-	[[nodiscard]] bool is_none() const
+	[[nodiscard]] bool is_none() const override
 	{
 		return networks.empty();
 	}
 
-	[[nodiscard]] virtual std::string to_string() const
+	[[nodiscard]] std::string to_string() const override
 	{
 		if (networks.empty())
 		{
@@ -334,12 +334,12 @@ struct filter_prm_t : filter_base_t
 		}
 	}
 
-	[[nodiscard]] bool is_none() const
+	[[nodiscard]] bool is_none() const override
 	{
 		return ranges.empty();
 	}
 
-	[[nodiscard]] virtual std::string to_string() const
+	[[nodiscard]] std::string to_string() const override
 	{
 		std::string ret;
 
@@ -592,12 +592,12 @@ struct filter_id_t : filter_base_t
 	inline filter_id_t(int _val) :
 	        val(_val) {}
 
-	[[nodiscard]] virtual bool is_none() const
+	[[nodiscard]] bool is_none() const override
 	{
 		return val < 0;
 	}
 
-	[[nodiscard]] virtual std::string to_string() const
+	[[nodiscard]] std::string to_string() const override
 	{
 		return std::to_string(val);
 	}
@@ -741,12 +741,12 @@ struct filter_proto_t : filter_base_t
 		}
 	}
 
-	[[nodiscard]] virtual bool is_none() const
+	[[nodiscard]] bool is_none() const override
 	{
 		return type.is_none() || prm1.is_none() || prm2.is_none();
 	}
 
-	[[nodiscard]] virtual std::string to_string() const
+	[[nodiscard]] std::string to_string() const override
 	{
 		bool has_ports = false, has_icmptypes = false,
 		     has_icmp6types = false, has_flags = false;
@@ -923,12 +923,12 @@ struct filter_t : filter_base_t
 		}
 	}
 
-	[[nodiscard]] virtual bool is_none() const
+	[[nodiscard]] bool is_none() const override
 	{
 		return acl_id.is_none() || src.is_none() || dst.is_none() || proto.is_none() || dir.is_none() || recordstate.is_none();
 	}
 
-	[[nodiscard]] virtual std::string to_string() const
+	[[nodiscard]] std::string to_string() const override
 	{
 		std::string ret;
 
