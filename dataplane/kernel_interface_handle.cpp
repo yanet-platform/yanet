@@ -42,7 +42,7 @@ KernelInterfaceHandle::KernelInterfaceHandle(KernelInterfaceHandle&& other) noex
 	*this = std::move(other);
 }
 
-bool KernelInterfaceHandle::Start() const
+bool KernelInterfaceHandle::Start() const noexcept
 {
 	auto rc = rte_eth_dev_start(kni_port_);
 	if (rc)
@@ -138,7 +138,7 @@ rte_eth_conf KernelInterfaceHandle::DefaultConfig() noexcept
 	return rte_eth_conf{};
 }
 
-bool KernelInterfaceHandle::Configure(const rte_eth_conf& eth_conf, tQueueId queue_count)
+bool KernelInterfaceHandle::Configure(const rte_eth_conf& eth_conf, tQueueId queue_count) noexcept
 {
 	int ret = rte_eth_dev_configure(kni_port_,
 	                                queue_count,
