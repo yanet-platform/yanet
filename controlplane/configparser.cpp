@@ -501,12 +501,9 @@ void config_parser_t::loadConfig_decap(controlplane::base_t& baseNext,
 void config_parser_t::loadConfig_nat64stateful(controlplane::base_t& baseNext,
                                                const std::string& moduleId,
                                                const nlohmann::json& moduleJson,
-                                               const std::string& rootFilePath,
-                                               const std::map<std::string, nlohmann::json>& jsons)
+                                               [[maybe_unused]] const std::string& rootFilePath,
+                                               [[maybe_unused]] const std::map<std::string, nlohmann::json>& jsons)
 {
-	(void)rootFilePath;
-	(void)jsons;
-
 	auto& nat64stateful = baseNext.nat64statefuls[moduleId];
 	nat64stateful_id_t nat64stateful_id = baseNext.nat64statefuls.size();
 
@@ -1013,12 +1010,9 @@ void config_parser_t::loadConfig_nat64stateless_translations(controlplane::base_
 void config_parser_t::loadConfig_nat46clat(controlplane::base_t& baseNext,
                                            const std::string& moduleId,
                                            const nlohmann::json& moduleJson,
-                                           const std::string& rootFilePath,
-                                           const std::map<std::string, nlohmann::json>& jsons)
+                                           [[maybe_unused]] const std::string& rootFilePath,
+                                           [[maybe_unused]] const std::map<std::string, nlohmann::json>& jsons)
 {
-	(void)rootFilePath;
-	(void)jsons;
-
 	auto& nat46clat = baseNext.nat46clats[moduleId];
 	nat46clat_id_t nat46clat_id = baseNext.nat46clats.size();
 

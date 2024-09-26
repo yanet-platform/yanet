@@ -152,7 +152,7 @@ public:
 
 	void allocate()
 	{
-		allocate([](const key_T& key) { (void)key; });
+		allocate([]([[maybe_unused]] const key_T& key) { });
 	}
 
 	template<typename callback_T>
@@ -172,7 +172,7 @@ public:
 
 	void release()
 	{
-		release([](const key_T& key) { (void)key; });
+		release([]([[maybe_unused]] const key_T& key) { });
 	}
 
 	void insert(const key_T& key)

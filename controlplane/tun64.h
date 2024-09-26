@@ -16,11 +16,9 @@ namespace tun64
 class generation_config_t
 {
 public:
-	void update(const controlplane::base_t& base_prev,
+	void update([[maybe_unused]] const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
 	{
-		(void)base_prev;
-
 		config_tunnels = base_next.tunnels;
 	}
 

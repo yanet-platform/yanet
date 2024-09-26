@@ -38,11 +38,9 @@ class generation_config_t
 public:
 	generation_config_t() = default;
 
-	void update(const controlplane::base_t& base_prev,
+	void update([[maybe_unused]] const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
 	{
-		(void)base_prev;
-
 		for (const auto& [name, balancer] : base_next.balancers)
 		{
 			name_id[name] = balancer.balancer_id;

@@ -890,10 +890,8 @@ void config_converter_t::acl_rules_route_local(controlplane::base::acl_t& acl,
 }
 
 void config_converter_t::acl_rules_route_forward(controlplane::base::acl_t& acl,
-                                                 const std::string& next_module) const
+                                                 [[maybe_unused]] const std::string& next_module) const
 {
-	(void)next_module;
-
 	common::globalBase::tFlow flow = convertToFlow(next_module);
 	acl.nextModuleRules.emplace_back(flow);
 }

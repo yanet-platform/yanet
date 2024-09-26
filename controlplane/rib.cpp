@@ -64,13 +64,10 @@ eResult rib_t::init()
 	return eResult::success;
 }
 
-void rib_t::reload(const controlplane::base_t& base_prev,
+void rib_t::reload([[maybe_unused]] const controlplane::base_t& base_prev,
                    const controlplane::base_t& base_next,
-                   common::idp::updateGlobalBase::request& globalbase)
+                   [[maybe_unused]] common::idp::updateGlobalBase::request& globalbase)
 {
-	(void)base_prev;
-	(void)globalbase;
-
 	common::icp::rib_update::request request;
 
 	{
