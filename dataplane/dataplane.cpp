@@ -1190,7 +1190,7 @@ eResult cDataPlane::InitSlowWorker(const tCoreId core, const CPlaneWorkerConfig&
 	std::vector<dpdk::RingConn<rte_mbuf*>> rings_from_gcs;
 	for (auto& gccore : cfg.gcs)
 	{
-		auto r = worker_gcs.at(gccore)->RegisterSlowWorker("cw" + core,
+		auto r = worker_gcs.at(gccore)->RegisterSlowWorker("cw" + std::to_string(core),
 		                                                   config_values_.ring_normalPriority_size,
 		                                                   config_values_.ring_toFreePackets_size);
 		if (r)
