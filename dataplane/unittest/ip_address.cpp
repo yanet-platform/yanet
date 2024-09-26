@@ -21,7 +21,7 @@ TEST(IpAddress, Basic)
 
 	{
 		ipv6_address_t addr = ipv6_address_t::convert(commonAddr);
-		ipv6_address_t expected{0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8};
+		ipv6_address_t expected{{{0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8}}};
 		EXPECT_EQ(addr, expected);
 
 		addr.reset();
