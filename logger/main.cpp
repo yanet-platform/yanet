@@ -232,82 +232,84 @@ int loadConfig(const std::string& path)
 	return 0;
 }
 
-int main(int argc,
-         char** argv)
+int main(int argc, char** argv)
 {
 	int config = argc;
 	for (int i = 1; i < argc; i++)
 	{
-		if (strcmp(argv[i], "-d") == 0)
+		std::string_view arg{argv[i]};
+		if (arg == "-d")
 		{
 			common::log::logPriority = common::log::TLOG_DEBUG;
 		}
-		else if (strcmp(argv[i], "-c") == 0)
+		else if (arg == "-c")
 		{
 			config = i + 1;
 		}
 	}
+
 	if (config >= argc)
 	{
 		std::cout << "usage: " << argv[0] << " [-d] -c <logger.conf>" << std::endl;
 		return 1;
 	}
+
 	int ret = loadConfig(argv[config]);
 	if (ret != 0)
 	{
 		return ret;
 	}
 
-	std::vector<const char*> args;
+	std::vector<std::string> args;
 	args.push_back(argv[0]);
-	args.push_back("--proc-type=secondary");
+	args.emplace_back("--proc-type=secondary");
 
 	std::string filePrefix = "--file-prefix=";
+	if (const char* pointer = std::getenv("YANET_FILEPREFIX"))
 	{
-		char* pointer = getenv("YANET_FILEPREFIX");
-		if (pointer)
-		{
-			filePrefix += pointer;
-		}
-		else
-		{
-			char* pointer = getenv("YANET_PREFIX");
-			if (pointer)
-			{
-				filePrefix += pointer;
-			}
-		}
+		filePrefix += pointer;
 	}
+	else if (const char* pointer = std::getenv("YANET_PREFIX"))
+	{
+		filePrefix += pointer;
+	}
+
 	if (filePrefix.size() > std::string("--file-prefix=").size())
 	{
-		args.push_back(filePrefix.data());
+		args.push_back(filePrefix);
 	}
 
 #if (RTE_VER_YEAR < 20) || (RTE_VER_YEAR == 20 && RTE_VER_MONT < 11)
-	const char masterLcore[] = "--master-lcore";
+	const std::string masterLcore = "--master-lcore";
 #else
-	const char masterLcore[] = "--main-lcore";
+	const std::string masterLcore = "--main-lcore";
 #endif
 
 	std::string masterLcoreId = std::to_string(loggerCoreId);
-
 	args.push_back(masterLcore);
-	args.push_back(masterLcoreId.data());
+	args.push_back(masterLcoreId);
 
 	YANET_LOG_DEBUG("eal args:\n");
-	for (auto& arg : args)
+	for (const auto& arg : args)
 	{
-		YANET_LOG_DEBUG("%s\n", arg);
+		YANET_LOG_DEBUG("%s\n", arg.c_str());
 	}
 
-	ret = rte_eal_init(args.size(), (char**)args.data());
+	// Use std::vector<char*> and copy the data into it for passing to rte_eal_init
+	std::vector<char*> c_args;
+	for (auto& arg : args)
+	{
+		c_args.push_back(const_cast<char*>(arg.c_str()));
+	}
+
+	ret = rte_eal_init(static_cast<int>(c_args.size()), c_args.data());
 	if (ret < 0)
 	{
 		YANET_LOG_ERROR("rte_eal_init() = %d\n", ret);
 		return 2;
 	}
 
-	if (signal(SIGPIPE, handleSignal) == SIG_ERR)
+	if (std::signal(SIGPIPE, handleSignal) == SIG_ERR)
 	{
 		return 3;
 	}
