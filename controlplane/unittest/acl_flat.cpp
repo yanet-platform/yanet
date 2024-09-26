@@ -6,21 +6,21 @@
 namespace
 {
 
-template<typename... args_T>
+template<typename... Args>
 void expect_group_ids_helper(std::vector<tAclGroupId>& vector,
                              const unsigned int group_id,
-                             const args_T... group_ids)
+                             const Args... group_ids)
 {
 	vector.emplace_back(group_id);
 
-	if constexpr (sizeof...(args_T) != 0)
+	if constexpr (sizeof...(Args) != 0)
 	{
 		expect_group_ids_helper(vector, group_ids...);
 	}
 }
 
-template<typename... args_T>
-std::vector<tAclGroupId> expect_group_ids(const args_T... group_ids)
+template<typename... Args>
+std::vector<tAclGroupId> expect_group_ids(const Args... group_ids)
 {
 	std::vector<tAclGroupId> result;
 	expect_group_ids_helper(result, group_ids...);

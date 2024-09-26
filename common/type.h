@@ -1672,8 +1672,8 @@ class values_t
 public:
 	values_t() = default;
 
-	template<typename... args_T>
-	values_t(const args_T&... args)
+	template<typename... Args>
+	values_t(const Args&... args)
 	{
 		insertHelper(args...);
 	}
@@ -1699,13 +1699,13 @@ public:
 	}
 
 protected:
-	template<typename arg0_T, typename... args_T>
+	template<typename arg0_T, typename... Args>
 	void insertHelper(const arg0_T& arg0,
-	                  const args_T&... args)
+	                  const Args&... args)
 	{
 		values.emplace(arg0);
 
-		if constexpr (sizeof...(args_T))
+		if constexpr (sizeof...(Args))
 		{
 			insertHelper(args...);
 		}

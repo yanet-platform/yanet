@@ -20,8 +20,8 @@ struct config_t
 
 template<typename arg_T>
 std::string to_string(const std::optional<arg_T>& value, const config_t config = {});
-template<typename... args_T>
-std::string to_string(const std::variant<args_T...>& value, const config_t config = {});
+template<typename... Args>
+std::string to_string(const std::variant<Args...>& value, const config_t config = {});
 template<typename arg_T>
 std::string to_string(const std::vector<arg_T>& vector, const config_t config = {});
 template<typename arg_T>
@@ -45,8 +45,8 @@ std::string to_string(const std::optional<arg_T>& value,
 	}
 };
 
-template<typename... args_T>
-std::string to_string(const std::variant<args_T...>& value,
+template<typename... Args>
+std::string to_string(const std::variant<Args...>& value,
                       const config_t config)
 {
 	return std::visit([&config](const auto& value) -> std::string { return to_string(value, config); }, value);
