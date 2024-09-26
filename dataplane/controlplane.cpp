@@ -305,9 +305,10 @@ common::idp::get_dregress_counters::response cControlPlane::get_dregress_counter
 {
 	common::dregress::counters_t counters_v4;
 	common::dregress::counters_t counters_v6;
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		dregress_t& dregress = slow->Dregress();
 		auto guard = dregress.LockCounters();
 		counters_v4.merge(dregress.Counters4());
 		counters_v6.merge(dregress.Counters6());
@@ -403,9 +404,10 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 	else
 	{
 		/// all ports
-		for (auto it : dataPlane->slow_workers)
+		for (auto& [core, slow] : dataPlane->slow_workers)
 		{
-			const auto& kni_worker = it.second->KniWorker();
+			YANET_GCC_BUG_UNUSED(core);
+			const auto& kni_worker = slow->KniWorker();
 
 			auto stats = kni_worker.PortsStats().first;
 			for (auto [current, end] = kni_worker.PortsIds(); current != end; ++current, ++stats)
@@ -444,9 +446,10 @@ common::dregress::stats_t cControlPlane::DregressStats() const
 std::optional<std::reference_wrapper<const dataplane::sKniStats>> cControlPlane::KniStats(tPortId pid) const
 {
 	// Dumb iteration over slow workers and their assigned ports, should not be a bottleneck
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		if (const auto& stats = it.second->KniWorker().PortStats(pid))
+		YANET_GCC_BUG_UNUSED(core);
+		if (const auto& stats = slow->KniWorker().PortStats(pid))
 		{
 			return stats;
 		}

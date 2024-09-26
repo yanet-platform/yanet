@@ -9,6 +9,7 @@
 #include <rte_ring.h>
 #include <rte_version.h>
 
+#include "common/define.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
 #include "common/type.h"
@@ -41,13 +42,13 @@ int initLogger()
 	auto response = dataplane.getConfig();
 	auto& workers = std::get<1>(response);
 
-	for (auto it : workers)
+	for (auto& [core, workers_vector] : workers)
 	{
-		auto coreId = it.first;
-		auto ring = rte_ring_lookup(("r_log_" + std::to_string(coreId)).c_str());
+		YANET_GCC_BUG_UNUSED(workers_vector);
+		auto ring = rte_ring_lookup(("r_log_" + std::to_string(core)).c_str());
 		if (ring != nullptr)
 		{
-			YANET_LOG_DEBUG("found log ring on #%u core\n", coreId);
+			YANET_LOG_DEBUG("found log ring on #%u core\n", core);
 
 			rings.push_back(ring);
 		}

@@ -30,6 +30,7 @@
 #include <sys/mman.h>
 
 #include "common.h"
+#include "common/define.h"
 #include "common/idp.h"
 #include "common/result.h"
 #include "common/tsc_deltas.h"
@@ -65,9 +66,10 @@ cDataPlane::~cDataPlane()
 	{
 		rte_mempool_free(mempool_log);
 	}
-	for (auto it : socket_cplane_mempools)
+	for (auto& [socket_id, rte_mempool] : socket_cplane_mempools)
 	{
-		rte_mempool_free(it.second);
+		YANET_GCC_BUG_UNUSED(socket_id);
+		rte_mempool_free(rte_mempool);
 	}
 }
 
@@ -1377,9 +1379,10 @@ void cDataPlane::SWRateLimiterTimeTracker()
 				__atomic_store_n(&worker->packetsToSWNPRemainder, config.SWNormalPriorityRateLimitPerWorker, __ATOMIC_RELAXED);
 			}
 
-			for (auto it : slow_workers)
+			for (auto& [core, slow] : slow_workers)
 			{
-				it.second->ResetIcmpOutRemainder(config.SWICMPOutRateLimit / config.rateLimitDivisor);
+				YANET_GCC_BUG_UNUSED(core);
+				slow->ResetIcmpOutRemainder(config.SWICMPOutRateLimit / config.rateLimitDivisor);
 			}
 
 			prevTimePointForSWRateLimiter = curTimePointForSWRateLimiter;
@@ -2120,9 +2123,10 @@ std::set<InterfaceName> cDataPlane::workerInterfacesToService()
 const std::set<tCoreId> cDataPlane::FastWorkerCores() const
 {
 	std::set<tCoreId> cores;
-	for (auto it : config.workers)
+	for (auto& [core, workers] : config.workers)
 	{
-		if (!cores.insert(it.first).second)
+		YANET_GCC_BUG_UNUSED(workers);
+		if (!cores.insert(core).second)
 		{
 			YANET_LOG_ERROR("Same core specified in config for multiple workers\n");
 		}
