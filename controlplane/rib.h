@@ -1,8 +1,8 @@
 #pragma once
 
 #include "module.h"
-#include <mutex>
 #include <atomic>
+#include <mutex>
 
 namespace rib
 {

@@ -15,7 +15,6 @@
 #include "result.h"
 #include "type.h"
 
-
 namespace common::icp
 {
 
@@ -1020,4 +1019,3 @@ using response = std::variant<std::tuple<>,
                               convert::response,
                               counters_stat::response>;
 }
-

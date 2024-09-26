@@ -32,7 +32,7 @@ template<unsigned int TSize = CONFIG_YADECAP_MBUFS_BURST_SIZE>
 class tStack
 {
 public:
-	tStack()  = default;
+	tStack() = default;
 
 	inline void insert(rte_mbuf** mbufs, unsigned int mbufsCount)
 	{

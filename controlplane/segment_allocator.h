@@ -4,7 +4,6 @@
 #include <cstring>
 #include <utility>
 
-
 #define ENABLE_BIT(v, b) (v) |= ((uint64_t)1) << (b)
 #define GET_BIT(v, b) (((v) >> (b)) & 1)
 #define DISABLE_BIT(v, b) (v) &= ~(((uint64_t)1) << (b))

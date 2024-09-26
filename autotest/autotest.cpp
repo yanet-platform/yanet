@@ -1,6 +1,6 @@
 #include <arpa/inet.h>
-#include <pcap.h>
 #include <cstring>
+#include <pcap.h>
 #include <sys/shm.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -409,7 +409,7 @@ private:
 class PcapDumper
 {
 public:
-	PcapDumper(std::string  path, int capsize = MAX_PACK_LEN) :
+	PcapDumper(std::string path, int capsize = MAX_PACK_LEN) :
 	        tmpFilePath(std::move(path)), pcap(pcap_open_dead(DLT_EN10MB, capsize))
 	{
 

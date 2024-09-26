@@ -238,4 +238,4 @@ private:
 	};
 };
 
-} //namespace samples
+} // namespace samples

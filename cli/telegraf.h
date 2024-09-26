@@ -711,7 +711,7 @@ void main_counters()
 	{
 		std::vector<influxdb_format::value_t> values;
 		auto* buffer = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
-		                                                       sdp_data.metadata_worker.start_counters);
+		                                                   sdp_data.metadata_worker.start_counters);
 		for (const auto& [name, index] : sdp_data.metadata_worker.counter_positions)
 		{
 			values.emplace_back(name.data(), buffer[index]);
@@ -723,7 +723,7 @@ void main_counters()
 	{
 		std::vector<influxdb_format::value_t> values;
 		auto* buffer = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
-		                                                       sdp_data.metadata_worker.start_counters);
+		                                                   sdp_data.metadata_worker.start_counters);
 		for (const auto& [name, index] : sdp_data.metadata_worker_gc.counter_positions)
 		{
 			values.emplace_back(name.data(), buffer[index]);

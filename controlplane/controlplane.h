@@ -8,12 +8,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "balancer.h"
 #include "common/generation.h"
 #include "common/icp.h"
 #include "common/idataplane.h"
 #include "common/idp.h"
 #include "common/result.h"
-#include "balancer.h"
 #include "dregress.h"
 #include "durations.h"
 #include "fqdn.h"

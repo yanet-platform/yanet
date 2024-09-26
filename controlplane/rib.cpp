@@ -568,14 +568,14 @@ void rib_t::rib_flush(bool force_flush)
 
 					controlPlane->route.prefix_update(vrf_priority, updated_prefix, proto_peer_table_name, destination);
 					controlPlane->route.tunnel_prefix_update(vrf_priority, updated_prefix, destination);
-					//controlPlane->route.linux_prefix_update(vrf_priority, updated_prefix, destination);
+					// controlPlane->route.linux_prefix_update(vrf_priority, updated_prefix, destination);
 					controlPlane->dregress.prefix_insert(vrf_priority, updated_prefix, destination);
 				}
 				else
 				{
 					controlPlane->route.prefix_update(vrf_priority, updated_prefix, {}, std::monostate()); // TODO: get rid of third parameter
 					controlPlane->route.tunnel_prefix_update(vrf_priority, updated_prefix, std::monostate());
-					//controlPlane->route.linux_prefix_update(vrf_priority, updated_prefix, std::monostate());
+					// controlPlane->route.linux_prefix_update(vrf_priority, updated_prefix, std::monostate());
 					controlPlane->dregress.prefix_remove(vrf_priority, updated_prefix);
 				}
 			}

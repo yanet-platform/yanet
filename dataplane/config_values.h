@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <nlohmann/json.hpp>
 
-
 struct FragmentationConfig
 {
 	uint64_t size = 1024;

@@ -13,8 +13,6 @@
 #define YANET_TSC_BINS_SHIFT 2
 #define YANET_TSC_BINS_N 4
 
-
-
 namespace dataplane::perf
 {
 
@@ -110,5 +108,3 @@ static_assert(std::is_pod_v<tsc_deltas> == true,
               "tsc structure is not pod");
 
 }
-
-

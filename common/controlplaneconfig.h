@@ -250,8 +250,7 @@ public:
 namespace balancer
 {
 
-[[maybe_unused]]
-static uint8_t to_proto(const std::string& string)
+[[maybe_unused]] static uint8_t to_proto(const std::string& string)
 {
 	if (string == "tcp")
 	{
@@ -265,8 +264,7 @@ static uint8_t to_proto(const std::string& string)
 	return 0;
 }
 
-[[maybe_unused]]
-constexpr const char* from_proto(const uint8_t& proto)
+[[maybe_unused]] constexpr const char* from_proto(const uint8_t& proto)
 {
 	switch (proto)
 	{

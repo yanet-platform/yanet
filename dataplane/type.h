@@ -581,9 +581,9 @@ struct balancer_service_t
 	uint32_t wlc_power;
 
 	/*
-		outer_source_network_flag:
-		zero byte stores the state for ipv4_router_source_network
-		first byte stores the state for ipv6_router_source_network
+	        outer_source_network_flag:
+	        zero byte stores the state for ipv4_router_source_network
+	        first byte stores the state for ipv6_router_source_network
 	*/
 	uint8_t outer_source_network_flag;
 	ipv4_prefix_t ipv4_outer_source_network;

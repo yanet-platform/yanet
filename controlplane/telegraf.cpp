@@ -4,8 +4,7 @@
 using common::int64;
 using controlplane::module::telegraf;
 
-[[maybe_unused]]
-static inline double perSecond(const int64_t& valueDiff, const uint64_t& timeDiff)
+[[maybe_unused]] static inline double perSecond(const int64_t& valueDiff, const uint64_t& timeDiff)
 {
 	if (timeDiff == 0)
 	{

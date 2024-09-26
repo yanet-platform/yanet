@@ -178,7 +178,7 @@ public:
 				if (!core_id.has_value() || worker_core_id == core_id)
 				{
 					auto* counters = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
-					                                                         sdp_data.metadata_worker.start_counters);
+					                                                     sdp_data.metadata_worker.start_counters);
 					result[worker_core_id] = counters[index];
 				}
 			}
@@ -194,7 +194,7 @@ public:
 				if (!core_id.has_value() || worker_core_id == core_id)
 				{
 					auto* counters = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
-					                                                         sdp_data.metadata_worker.start_counters);
+					                                                     sdp_data.metadata_worker.start_counters);
 					result[worker_core_id] = counters[index];
 				}
 			}
