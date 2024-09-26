@@ -1,62 +1,34 @@
 #pragma once
-#include <algorithm>
 
+#include <algorithm>
+#include <array>
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
 
 namespace utils
 {
 
-#ifdef STATIC_VECTOR_USE_EXCEPTIONS
-static constexpr bool USE_EXCEPTIONS = true;
-#else
-static constexpr bool USE_EXCEPTIONS = false;
-#endif
-
-template<typename T, std::size_t Cap>
+template<typename T, std::size_t Cap, bool UseExceptions = false>
 class StaticVector
 {
-	alignas(T) unsigned char buf_[sizeof(T[Cap])];
+	using storage_t = std::aligned_storage_t<sizeof(T), alignof(T)>;
+	std::array<storage_t, Cap> buf_;
 	std::size_t len_ = 0;
 
 	T* AddressOfIndex(std::size_t idx)
 	{
-		return reinterpret_cast<T*>(buf_) + idx;
+		return std::launder(reinterpret_cast<T*>(&buf_[idx]));
 	}
 
 	const T* AddressOfIndex(std::size_t idx) const
 	{
-		return reinterpret_cast<const T*>(buf_) + idx;
-	}
-
-	void TrivialCopy(const StaticVector& other)
-	{
-		std::copy(std::begin(other.buf_),
-		          std::begin(other.buf_) + other.len_ * sizeof(T),
-		          std::begin(buf_));
-		len_ = other.len_;
-	}
-
-	void PerElementCopy(const StaticVector& other)
-	{
-		clear();
-		for (const auto& elem : other)
-		{
-			PushBackUnsafe(elem);
-		}
-	}
-
-	void PerElementCopy(StaticVector&& other)
-	{
-		clear();
-		for (auto& elem : other)
-		{
-			PushBackUnsafe(std::move(elem));
-		}
+		return std::launder(reinterpret_cast<const T*>(&buf_[idx]));
 	}
 
 	void HandleOutOfRange()
 	{
-		if constexpr (USE_EXCEPTIONS)
+		if constexpr (UseExceptions)
 		{
 			throw std::out_of_range("");
 		}
@@ -66,94 +38,98 @@ class StaticVector
 		}
 	}
 
-	void PushBackUnsafe(const T& elem)
+	template<typename... Args>
+	void PushBackUnsafe(Args&&... args)
 	{
-		new (AddressOfIndex(len_)) T(elem);
+		new (AddressOfIndex(len_)) T(std::forward<Args>(args)...);
 		++len_;
 	}
 
-	void PushBackUnsafe(T&& elem)
+	template<typename OtherVector>
+	void PerElementTransfer(OtherVector&& other)
 	{
-		new (AddressOfIndex(len_)) T(std::move(elem));
-		++len_;
+		// If T is trivially copyable, use trivial copy
+		if constexpr (std::is_trivially_copyable_v<T>)
+		{
+			std::copy(std::begin(other.buf_), std::begin(other.buf_) + other.len_, std::begin(buf_));
+			len_ = other.len_;
+		}
+		else
+		{
+			clear();
+
+			for (auto&& elem : other)
+			{
+				PushBackUnsafe(std::forward<decltype(elem)>(elem));
+			}
+
+			// If other is an rvalue, clear the original vector
+			if constexpr (std::is_rvalue_reference_v<decltype(other)>)
+			{
+				other.clear();
+			}
+		}
 	}
 
 public:
 	using iterator = T*;
 	using const_iterator = const T*;
+
 	StaticVector() = default;
 
-	StaticVector(StaticVector&& other)
+	~StaticVector()
 	{
-		*this = std::move(other);
-	}
-
-	StaticVector& operator=(StaticVector&& other)
-	{
-		if (this == &other)
-		{
-			return *this;
-		}
-
-		if constexpr (std::is_trivially_copyable_v<T>)
-		{
-			TrivialCopy(other);
-		}
-		else
-		{
-			PerElementMove(other);
-		}
-		return *this;
+		clear();
 	}
 
 	StaticVector(const StaticVector& other)
 	{
-		*this = other;
+		PerElementTransfer(other);
+	}
+
+	StaticVector(StaticVector&& other) noexcept
+	{
+		PerElementTransfer(std::move(other));
 	}
 
 	StaticVector& operator=(const StaticVector& other)
 	{
-		if (this == &other)
+		if (this != &other)
 		{
-			return *this;
-		}
-		clear();
-		if constexpr (std::is_trivially_copyable_v<T>)
-		{
-			TrivialCopy(other);
-		}
-		else
-		{
-			PerElementCopy(other);
+			clear();
+			PerElementTransfer(other);
 		}
 		return *this;
 	}
 
-	void push_back(const T& elem)
+	StaticVector& operator=(StaticVector&& other) noexcept
 	{
-		if (Full())
+		if (this != &other)
 		{
-			HandleOutOfRange();
-			return;
+			clear();
+			PerElementTransfer(std::move(other));
 		}
-		PushBackUnsafe(elem);
+		return *this;
 	}
 
-	void push_back(T&& elem)
+	template<typename U>
+	void push_back(U&& elem)
 	{
 		if (Full())
 		{
 			HandleOutOfRange();
-			return;
 		}
-		PushBackUnsafe(std::move(elem));
+		PushBackUnsafe(std::forward<U>(elem));
 	}
 
 	template<typename... Args>
 	void emplace_back(Args&&... args)
 	{
-		new (AddressOfIndex(len_)) T(std::forward<Args>(args)...);
-		++len_;
+		if (Full())
+		{
+			HandleOutOfRange();
+		}
+		PushBackUnsafe(std::forward<Args>(args)...);
 	}
 
 	void pop_back()
@@ -161,7 +137,6 @@ public:
 		if (empty())
 		{
 			HandleOutOfRange();
-			return;
 		}
 		at(--len_).~T();
 	}
@@ -169,7 +144,6 @@ public:
 	T& operator[](std::size_t pos)
 	{
 		return *AddressOfIndex(pos);
-		// return reinterpret_cast<T&>(buf_[pos * sizeof(T)]);
 	}
 
 	const T& operator[](std::size_t pos) const
@@ -182,10 +156,8 @@ public:
 		if (pos >= size())
 		{
 			HandleOutOfRange();
-			abort();
 		}
 		return *AddressOfIndex(pos);
-		// return reinterpret_cast<T&>(buf_[pos * sizeof(T)]);
 	}
 
 	const T& at(std::size_t pos) const
@@ -193,7 +165,6 @@ public:
 		if (pos >= size())
 		{
 			HandleOutOfRange();
-			abort();
 		}
 		return *AddressOfIndex(pos);
 	}
@@ -205,13 +176,12 @@ public:
 	const_iterator cbegin() const { return AddressOfIndex(0); }
 	const_iterator cend() const { return AddressOfIndex(size()); }
 
-	[[nodiscard]] bool empty() const
-	{
-		return size() == 0;
-	}
-
+	[[nodiscard]] bool empty() const { return size() == 0; }
 	[[nodiscard]] constexpr std::size_t capacity() const { return Cap; }
+	[[nodiscard]] std::size_t size() const { return len_; }
+	[[nodiscard]] bool Full() const { return size() == capacity(); }
 
+	// Clear the vector and destruct elements
 	void clear()
 	{
 		if constexpr (std::is_trivially_destructible_v<T>)
@@ -226,9 +196,6 @@ public:
 			}
 		}
 	}
-
-	[[nodiscard]] std::size_t size() const { return len_; }
-	[[nodiscard]] bool Full() const { return size() == capacity(); }
 };
 
 } // namespace utils
