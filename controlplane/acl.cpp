@@ -840,14 +840,14 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 			if (!rule.ids.empty())
 #endif
 			{
-				result.dispatcher.emplace_back(std::make_tuple(
+				result.dispatcher.emplace_back(
 #ifdef ACL_DEBUG
 				        rule.ids[0],
 #else
 				        FW_DISPATCHER_START_ID,
 #endif
 				        rule.to_string(),
-				        std::string()));
+				        std::string());
 			}
 			ACL_DBGMSG("dispatcher rule: " << rule.to_string());
 		}
