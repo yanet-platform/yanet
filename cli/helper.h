@@ -234,8 +234,8 @@ public:
 	{
 	}
 
-	template<typename... args_T>
-	void insert(const args_T&... args)
+	template<typename... Args>
+	void insert(const Args&... args)
 	{
 		std::vector<std::string> row = {converter::to_string(args, config)...};
 
