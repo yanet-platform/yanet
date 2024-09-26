@@ -2316,9 +2316,10 @@ eResult generation::dregress_prefix_update(const common::idp::updateGlobalBase::
 {
 	eResult result = eResult::success;
 
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		::dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		::dregress_t& dregress = slow->Dregress();
 		for (const auto& [prefix, value_id] : request)
 		{
 			std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
@@ -2333,9 +2334,10 @@ eResult generation::dregress_prefix_remove(const common::idp::updateGlobalBase::
 {
 	eResult result = eResult::success;
 
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		::dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		::dregress_t& dregress = slow->Dregress();
 		for (const auto& prefix : request)
 		{
 			std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
@@ -2349,9 +2351,10 @@ eResult generation::dregress_prefix_clear()
 {
 	eResult result = eResult::success;
 
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		::dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		::dregress_t& dregress = slow->Dregress();
 		std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
 		dregress.prefixes.clear();
 	}
@@ -2363,9 +2366,10 @@ eResult generation::dregress_local_prefix_update(const common::idp::updateGlobal
 {
 	eResult result = eResult::success;
 
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		::dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		::dregress_t& dregress = slow->Dregress();
 		std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
 
 		dregress.local_prefixes_v4.clear();
@@ -2390,9 +2394,10 @@ eResult generation::dregress_value_update(const common::idp::updateGlobalBase::d
 {
 	eResult result = eResult::success;
 
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		::dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		::dregress_t& dregress = slow->Dregress();
 		std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
 
 		for (const auto& [value_id, value] : request)
