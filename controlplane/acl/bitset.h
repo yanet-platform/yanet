@@ -135,7 +135,7 @@ public:
 	}
 
 	[[nodiscard]] std::tuple<size_t, bool> minAnd(const bitset_t& p1,
-	                                const bitset_t& p2) const
+	                                              const bitset_t& p2) const
 	{
 		for (size_t i = std::max(std::max(first_one, p1.first_one), p2.first_one); i < size; ++i)
 		{
@@ -207,7 +207,7 @@ public:
 	}
 };
 
-} //namespace acl
+} // namespace acl
 
 namespace std
 {

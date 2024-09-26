@@ -9,7 +9,6 @@
 #include <set>
 #include <vector>
 
-
 /**
  *  GCC 7.5 version which we have to support for now due to Ubuntu 18 have a bug
  *  (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81767) where unused variables

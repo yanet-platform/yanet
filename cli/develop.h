@@ -13,8 +13,6 @@
 
 #include "helper.h"
 
-
-
 namespace develop::dataplane
 {
 
@@ -366,5 +364,3 @@ void tsc_monitoring()
 }
 
 }
-
-

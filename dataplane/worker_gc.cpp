@@ -278,7 +278,7 @@ void worker_gc_t::handle_nat64stateful_gc()
 		/// check lan tables
 		for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 		{
-				if (globalbase_atomic == nullptr)
+			if (globalbase_atomic == nullptr)
 			{
 				break;
 			}
@@ -424,7 +424,7 @@ void worker_gc_t::handle_balancer_gc()
 
 				for (auto globalbase_atomic_other : base_permanently.globalBaseAtomics)
 				{
-						if (globalbase_atomic_other == nullptr)
+					if (globalbase_atomic_other == nullptr)
 					{
 						break;
 					}
@@ -978,7 +978,7 @@ void worker_gc_t::nat64stateful_remove_state(const dataplane::globalBase::nat64s
 	/// remove on other numas
 	for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 	{
-			if (globalbase_atomic == base_permanently.globalBaseAtomic)
+		if (globalbase_atomic == base_permanently.globalBaseAtomic)
 		{
 			continue;
 		}
@@ -1129,7 +1129,7 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 			/// check lan tables
 			for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 			{
-					if (globalbase_atomic == nullptr)
+				if (globalbase_atomic == nullptr)
 				{
 					break;
 				}

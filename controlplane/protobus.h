@@ -1,8 +1,6 @@
 #pragma once
 
-
 #include "module.h"
-
 
 namespace controlplane::module
 {
@@ -25,4 +23,3 @@ protected:
 };
 
 }
-

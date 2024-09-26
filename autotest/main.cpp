@@ -1,6 +1,5 @@
 #include <csignal>
 
-
 #include "common/result.h"
 
 #include "autotest.h"
@@ -44,7 +43,7 @@ int main(int argc,
 	/** @todo
 	if (signal(SIGINT, handleSignal) == SIG_ERR)
 	{
-		return 3;
+	        return 3;
 	}
 	*/
 

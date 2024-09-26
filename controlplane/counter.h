@@ -1,10 +1,10 @@
 #pragma once
 
-#include <mutex>
 #include "common/icp.h"
-#include "common/sdpcommon.h"
 #include "common/sdpclient.h"
+#include "common/sdpcommon.h"
 #include "segment_allocator.h"
+#include <mutex>
 
 class counter_manager_t
 {
@@ -152,7 +152,7 @@ public:
 
 	void allocate()
 	{
-		allocate([]([[maybe_unused]] const key_T& key) { });
+		allocate([]([[maybe_unused]] const key_T& key) {});
 	}
 
 	template<typename callback_T>
@@ -172,7 +172,7 @@ public:
 
 	void release()
 	{
-		release([]([[maybe_unused]] const key_T& key) { });
+		release([]([[maybe_unused]] const key_T& key) {});
 	}
 
 	void insert(const key_T& key)
