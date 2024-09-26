@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "bitset.h"
 #include "network.h"
 #include "rule.h"

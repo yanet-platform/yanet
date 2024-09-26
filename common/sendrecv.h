@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include <google/protobuf/message.h>
 #include <cstring>
+#include <google/protobuf/message.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
@@ -118,7 +118,7 @@ static int send(int clientSocket, Req&& request)
 }
 
 template<class Resp>
-static inline Resp recv(int clientSocket) //unsafe
+static inline Resp recv(int clientSocket) // unsafe
 {
 	std::vector<uint8_t> buffer;
 

@@ -10,8 +10,8 @@ class config_converter_t
 {
 public:
 	config_converter_t(cControlPlane* controlplane,
-	                   controlplane::base_t  baseNext,
-	                   common::idp::limits::response  limits) :
+	                   controlplane::base_t baseNext,
+	                   common::idp::limits::response limits) :
 	        controlplane(controlplane),
 	        baseNext(std::move(baseNext)),
 	        limits(std::move(limits))

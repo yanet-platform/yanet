@@ -1,7 +1,7 @@
 #pragma once
 
-#include "libfwparser/fw_parser.h"
 #include "libfwparser/fw_config.h"
+#include "libfwparser/fw_parser.h"
 #include <memory>
 
 namespace ipfw

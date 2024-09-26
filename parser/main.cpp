@@ -98,12 +98,12 @@ int main(int argc, char* argv[])
 	config->set_debug(verbose_level);
 
 	/*
-     * For -c option we concatenate all remaining arguments into
-     * single spaces delimited string and pass it to the parser.
-     *
-     * NOTE: the order of scheduled files is matter. DNS cache
-     * should be scheduled last, then it will be processed first.
-     */
+	 * For -c option we concatenate all remaining arguments into
+	 * single spaces delimited string and pass it to the parser.
+	 *
+	 * NOTE: the order of scheduled files is matter. DNS cache
+	 * should be scheduled last, then it will be processed first.
+	 */
 	if (cmd_mode)
 	{
 		/* Rule from command line arguments */

@@ -35,7 +35,6 @@ nlohmann::json convertHashtable(const hashtable_mod_T& hashtable, const stats_T&
 
 } // namespace
 
-
 namespace common::dregress
 {
 void to_json(nlohmann::json& j, const stats_t& stats)
@@ -57,7 +56,6 @@ void to_json(nlohmann::json& j, const stats_t& stats)
 	        {"tcp_unknown_sessions", stats.tcp_unknown_sessions}};
 }
 } // namespace common::dregress
-
 
 cReport::cReport(cDataPlane* dataPlane) :
         dataPlane(dataPlane)

@@ -1,7 +1,6 @@
 #include <csignal>
 #include <systemd/sd-daemon.h>
 
-
 #include "controlplane.h"
 
 cControlPlane application;
@@ -48,7 +47,7 @@ int main(int argc,
 	/** @todo
 	if (signal(SIGINT, handleSignal) == SIG_ERR)
 	{
-		return 3;
+	        return 3;
 	}
 	*/
 

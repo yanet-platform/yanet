@@ -1,10 +1,10 @@
 #pragma once
 
+#include <cstring>
 #include <fcntl.h>
 #include <numa.h>
 #include <numaif.h>
 #include <optional>
-#include <cstring>
 #include <sys/mman.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
