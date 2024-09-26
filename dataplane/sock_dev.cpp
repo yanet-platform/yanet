@@ -386,7 +386,7 @@ sock_dev_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		iov[0].iov_base = &hdr;
 		iov[0].iov_len = sizeof(hdr);
 
-		iov[1].iov_base = (void*)rte_pktmbuf_read(mbuf, 0, len, writeBuf);
+		iov[1].iov_base = const_cast<void*>(rte_pktmbuf_read(mbuf, 0, len, writeBuf));
 		iov[1].iov_len = len;
 
 		if (writeIovCount(si->conFd, iov, 2) < 0)
