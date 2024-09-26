@@ -541,7 +541,7 @@ iface_map_t ifaceMapping(std::map<std::string, controlplane::base::logical_port_
 // used by acl_lookup
 unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acls,
                      const iface_map_t& ifaces,
-                     const std::optional<std::string>& module,
+                     [[maybe_unused]] const std::optional<std::string>& module,
                      const std::optional<std::string>& direction,
                      const std::optional<std::string>& network_source,
                      const std::optional<std::string>& network_destination,
@@ -552,8 +552,6 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
                      const std::optional<std::string>& transport_flags,
                      const std::optional<std::string>& in_recordstate)
 {
-	(void)module;
-
 	unwind_result result;
 
 	try
@@ -1023,7 +1021,7 @@ uint8_t string_to_proto(const std::string& string)
 
 std::set<uint32_t> lookup(const std::map<std::string, controlplane::base::acl_t>& acls,
                           const iface_map_t& ifaces,
-                          const std::optional<std::string>& module,
+                          [[maybe_unused]] const std::optional<std::string>& module,
                           const std::optional<std::string>& direction,
                           const std::optional<std::string>& network_source,
                           const std::optional<std::string>& network_destination,
@@ -1032,8 +1030,6 @@ std::set<uint32_t> lookup(const std::map<std::string, controlplane::base::acl_t>
                           const std::optional<std::string>& transport_source,
                           const std::optional<std::string>& transport_destination)
 {
-	(void)module;
-
 	std::set<uint32_t> result;
 
 	try

@@ -19,11 +19,9 @@ using module_counter_key_t = std::string; ///< module_name
 class generation_config_t
 {
 public:
-	void update(const controlplane::base_t& base_prev,
+	void update([[maybe_unused]] const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
 	{
-		(void)base_prev;
-
 		config_nat64statefuls = base_next.nat64statefuls;
 
 		for (const auto& [name, nat64stateful] : base_next.nat64statefuls)

@@ -29,11 +29,9 @@ class generation_t
 public:
 	generation_t() = default;
 
-	void update(const controlplane::base_t& base_prev,
+	void update([[maybe_unused]] const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
 	{
-		(void)base_prev;
-
 		routes = base_next.routes;
 		dregresses = base_next.dregresses;
 
