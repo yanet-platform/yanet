@@ -159,41 +159,6 @@ void call(void (*func)(TArgs... args),
 	std::apply(func, tuple);
 }
 
-template<size_t TIndex,
-         size_t TSize,
-         typename TDiffTuple,
-         typename TTuple>
-void getDiffTuple(TDiffTuple& diff,
-                  const TTuple& curr,
-                  const TTuple& prev)
-{
-	if constexpr (TIndex < TSize)
-	{
-		std::get<TIndex>(diff) = std::get<TIndex>(curr) - std::get<TIndex>(prev);
-		getDiffTuple<TIndex + 1, TSize>(diff, curr, prev);
-	}
-}
-
-template<typename TFirst,
-         typename... TSecondArgs>
-std::map<TFirst, std::array<int64_t, sizeof...(TSecondArgs)>> getDiff(const std::map<TFirst, std::tuple<TSecondArgs...>>& curr,
-                                                                      const std::map<TFirst, std::tuple<TSecondArgs...>>& prev)
-{
-	std::map<TFirst, std::array<int64_t, sizeof...(TSecondArgs)>> result;
-
-	for (const auto& iter : curr)
-	{
-		if (prev.find(iter.first) != prev.end())
-		{
-			std::array<int64_t, sizeof...(TSecondArgs)> diff;
-			getDiffTuple<0, sizeof...(TSecondArgs)>(diff, iter.second, prev.find(iter.first)->second);
-			result[iter.first] = diff;
-		}
-	}
-
-	return result;
-}
-
 class table_t
 {
 public:
