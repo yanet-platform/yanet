@@ -134,4 +134,86 @@ TEST(IndexOf, EmptyTuple)
 	// constexpr std::size_t invalidIndex = IndexOf<int, EmptyTuple>::value;
 }
 
+using utils::get_first_tuple_size;
+
+TEST(TupleSize, GetFirstTupleSize)
+{
+	using Tuple1 = std::tuple<int, double, char>;
+	constexpr std::size_t size1 = get_first_tuple_size<Tuple1>();
+	EXPECT_EQ(size1, 3);
+
+	using Tuple2 = std::tuple<float, bool, long, int, double>;
+	constexpr std::size_t size2 = get_first_tuple_size<Tuple1, Tuple2>();
+	EXPECT_EQ(size2, 3);
+
+	using EmptyTuple = std::tuple<>;
+	constexpr std::size_t size3 = get_first_tuple_size<EmptyTuple>();
+	EXPECT_EQ(size3, 0);
+}
+
+using utils::zip_apply;
+
+TEST(ZipApply, BasicUsage)
+{
+	auto t1 = std::make_tuple(1, 2, 3);
+	auto t2 = std::make_tuple(4, 5, 6);
+	std::vector<int> results;
+
+	auto op = [&](int a, int b) {
+		results.push_back(a + b);
+	};
+
+	zip_apply(op, t1, t2);
+
+	EXPECT_EQ(results.size(), 3u);
+	EXPECT_EQ(results[0], 5);
+	EXPECT_EQ(results[1], 7);
+	EXPECT_EQ(results[2], 9);
+
+	results.clear();
+	auto op2 = [&](int a, int b, int c, int d) {
+		results.push_back(a + b + c + d);
+	};
+
+	zip_apply(op2, t1, t2, t1, t2);
+
+	EXPECT_EQ(results.size(), 3u);
+	EXPECT_EQ(results[0], 10);
+	EXPECT_EQ(results[1], 14);
+	EXPECT_EQ(results[2], 18);
+}
+
+TEST(ZipApply, WorksWithSingleTuple)
+{
+	auto t1 = std::make_tuple(1, 2, 3);
+	std::vector<int> results;
+
+	auto op = [&](int a) {
+		results.push_back(a * 2);
+	};
+
+	zip_apply(op, t1);
+
+	EXPECT_EQ(results.size(), 3u);
+	EXPECT_EQ(results[0], 2);
+	EXPECT_EQ(results[1], 4);
+	EXPECT_EQ(results[2], 6);
+}
+
+TEST(ZipApply, DifferentSizesCompileError)
+{
+	// Expect a compile-time failure due to different tuple sizes
+	// Uncommenting the following lines should trigger a compile-time error:
+	/* auto t1 = std::make_tuple(1, 2); */
+	/* auto t2 = std::make_tuple(3); */
+	/* zip_apply([](int a, int b) {}, t1, t2); */
+}
+
+TEST(ZipApply, NoTuplesCompileError)
+{
+	// Expect a compile-time failure due to no tuples provided
+	// Uncommenting the following lines should trigger a compile-time error:
+	/* zip_apply([]() { }); */
+}
+
 } // namespace
