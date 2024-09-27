@@ -100,6 +100,12 @@ public:
 		return *this;
 	}
 
+	template<typename U = type_t, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
+	operator std::string() const
+	{
+		return std::to_string(value);
+	}
+
 public:
 	type_t value;
 };
