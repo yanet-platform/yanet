@@ -7,152 +7,91 @@
 #include <vector>
 
 #include "common/sdpclient.h"
+#include "common/traits.h"
 #include "table_printer.h"
 
-void fillValue(std::optional<uint8_t>& value, const std::string& string)
-{
-	if (string == "any")
-	{
-		value = std::nullopt;
-	}
-	else if (string != "")
-	{
-		value = std::stoull(string, nullptr, 0);
-		;
-	}
-	else
-	{
-		value = std::nullopt;
-	}
-}
+#if __cpp_lib_charconv >= 201606L && !defined(__GNUC__) || __GNUC__ >= 8
+#define USE_FROM_CHARS
+#endif
 
-void fillValue(std::optional<uint16_t>& value, const std::string& string)
-{
-	if (string == "any")
-	{
-		value = std::nullopt;
-	}
-	else if (string != "")
-	{
-		value = std::stoull(string, nullptr, 0);
-		;
-	}
-	else
-	{
-		value = std::nullopt;
-	}
-}
+#if defined(USE_FROM_CHARS)
+#include <charconv>
+#else
+#include <sstream>
+#endif
 
-void fillValue(std::optional<uint32_t>& value, const std::string& string)
+template<typename T>
+static void fill(T& value, const std::string& str)
 {
-	if (string == "any")
+	if constexpr (std::is_same_v<T, bool>)
 	{
-		value = std::nullopt;
+		if (str == "true")
+			value = true;
+		else if (str == "false")
+			value = false;
+		else
+			throw std::invalid_argument("Invalid boolean value");
 	}
-	else if (string != "")
+	else if constexpr (std::is_integral_v<T> || std::is_floating_point_v<T>)
 	{
-		value = std::stoull(string, nullptr, 0);
-		;
+#ifdef USE_FROM_CHARS
+		auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), value);
+		if (ec != std::errc{})
+			throw std::invalid_argument("Invalid numeric value: '" + str + "'");
+#else
+		std::istringstream iss(str);
+		if (!(iss >> value) || !iss.eof())
+			throw std::invalid_argument("Invalid numeric value: '" + str + "'");
+#endif
 	}
-	else
+	else if constexpr (traits::is_optional_v<T>)
 	{
-		value = std::nullopt;
-	}
-}
-
-template<typename TArg>
-void fillValue(std::optional<TArg>& value, const std::string& string)
-{
-	if (string == "any")
-	{
-		value = std::nullopt;
-	}
-	else if (string != "")
-	{
-		value = string;
-	}
-	else
-	{
-		value = std::nullopt;
-	}
-}
-
-void fillValue(bool& value, const std::string& string)
-{
-	if (string == "false" || string == "true")
-	{
-		value = string == "true";
-	}
-	else
-	{
-		throw std::string("invalid argument, must be true or false");
-	}
-}
-
-void fillValue(uint8_t& value, const std::string& string)
-{
-	value = std::stoull(string, nullptr, 0);
-}
-
-void fillValue(uint16_t& value, const std::string& string)
-{
-	value = std::stoull(string, nullptr, 0);
-}
-
-void fillValue(uint32_t& value, const std::string& string)
-{
-	value = std::stoull(string, nullptr, 0);
-}
-
-template<typename TArg>
-void fillValue(TArg& value, const std::string& string)
-{
-	value = string;
-}
-
-template<typename TArg>
-void fillValue(std::optional<TArg>& value)
-{
-	value = std::nullopt;
-}
-
-template<typename TArg>
-void fillValue([[maybe_unused]] TArg& value)
-{
-	throw std::string("invalid arguments count");
-}
-
-template<size_t TIndex,
-         size_t TSize,
-         typename TTuple>
-void fillTuple(TTuple& tuple, const std::vector<std::string>& stringArgs)
-{
-	if constexpr (TIndex < TSize)
-	{
-		if (TIndex < stringArgs.size())
+		if (str == "any" || str.empty())
 		{
-			fillValue(std::get<TIndex>(tuple), stringArgs[TIndex]);
+			value.reset();
 		}
 		else
 		{
-			fillValue(std::get<TIndex>(tuple));
+			typename T::value_type temp;
+			fill(temp, str);
+			value = std::move(temp);
 		}
-
-		fillTuple<TIndex + 1, TSize>(tuple, stringArgs);
+	}
+	else
+	{
+		value = str;
 	}
 }
 
-template<typename... TArgs>
-void call(void (*func)(TArgs... args),
-          const std::vector<std::string>& stringArgs)
+// Fill a tuple with values from a vector of strings
+template<typename Tuple, std::size_t... Is>
+static void fillTupleImpl(Tuple& tuple, const std::vector<std::string>& args, std::index_sequence<Is...>)
 {
-	if (stringArgs.size() > sizeof...(TArgs))
+	(..., fill(std::get<Is>(tuple), Is < args.size() ? args[Is] : std::string{}));
+}
+
+template<typename... Args>
+static void fillTuple(std::tuple<Args...>& tuple, const std::vector<std::string>& args)
+{
+	fillTupleImpl(tuple, args, std::index_sequence_for<Args...>{});
+}
+
+// Call function using string arguments
+template<typename F>
+inline void Call(F&& func, const std::vector<std::string>& string_args)
+{
+	using ArgsTuple = typename traits::function<F>::args;
+	constexpr auto arity = std::tuple_size_v<ArgsTuple>;
+
+	if (string_args.size() > arity)
 	{
-		throw std::string("invalid arguments count: '") + std::to_string(stringArgs.size()) + "', need: '" + std::to_string(sizeof...(TArgs)) + "'";
+		throw std::invalid_argument("Invalid arguments count: '" + std::to_string(string_args.size()) +
+		                            "', expected at most: '" + std::to_string(arity) + "'");
 	}
-	std::tuple<std::decay_t<TArgs>...> tuple;
-	fillTuple<0, sizeof...(TArgs)>(tuple, stringArgs);
-	std::apply(func, tuple);
+
+	utils::decay_tuple<ArgsTuple> args_tuple;
+	fillTuple(args_tuple, string_args);
+	std::apply(std::forward<F>(func), args_tuple);
 }
 
 void OpenSharedMemoryDataplaneBuffers(common::sdp::DataPlaneInSharedMemory& sdp_data, bool open_workers_data)
