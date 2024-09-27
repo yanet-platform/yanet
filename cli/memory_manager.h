@@ -79,7 +79,7 @@ void group()
 		if (memory_group.limit)
 		{
 			maximum = memory_group.limit;
-			percent = to_percent(group_total, memory_group.limit);
+			percent = utils::to_percent(group_total, memory_group.limit);
 		}
 
 		table.insert(memory_group.name,
