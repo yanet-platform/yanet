@@ -103,6 +103,33 @@ struct alignas(2 * RTE_CACHE_LINE_SIZE) tsc_deltas
 
 		tsc_start = tsc_end;
 	}
+
+	[[nodiscard]] auto as_tuple() const
+	{
+		return std::tie(logicalPort_ingress_handle,
+		                acl_ingress_handle4,
+		                acl_ingress_handle6,
+		                tun64_ipv4_handle,
+		                tun64_ipv6_handle,
+		                route_handle4,
+		                route_handle6,
+		                decap_handle,
+		                nat64stateful_lan_handle,
+		                nat64stateful_wan_handle,
+		                nat64stateless_egress_handle,
+		                nat64stateless_ingress_handle,
+		                nat46clat_lan_handle,
+		                nat46clat_wan_handle,
+		                balancer_handle,
+		                balancer_icmp_reply_handle,
+		                balancer_icmp_forward_handle,
+		                route_tunnel_handle4,
+		                route_tunnel_handle6,
+		                acl_egress_handle4,
+		                acl_egress_handle6,
+		                logicalPort_egress_handle,
+		                controlPlane_handle);
+	}
 };
 
 static_assert(sizeof(tsc_deltas) <= 8 * RTE_CACHE_LINE_SIZE, "tsc_deltas size exceeds cache line size");
