@@ -4,6 +4,7 @@
 
 #include "common/icontrolplane.h"
 
+#include "common/utils.h"
 #include "helper.h"
 
 namespace route
@@ -155,19 +156,13 @@ void lookup(const std::string& route_name,
 	{
 		const auto& [ingress_physical_ports, prefix, nexthop, label, egress_interface, peer, weight_percent] = item;
 
-		double percent = (double)100.0 * weight_percent;
-
-		std::stringstream stream;
-		stream << std::fixed << std::setprecision(2) << percent;
-		std::string percent_string = stream.str();
-
 		table.insert(ingress_physical_ports,
 		             prefix,
 		             nexthop.is_default() ? std::string("") : nexthop.toString(),
 		             label,
 		             egress_interface,
 		             peer,
-		             percent_string);
+		             utils::to_percent(weight_percent));
 	}
 
 	table.print();
@@ -192,18 +187,12 @@ void get(const std::string& route_name,
 		const auto& [ingress_physical_ports, prefix, nexthop, label, egress_interface, peer, weight_percent] = item;
 		YANET_GCC_BUG_UNUSED(prefix);
 
-		double percent = (double)100.0 * weight_percent;
-
-		std::stringstream stream;
-		stream << std::fixed << std::setprecision(2) << percent;
-		std::string percent_string = stream.str();
-
 		table.insert(ingress_physical_ports,
 		             nexthop.is_default() ? std::string("") : nexthop.toString(),
 		             label,
 		             egress_interface,
 		             peer,
-		             percent_string);
+		             utils::to_percent(weight_percent));
 	}
 
 	table.print();

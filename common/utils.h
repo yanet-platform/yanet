@@ -5,6 +5,7 @@
 #include <iterator>
 #include <optional>
 #include <set>
+#include <iomanip>
 #include <type_traits>
 #include <variant>
 #include <vector>
@@ -80,6 +81,23 @@ struct is_set<std::set<Key, Compare, Allocator>> : std::true_type
 
 template<typename T>
 inline constexpr bool is_set_v = is_set<T>::value;
+
+// Utility to calculate percentage
+// TODO C++20: use std::type_identity_t to establish non-deduced context
+// Will allow to do `to_percent(4.2, 1)`
+template<typename T>
+inline std::string to_percent(T current, T maximum = 1)
+{
+	double percent = 0.0;
+	if (maximum != 0)
+	{
+		percent = static_cast<double>(current) / static_cast<double>(maximum) * 100.0;
+	}
+
+	std::ostringstream stream;
+	stream << std::fixed << std::setprecision(2) << percent;
+	return stream.str();
+}
 
 }
 // namespace utils
