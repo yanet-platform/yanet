@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <tuple>
 #include <type_traits>
 #include <variant>
@@ -125,5 +126,57 @@ private:
 public:
 	static constexpr std::size_t value = Helper<0>::value();
 };
+
+/**
+ * @brief Helper to get the size of the first tuple in a parameter pack.
+ *
+ * This function extracts the size of the first tuple in the parameter pack `Tuples`.
+ *
+ * @tparam Tuples The types of the tuples.
+ * @return The size of the first tuple.
+ */
+template<typename... Tuples>
+constexpr std::size_t get_first_tuple_size()
+{
+	static_assert(sizeof...(Tuples) > 0, "At least one tuple is required.");
+	return std::tuple_size_v<std::decay_t<std::tuple_element_t<0, std::tuple<Tuples...>>>>;
+}
+
+template<std::size_t I, std::size_t N, typename Func, typename... Tuples>
+static void zip_apply_helper(Func&& f, Tuples&&... tuples)
+{
+	if constexpr (I < N)
+	{
+		f(std::get<I>(std::forward<Tuples>(tuples))...);
+		zip_apply_helper<I + 1, N>(std::forward<Func>(f), std::forward<Tuples>(tuples)...);
+	}
+}
+
+/**
+ * @brief Applies a function to corresponding elements of multiple tuples.
+ *
+ * The function `f` should be callable with the elements of the tuples at each index.
+ * This function works with any number of tuples, as long as they are all the same size.
+ *
+ * Example:
+ * ```
+ * auto t1 = std::make_tuple(1, 2, 3);
+ * auto t2 = std::make_tuple(4, 5, 6);
+ * zip_apply([](auto a, auto b) {  do something with a and b }, t1, t2);
+ * ```
+ *
+ * @tparam Func The type of the function to apply.
+ * @tparam Tuples The types of the tuples.
+ * @param f The function to apply.
+ * @param tuples The tuples to iterate over.
+ */
+template<typename Func, typename... Tuples>
+inline void zip_apply(Func&& f, Tuples&&... tuples)
+{
+	constexpr std::size_t tuple_size = get_first_tuple_size<Tuples...>();
+	static_assert((... && (std::tuple_size_v<std::decay_t<Tuples>> == tuple_size)), "All tuples must have the same size.");
+
+	zip_apply_helper<0, tuple_size>(std::forward<Func>(f), std::forward<Tuples>(tuples)...);
+}
 
 } // namespace utils
