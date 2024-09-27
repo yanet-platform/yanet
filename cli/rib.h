@@ -208,25 +208,10 @@ void get(const std::string& vrf,
 	table.print();
 }
 
-std::vector<std::string> split(const std::string& string,
-                               char delimiter = ' ')
-{
-	std::vector<std::string> result;
-
-	std::stringstream stream(string);
-	std::string item;
-	while (std::getline(stream, item, delimiter))
-	{
-		result.emplace_back(item);
-	}
-
-	return result;
-}
-
 void convert(const std::string& string,
              std::tuple<std::string, common::ip_address_t, std::vector<uint32_t>>& result)
 {
-	auto nexthop_label_string = split(string, '+');
+	auto nexthop_label_string = utils::split(string, '+');
 
 	if (nexthop_label_string.size() == 1)
 	{

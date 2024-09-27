@@ -3,7 +3,6 @@
 #include <array>
 #include <cstdio>
 #include <map>
-#include <sstream>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -13,22 +12,6 @@
 
 #include "common/sdpclient.h"
 #include "converter.h"
-
-
-std::vector<std::string> split(const char* string,
-                               const char delimiter)
-{
-	std::vector<std::string> result;
-	std::stringstream ss(string);
-
-	std::string part;
-	while (std::getline(ss, part, delimiter))
-	{
-		result.emplace_back(part);
-	}
-
-	return result;
-}
 
 void fillValue(std::optional<uint8_t>& value, const std::string& string)
 {
@@ -241,7 +224,7 @@ public:
 		std::map<unsigned int, unsigned int> format_keys_i;
 		if (const char* format_keys_pointer = std::getenv("YANET_FORMAT_KEYS"))
 		{
-			format_keys = split(format_keys_pointer, ',');
+			format_keys = utils::split(format_keys_pointer, ',');
 		}
 
 		std::vector<std::string> keys;
@@ -313,7 +296,7 @@ public:
 		bool print_selected_cols_only = false;
 		if (const char* columns_pointer = std::getenv("YANET_FORMAT_COLUMNS"))
 		{
-			user_selected_col_names = split(columns_pointer, ',');
+			user_selected_col_names = utils::split(columns_pointer, ',');
 			print_selected_cols_only = true;
 		}
 

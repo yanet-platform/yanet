@@ -20,6 +20,7 @@
 #include "common.h"
 
 #include "common/sdpclient.h"
+#include "common/utils.h"
 
 #define MAX_PACK_LEN 16384
 #define SOCK_DEV_PREFIX "sock_dev:"
@@ -739,21 +740,6 @@ void tAutotest::recvThread(std::string interfaceName,
 	}
 
 	unlink(pcapDumper.path().data());
-}
-
-std::vector<std::string> split(const std::string& string,
-                               char delimiter = ' ')
-{
-	std::vector<std::string> result;
-
-	std::stringstream stream(string);
-	std::string item;
-	while (std::getline(stream, item, delimiter))
-	{
-		result.emplace_back(item);
-	}
-
-	return result;
 }
 
 bool tAutotest::step_ipv4Update(const YAML::Node& yamlStep)
@@ -1535,7 +1521,7 @@ void tAutotest::convert_ipv4Update(const std::string& string)
 
 	convert_ipv4Remove(prefix);
 
-	for (const auto& nexthop : split(nexthops))
+	for (const auto& nexthop : utils::split(nexthops, ' '))
 	{
 		common::icp::rib_update::insert request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
 		std::get<3>(request)[attribute_default]["ipv4"][nexthop].emplace_back(prefix,
@@ -1572,7 +1558,7 @@ void tAutotest::convert_ipv4LabelledUpdate(const std::string& string)
 
 	convert_ipv4LabelledRemove(prefix);
 
-	for (const auto& nexthop_label : split(nexthops))
+	for (const auto& nexthop_label : utils::split(nexthops, ' '))
 	{
 		std::string nexthop = nexthop_label.substr(0, nexthop_label.find(":"));
 		std::string label = nexthop_label.substr(nexthop_label.find(":") + 1);
@@ -1616,7 +1602,7 @@ void tAutotest::convert_ipv6Update(const std::string& string)
 	std::string prefix = string.substr(0, string.find(" -> "));
 	std::string nexthops = string.substr(string.find(" -> ") + 4);
 
-	for (const auto& nexthop : split(nexthops))
+	for (const auto& nexthop : utils::split(nexthops, ' '))
 	{
 		common::icp::rib_update::insert request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
 		std::get<3>(request)[attribute_default]["ipv6"][nexthop].emplace_back(prefix,
@@ -1633,7 +1619,7 @@ void tAutotest::convert_ipv6LabelledUpdate(const std::string& string)
 	std::string prefix = string.substr(0, string.find(" -> "));
 	std::string nexthops = string.substr(string.find(" -> ") + 4);
 
-	for (const auto& nexthop_label : split(nexthops))
+	for (const auto& nexthop_label : utils::split(nexthops, ' '))
 	{
 		std::string nexthop = nexthop_label.substr(0, nexthop_label.find("|"));
 		std::string label = nexthop_label.substr(nexthop_label.find("|") + 1);
