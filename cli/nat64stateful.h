@@ -3,7 +3,7 @@
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace nat64stateful
 {
@@ -13,7 +13,7 @@ void summary()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.nat64stateful_config();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "ipv4_pool_size",
 	             "next_module");
@@ -39,7 +39,7 @@ void announce()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.nat64stateful_announce();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "announces");
 
@@ -152,7 +152,7 @@ void state(std::optional<std::string> module)
 	interface::dataPlane dataplane;
 	const auto response = dataplane.nat64stateful_state({module_id});
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "ipv6_source",
 	             "ipv4_source",
