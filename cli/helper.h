@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/sdpclient.h"
+#include "table_printer.h"
 
 void fillValue(std::optional<uint8_t>& value, const std::string& string)
 {
@@ -161,4 +162,14 @@ void OpenSharedMemoryDataplaneBuffers(common::sdp::DataPlaneInSharedMemory& sdp_
 		YANET_LOG_ERROR("Error openning shared memory dataplane buffers\n");
 		std::exit(1);
 	}
+}
+
+template<typename Container>
+inline void FillAndPrintTable(const std::initializer_list<std::string_view>& headers, const Container& data, const converter::config_t config = {})
+{
+	TablePrinter table(config);
+
+	table.insert_row(headers.begin(), headers.end());
+	table.insert(data.begin(), data.end());
+	table.Print();
 }

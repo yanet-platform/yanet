@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cli/helper.h"
 #include "common/icontrolplane.h"
 
 #include "table_printer.h"
@@ -52,39 +53,21 @@ void unwind(const std::string& in_module,
 	                                         transport_flags,
 	                                         recordstate});
 
-	TablePrinter table({.optional_null = "any"});
-	table.insert("module",
-	             "direction",
-	             "network_source",
-	             "network_destination",
-	             "fragment",
-	             "protocol",
-	             "transport_source",
-	             "transport_destination",
-	             "transport_flags",
-	             "recordstate",
-	             "next_module",
-	             "ids",
-	             "log");
-
-	for (const auto& [module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, recordstate, next_module, ids, log] : response)
-	{
-		table.insert(module,
-		             direction,
-		             network_source,
-		             network_destination,
-		             fragment,
-		             protocol,
-		             transport_source,
-		             transport_destination,
-		             transport_flags,
-		             recordstate,
-		             next_module,
-		             ids,
-		             log);
-	}
-
-	table.print();
+	FillAndPrintTable({"module",
+	                   "direction",
+	                   "network_source",
+	                   "network_destination",
+	                   "fragment",
+	                   "protocol",
+	                   "transport_source",
+	                   "transport_destination",
+	                   "transport_flags",
+	                   "recordstate",
+	                   "next_module",
+	                   "ids",
+	                   "log"},
+	                  response,
+	                  {.optional_null = "any"});
 }
 
 void lookup(std::optional<std::string> module,
@@ -113,19 +96,7 @@ void lookup(std::optional<std::string> module,
 	                                         transport_source,
 	                                         transport_destination});
 
-	TablePrinter table;
-	table.insert("ruleno",
-	             "label",
-	             "rule");
-
-	for (const auto& [ruleno, label, rule] : response)
-	{
-		table.insert(ruleno,
-		             label,
-		             rule);
-	}
-
-	table.print();
+	FillAndPrintTable({"ruleno", "label", "rule"}, response);
 }
 
 }

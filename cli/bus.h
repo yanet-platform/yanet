@@ -1,8 +1,8 @@
 #pragma once
 
 #include "helper.h"
-#include "table_printer.h"
 #include "influxdb_format.h"
+#include "table_printer.h"
 
 namespace bus
 {
@@ -80,16 +80,16 @@ inline void bus_requests()
 	auto requests = get_bus_requests(sdp_data);
 
 	TablePrinter table;
-	table.insert("request", "count", "duration_ms");
+	table.insert_row("request", "count", "duration_ms");
 	for (const auto& [request, count, duration] : requests)
 	{
 		if ((count != 0) || (duration != 0))
 		{
-			table.insert(request, count, duration);
+			table.insert_row(request, count, duration);
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline std::vector<std::pair<std::string, uint64_t>> get_bus_errors(const common::sdp::DataPlaneInSharedMemory& sdp_data)
@@ -120,14 +120,7 @@ inline void bus_errors()
 	OpenSharedMemoryDataplaneBuffers(sdp_data, false);
 	auto errors = get_bus_errors(sdp_data);
 
-	TablePrinter table;
-	table.insert("error", "count");
-	for (const auto& [error, count] : errors)
-	{
-		table.insert(error, count);
-	}
-
-	table.print();
+	FillAndPrintTable({"error", "count"}, errors);
 }
 
 inline void bus_telegraf()

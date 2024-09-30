@@ -15,25 +15,19 @@ void show()
 	YANET_GCC_BUG_UNUSED(response_memory_group);
 
 	TablePrinter table;
-	table.insert("name",
-	             "socket_id",
-	             "current");
+	table.insert_row("name", "socket_id", "current");
 
 	uint64_t total = 0;
 	for (const auto& [name, socket_id, current] : response_objects)
 	{
 		total += current;
 
-		table.insert(name,
-		             socket_id,
-		             current);
+		table.insert_row(name, socket_id, current);
 	}
 
-	table.insert("total",
-	             "n/s",
-	             total);
+	table.insert_row("total", "n/s", total);
 
-	table.print();
+	table.Print();
 }
 
 void group()
@@ -44,10 +38,7 @@ void group()
 	const auto& [response_memory_group, response_objects] = response;
 
 	TablePrinter table;
-	table.insert("group",
-	             "current",
-	             "maximum",
-	             "percent");
+	table.insert_row("group", "current", "maximum", "percent");
 
 	std::map<std::string, ///< object_name
 	         common::uint64> ///< current
@@ -57,8 +48,7 @@ void group()
 	{
 		YANET_GCC_BUG_UNUSED(socket_id);
 
-		currents[name] = std::max(currents[name].value,
-		                          current);
+		currents[name] = std::max(currents[name].value, current);
 	}
 
 	response_memory_group.for_each([&](const auto& memory_group,
@@ -82,13 +72,9 @@ void group()
 			percent = utils::to_percent(group_total, memory_group.limit);
 		}
 
-		table.insert(memory_group.name,
-		             group_total,
-		             maximum,
-		             percent);
+		table.insert_row(memory_group.name, group_total, maximum, percent);
 	});
 
-	table.print();
+	table.Print();
 }
-
 }
