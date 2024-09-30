@@ -2,7 +2,7 @@
 
 #include "common/icontrolplane.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace dregress
 {
@@ -12,7 +12,7 @@ void summary()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.dregress_config();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "ipv6_sources",
 	             "ipv6_destination",
@@ -42,7 +42,7 @@ void announce()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.dregress_config();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "announces");
 

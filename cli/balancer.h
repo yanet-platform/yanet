@@ -5,7 +5,7 @@
 #include "common/iproto_controlplane.h"
 #include "common/type.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace balancer
 {
@@ -15,7 +15,7 @@ void summary()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.balancer_summary();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "services",
 	             "reals_enabled",
@@ -66,7 +66,7 @@ void service(std::string module_string,
 	interface::dataPlane dataplane;
 	auto balancer_service_connections = dataplane.balancer_service_connections();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "virtual_ip",
 	             "proto",
@@ -201,7 +201,7 @@ void real_find(std::string module_string,
 	interface::dataPlane dataplane;
 	auto balancer_real_connections = dataplane.balancer_real_connections();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "virtual_ip",
 	             "proto",
@@ -350,7 +350,7 @@ void state(std::string module,
 		}
 	}
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "virtual_ip",
 	             "proto",
@@ -489,7 +489,7 @@ void announce()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.balancer_announce();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "announces");
 
