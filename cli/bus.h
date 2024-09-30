@@ -1,6 +1,7 @@
 #pragma once
 
 #include "helper.h"
+#include "table_printer.h"
 #include "influxdb_format.h"
 
 namespace bus
@@ -78,7 +79,7 @@ inline void bus_requests()
 	OpenSharedMemoryDataplaneBuffers(sdp_data, false);
 	auto requests = get_bus_requests(sdp_data);
 
-	table_t table;
+	TablePrinter table;
 	table.insert("request", "count", "duration_ms");
 	for (const auto& [request, count, duration] : requests)
 	{
@@ -119,7 +120,7 @@ inline void bus_errors()
 	OpenSharedMemoryDataplaneBuffers(sdp_data, false);
 	auto errors = get_bus_errors(sdp_data);
 
-	table_t table;
+	TablePrinter table;
 	table.insert("error", "count");
 	for (const auto& [error, count] : errors)
 	{

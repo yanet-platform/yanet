@@ -2,7 +2,7 @@
 
 #include "common/idataplane.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace neighbor
 {
@@ -12,7 +12,7 @@ void show()
 	interface::dataPlane dataplane;
 	const auto response = dataplane.neighbor_show();
 
-	table_t table({.optional_null = "static"});
+	TablePrinter table({.optional_null = "static"});
 	table.insert("route_name",
 	             "interface_name",
 	             "ip_address",

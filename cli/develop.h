@@ -14,7 +14,7 @@
 #include "common/tsc_deltas.h"
 #include "common/tuple.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace develop::dataplane
 {
@@ -148,7 +148,7 @@ inline void counter(uint32_t counter_id, const std::optional<uint32_t>& range_si
 
 	const auto& response = common::sdp::SdpClient::GetCounters(counter_ids);
 
-	table_t table;
+	TablePrinter table;
 	table.insert("counter_id", "value");
 
 	for (uint32_t i = 0; i < counter_ids.size(); i++)
@@ -313,7 +313,7 @@ private:
 	};
 
 	std::vector<std::tuple<uint32_t, tsc_deltas*, tsc_deltas, overflow_store>> worker_counters;
-	table_t table;
+	TablePrinter table;
 
 	void insert_header()
 	{

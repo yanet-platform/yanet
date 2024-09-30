@@ -10,7 +10,7 @@
 #include "common/tsc_deltas.h"
 #include "common/version.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace show
 {
@@ -20,7 +20,7 @@ inline void physicalPort()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getPhysicalPorts();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("moduleName",
 	             "link",
 	             "speed",
@@ -75,7 +75,7 @@ inline void logicalPort()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getLogicalPorts();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("moduleName",
 	             "physicalPortName",
 	             "vlanId",
@@ -142,7 +142,7 @@ inline void summary(std::optional<std::string> module)
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.tun64_tunnels();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "source_address",
 	             "prefixes",
@@ -174,7 +174,7 @@ inline void announce(std::optional<std::string> module)
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.tun64_prefixes();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "prefix",
 	             "announces");
@@ -201,7 +201,7 @@ inline void mappings(std::optional<std::string> module)
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.tun64_mappings();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "ipv4Address",
 	             "ipv6Address",
@@ -235,7 +235,7 @@ inline void summary()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getDecaps();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "prefixes",
 	             "DSCP",
@@ -275,7 +275,7 @@ inline void announce()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getDecapPrefixes();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "prefix",
 	             "announces");
@@ -303,7 +303,7 @@ inline void summary()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getNat64statelesses();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "translations",
 	             "WKP",
@@ -329,7 +329,7 @@ inline void translation()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getNat64statelessTranslations();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("moduleName",
 	             "ipv6Address",
 	             "ipv6DestinationAddress",
@@ -362,7 +362,7 @@ inline void announce()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getNat64statelessPrefixes();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "prefix",
 	             "announces");
@@ -509,7 +509,7 @@ static void list_fw_rules(unsigned int mask, bool list)
 	common::icp::getFwLabels::response labels;
 	interface::controlPlane controlPlane;
 
-	table_t table;
+	TablePrinter table;
 	if (list)
 	{
 		table.insert("id",
@@ -625,7 +625,7 @@ inline void fwlist(std::optional<std::string> str)
 
 inline void errors()
 {
-	table_t table;
+	TablePrinter table;
 	table.insert("name", "counter");
 
 	interface::dataPlane dataPlane;
@@ -644,7 +644,7 @@ inline void samples()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.getSamples();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("in_iface",
 	             "out_iface",
 	             "proto",
@@ -710,7 +710,7 @@ inline void values()
 	interface::controlPlane controlplane;
 	const auto controlplane_values = controlplane.controlplane_values();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("application",
 	             "name",
 	             "value");
@@ -730,7 +730,7 @@ inline void durations()
 	interface::controlPlane controlplane;
 	const auto controlplane_durations = controlplane.controlplane_durations();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("application",
 	             "name",
 	             "duration");
@@ -747,7 +747,7 @@ inline void durations()
 
 inline void version()
 {
-	table_t table;
+	TablePrinter table;
 	table.insert("application",
 	             "version",
 	             "revision",
@@ -815,7 +815,7 @@ inline void counter_by_name(std::string counter_name,
 		}
 	}
 
-	table_t table;
+	TablePrinter table;
 	table.insert("core_id",
 	             "counter_value");
 
@@ -832,7 +832,7 @@ inline void shm_info()
 	interface::dataPlane dataplane;
 	const auto response = dataplane.get_shm_info();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("ring name",
 	             "dump tag",
 	             "dump size",
@@ -855,7 +855,7 @@ void shm_tsc_info()
 	interface::dataPlane dataplane;
 	const auto response = dataplane.get_shm_tsc_info();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("core id",
 	             "socket id",
 	             "ipc key",

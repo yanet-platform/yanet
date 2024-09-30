@@ -4,7 +4,7 @@
 
 #include "common/icontrolplane.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace rib
 {
@@ -14,7 +14,7 @@ void summary()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.rib_summary();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("vrf",
 	             "priority",
 	             "protocol",
@@ -47,7 +47,7 @@ void prefixes()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.rib_prefixes();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("vrf",
 	             "priority",
 	             "prefix",
@@ -103,7 +103,7 @@ void lookup(const std::string& vrf,
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.rib_lookup({vrf, address});
 
-	table_t table;
+	TablePrinter table;
 	table.insert("vrf",
 	             "priority",
 	             "prefix",
@@ -159,7 +159,7 @@ void get(const std::string& vrf,
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.rib_get({vrf, prefix});
 
-	table_t table;
+	TablePrinter table;
 	table.insert("vrf",
 	             "priority",
 	             "protocol",

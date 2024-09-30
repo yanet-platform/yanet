@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/idataplane.h"
-#include "helper.h"
+#include "table_printer.h"
 
 namespace memory_manager
 {
@@ -14,7 +14,7 @@ void show()
 	const auto& [response_memory_group, response_objects] = response;
 	YANET_GCC_BUG_UNUSED(response_memory_group);
 
-	table_t table;
+	TablePrinter table;
 	table.insert("name",
 	             "socket_id",
 	             "current");
@@ -43,7 +43,7 @@ void group()
 	const auto response = dataplane.memory_manager_stats();
 	const auto& [response_memory_group, response_objects] = response;
 
-	table_t table;
+	TablePrinter table;
 	table.insert("group",
 	             "current",
 	             "maximum",

@@ -1,11 +1,9 @@
 #pragma once
 
-#include <iomanip>
-
 #include "common/icontrolplane.h"
 
 #include "common/utils.h"
-#include "helper.h"
+#include "table_printer.h"
 
 namespace route
 {
@@ -15,7 +13,7 @@ void summary()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.route_summary();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "vrf");
 
@@ -33,7 +31,7 @@ void interface()
 	interface::controlPlane controlplane;
 	const auto response = controlplane.route_interface();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "interface",
 	             "address",
@@ -67,7 +65,7 @@ void lookup(const std::string& route_name,
 	interface::controlPlane controlplane;
 	auto response = controlplane.route_lookup({route_name, address});
 
-	table_t table;
+	TablePrinter table;
 	table.insert("ingress_physical_ports",
 	             "prefix",
 	             "nexthop",
@@ -94,7 +92,7 @@ void get(const std::string& route_name,
 	interface::controlPlane controlplane;
 	auto response = controlplane.route_get({route_name, prefix});
 
-	table_t table;
+	TablePrinter table;
 	table.insert("ingress_physical_ports",
 	             "nexthop",
 	             "egress_interface",
@@ -119,7 +117,7 @@ void counters()
 	interface::controlPlane controlplane;
 	auto response = controlplane.route_counters();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("link",
 	             "nexthop",
 	             "prefix",
@@ -143,7 +141,7 @@ void lookup(const std::string& route_name,
 	interface::controlPlane controlplane;
 	auto response = controlplane.route_tunnel_lookup({route_name, address});
 
-	table_t table;
+	TablePrinter table;
 	table.insert("ingress_physical_ports",
 	             "prefix",
 	             "nexthop",
@@ -174,7 +172,7 @@ void get(const std::string& route_name,
 	interface::controlPlane controlplane;
 	auto response = controlplane.route_tunnel_get({route_name, prefix});
 
-	table_t table;
+	TablePrinter table;
 	table.insert("ingress_physical_ports",
 	             "nexthop",
 	             "label",
@@ -203,7 +201,7 @@ void counters()
 	interface::controlPlane controlplane;
 	auto response = controlplane.route_tunnel_counters();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("link",
 	             "nexthop",
 	             "counts",

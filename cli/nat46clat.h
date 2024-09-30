@@ -2,7 +2,7 @@
 
 #include "common/icontrolplane.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace nat46clat
 {
@@ -12,7 +12,7 @@ void summary()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.nat46clat_config();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "ipv6_source",
 	             "ipv6_destination",
@@ -34,7 +34,7 @@ void announce()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.nat46clat_announce();
 
-	table_t table;
+	TablePrinter table;
 	table.insert("module",
 	             "announces");
 

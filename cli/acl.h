@@ -2,7 +2,7 @@
 
 #include "common/icontrolplane.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace acl
 {
@@ -52,7 +52,7 @@ void unwind(const std::string& in_module,
 	                                         transport_flags,
 	                                         recordstate});
 
-	table_t table({.optional_null = "any"});
+	TablePrinter table({.optional_null = "any"});
 	table.insert("module",
 	             "direction",
 	             "network_source",
@@ -113,7 +113,7 @@ void lookup(std::optional<std::string> module,
 	                                         transport_source,
 	                                         transport_destination});
 
-	table_t table;
+	TablePrinter table;
 	table.insert("ruleno",
 	             "label",
 	             "rule");
