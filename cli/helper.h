@@ -230,31 +230,24 @@ class table_t
 {
 public:
 	table_t(const converter::config_t config = {}) :
-	        config(config)
-	{
-	}
+	        config(config) {}
 
 	template<typename... Args>
 	void insert(const Args&... args)
 	{
 		std::vector<std::string> row = {converter::to_string(args, config)...};
+		insert_row(row);
+	}
 
-		if (row.size() > columnLengths.size())
+	template<typename Iterator, typename = typename std::iterator_traits<Iterator>::iterator_category>
+	void insert(Iterator begin, Iterator end)
+	{
+		std::vector<std::string> row;
+		for (auto it = begin; it != end; ++it)
 		{
-			columnLengths.resize(row.size(), 0);
+			row.push_back(converter::to_string(*it, config));
 		}
-
-		for (uint32_t string_i = 0;
-		     string_i < row.size();
-		     string_i++)
-		{
-			if (columnLengths[string_i] < row[string_i].size())
-			{
-				columnLengths[string_i] = row[string_i].size();
-			}
-		}
-
-		table.emplace_back(row);
+		insert_row(row);
 	}
 
 	void print_json()
@@ -461,7 +454,25 @@ public:
 		table.clear();
 	}
 
-protected:
+private:
+	void insert_row(const std::vector<std::string>& row)
+	{
+		if (row.size() > columnLengths.size())
+		{
+			columnLengths.resize(row.size(), 0);
+		}
+
+		for (uint32_t string_i = 0; string_i < row.size(); ++string_i)
+		{
+			if (columnLengths[string_i] < row[string_i].size())
+			{
+				columnLengths[string_i] = row[string_i].size();
+			}
+		}
+
+		table.emplace_back(row);
+	}
+
 	converter::config_t config;
 	std::vector<std::vector<std::string>> table;
 	std::vector<uint32_t> columnLengths;
