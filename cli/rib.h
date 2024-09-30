@@ -15,31 +15,31 @@ void summary()
 	const auto response = controlPlane.rib_summary();
 
 	TablePrinter table;
-	table.insert("vrf",
-	             "priority",
-	             "protocol",
-	             "peer",
-	             "table_name",
-	             "prefixes",
-	             "paths",
-	             "eor");
+	table.insert_row("vrf",
+	                 "priority",
+	                 "protocol",
+	                 "peer",
+	                 "table_name",
+	                 "prefixes",
+	                 "paths",
+	                 "eor");
 
 	for (const auto& [key, value] : response)
 	{
 		const auto& [vrf, priority, protocol, peer, table_name] = key;
 		const auto& [prefixes, paths, eor] = value;
 
-		table.insert(vrf,
-		             priority,
-		             protocol,
-		             peer,
-		             table_name,
-		             prefixes,
-		             paths,
-		             (bool)eor);
+		table.insert_row(vrf,
+		                 priority,
+		                 protocol,
+		                 peer,
+		                 table_name,
+		                 prefixes,
+		                 paths,
+		                 (bool)eor);
 	}
 
-	table.print();
+	table.Print();
 }
 
 void prefixes()
@@ -48,21 +48,21 @@ void prefixes()
 	const auto response = controlPlane.rib_prefixes();
 
 	TablePrinter table;
-	table.insert("vrf",
-	             "priority",
-	             "prefix",
-	             "protocol",
-	             "peer",
-	             "table_name",
-	             "path_information",
-	             "nexthop",
-	             "labels",
-	             "local_preference",
-	             "aspath",
-	             "origin",
-	             "med",
-	             "communities",
-	             "large_communities");
+	table.insert_row("vrf",
+	                 "priority",
+	                 "prefix",
+	                 "protocol",
+	                 "peer",
+	                 "table_name",
+	                 "path_information",
+	                 "nexthop",
+	                 "labels",
+	                 "local_preference",
+	                 "aspath",
+	                 "origin",
+	                 "med",
+	                 "communities",
+	                 "large_communities");
 
 	for (const auto& [vrf_priority, prefix_nexthops] : response)
 	{
@@ -75,26 +75,26 @@ void prefixes()
 				const auto& [protocol, peer, table_name, path_information] = nexthop_key;
 				const auto& [nexthop, labels, origin, med, aspath, communities, large_communities, local_preference] = nexthop_value;
 
-				table.insert(vrf,
-				             priority,
-				             prefix,
-				             protocol,
-				             peer,
-				             table_name,
-				             path_information,
-				             nexthop,
-				             labels,
-				             local_preference,
-				             aspath,
-				             origin,
-				             med,
-				             communities,
-				             large_communities);
+				table.insert_row(vrf,
+				                 priority,
+				                 prefix,
+				                 protocol,
+				                 peer,
+				                 table_name,
+				                 path_information,
+				                 nexthop,
+				                 labels,
+				                 local_preference,
+				                 aspath,
+				                 origin,
+				                 med,
+				                 communities,
+				                 large_communities);
 			}
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 void lookup(const std::string& vrf,
@@ -104,21 +104,21 @@ void lookup(const std::string& vrf,
 	const auto response = controlPlane.rib_lookup({vrf, address});
 
 	TablePrinter table;
-	table.insert("vrf",
-	             "priority",
-	             "prefix",
-	             "protocol",
-	             "peer",
-	             "table_name",
-	             "path_information",
-	             "nexthop",
-	             "labels",
-	             "local_preference",
-	             "aspath",
-	             "origin",
-	             "med",
-	             "communities",
-	             "large_communities");
+	table.insert_row("vrf",
+	                 "priority",
+	                 "prefix",
+	                 "protocol",
+	                 "peer",
+	                 "table_name",
+	                 "path_information",
+	                 "nexthop",
+	                 "labels",
+	                 "local_preference",
+	                 "aspath",
+	                 "origin",
+	                 "med",
+	                 "communities",
+	                 "large_communities");
 
 	for (const auto& [vrf_priority, prefix_nexthops] : response)
 	{
@@ -131,26 +131,26 @@ void lookup(const std::string& vrf,
 				const auto& [protocol, peer, table_name, path_information] = nexthop_key;
 				const auto& [nexthop, labels, origin, med, aspath, communities, large_communities, local_preference] = nexthop_value;
 
-				table.insert(vrf,
-				             priority,
-				             prefix,
-				             protocol,
-				             peer,
-				             table_name,
-				             path_information,
-				             nexthop,
-				             labels,
-				             local_preference,
-				             aspath,
-				             origin,
-				             med,
-				             communities,
-				             large_communities);
+				table.insert_row(vrf,
+				                 priority,
+				                 prefix,
+				                 protocol,
+				                 peer,
+				                 table_name,
+				                 path_information,
+				                 nexthop,
+				                 labels,
+				                 local_preference,
+				                 aspath,
+				                 origin,
+				                 med,
+				                 communities,
+				                 large_communities);
 			}
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 void get(const std::string& vrf,
@@ -160,20 +160,20 @@ void get(const std::string& vrf,
 	const auto response = controlPlane.rib_get({vrf, prefix});
 
 	TablePrinter table;
-	table.insert("vrf",
-	             "priority",
-	             "protocol",
-	             "peer",
-	             "table_name",
-	             "path_information",
-	             "nexthop",
-	             "labels",
-	             "local_preference",
-	             "aspath",
-	             "origin",
-	             "med",
-	             "communities",
-	             "large_communities");
+	table.insert_row("vrf",
+	                 "priority",
+	                 "protocol",
+	                 "peer",
+	                 "table_name",
+	                 "path_information",
+	                 "nexthop",
+	                 "labels",
+	                 "local_preference",
+	                 "aspath",
+	                 "origin",
+	                 "med",
+	                 "communities",
+	                 "large_communities");
 
 	for (const auto& [vrf_priority, prefix_nexthops] : response)
 	{
@@ -187,25 +187,25 @@ void get(const std::string& vrf,
 				const auto& [nexthop, labels, origin, med, aspath, communities, large_communities, local_preference] = nexthop_value;
 				YANET_GCC_BUG_UNUSED(prefix);
 
-				table.insert(vrf,
-				             priority,
-				             protocol,
-				             peer,
-				             table_name,
-				             path_information,
-				             nexthop,
-				             labels,
-				             local_preference,
-				             aspath,
-				             origin,
-				             med,
-				             communities,
-				             large_communities);
+				table.insert_row(vrf,
+				                 priority,
+				                 protocol,
+				                 peer,
+				                 table_name,
+				                 path_information,
+				                 nexthop,
+				                 labels,
+				                 local_preference,
+				                 aspath,
+				                 origin,
+				                 med,
+				                 communities,
+				                 large_communities);
 			}
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 void convert(const std::string& string,

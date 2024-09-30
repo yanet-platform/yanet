@@ -153,10 +153,10 @@ inline void counter(uint32_t counter_id, const std::optional<uint32_t>& range_si
 
 	for (uint32_t i = 0; i < counter_ids.size(); i++)
 	{
-		table.insert(counter_ids[i], response[i]);
+		table.insert_row(counter_ids[i], response[i]);
 	}
 
-	table.print();
+	table.Print();
 }
 
 using namespace ::dataplane::perf;
@@ -222,7 +222,7 @@ struct tsc_monitoring_t
 
 			if (render_header)
 			{
-				table.render();
+				table.Render();
 			}
 
 			std::this_thread::sleep_for(std::chrono::milliseconds(250));
@@ -317,31 +317,31 @@ private:
 
 	void insert_header()
 	{
-		table.insert("core_id",
-		             "iter_num",
-		             "logicalPort_ingress",
-		             "acl_ingress4",
-		             "acl_ingress6",
-		             "tun64_ipv4",
-		             "tun64_ipv6",
-		             "route4",
-		             "route6",
-		             "decap",
-		             "nat64stateful_lan",
-		             "nat64stateful_wan",
-		             "nat64stateless_egress",
-		             "nat64stateless_ingress",
-		             "nat46clat_lan",
-		             "nat46clat_wan",
-		             "balancer",
-		             "balancer_icmp_reply",
-		             "balancer_icmp_forward",
-		             "route_tunnel4",
-		             "route_tunnel6",
-		             "acl_egress4",
-		             "acl_egress6",
-		             "logicalPort_egress",
-		             "controlPlane");
+		table.insert_row("core_id",
+		                 "iter_num",
+		                 "logicalPort_ingress",
+		                 "acl_ingress4",
+		                 "acl_ingress6",
+		                 "tun64_ipv4",
+		                 "tun64_ipv6",
+		                 "route4",
+		                 "route6",
+		                 "decap",
+		                 "nat64stateful_lan",
+		                 "nat64stateful_wan",
+		                 "nat64stateless_egress",
+		                 "nat64stateless_ingress",
+		                 "nat46clat_lan",
+		                 "nat46clat_wan",
+		                 "balancer",
+		                 "balancer_icmp_reply",
+		                 "balancer_icmp_forward",
+		                 "route_tunnel4",
+		                 "route_tunnel6",
+		                 "acl_egress4",
+		                 "acl_egress6",
+		                 "logicalPort_egress",
+		                 "controlPlane");
 	}
 
 	void insert_bin(const tsc_deltas& cnt, const overflow_store& of_store, int bin, uint32_t core_id)
@@ -363,7 +363,7 @@ private:
 
 		utils::zip_apply(op, of_store_tuple, cnt_tuple);
 
-		table.insert(row.begin(), row.end());
+		table.insert_row(row.begin(), row.end());
 	}
 };
 

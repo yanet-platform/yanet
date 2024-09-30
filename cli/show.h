@@ -10,6 +10,7 @@
 #include "common/tsc_deltas.h"
 #include "common/version.h"
 
+#include "helper.h"
 #include "table_printer.h"
 
 namespace show
@@ -21,34 +22,34 @@ inline void physicalPort()
 	const auto response = controlPlane.getPhysicalPorts();
 
 	TablePrinter table;
-	table.insert("moduleName",
-	             "link",
-	             "speed",
-	             "rx_packets",
-	             "rx_bytes",
-	             "rx_errors",
-	             "rx_drops",
-	             "tx_packets",
-	             "tx_bytes",
-	             "tx_errors",
-	             "tx_drops");
+	table.insert_row("moduleName",
+	                 "link",
+	                 "speed",
+	                 "rx_packets",
+	                 "rx_bytes",
+	                 "rx_errors",
+	                 "rx_drops",
+	                 "tx_packets",
+	                 "tx_bytes",
+	                 "tx_errors",
+	                 "tx_drops");
 
 	for (const auto& [physicalPortName, physicalPort] : response)
 	{
-		table.insert(physicalPortName,
-		             std::get<8>(physicalPort) ? "up" : "down",
-		             std::to_string(std::get<9>(physicalPort) / 1000) + "G",
-		             std::get<0>(physicalPort),
-		             std::get<1>(physicalPort),
-		             std::get<2>(physicalPort),
-		             std::get<3>(physicalPort),
-		             std::get<4>(physicalPort),
-		             std::get<5>(physicalPort),
-		             std::get<6>(physicalPort),
-		             std::get<7>(physicalPort));
+		table.insert_row(physicalPortName,
+		                 std::get<8>(physicalPort) ? "up" : "down",
+		                 std::to_string(std::get<9>(physicalPort) / 1000) + "G",
+		                 std::get<0>(physicalPort),
+		                 std::get<1>(physicalPort),
+		                 std::get<2>(physicalPort),
+		                 std::get<3>(physicalPort),
+		                 std::get<4>(physicalPort),
+		                 std::get<5>(physicalPort),
+		                 std::get<6>(physicalPort),
+		                 std::get<7>(physicalPort));
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void physical_port_dump(const std::string& direction,
@@ -76,22 +77,22 @@ inline void logicalPort()
 	const auto response = controlPlane.getLogicalPorts();
 
 	TablePrinter table;
-	table.insert("moduleName",
-	             "physicalPortName",
-	             "vlanId",
-	             "macAddress",
-	             "promiscuousMode");
+	table.insert_row("moduleName",
+	                 "physicalPortName",
+	                 "vlanId",
+	                 "macAddress",
+	                 "promiscuousMode");
 
 	for (const auto& [logicalPortName, logicalPort] : response)
 	{
-		table.insert(logicalPortName,
-		             std::get<0>(logicalPort),
-		             std::get<1>(logicalPort),
-		             std::get<2>(logicalPort),
-		             std::get<3>(logicalPort) ? "true" : "false");
+		table.insert_row(logicalPortName,
+		                 std::get<0>(logicalPort),
+		                 std::get<1>(logicalPort),
+		                 std::get<2>(logicalPort),
+		                 std::get<3>(logicalPort) ? "true" : "false");
 	}
 
-	table.print();
+	table.Print();
 }
 
 static inline std::string convertToString(const common::defender::status& status)
@@ -143,11 +144,11 @@ inline void summary(std::optional<std::string> module)
 	const auto response = controlPlane.tun64_tunnels();
 
 	TablePrinter table;
-	table.insert("module",
-	             "source_address",
-	             "prefixes",
-	             "randomization",
-	             "next_module");
+	table.insert_row("module",
+	                 "source_address",
+	                 "prefixes",
+	                 "randomization",
+	                 "next_module");
 
 	for (const auto& [tunnelName, tunnel] : response)
 	{
@@ -159,14 +160,14 @@ inline void summary(std::optional<std::string> module)
 
 		const auto& [ipv6Src, pfxCnt, rndFlag, nxtModule] = tunnel;
 
-		table.insert(tunnelName,
-		             ipv6Src,
-		             pfxCnt,
-		             rndFlag ? "true" : "false",
-		             nxtModule);
+		table.insert_row(tunnelName,
+		                 ipv6Src,
+		                 pfxCnt,
+		                 rndFlag ? "true" : "false",
+		                 nxtModule);
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void announce(std::optional<std::string> module)
@@ -175,9 +176,9 @@ inline void announce(std::optional<std::string> module)
 	const auto response = controlPlane.tun64_prefixes();
 
 	TablePrinter table;
-	table.insert("module",
-	             "prefix",
-	             "announces");
+	table.insert_row("module",
+	                 "prefix",
+	                 "announces");
 
 	for (const auto& [tunnelName, prefixes] : response)
 	{
@@ -189,11 +190,11 @@ inline void announce(std::optional<std::string> module)
 
 		for (const auto& prefix : prefixes)
 		{
-			table.insert(tunnelName, prefix, prefix);
+			table.insert_row(tunnelName, prefix, prefix);
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void mappings(std::optional<std::string> module)
@@ -202,10 +203,10 @@ inline void mappings(std::optional<std::string> module)
 	const auto response = controlPlane.tun64_mappings();
 
 	TablePrinter table;
-	table.insert("module",
-	             "ipv4Address",
-	             "ipv6Address",
-	             "location");
+	table.insert_row("module",
+	                 "ipv4Address",
+	                 "ipv6Address",
+	                 "location");
 
 	for (const auto& v : response)
 	{
@@ -217,13 +218,13 @@ inline void mappings(std::optional<std::string> module)
 			continue;
 		}
 
-		table.insert(tunnelName,
-		             ipv4Address,
-		             ipv6Address,
-		             location);
+		table.insert_row(tunnelName,
+		                 ipv4Address,
+		                 ipv6Address,
+		                 location);
 	}
 
-	table.print();
+	table.Print();
 }
 } /* namespace tun64 */
 
@@ -236,10 +237,10 @@ inline void summary()
 	const auto response = controlPlane.getDecaps();
 
 	TablePrinter table;
-	table.insert("module",
-	             "prefixes",
-	             "DSCP",
-	             "next_module");
+	table.insert_row("module",
+	                 "prefixes",
+	                 "DSCP",
+	                 "next_module");
 
 	for (const auto& [decapName, decap] : response)
 	{
@@ -261,13 +262,13 @@ inline void summary()
 			dscpString = "n/s";
 		}
 
-		table.insert(decapName,
-		             std::get<0>(decap),
-		             dscpString,
-		             std::get<2>(decap));
+		table.insert_row(decapName,
+		                 std::get<0>(decap),
+		                 dscpString,
+		                 std::get<2>(decap));
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void announce()
@@ -276,21 +277,21 @@ inline void announce()
 	const auto response = controlPlane.getDecapPrefixes();
 
 	TablePrinter table;
-	table.insert("module",
-	             "prefix",
-	             "announces");
+	table.insert_row("module",
+	                 "prefix",
+	                 "announces");
 
 	for (const auto& [moduleName, prefixes] : response)
 	{
 		for (const auto& prefix : prefixes)
 		{
-			table.insert(moduleName,
-			             prefix.prefix,
-			             prefix.announces);
+			table.insert_row(moduleName,
+			                 prefix.prefix,
+			                 prefix.announces);
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 }
@@ -304,24 +305,24 @@ inline void summary()
 	const auto response = controlPlane.getNat64statelesses();
 
 	TablePrinter table;
-	table.insert("module",
-	             "translations",
-	             "WKP",
-	             "SRC",
-	             "prefixes",
-	             "next_module");
+	table.insert_row("module",
+	                 "translations",
+	                 "WKP",
+	                 "SRC",
+	                 "prefixes",
+	                 "next_module");
 
 	for (const auto& [nat64statelessName, nat64stateless] : response)
 	{
-		table.insert(nat64statelessName,
-		             std::get<0>(nat64stateless),
-		             std::get<1>(nat64stateless),
-		             std::get<2>(nat64stateless),
-		             std::get<3>(nat64stateless),
-		             std::get<4>(nat64stateless));
+		table.insert_row(nat64statelessName,
+		                 std::get<0>(nat64stateless),
+		                 std::get<1>(nat64stateless),
+		                 std::get<2>(nat64stateless),
+		                 std::get<3>(nat64stateless),
+		                 std::get<4>(nat64stateless));
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void translation()
@@ -330,12 +331,12 @@ inline void translation()
 	const auto response = controlPlane.getNat64statelessTranslations();
 
 	TablePrinter table;
-	table.insert("moduleName",
-	             "ipv6Address",
-	             "ipv6DestinationAddress",
-	             "fromRange",
-	             "ipv4Address",
-	             "toRange");
+	table.insert_row("moduleName",
+	                 "ipv6Address",
+	                 "ipv6DestinationAddress",
+	                 "fromRange",
+	                 "ipv4Address",
+	                 "toRange");
 
 	for (const auto& [key, value] : response)
 	{
@@ -346,15 +347,15 @@ inline void translation()
 		const auto& ipv4Address = std::get<0>(value);
 		const auto& egressPorts = std::get<1>(value);
 
-		table.insert(moduleName,
-		             ipv6Address,
-		             ipv6DestinationAddress,
-		             ingressPorts,
-		             ipv4Address,
-		             egressPorts);
+		table.insert_row(moduleName,
+		                 ipv6Address,
+		                 ipv6DestinationAddress,
+		                 ingressPorts,
+		                 ipv4Address,
+		                 egressPorts);
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void announce()
@@ -363,9 +364,9 @@ inline void announce()
 	const auto response = controlPlane.getNat64statelessPrefixes();
 
 	TablePrinter table;
-	table.insert("module",
-	             "prefix",
-	             "announces");
+	table.insert_row("module",
+	                 "prefix",
+	                 "announces");
 
 	for (const auto& [moduleName, prefixes] : response)
 	{
@@ -373,15 +374,15 @@ inline void announce()
 		{
 			std::visit(
 			        [&, &moduleName = moduleName](auto&& value) {
-				        table.insert(moduleName,
-				                     value.prefix,
-				                     value.announces);
+				        table.insert_row(moduleName,
+				                         value.prefix,
+				                         value.announces);
 			        },
 			        (const common::ip_prefix_with_announces_t::variant_t&)prefix);
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 }
@@ -512,18 +513,18 @@ static void list_fw_rules(unsigned int mask, bool list)
 	TablePrinter table;
 	if (list)
 	{
-		table.insert("id",
-		             "ruleno",
-		             "label",
-		             "rule");
+		table.insert_row("id",
+		                 "ruleno",
+		                 "label",
+		                 "rule");
 	}
 	else
 	{
-		table.insert("id",
-		             "ruleno",
-		             "label",
-		             "counter",
-		             "rule");
+		table.insert_row("id",
+		                 "ruleno",
+		                 "label",
+		                 "counter",
+		                 "rule");
 	}
 
 	if (need_labels & mask)
@@ -579,16 +580,16 @@ static void list_fw_rules(unsigned int mask, bool list)
 				if (list)
 				{
 					YANET_GCC_BUG_UNUSED(counter);
-					table.insert(id, ruleno, label, text);
+					table.insert_row(id, ruleno, label, text);
 				}
 				else
 				{
-					table.insert(id, ruleno, label, counter, text);
+					table.insert_row(id, ruleno, label, counter, text);
 				}
 			}
 		}
 	}
-	table.print();
+	table.Print();
 }
 
 inline void fw(std::optional<std::string> str)
@@ -625,18 +626,10 @@ inline void fwlist(std::optional<std::string> str)
 
 inline void errors()
 {
-	TablePrinter table;
-	table.insert("name", "counter");
-
 	interface::dataPlane dataPlane;
 	const auto response = dataPlane.getErrors();
 
-	for (const auto& [name, counter] : response)
-	{
-		table.insert(name, counter);
-	}
-
-	table.print();
+	FillAndPrintTable({"name", "counter"}, response);
 }
 
 inline void samples()
@@ -645,13 +638,13 @@ inline void samples()
 	const auto response = controlPlane.getSamples();
 
 	TablePrinter table;
-	table.insert("in_iface",
-	             "out_iface",
-	             "proto",
-	             "src_addr",
-	             "src_port",
-	             "dst_addr",
-	             "dst_port");
+	table.insert_row("in_iface",
+	                 "out_iface",
+	                 "proto",
+	                 "src_addr",
+	                 "src_port",
+	                 "dst_addr",
+	                 "dst_port");
 
 	// Cache the protocols we are interested in to prevent enormous number of reading of "/etc/protocols".
 	std::unordered_map<std::uint8_t, std::string> proto_cache;
@@ -671,10 +664,10 @@ inline void samples()
 		}
 		const auto& protoName = it->second;
 
-		table.insert(in_iface, out_iface, protoName, src_addr, src_port, dst_addr, dst_port);
+		table.insert_row(in_iface, out_iface, protoName, src_addr, src_port, dst_addr, dst_port);
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void samples_dump()
@@ -711,18 +704,18 @@ inline void values()
 	const auto controlplane_values = controlplane.controlplane_values();
 
 	TablePrinter table;
-	table.insert("application",
-	             "name",
-	             "value");
+	table.insert_row("application",
+	                 "name",
+	                 "value");
 
 	for (const auto& [name, value] : controlplane_values)
 	{
-		table.insert("controlplane",
-		             name,
-		             value);
+		table.insert_row("controlplane",
+		                 name,
+		                 value);
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void durations()
@@ -731,28 +724,28 @@ inline void durations()
 	const auto controlplane_durations = controlplane.controlplane_durations();
 
 	TablePrinter table;
-	table.insert("application",
-	             "name",
-	             "duration");
+	table.insert_row("application",
+	                 "name",
+	                 "duration");
 
 	for (const auto& [name, value] : controlplane_durations)
 	{
-		table.insert("controlplane",
-		             name,
-		             value);
+		table.insert_row("controlplane",
+		                 name,
+		                 value);
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void version()
 {
 	TablePrinter table;
-	table.insert("application",
-	             "version",
-	             "revision",
-	             "hash",
-	             "custom");
+	table.insert_row("application",
+	                 "version",
+	                 "revision",
+	                 "hash",
+	                 "custom");
 
 	/// dataplane
 	try
@@ -760,11 +753,11 @@ inline void version()
 		interface::dataPlane dataplane;
 		const auto [major, minor, revision, hash, custom] = dataplane.version();
 
-		table.insert("dataplane",
-		             version_to_string(major, minor),
-		             version_revision_to_string(revision),
-		             version_hash_to_string(hash),
-		             version_custom_to_string(custom));
+		table.insert_row("dataplane",
+		                 version_to_string(major, minor),
+		                 version_revision_to_string(revision),
+		                 version_hash_to_string(hash),
+		                 version_custom_to_string(custom));
 	}
 	catch (...)
 	{
@@ -776,11 +769,11 @@ inline void version()
 		interface::controlPlane controlplane;
 		const auto [major, minor, revision, hash, custom] = controlplane.version();
 
-		table.insert("controlplane",
-		             version_to_string(major, minor),
-		             version_revision_to_string(revision),
-		             version_hash_to_string(hash),
-		             version_custom_to_string(custom));
+		table.insert_row("controlplane",
+		                 version_to_string(major, minor),
+		                 version_revision_to_string(revision),
+		                 version_hash_to_string(hash),
+		                 version_custom_to_string(custom));
 	}
 	catch (...)
 	{
@@ -788,14 +781,14 @@ inline void version()
 
 	/// cli
 	{
-		table.insert("cli",
-		             version_to_string(),
-		             version_revision_to_string(),
-		             version_hash_to_string(),
-		             version_custom_to_string());
+		table.insert_row("cli",
+		                 version_to_string(),
+		                 version_revision_to_string(),
+		                 version_hash_to_string(),
+		                 version_custom_to_string());
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void counter_by_name(std::string counter_name,
@@ -815,16 +808,7 @@ inline void counter_by_name(std::string counter_name,
 		}
 	}
 
-	TablePrinter table;
-	table.insert("core_id",
-	             "counter_value");
-
-	for (const auto& [core_id, counter_value] : response)
-	{
-		table.insert(core_id, counter_value);
-	}
-
-	table.print();
+	FillAndPrintTable({"core_id", "counter_value"}, response);
 }
 
 inline void shm_info()
@@ -832,22 +816,15 @@ inline void shm_info()
 	interface::dataPlane dataplane;
 	const auto response = dataplane.get_shm_info();
 
-	TablePrinter table;
-	table.insert("ring name",
-	             "dump tag",
-	             "dump size",
-	             "dump count",
-	             "core id",
-	             "socket id",
-	             "ipc key",
-	             "offset");
-
-	for (const auto& [name, tag, size, count, core, socket, ipc_key, offset] : response)
-	{
-		table.insert(name, tag, size, count, core, socket, ipc_key, offset);
-	}
-
-	table.print();
+	FillAndPrintTable({"ring name",
+	                   "dump tag",
+	                   "dump size",
+	                   "dump count",
+	                   "core id",
+	                   "socket id",
+	                   "ipc key",
+	                   "offset"},
+	                  response);
 }
 
 void shm_tsc_info()
@@ -855,18 +832,7 @@ void shm_tsc_info()
 	interface::dataPlane dataplane;
 	const auto response = dataplane.get_shm_tsc_info();
 
-	TablePrinter table;
-	table.insert("core id",
-	             "socket id",
-	             "ipc key",
-	             "offset");
-
-	for (const auto& [core, socket, ipc_key, offset] : response)
-	{
-		table.insert(core, socket, ipc_key, offset);
-	}
-
-	table.print();
+	FillAndPrintTable({"core id", "socket id", "ipc key", "offset"}, response);
 }
 
 void shm_tsc_set_state(bool state)
