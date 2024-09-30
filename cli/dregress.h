@@ -13,28 +13,28 @@ void summary()
 	const auto response = controlPlane.dregress_config();
 
 	TablePrinter table;
-	table.insert("module",
-	             "ipv6_sources",
-	             "ipv6_destination",
-	             "ipv4_address",
-	             "ipv6_address",
-	             "udp_destination_port",
-	             "only_longest",
-	             "next_module");
+	table.insert_row("module",
+	                 "ipv6_sources",
+	                 "ipv6_destination",
+	                 "ipv4_address",
+	                 "ipv6_address",
+	                 "udp_destination_port",
+	                 "only_longest",
+	                 "next_module");
 
 	for (const auto& [module_name, dregress] : response)
 	{
-		table.insert(module_name,
-		             dregress.ipv6SourcePrefixes,
-		             dregress.ipv6DestinationPrefix,
-		             dregress.ipv4SourceAddress,
-		             dregress.ipv6SourceAddress,
-		             dregress.udpDestinationPort,
-		             dregress.onlyLongest,
-		             dregress.nextModule);
+		table.insert_row(module_name,
+		                 dregress.ipv6SourcePrefixes,
+		                 dregress.ipv6DestinationPrefix,
+		                 dregress.ipv4SourceAddress,
+		                 dregress.ipv6SourceAddress,
+		                 dregress.udpDestinationPort,
+		                 dregress.onlyLongest,
+		                 dregress.nextModule);
 	}
 
-	table.print();
+	table.Print();
 }
 
 void announce()
@@ -48,11 +48,11 @@ void announce()
 
 	for (const auto& [module_name, dregress] : response)
 	{
-		table.insert(module_name,
-		             dregress.announces);
+		table.insert_row(module_name,
+		                 dregress.announces);
 	}
 
-	table.print();
+	table.Print();
 }
 
 /** @todo
