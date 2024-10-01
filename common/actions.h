@@ -1,7 +1,7 @@
 #pragma once
 
+#include "common/traits.h"
 #include "common/type.h"
-#include "common/utils.h"
 #include "common/variant_trait_map.h"
 
 namespace common
@@ -470,11 +470,11 @@ private:
 		}
 		else
 		{
-			static_assert(utils::always_false<T>::value, "Not all unique actions with MAX_COUNT = 1 are properly categorized. "
-			                                             "Please add the missing actions to either `is_first_matters` or `is_last_matters` "
-			                                             "to ensure their index is tracked. Tracking the index of such actions could "
-			                                             "enhance dataplane performance if this information is utilized in "
-			                                             "`value_t::compile()`.");
+			static_assert(traits::always_false_v<T>, "Not all unique actions with MAX_COUNT = 1 are properly categorized. "
+			                                         "Please add the missing actions to either `is_first_matters` or `is_last_matters` "
+			                                         "to ensure their index is tracked. Tracking the index of such actions could "
+			                                         "enhance dataplane performance if this information is utilized in "
+			                                         "`value_t::compile()`.");
 		}
 	}
 

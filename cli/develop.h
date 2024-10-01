@@ -85,7 +85,7 @@ static void lpmLookupAddress(const T& address)
 		}
 		else
 		{
-			static_assert(utils::always_false<T>::value,
+			static_assert(traits::always_false_v<T>,
 			              "lpmLookupAddress cannot be used with types other than ipv4/6_address");
 		}
 	}();
