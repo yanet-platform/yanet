@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <iterator>
 #include <optional>
 #include <set>
@@ -81,6 +82,15 @@ struct is_set<std::set<Key, Compare, Allocator>> : std::true_type
 
 template<typename T>
 inline constexpr bool is_set_v = is_set<T>::value;
+
+template<typename T>
+struct function
+{
+	template<typename R, typename... Args>
+	static std::tuple<Args...> pro_args(std::function<R(Args...)>);
+
+	using args = decltype(pro_args(std::function{std::declval<T>()}));
+};
 
 }
 // namespace utils
