@@ -94,7 +94,7 @@ inline void Call(F&& func, const std::vector<std::string>& string_args)
 	std::apply(std::forward<F>(func), args_tuple);
 }
 
-void OpenSharedMemoryDataplaneBuffers(common::sdp::DataPlaneInSharedMemory& sdp_data, bool open_workers_data)
+inline void OpenSharedMemoryDataplaneBuffers(common::sdp::DataPlaneInSharedMemory& sdp_data, bool open_workers_data)
 {
 	if (common::sdp::SdpClient::ReadSharedMemoryData(sdp_data, open_workers_data) != eResult::success)
 	{
