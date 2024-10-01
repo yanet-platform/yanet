@@ -1,6 +1,5 @@
 #pragma once
 
-#include <array>
 #include <tuple>
 #include <type_traits>
 #include <variant>
@@ -178,5 +177,27 @@ inline void zip_apply(Func&& f, Tuples&&... tuples)
 
 	zip_apply_helper<0, tuple_size>(std::forward<Func>(f), std::forward<Tuples>(tuples)...);
 }
+
+template<typename... Ts>
+constexpr auto decay_types(std::tuple<Ts...> const&) -> std::tuple<std::decay_t<Ts>...>;
+
+/**
+ * @brief Decays the types of a tuple's elements.
+ *
+ * It removes any const, volatile, and reference qualifiers from the element
+ * types and performs array-to-pointer and function-to-pointer conversions.
+ *
+ * Example usage:
+ * ```
+ * std::tuple<const int&, float, double> t;
+ * using DecayedTuple = decay_tuple<decltype(t)>;
+ * // DecayedTuple is std::tuple<int, float, double>
+ * ```
+ *
+ * @tparam T The type of the tuple to decay.
+ * @return A tuple type with decayed element types.
+ */
+template<typename T>
+using decay_tuple = decltype(decay_types(std::declval<T>()));
 
 } // namespace utils
