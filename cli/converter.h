@@ -6,7 +6,7 @@
 #include <variant>
 #include <vector>
 
-#include "common/utils.h"
+#include "common/traits.h"
 
 namespace converter
 {
@@ -42,29 +42,29 @@ std::string to_string(const T& value, const config_t& config = {})
 	{
 		return std::to_string(value);
 	}
-	else if constexpr (utils::is_variant_v<T>)
+	else if constexpr (traits::is_variant_v<T>)
 	{
 		return std::visit([&config](const auto& val) { return to_string(val, config); }, value);
 	}
-	else if constexpr (utils::is_optional_v<T>)
+	else if constexpr (traits::is_optional_v<T>)
 	{
 		return value ? to_string(*value, config) : config.optional_null;
 	}
-	else if constexpr (utils::is_container_v<T>)
+	else if constexpr (traits::is_container_v<T>)
 	{
 		if (value.empty())
 		{
-			if constexpr (utils::is_vector_v<T>)
+			if constexpr (traits::is_vector_v<T>)
 			{
 				return config.vector_empty;
 			}
-			else if constexpr (utils::is_set_v<T>)
+			else if constexpr (traits::is_set_v<T>)
 			{
 				return config.set_empty;
 			}
 			else
 			{
-				static_assert(utils::always_false<T>::value,
+				static_assert(traits::always_false_v<T>,
 				              "Container does not have default empty representation in struct config_t");
 			}
 		}
