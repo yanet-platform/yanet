@@ -126,6 +126,8 @@ constexpr inline uint32_t unlabelled = 3;
 class uint
 {
 public:
+	uint() = default;
+
 	uint(const std::string& string) :
 	        value(std::stoull(string, nullptr, 0))
 	{
@@ -142,7 +144,7 @@ public:
 		return std::to_string(value);
 	}
 
-	uint64_t value;
+	uint64_t value{};
 };
 
 class mac_address_t
