@@ -146,19 +146,25 @@ def bgp_remove_ipv6(prefix):
             Executer.run(command)
 
 
-def bgp_update(prefix):
-    if ":" in prefix:
-        bgp_update_ipv6(prefix)
-    else:
-        bgp_update_ipv4(prefix)
+def bgp_update(prefix_list):
+    for prefix in prefix_list:
+        try:
+            if ":" in prefix:
+                bgp_update_ipv6(prefix)
+            else:
+                bgp_update_ipv4(prefix)
+        except Exception as error:
+            LOGGER.error("Can not update bgp prefix: %s with error: %s", prefix, error)
 
-
-def bgp_remove(prefix):
-    if ":" in prefix:
-        bgp_remove_ipv6(prefix)
-    else:
-        bgp_remove_ipv4(prefix)
-
+def bgp_remove(prefix_list):
+    for prefix in prefix_list:
+        try:
+            if ":" in prefix:
+                bgp_remove_ipv6(prefix)
+            else:
+                bgp_remove_ipv4(prefix)
+        except Exception as error:
+            LOGGER.error("Can not remove bgp prefix: %s with error: %s", prefix, error)
 
 def get_announces(types):
     for type in types:
@@ -458,7 +464,8 @@ def main():
         signal.signal(signal.SIGTERM, signal_handler)
 
     current_prefixes = []
-    report_counter: int = 0
+    report_config_counter: int = 0
+    report_getannounces_counter: int = 0
     is_firewall_machine: bool = False
 
     try:
@@ -475,10 +482,11 @@ def main():
 
         try:
             update_config()
+            report_config_counter = 0
         except Exception as error:
-            if report_counter % 25 == 0:
+            if report_config_counter == 0:
                 LOGGER.error("Fail: %s", error)
-            report_counter += 1
+            report_config_counter = 1
             time.sleep(1)
             continue
 
@@ -489,34 +497,31 @@ def main():
 
                 if check_module(module):
                     prefixes.extend(module["announces"])
-        except:
-            pass
+            report_getannounces_counter = 0
+        except Exception as error:
+            if report_getannounces_counter == 0:
+                LOGGER.error("Can not get announces with error: %s", error)
+                report_getannounces_counter = 1
+            if len(current_prefixes) > 0:
+                LOGGER.warning(
+                    "Problem with get_announce(dp/cp in down state?), remove current announces: %s", current_prefixes
+                )
+                bgp_remove(current_prefixes)
 
         if is_firewall_machine and check_firewall_module():
             prefixes.extend(["firewall::/128"])
 
-        for prefix in list(set(prefixes) - set(current_prefixes)):
-            try:
-                bgp_update(prefix)
-            except:
-                pass
+        bgp_update(list(set(prefixes) - set(current_prefixes)))
 
-        for prefix in list(set(current_prefixes) - set(prefixes)):
-            try:
-                bgp_remove(prefix)
-            except:
-                pass
+        bgp_remove(list(set(current_prefixes) - set(prefixes)))
 
         if not OPTIONS.daemon:
             return
 
         current_prefixes = prefixes
         if SIGNAL_RECV:
-            for prefix in current_prefixes:
-                try:
-                    bgp_remove(prefix)
-                except:
-                    pass
+            LOGGER.warning("Detect SIGNAL_RECV, remove announces and exit...")
+            bgp_remove(current_prefixes)
             return
 
         time.sleep(1)
