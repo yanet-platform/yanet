@@ -7,6 +7,7 @@ import json
 import logging
 import signal
 import subprocess
+import ipaddress
 import textwrap
 import time
 import typing
@@ -149,7 +150,8 @@ def bgp_remove_ipv6(prefix):
 def bgp_update(prefix_list):
     for prefix in prefix_list:
         try:
-            if ":" in prefix:
+            parsed = ipaddress.ip_network(prefix)
+            if parsed.version == 6:
                 bgp_update_ipv6(prefix)
             else:
                 bgp_update_ipv4(prefix)
@@ -160,7 +162,8 @@ def bgp_update(prefix_list):
 def bgp_remove(prefix_list):
     for prefix in prefix_list:
         try:
-            if ":" in prefix:
+            parsed = ipaddress.ip_network(prefix)
+            if parsed.version == 6:
                 bgp_remove_ipv6(prefix)
             else:
                 bgp_remove_ipv4(prefix)
