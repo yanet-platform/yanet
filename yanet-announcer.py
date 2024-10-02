@@ -156,6 +156,7 @@ def bgp_update(prefix_list):
         except Exception as error:
             LOGGER.error("Can not update bgp prefix: %s with error: %s", prefix, error)
 
+
 def bgp_remove(prefix_list):
     for prefix in prefix_list:
         try:
@@ -165,6 +166,7 @@ def bgp_remove(prefix_list):
                 bgp_remove_ipv4(prefix)
         except Exception as error:
             LOGGER.error("Can not remove bgp prefix: %s with error: %s", prefix, error)
+
 
 def get_announces(types):
     for type in types:
