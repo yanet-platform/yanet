@@ -68,7 +68,7 @@ class Executer:
         # don't use generator output, because LRU cache return wrong response
         parsed_output: typing.List[typing.Dict[str, str]] = []
 
-        out = subprocess.check_output(command, shell=True).decode("ascii").splitlines()
+        out = subprocess.check_output(command, shell=True, stderr=subprocess.DEVNULL).decode("ascii").splitlines()
         if len(out) <= 1:
             return parsed_output
 
@@ -156,7 +156,11 @@ def bgp_update(prefix_list):
             else:
                 bgp_update_ipv4(prefix)
         except Exception as error:
-            LOGGER.error("Can not update bgp prefix: %s with error: %s", prefix, error)
+            if "firewall" in prefix:
+                bgp_update_ipv6(prefix)
+                LOGGER.info("Update bgp with custom prefix: %s", prefix)
+            else:
+                LOGGER.error("Can not update bgp prefix: %s with error: %s", prefix, error)
 
 
 def bgp_remove(prefix_list):
@@ -168,7 +172,11 @@ def bgp_remove(prefix_list):
             else:
                 bgp_remove_ipv4(prefix)
         except Exception as error:
-            LOGGER.error("Can not remove bgp prefix: %s with error: %s", prefix, error)
+            if "firewall" in prefix:
+                bgp_remove_ipv6(prefix)
+                LOGGER.info("Remove bgp with custom prefix: %s", prefix)
+            else:
+                LOGGER.error("Can not remove bgp prefix: %s with error: %s", prefix, error)
 
 
 def get_announces(types):
@@ -512,6 +520,8 @@ def main():
                     "Problem with get_announce(dp/cp in down state?), remove current announces: %s", current_prefixes
                 )
                 bgp_remove(current_prefixes)
+                current_prefixes = []
+            continue
 
         if is_firewall_machine and check_firewall_module():
             prefixes.extend(["firewall::/128"])
