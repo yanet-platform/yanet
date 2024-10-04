@@ -1,7 +1,5 @@
 #pragma once
 
-#include <inttypes.h>
-
 #include <map>
 #include <memory>
 #include <optional>
@@ -87,8 +85,8 @@ protected:
 
 protected:
 	const std::vector<uint8_t>& inBuffer;
-	uint64_t inPosition;
-	bool failed;
+	uint64_t inPosition{};
+	bool failed{};
 };
 
 //
@@ -99,7 +97,7 @@ public:
 	using integer_t = uint64_t;
 
 public:
-	stream_out_t();
+	stream_out_t() = default;
 
 	template<typename TType>
 	inline void push(const TType& value);
@@ -287,9 +285,7 @@ private:
 //
 
 inline stream_in_t::stream_in_t(const std::vector<uint8_t>& buffer) :
-        inBuffer(buffer),
-        inPosition(0),
-        failed(false)
+        inBuffer(buffer)
 {
 }
 
@@ -338,7 +334,7 @@ inline void stream_in_t::pop(char* buffer, uint64_t bufferSize)
 
 inline void stream_in_t::pop(std::string& value)
 {
-	std::string::size_type size;
+	std::string::size_type size = 0;
 	pop(size);
 
 	if (this->inBuffer.size() - inPosition < size)
@@ -559,10 +555,6 @@ inline void stream_in_t::popVariant(std::variant<TArgs...>& variant,
 }
 
 //
-
-inline stream_out_t::stream_out_t()
-{
-}
 
 template<typename TType>
 inline void stream_out_t::push(const TType& value)

@@ -1,15 +1,10 @@
 #pragma once
 
-#include <mutex>
-#include <set>
-
-#include "segment_allocator.h"
-#include "type.h"
-
 #include "common/icp.h"
-#include "common/idataplane.h"
-#include "common/refarray.h"
 #include "common/sdpclient.h"
+#include "common/sdpcommon.h"
+#include "segment_allocator.h"
+#include <mutex>
 
 class counter_manager_t
 {
@@ -126,10 +121,7 @@ class counter_t
 public:
 	static_assert(size_T <= YANET_CONFIG_COUNTER_FALLBACK_SIZE);
 
-	counter_t() :
-	        manager(nullptr)
-	{
-	}
+	counter_t() = default;
 
 	void init(counter_manager_t* manager)
 	{
@@ -160,7 +152,7 @@ public:
 
 	void allocate()
 	{
-		allocate([](const key_T& key) { (void)key; });
+		allocate([]([[maybe_unused]] const key_T& key) {});
 	}
 
 	template<typename callback_T>
@@ -180,7 +172,7 @@ public:
 
 	void release()
 	{
-		release([](const key_T& key) { (void)key; });
+		release([]([[maybe_unused]] const key_T& key) {});
 	}
 
 	void insert(const key_T& key)
@@ -191,7 +183,7 @@ public:
 		if (counters_it != counters.end())
 		{
 			auto& [counter_id, refcount] = counters_it->second;
-			(void)counter_id;
+			YANET_GCC_BUG_UNUSED(counter_id);
 
 			if (!refcount)
 			{
@@ -273,7 +265,7 @@ public:
 		}
 
 		const auto& [counter_id, refcount] = iter->second;
-		(void)refcount;
+		YANET_GCC_BUG_UNUSED(refcount);
 
 		return counter_id;
 	}
@@ -286,7 +278,7 @@ public:
 		std::vector<tCounterId> manager_counter_ids;
 		for (const auto& [key, counter_id] : counters_allocated)
 		{
-			(void)key;
+			YANET_GCC_BUG_UNUSED(key);
 
 			for (size_t index = 0; index < size_T; index++)
 			{
@@ -301,7 +293,7 @@ public:
 		size_t i = 0;
 		for (const auto& [key, counter_id] : counters_allocated)
 		{
-			(void)counter_id;
+			YANET_GCC_BUG_UNUSED(counter_id);
 
 			std::array<uint64_t, size_T> array;
 			for (size_t array_i = 0;
@@ -352,7 +344,7 @@ public:
 	}
 
 protected:
-	counter_manager_t* manager;
+	counter_manager_t* manager{};
 
 	mutable std::mutex mutex;
 

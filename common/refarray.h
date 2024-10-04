@@ -17,10 +17,9 @@ public:
 	using id_t = uint64_t;
 
 public:
-	refarray_t() ///< @todo: fallback value?
+	refarray_t() :
+	        ids_unused_size(size_T) ///< @todo: fallback value?
 	{
-		ids_unused_size = size_T;
-		ids_unused_watermark = 0;
 	}
 
 	bool exist_id(const id_t& id)
@@ -42,7 +41,7 @@ public:
 		}
 
 		auto& [refcount, id] = it->second;
-		(void)id;
+		YANET_GCC_BUG_UNUSED(id);
 
 		refcount++;
 
@@ -59,7 +58,7 @@ public:
 			return std::nullopt;
 		}
 
-		id_t id;
+		id_t id = 0;
 		ids_unused_size--;
 		if (ids_unused.size())
 		{
@@ -107,7 +106,7 @@ public:
 
 		const auto& value = it->second;
 		auto& [refcount, values_id] = values[value];
-		(void)values_id;
+		YANET_GCC_BUG_UNUSED(values_id);
 
 		refcount--;
 		if (refcount)
@@ -163,7 +162,7 @@ public:
 
 		auto it = values.find(value);
 		const auto& [refcount, id] = it->second;
-		(void)refcount;
+		YANET_GCC_BUG_UNUSED(refcount);
 
 		return id;
 	}
@@ -186,7 +185,7 @@ public:
 		ids.clear();
 	}
 
-	std::tuple<uint64_t, uint64_t> stats() const
+	[[nodiscard]] std::tuple<uint64_t, uint64_t> stats() const
 	{
 		return {size_T - ids_unused_size, size_T};
 	}
@@ -203,7 +202,7 @@ public:
 
 protected:
 	std::vector<id_t> ids_unused;
-	std::atomic<id_t> ids_unused_watermark;
+	std::atomic<id_t> ids_unused_watermark{0};
 
 	std::map<value_T,
 	         std::tuple<uint64_t, ///< refcount

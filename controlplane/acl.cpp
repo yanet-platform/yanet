@@ -7,7 +7,6 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #ifdef ACL_DEBUG
@@ -23,13 +22,9 @@
 	}
 
 #include "acl.h"
-#include "acl/bitset.h"
 #include "acl/dict.h"
-#include "acl/network.h"
 #include "acl/rule.h"
 #include "acl_compiler.h"
-
-#include "common/acl.h"
 
 namespace acl
 {
@@ -58,8 +53,8 @@ struct dispatcher_rules_t
 			{
 				const auto& network = *item.network;
 
-				filter_network_t* _src = new filter_network_t;
-				filter_network_t* _dst = new filter_network_t;
+				auto* _src = new filter_network_t;
+				auto* _dst = new filter_network_t;
 
 				if (std::holds_alternative<controlplane::base::acl_rule_network_ipv4_t>(network))
 				{
@@ -532,10 +527,10 @@ iface_map_t ifaceMapping(std::map<std::string, controlplane::base::logical_port_
 
 	for (const auto& [route_name, route] : routes)
 	{
-		(void)route_name;
+		YANET_GCC_BUG_UNUSED(route_name);
 		for (const auto& [name, iface] : route.interfaces)
 		{
-			(void)name;
+			YANET_GCC_BUG_UNUSED(name);
 			ret[iface.aclId].emplace(false, iface.nextModule);
 		}
 	}
@@ -546,7 +541,7 @@ iface_map_t ifaceMapping(std::map<std::string, controlplane::base::logical_port_
 // used by acl_lookup
 unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acls,
                      const iface_map_t& ifaces,
-                     const std::optional<std::string>& module,
+                     [[maybe_unused]] const std::optional<std::string>& module,
                      const std::optional<std::string>& direction,
                      const std::optional<std::string>& network_source,
                      const std::optional<std::string>& network_destination,
@@ -557,8 +552,6 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
                      const std::optional<std::string>& transport_flags,
                      const std::optional<std::string>& in_recordstate)
 {
-	(void)module;
-
 	unwind_result result;
 
 	try
@@ -785,7 +778,7 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 	ids_map_map.emplace(ids_t(), 0);
 
 	result.ids_map.clear();
-	result.ids_map.push_back(ids_t());
+	result.ids_map.emplace_back();
 	std::set<ids_t> ids_overflow;
 
 #ifdef ACL_DEBUG
@@ -847,14 +840,14 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 			if (!rule.ids.empty())
 #endif
 			{
-				result.dispatcher.emplace_back(std::make_tuple(
+				result.dispatcher.emplace_back(
 #ifdef ACL_DEBUG
 				        rule.ids[0],
 #else
 				        FW_DISPATCHER_START_ID,
 #endif
 				        rule.to_string(),
-				        std::string()));
+				        std::string());
 			}
 			ACL_DBGMSG("dispatcher rule: " << rule.to_string());
 		}
@@ -1028,7 +1021,7 @@ uint8_t string_to_proto(const std::string& string)
 
 std::set<uint32_t> lookup(const std::map<std::string, controlplane::base::acl_t>& acls,
                           const iface_map_t& ifaces,
-                          const std::optional<std::string>& module,
+                          [[maybe_unused]] const std::optional<std::string>& module,
                           const std::optional<std::string>& direction,
                           const std::optional<std::string>& network_source,
                           const std::optional<std::string>& network_destination,
@@ -1037,8 +1030,6 @@ std::set<uint32_t> lookup(const std::map<std::string, controlplane::base::acl_t>
                           const std::optional<std::string>& transport_source,
                           const std::optional<std::string>& transport_destination)
 {
-	(void)module;
-
 	std::set<uint32_t> result;
 
 	try

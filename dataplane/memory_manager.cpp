@@ -68,7 +68,7 @@ common::idp::memory_manager_stats::response memory_manager::memory_manager_stats
 		response_memory_group = root_memory_group;
 		for (const auto& [pointer, memory_pointer] : pointers)
 		{
-			(void)pointer;
+			YANET_GCC_BUG_UNUSED(pointer);
 			response_objects.emplace_back(memory_pointer.name,
 			                              memory_pointer.socket_id,
 			                              memory_pointer.size);
@@ -169,7 +169,7 @@ bool memory_manager::check_memory_limit(const std::string& name,
 
 	for (const auto& [pointer, memory_pointer] : pointers)
 	{
-		(void)pointer;
+		YANET_GCC_BUG_UNUSED(pointer);
 
 		uint64_t object_size = memory_pointer.size;
 		if (memory_pointer.name == name)
@@ -218,7 +218,6 @@ bool memory_manager::check_memory_limit(const std::string& name,
 	return result;
 }
 
-void memory_manager::limits(common::idp::limits::response& response)
+void memory_manager::limits([[maybe_unused]] common::idp::limits::response& response)
 {
-	(void)response;
 }

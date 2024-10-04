@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdexcept>
 #include <string>
 
 #include "common/result.h"
@@ -11,7 +12,7 @@ public:
 	        std::runtime_error(error), code(result)
 	{}
 
-	eResult result() const
+	[[nodiscard]] eResult result() const
 	{
 		return code;
 	}

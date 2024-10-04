@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cinttypes>
-
 #include <vector>
 
 #include "common/define.h"

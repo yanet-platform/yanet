@@ -2,8 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
-
-#include <iostream>
+#include <utility>
 
 #define ENABLE_BIT(v, b) (v) |= ((uint64_t)1) << (b)
 #define GET_BIT(v, b) (((v) >> (b)) & 1)
@@ -27,10 +26,9 @@ public:
 		uint32_t used_segments = 0;
 	};
 
-	SegmentAllocator()
+	SegmentAllocator() :
+	        free_cells_(IndexEnd - IndexBegin)
 	{
-		free_cells_ = IndexEnd - IndexBegin;
-
 		// Initialize blocks in main list of free blocks and set size of each block
 		for (uint32_t index = 0; index < total_blocks_; ++index)
 		{
@@ -149,7 +147,7 @@ public:
 		return true;
 	}
 
-	uint32_t Size() const
+	[[nodiscard]] uint32_t Size() const
 	{
 		return free_cells_;
 	}
@@ -159,7 +157,7 @@ public:
 		return sizes_info_;
 	}
 
-	std::pair<uint64_t, uint64_t> GetErrors() const
+	[[nodiscard]] std::pair<uint64_t, uint64_t> GetErrors() const
 	{
 		return {errors_external_, errors_internal_};
 	}

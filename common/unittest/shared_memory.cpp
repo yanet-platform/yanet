@@ -8,8 +8,8 @@ void TestForSize(void* buffer_writer, void* buffer_reader, size_t size, size_t s
 	ASSERT_TRUE(buffer_reader != nullptr);
 	ASSERT_EQ(size, size_reader);
 
-	uint8_t* buffer_writer8 = reinterpret_cast<uint8_t*>(buffer_writer);
-	uint8_t* buffer_reader8 = reinterpret_cast<uint8_t*>(buffer_reader);
+	auto* buffer_writer8 = reinterpret_cast<uint8_t*>(buffer_writer);
+	auto* buffer_reader8 = reinterpret_cast<uint8_t*>(buffer_reader);
 
 	for (uint64_t index = 0; index < size; index++)
 	{

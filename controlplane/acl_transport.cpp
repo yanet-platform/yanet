@@ -1,5 +1,4 @@
 #include "acl_compiler.h"
-#include "acl_network_table.h"
 
 using namespace acl::compiler;
 
@@ -64,10 +63,10 @@ void transport_t::distribute()
 	for (const auto& [key, network_table_group_ids] : variation)
 	{
 		const auto& [size, filter_ids] = key;
-		(void)size;
+		YANET_GCC_BUG_UNUSED(size);
 
 		unsigned int best_layer_id = 0;
-		size_t best_filter_ids_count = (size_t)-1;
+		auto best_filter_ids_count = (size_t)-1;
 
 		for (unsigned int layer_id = 0;
 		     layer_id < compiler->transport_layers_size_max;
@@ -105,12 +104,8 @@ void transport_t::distribute()
 
 void transport_t::compile()
 {
-	for (unsigned int layer_id = 0;
-	     layer_id < layers.size();
-	     layer_id++)
+	for (auto& layer : layers)
 	{
-		auto& layer = layers[layer_id];
-
 		for (const auto filter_id : layer.filter_ids_set)
 		{
 			const auto& filter = filters[filter_id];
@@ -144,12 +139,8 @@ void transport_t::compile()
 		layer.icmp_identifier.prepare();
 	}
 
-	for (unsigned int layer_id = 0;
-	     layer_id < layers.size();
-	     layer_id++)
+	for (auto& layer : layers)
 	{
-		auto& layer = layers[layer_id];
-
 		layer.protocol.compile();
 		layer.tcp_source.compile();
 		layer.tcp_destination.compile();
@@ -163,12 +154,8 @@ void transport_t::compile()
 
 void transport_t::populate()
 {
-	for (unsigned int layer_id = 0;
-	     layer_id < layers.size();
-	     layer_id++)
+	for (auto& layer : layers)
 	{
-		auto& layer = layers[layer_id];
-
 		layer.protocol.populate();
 		layer.tcp_source.populate();
 		layer.tcp_destination.populate();

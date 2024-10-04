@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "common/actions.h"
-#include "libfwparser/fw_parser.h"
 
 #include "network.h"
 
@@ -27,12 +26,12 @@ struct range_t : std::tuple<uint_t, uint_t>
 	inline range_t(unsigned int val) :
 	        std::tuple<uint_t, uint_t>(val, val) {}
 
-	uint_t from() const
+	[[nodiscard]] uint_t from() const
 	{
 		return std::get<0>(*this);
 	}
 
-	uint_t to() const
+	[[nodiscard]] uint_t to() const
 	{
 		return std::get<1>(*this);
 	}
@@ -40,13 +39,12 @@ struct range_t : std::tuple<uint_t, uint_t>
 
 struct filter_base_t
 {
-	unsigned long ref_count;
+	unsigned long ref_count{};
 
-	inline constexpr filter_base_t() :
-	        ref_count(0) {}
-	virtual bool is_none() const = 0;
-	virtual ~filter_base_t() {}
-	virtual std::string to_string() const = 0;
+	inline constexpr filter_base_t() = default;
+	[[nodiscard]] virtual bool is_none() const = 0;
+	virtual ~filter_base_t() = default;
+	[[nodiscard]] virtual std::string to_string() const = 0;
 };
 
 template<typename filter_t>
@@ -80,9 +78,9 @@ struct ref_t
 		ref_inc();
 	}
 
-	inline ref_t(const ref_t& _ref)
+	inline ref_t(const ref_t& _ref) :
+	        filter(_ref.filter)
 	{
-		filter = _ref.filter;
 		ref_inc();
 	}
 
@@ -146,7 +144,7 @@ struct ref_t
 		return filter != nullptr;
 	}
 
-	inline bool is_none() const
+	[[nodiscard]] inline bool is_none() const
 	{
 		return filter ? filter->is_none() : false;
 	}
@@ -182,7 +180,7 @@ struct filter_network_t : filter_base_t
 {
 	std::vector<network_t> networks;
 
-	inline filter_network_t() {}
+	inline filter_network_t() = default;
 
 	filter_network_t(const ipfw::rule_t::address_t& target)
 	{
@@ -200,12 +198,12 @@ struct filter_network_t : filter_base_t
 		networks.emplace_back(std::move(string));
 	}
 
-	virtual bool is_none() const
+	[[nodiscard]] bool is_none() const override
 	{
 		return networks.empty();
 	}
 
-	virtual std::string to_string() const
+	[[nodiscard]] std::string to_string() const override
 	{
 		if (networks.empty())
 		{
@@ -234,7 +232,7 @@ struct filter_network_t : filter_base_t
 
 inline ref_t<filter_network_t> and_op(const ref_t<filter_network_t>& a, const ref_t<filter_network_t>& b)
 {
-	filter_network_t* result = new filter_network_t;
+	auto* result = new filter_network_t;
 
 	for (const auto& a_item : a.filter->networks)
 	{
@@ -270,7 +268,7 @@ struct filter_prm_t : filter_base_t
 {
 	std::vector<range_t<uint_t>> ranges;
 
-	inline filter_prm_t() {}
+	inline filter_prm_t() = default;
 
 	filter_prm_t(const common::ranges_t& _ranges)
 	{
@@ -336,12 +334,12 @@ struct filter_prm_t : filter_base_t
 		}
 	}
 
-	virtual bool is_none() const
+	[[nodiscard]] bool is_none() const override
 	{
 		return ranges.empty();
 	}
 
-	virtual std::string to_string() const
+	[[nodiscard]] std::string to_string() const override
 	{
 		std::string ret;
 
@@ -372,7 +370,7 @@ struct filter_prm_t : filter_base_t
 template<typename uint_t>
 ref_t<filter_prm_t<uint_t>> and_op(const ref_t<filter_prm_t<uint_t>>& a, const ref_t<filter_prm_t<uint_t>>& b)
 {
-	filter_prm_t<uint_t>* result = new filter_prm_t<uint_t>;
+	auto* result = new filter_prm_t<uint_t>;
 
 	for (const auto& a_item : a.filter->ranges)
 	{
@@ -397,7 +395,7 @@ using filter_prm16_t = filter_prm_t<uint16_t>;
 
 static inline ref_t<filter_prm16_t> icmp_prm1(const common::ranges_t& types, const common::ranges_t& codes)
 {
-	filter_prm16_t* filter = new filter_prm16_t;
+	auto* filter = new filter_prm16_t;
 
 	if (types == ranges_t{common::range_t{0x00, 0xFF}} && codes == ranges_t{common::range_t{0x00, 0xFF}})
 	{
@@ -594,12 +592,12 @@ struct filter_id_t : filter_base_t
 	inline filter_id_t(int _val) :
 	        val(_val) {}
 
-	virtual bool is_none() const
+	[[nodiscard]] bool is_none() const override
 	{
 		return val < 0;
 	}
 
-	virtual std::string to_string() const
+	[[nodiscard]] std::string to_string() const override
 	{
 		return std::to_string(val);
 	}
@@ -743,12 +741,12 @@ struct filter_proto_t : filter_base_t
 		}
 	}
 
-	virtual bool is_none() const
+	[[nodiscard]] bool is_none() const override
 	{
 		return type.is_none() || prm1.is_none() || prm2.is_none();
 	}
 
-	virtual std::string to_string() const
+	[[nodiscard]] std::string to_string() const override
 	{
 		bool has_ports = false, has_icmptypes = false,
 		     has_icmp6types = false, has_flags = false;
@@ -925,12 +923,12 @@ struct filter_t : filter_base_t
 		}
 	}
 
-	virtual bool is_none() const
+	[[nodiscard]] bool is_none() const override
 	{
 		return acl_id.is_none() || src.is_none() || dst.is_none() || proto.is_none() || dir.is_none() || recordstate.is_none();
 	}
 
-	virtual std::string to_string() const
+	[[nodiscard]] std::string to_string() const override
 	{
 		std::string ret;
 
@@ -1063,9 +1061,9 @@ public:
 	        log(false)
 	{}
 
-	rule_t(ipfw::rule_ptr_t rulep, ipfw::fw_config_ptr_t configp)
+	rule_t(ipfw::rule_ptr_t rulep, ipfw::fw_config_ptr_t configp) :
+	        text(rulep->text)
 	{
-		text = rulep->text;
 		switch (rulep->action)
 		{
 			case ipfw::rule_action_t::SKIPTO:
@@ -1116,12 +1114,12 @@ public:
 		ids.emplace_back(rulep->ruleid);
 		for (const auto& [name, how] : rulep->ifaces)
 		{
-			(void)how; // XXX: we can use in/out filters
+			YANET_GCC_BUG_UNUSED(how); // XXX: we can use in/out filters
 			via.insert(name);
 		}
 		for (const auto& [direction, tables] : rulep->iface_tables)
 		{
-			(void)direction; // XXX: we can use in/out filters
+			YANET_GCC_BUG_UNUSED(direction); // XXX: we can use in/out filters
 			for (const auto& tablename : tables)
 			{
 				if (configp->m_tables.count(tablename) == 0)
@@ -1135,7 +1133,7 @@ public:
 					const auto& ifnames = std::get<ipfw::tables::ifname_t>(table);
 					for (const auto& [iface, label] : ifnames)
 					{
-						(void)label;
+						YANET_GCC_BUG_UNUSED(label);
 						via.insert(iface);
 					}
 				}
@@ -1143,7 +1141,7 @@ public:
 				{
 					YANET_LOG_WARNING("wrong type for interface table %s\n", tablename.data());
 				}
-				(void)location;
+				YANET_GCC_BUG_UNUSED(location);
 			}
 		}
 	}

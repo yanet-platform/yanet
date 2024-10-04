@@ -8,11 +8,10 @@
 #include <vector>
 
 #include <arpa/inet.h>
-#include <inttypes.h>
 #include <memory.h>
 #include <nlohmann/json.hpp>
 
-#include "config.h"
+#include "config.release.h"
 #include "ctree.h"
 #include "define.h"
 #include "stream.h"
@@ -62,43 +61,49 @@ public:
 	using this_type = default_value_t<type_t, default_value>;
 
 public:
-	inline default_value_t() :
+	default_value_t() :
 	        value(default_value)
 	{
 	}
 
-	inline default_value_t(const type_t& value) :
+	default_value_t(const type_t& value) :
 	        value(value)
 	{
 	}
 
-	inline operator const type_t&() const
+	operator const type_t&() const
 	{
 		return value;
 	}
 
-	inline this_type& operator+=(const this_type& second)
+	this_type& operator+=(const this_type& second)
 	{
 		this->value += second.value;
 		return *this;
 	}
 
-	inline this_type& operator-=(const this_type& second)
+	this_type& operator-=(const this_type& second)
 	{
 		this->value -= second.value;
 		return *this;
 	}
 
-	inline this_type& operator++()
+	this_type& operator++()
 	{
 		this->value++;
 		return *this;
 	}
 
-	inline this_type& operator--()
+	this_type& operator--()
 	{
 		this->value--;
 		return *this;
+	}
+
+	template<typename U = type_t, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
+	operator std::string() const
+	{
+		return std::to_string(value);
 	}
 
 public:
@@ -121,9 +126,11 @@ constexpr inline uint32_t unlabelled = 3;
 class uint
 {
 public:
-	uint(const std::string& string)
+	uint() = default;
+
+	uint(const std::string& string) :
+	        value(std::stoull(string, nullptr, 0))
 	{
-		value = std::stoull(string, nullptr, 0);
 	}
 
 	constexpr operator const uint64_t&() const
@@ -137,7 +144,7 @@ public:
 		return std::to_string(value);
 	}
 
-	uint64_t value;
+	uint64_t value{};
 };
 
 class mac_address_t
@@ -199,12 +206,12 @@ public:
 		return address < second.address;
 	}
 
-	constexpr operator const std::array<uint8_t, 6> &() const
+	constexpr operator const std::array<uint8_t, 6>&() const
 	{
 		return address;
 	}
 
-	constexpr operator std::array<uint8_t, 6> &()
+	constexpr operator std::array<uint8_t, 6>&()
 	{
 		return address;
 	}
@@ -215,12 +222,12 @@ public:
 	}
 
 public:
-	bool is_default() const
+	[[nodiscard]] bool is_default() const
 	{
 		return *this == mac_address_t();
 	}
 
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		char buffer[64];
 		snprintf(buffer, 64, "%2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X", address[0], address[1], address[2], address[3], address[4], address[5]);
@@ -232,7 +239,7 @@ public:
 		return address.data();
 	}
 
-	const uint8_t* data() const
+	[[nodiscard]] const uint8_t* data() const
 	{
 		return address.data();
 	}
@@ -303,14 +310,14 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		char buffer[64];
 		snprintf(buffer, 64, "%u.%u.%u.%u", (address >> 24) & 0xFF, (address >> 16) & 0xFF, (address >> 8) & 0xFF, address & 0xFF);
 		return buffer;
 	}
 
-	constexpr ipv4_address_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] constexpr ipv4_address_t applyMask(const uint8_t& mask) const
 	{
 		if (mask == 0 ||
 		    mask > 32)
@@ -321,7 +328,7 @@ public:
 		return {address & (0xFFFFFFFFu << (32u - mask))};
 	}
 
-	constexpr std::tuple<ipv4_address_t, ipv4_address_t> splitNetwork(const uint8_t& mask) const
+	[[nodiscard]] constexpr std::tuple<ipv4_address_t, ipv4_address_t> splitNetwork(const uint8_t& mask) const
 	{
 		if (mask >= 32)
 		{
@@ -339,7 +346,7 @@ public:
 		address &= ~((!bit) << (31 - index));
 	}
 
-	uint8_t get_bit(const uint32_t& index) const
+	[[nodiscard]] uint8_t get_bit(const uint32_t& index) const
 	{
 		return (address >> (31 - index)) & 1;
 	}
@@ -422,12 +429,12 @@ public:
 		return !memcmp(address.data(), second.address.data(), address.size());
 	}
 
-	constexpr operator const std::array<uint8_t, 16> &() const
+	constexpr operator const std::array<uint8_t, 16>&() const
 	{
 		return address;
 	}
 
-	constexpr operator std::array<uint8_t, 16> &()
+	constexpr operator std::array<uint8_t, 16>&()
 	{
 		return address;
 	}
@@ -438,7 +445,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		char buffer[256];
 		inet_ntop(AF_INET6, address.data(), buffer, sizeof(buffer));
@@ -446,7 +453,7 @@ public:
 		return buffer;
 	}
 
-	ipv6_address_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] ipv6_address_t applyMask(const uint8_t& mask) const
 	{
 		if (mask == 0 ||
 		    mask > 128)
@@ -470,12 +477,12 @@ public:
 		return {address0, address64};
 	}
 
-	uint128_t getAddress128() const
+	[[nodiscard]] uint128_t getAddress128() const
 	{
 		return ((uint128_t)(getAddress64(0)) << 64) + ((uint128_t)(getAddress64(64)));
 	}
 
-	uint64_t getAddress64(const uint8_t& offset) const
+	[[nodiscard]] uint64_t getAddress64(const uint8_t& offset) const
 	{
 		if (offset % 8 ||
 		    offset > 128 - 64)
@@ -486,7 +493,7 @@ public:
 		return be64toh(*(uint64_t*)&address[offset / 8]);
 	}
 
-	uint32_t getAddress32(const uint8_t& offset) const
+	[[nodiscard]] uint32_t getAddress32(const uint8_t& offset) const
 	{
 		if (offset % 8 ||
 		    offset > 128 - 32)
@@ -497,12 +504,12 @@ public:
 		return be32toh(*(uint32_t*)&address[offset / 8]);
 	}
 
-	ipv4_address_t get_mapped_ipv4_address() const
+	[[nodiscard]] ipv4_address_t get_mapped_ipv4_address() const
 	{
 		return ipv4_address_t(getAddress32(96));
 	}
 
-	constexpr const uint8_t* data() const
+	[[nodiscard]] constexpr const uint8_t* data() const
 	{
 		return address.data();
 	}
@@ -519,7 +526,7 @@ public:
 		byte &= ~((!bit) << (7 - (index % 8)));
 	}
 
-	uint8_t get_bit(const uint32_t& index) const
+	[[nodiscard]] uint8_t get_bit(const uint32_t& index) const
 	{
 		uint32_t address = getAddress32((index / 32) * 32);
 		return (address >> (31 - (index % 32))) & 1;
@@ -538,7 +545,7 @@ public:
 	/// Returns true if this is a multicast address (ff00::/8).
 	///
 	/// This property is defined by IETF RFC 4291.
-	constexpr bool is_multicast() const
+	[[nodiscard]] constexpr bool is_multicast() const
 	{
 		return (address[0] & 0xff) == 0xff;
 	}
@@ -550,9 +557,7 @@ protected:
 class ip_address_t
 {
 public:
-	constexpr ip_address_t()
-	{
-	}
+	constexpr ip_address_t() = default;
 
 	ip_address_t(const uint8_t ip_version, const uint8_t* bytes)
 	{
@@ -612,12 +617,12 @@ public:
 		return !(address == second.address);
 	}
 
-	constexpr operator const std::variant<ipv4_address_t, ipv6_address_t> &() const
+	constexpr operator const std::variant<ipv4_address_t, ipv6_address_t>&() const
 	{
 		return address;
 	}
 
-	constexpr operator std::variant<ipv4_address_t, ipv6_address_t> &()
+	constexpr operator std::variant<ipv4_address_t, ipv6_address_t>&()
 	{
 		return address;
 	}
@@ -628,7 +633,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		std::string string;
 
@@ -640,12 +645,12 @@ public:
 		return string;
 	}
 
-	constexpr bool is_ipv4() const
+	[[nodiscard]] constexpr bool is_ipv4() const
 	{
 		return std::holds_alternative<ipv4_address_t>(address);
 	}
 
-	constexpr bool is_ipv6() const
+	[[nodiscard]] constexpr bool is_ipv6() const
 	{
 		return std::holds_alternative<ipv6_address_t>(address);
 	}
@@ -655,7 +660,7 @@ public:
 		return std::get<ipv4_address_t>(address);
 	}
 
-	const ipv4_address_t& get_ipv4() const
+	[[nodiscard]] const ipv4_address_t& get_ipv4() const
 	{
 		return std::get<ipv4_address_t>(address);
 	}
@@ -665,12 +670,12 @@ public:
 		return std::get<ipv6_address_t>(address);
 	}
 
-	const ipv6_address_t& get_ipv6() const
+	[[nodiscard]] const ipv6_address_t& get_ipv6() const
 	{
 		return std::get<ipv6_address_t>(address);
 	}
 
-	bool is_default() const
+	[[nodiscard]] bool is_default() const
 	{
 		if (is_ipv4() &&
 		    get_ipv4() == ipv4_address_t())
@@ -688,7 +693,7 @@ public:
 		}
 	}
 
-	ip_address_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] ip_address_t applyMask(const uint8_t& mask) const
 	{
 		if (is_ipv4())
 		{
@@ -757,12 +762,12 @@ public:
 		return prefix > second.prefix;
 	}
 
-	constexpr operator const std::tuple<ipv4_address_t, uint8_t> &() const
+	constexpr operator const std::tuple<ipv4_address_t, uint8_t>&() const
 	{
 		return prefix;
 	}
 
-	constexpr operator std::tuple<ipv4_address_t, uint8_t> &()
+	constexpr operator std::tuple<ipv4_address_t, uint8_t>&()
 	{
 		return prefix;
 	}
@@ -773,7 +778,7 @@ public:
 	}
 
 public:
-	constexpr const ipv4_address_t& address() const
+	[[nodiscard]] constexpr const ipv4_address_t& address() const
 	{
 		return std::get<0>(prefix);
 	}
@@ -783,7 +788,7 @@ public:
 		return std::get<0>(prefix);
 	}
 
-	constexpr const uint8_t& mask() const
+	[[nodiscard]] constexpr const uint8_t& mask() const
 	{
 		return std::get<1>(prefix);
 	}
@@ -793,23 +798,23 @@ public:
 		return std::get<1>(prefix);
 	}
 
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		return address().toString() + "/" + std::to_string(mask());
 	}
 
-	constexpr bool isValid() const
+	[[nodiscard]] constexpr bool isValid() const
 	{
 		return mask() <= 32 &&
 		       address().applyMask(mask()) == address();
 	}
 
-	constexpr ipv4_prefix_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] constexpr ipv4_prefix_t applyMask(const uint8_t& mask) const
 	{
 		return {address().applyMask(mask), mask};
 	}
 
-	constexpr std::tuple<ipv4_prefix_t, ipv4_prefix_t> splitNetwork() const
+	[[nodiscard]] constexpr std::tuple<ipv4_prefix_t, ipv4_prefix_t> splitNetwork() const
 	{
 		if (mask() >= 32)
 		{
@@ -831,7 +836,7 @@ public:
 		stream.push(prefix);
 	}
 
-	bool subnetOf(const ipv4_prefix_t& other) const
+	[[nodiscard]] bool subnetOf(const ipv4_prefix_t& other) const
 	{
 		if (mask() < other.mask())
 		{
@@ -841,7 +846,7 @@ public:
 		return address().applyMask(other.mask()) == other.address();
 	}
 
-	bool subnetFor(const ipv4_address_t& other) const
+	[[nodiscard]] bool subnetFor(const ipv4_address_t& other) const
 	{
 		return other.applyMask(mask()) == address().applyMask(mask());
 	}
@@ -853,9 +858,7 @@ protected:
 class ipv4_prefix_with_announces_t
 {
 public:
-	ipv4_prefix_with_announces_t()
-	{
-	}
+	ipv4_prefix_with_announces_t() = default;
 
 	ipv4_prefix_with_announces_t(const nlohmann::json& prefixJson)
 	{
@@ -972,12 +975,12 @@ public:
 		return prefix > second.prefix;
 	}
 
-	constexpr operator const std::tuple<ipv6_address_t, uint8_t> &() const
+	constexpr operator const std::tuple<ipv6_address_t, uint8_t>&() const
 	{
 		return prefix;
 	}
 
-	constexpr operator std::tuple<ipv6_address_t, uint8_t> &()
+	constexpr operator std::tuple<ipv6_address_t, uint8_t>&()
 	{
 		return prefix;
 	}
@@ -988,7 +991,7 @@ public:
 	}
 
 public:
-	constexpr const ipv6_address_t& address() const
+	[[nodiscard]] constexpr const ipv6_address_t& address() const
 	{
 		return std::get<0>(prefix);
 	}
@@ -998,7 +1001,7 @@ public:
 		return std::get<0>(prefix);
 	}
 
-	constexpr const uint8_t& mask() const
+	[[nodiscard]] constexpr const uint8_t& mask() const
 	{
 		return std::get<1>(prefix);
 	}
@@ -1008,12 +1011,12 @@ public:
 		return std::get<1>(prefix);
 	}
 
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		return address().toString() + "/" + std::to_string(mask());
 	}
 
-	bool isValid() const
+	[[nodiscard]] bool isValid() const
 	{
 		if (mask() > 128)
 		{
@@ -1033,22 +1036,22 @@ public:
 		return true;
 	}
 
-	ipv6_prefix_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] ipv6_prefix_t applyMask(const uint8_t& mask) const
 	{
 		return {address().applyMask(mask), mask};
 	}
 
-	uint64_t getAddress64(const uint8_t& offset) const
+	[[nodiscard]] uint64_t getAddress64(const uint8_t& offset) const
 	{
 		return address().getAddress64(offset) & getAddressMask64(offset);
 	}
 
-	uint32_t getAddress32(const uint8_t& offset) const
+	[[nodiscard]] uint32_t getAddress32(const uint8_t& offset) const
 	{
 		return address().getAddress32(offset) & getAddressMask32(offset);
 	}
 
-	uint64_t getAddressMask64(const uint8_t& offset) const
+	[[nodiscard]] uint64_t getAddressMask64(const uint8_t& offset) const
 	{
 		if (offset > 128 - 64)
 		{
@@ -1068,7 +1071,7 @@ public:
 		return 0xFFFFFFFFFFFFFFFFull << (64ull + offset - mask());
 	}
 
-	uint32_t getAddressMask32(const uint8_t& offset) const
+	[[nodiscard]] uint32_t getAddressMask32(const uint8_t& offset) const
 	{
 		if (offset > 128 - 32)
 		{
@@ -1098,12 +1101,12 @@ public:
 		stream.push(prefix);
 	}
 
-	bool subnetFor(const ipv6_address_t& other) const
+	[[nodiscard]] bool subnetFor(const ipv6_address_t& other) const
 	{
 		return other.applyMask(mask()) == address().applyMask(mask());
 	}
 
-	bool subnetOf(const ipv6_prefix_t& other) const
+	[[nodiscard]] bool subnetOf(const ipv6_prefix_t& other) const
 	{
 		if (mask() < other.mask())
 		{
@@ -1200,9 +1203,7 @@ public:
 class ip_prefix_t
 {
 public:
-	constexpr ip_prefix_t()
-	{
-	}
+	constexpr ip_prefix_t() = default;
 
 	constexpr ip_prefix_t(const ipv4_prefix_t& prefix) :
 	        prefix(prefix)
@@ -1253,12 +1254,12 @@ public:
 		return prefix == second.prefix;
 	}
 
-	constexpr operator const std::variant<ipv4_prefix_t, ipv6_prefix_t> &() const
+	constexpr operator const std::variant<ipv4_prefix_t, ipv6_prefix_t>&() const
 	{
 		return prefix;
 	}
 
-	constexpr operator std::variant<ipv4_prefix_t, ipv6_prefix_t> &()
+	constexpr operator std::variant<ipv4_prefix_t, ipv6_prefix_t>&()
 	{
 		return prefix;
 	}
@@ -1269,7 +1270,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		std::string string;
 
@@ -1281,12 +1282,12 @@ public:
 		return string;
 	}
 
-	bool is_ipv4() const
+	[[nodiscard]] bool is_ipv4() const
 	{
 		return std::holds_alternative<ipv4_prefix_t>(prefix);
 	}
 
-	bool is_ipv6() const
+	[[nodiscard]] bool is_ipv6() const
 	{
 		return std::holds_alternative<ipv6_prefix_t>(prefix);
 	}
@@ -1296,7 +1297,7 @@ public:
 		return std::get<ipv4_prefix_t>(prefix);
 	}
 
-	const ipv4_prefix_t& get_ipv4() const
+	[[nodiscard]] const ipv4_prefix_t& get_ipv4() const
 	{
 		return std::get<ipv4_prefix_t>(prefix);
 	}
@@ -1306,7 +1307,7 @@ public:
 		return std::get<ipv6_prefix_t>(prefix);
 	}
 
-	const ipv6_prefix_t& get_ipv6() const
+	[[nodiscard]] const ipv6_prefix_t& get_ipv6() const
 	{
 		return std::get<ipv6_prefix_t>(prefix);
 	}
@@ -1323,7 +1324,7 @@ public:
 		}
 	}
 
-	const uint8_t& mask() const
+	[[nodiscard]] const uint8_t& mask() const
 	{
 		if (is_ipv4())
 		{
@@ -1335,7 +1336,7 @@ public:
 		}
 	}
 
-	bool is_default() const
+	[[nodiscard]] bool is_default() const
 	{
 		if (is_ipv4() &&
 		    get_ipv4() == ipv4_prefix_t())
@@ -1353,7 +1354,7 @@ public:
 		}
 	}
 
-	bool is_host() const
+	[[nodiscard]] bool is_host() const
 	{
 		if (is_ipv4())
 		{
@@ -1365,7 +1366,7 @@ public:
 		}
 	}
 
-	ip_prefix_t get_default() const
+	[[nodiscard]] ip_prefix_t get_default() const
 	{
 		if (is_ipv4())
 		{
@@ -1377,7 +1378,7 @@ public:
 		}
 	}
 
-	ip_address_t address() const
+	[[nodiscard]] ip_address_t address() const
 	{
 		if (is_ipv4())
 		{
@@ -1389,7 +1390,7 @@ public:
 		}
 	}
 
-	ip_prefix_t applyMask(const uint8_t& mask) const
+	[[nodiscard]] ip_prefix_t applyMask(const uint8_t& mask) const
 	{
 		if (is_ipv4())
 		{
@@ -1401,7 +1402,7 @@ public:
 		}
 	}
 
-	bool subnetFor(const ip_address_t& other) const
+	[[nodiscard]] bool subnetFor(const ip_address_t& other) const
 	{
 		if (is_ipv4() && other.is_ipv4())
 		{
@@ -1433,9 +1434,7 @@ class ip_prefix_with_announces_t
 public:
 	using variant_t = std::variant<ipv4_prefix_with_announces_t, ipv6_prefix_with_announces_t>;
 
-	ip_prefix_with_announces_t()
-	{
-	}
+	ip_prefix_with_announces_t() = default;
 
 	ip_prefix_with_announces_t(const nlohmann::json& prefixJson)
 	{
@@ -1488,7 +1487,7 @@ public:
 	}
 
 public:
-	ip_prefix_t get_prefix() const
+	[[nodiscard]] ip_prefix_t get_prefix() const
 	{
 		if (std::holds_alternative<ipv4_prefix_with_announces_t>(prefix))
 		{
@@ -1572,7 +1571,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		return std::to_string(value >> 16) + ":" + std::to_string(value & 0xFFFF);
 	}
@@ -1641,12 +1640,12 @@ public:
 		return value == second.value;
 	}
 
-	constexpr operator const std::array<uint32_t, 3> &() const
+	constexpr operator const std::array<uint32_t, 3>&() const
 	{
 		return value;
 	}
 
-	constexpr operator std::array<uint32_t, 3> &()
+	constexpr operator std::array<uint32_t, 3>&()
 	{
 		return value;
 	}
@@ -1657,7 +1656,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		return std::to_string(value[0]) + ":" + std::to_string(value[1]) + ":" + std::to_string(value[2]);
 	}
@@ -1679,44 +1678,42 @@ public:
 class values_t
 {
 public:
-	values_t()
-	{
-	}
+	values_t() = default;
 
-	template<typename... args_T>
-	values_t(const args_T&... args)
+	template<typename... Args>
+	values_t(const Args&... args)
 	{
 		insertHelper(args...);
 	}
 
-	operator const std::set<uint64_t> &() const
+	operator const std::set<uint64_t>&() const
 	{
 		return values;
 	}
 
-	operator std::set<uint64_t> &()
+	operator std::set<uint64_t>&()
 	{
 		return values;
 	}
 
-	auto begin() const
+	[[nodiscard]] auto begin() const
 	{
 		return values.begin();
 	}
 
-	auto end() const
+	[[nodiscard]] auto end() const
 	{
 		return values.end();
 	}
 
 protected:
-	template<typename arg0_T, typename... args_T>
+	template<typename arg0_T, typename... Args>
 	void insertHelper(const arg0_T& arg0,
-	                  const args_T&... args)
+	                  const Args&... args)
 	{
 		values.emplace(arg0);
 
-		if constexpr (sizeof...(args_T))
+		if constexpr (sizeof...(Args))
 		{
 			insertHelper(args...);
 		}
@@ -1729,9 +1726,7 @@ protected:
 class range_t
 {
 public:
-	constexpr range_t()
-	{
-	}
+	constexpr range_t() = default;
 
 	constexpr range_t(const uint64_t& value) :
 	        range(value, value)
@@ -1773,12 +1768,12 @@ public:
 		return range < second.range;
 	}
 
-	constexpr operator const std::tuple<uint64_t, uint64_t> &() const
+	constexpr operator const std::tuple<uint64_t, uint64_t>&() const
 	{
 		return range;
 	}
 
-	constexpr operator std::tuple<uint64_t, uint64_t> &()
+	constexpr operator std::tuple<uint64_t, uint64_t>&()
 	{
 		return range;
 	}
@@ -1789,7 +1784,7 @@ public:
 	}
 
 public:
-	std::string toString() const
+	[[nodiscard]] std::string toString() const
 	{
 		return std::to_string(from()) + (from() == to() ? "" : "-" + std::to_string(to()));
 	}
@@ -1799,7 +1794,7 @@ public:
 		return std::get<0>(range);
 	}
 
-	const uint64_t& from() const
+	[[nodiscard]] const uint64_t& from() const
 	{
 		return std::get<0>(range);
 	}
@@ -1809,7 +1804,7 @@ public:
 		return std::get<1>(range);
 	}
 
-	const uint64_t& to() const
+	[[nodiscard]] const uint64_t& to() const
 	{
 		return std::get<1>(range);
 	}
@@ -1849,9 +1844,7 @@ protected:
 class ranges_t ///< @todo: rename filter_t
 {
 public:
-	ranges_t()
-	{
-	}
+	ranges_t() = default;
 
 	ranges_t(const uint64_t& value)
 	{
@@ -1897,17 +1890,17 @@ public:
 		return ranges < second.ranges;
 	}
 
-	auto begin() const
+	[[nodiscard]] auto begin() const
 	{
 		return ranges.begin();
 	}
 
-	auto end() const
+	[[nodiscard]] auto end() const
 	{
 		return ranges.end();
 	}
 
-	bool empty() const
+	[[nodiscard]] bool empty() const
 	{
 		return ranges.empty();
 	}
@@ -1959,7 +1952,7 @@ public:
 		ranges = newRanges;
 	}
 
-	bool isIntersect(const ranges_t& second) const
+	[[nodiscard]] bool isIntersect(const ranges_t& second) const
 	{
 		for (const auto& range : ranges)
 		{
@@ -1998,9 +1991,7 @@ constexpr ipv6_prefix_t ipv6_prefix_default = {ipv6_address_default, 0};
 
 //
 
-namespace worker
-{
-namespace stats
+namespace worker::stats
 {
 struct common
 {
@@ -2046,7 +2037,6 @@ struct port
 	uint64_t physicalPort_egress_drops = 0;
 	uint64_t controlPlane_drops = 0; ///< @todo: DELETE
 };
-}
 }
 
 namespace worker_gc
@@ -2302,7 +2292,6 @@ class tFlow
 {
 public:
 	tFlow() :
-	        type(eFlowType::controlPlane), ///< @todo: drop
 	        flags(0),
 	        counter_id(0)
 	{
@@ -2317,12 +2306,12 @@ public:
 		data.atomic = 0;
 	}
 
-	inline bool operator==(const tFlow& second) const
+	bool operator==(const tFlow& second) const
 	{
 		return std::tie(type_params_atomic, data.atomic) == std::tie(second.type_params_atomic, second.data.atomic);
 	}
 
-	inline bool operator!=(const tFlow& second) const
+	bool operator!=(const tFlow& second) const
 	{
 		return !operator==(second);
 	}
@@ -2383,7 +2372,7 @@ public:
 		uint32_t type_params_atomic;
 		struct
 		{
-			eFlowType type;
+			eFlowType type{eFlowType::controlPlane}; ///< @todo: drop
 			uint8_t flags : 2;
 			uint32_t counter_id : 22;
 		};
@@ -2649,7 +2638,7 @@ struct hash<common::ipv4_address_t>
 {
 	std::size_t operator()(const common::ipv4_address_t& ip_addr) const
 	{
-		const uint32_t ipv4 = static_cast<uint32_t>(ip_addr);
+		const auto ipv4 = static_cast<uint32_t>(ip_addr);
 		return std::hash<uint32_t>()(ipv4);
 	}
 };

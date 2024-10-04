@@ -1,6 +1,4 @@
-#include <signal.h>
-
-#include <iostream>
+#include <csignal>
 
 #include "common/result.h"
 
@@ -45,7 +43,7 @@ int main(int argc,
 	/** @todo
 	if (signal(SIGINT, handleSignal) == SIG_ERR)
 	{
-		return 3;
+	        return 3;
 	}
 	*/
 

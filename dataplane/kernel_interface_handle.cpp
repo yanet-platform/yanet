@@ -42,7 +42,7 @@ KernelInterfaceHandle::KernelInterfaceHandle(KernelInterfaceHandle&& other) noex
 	*this = std::move(other);
 }
 
-bool KernelInterfaceHandle::Start() const
+bool KernelInterfaceHandle::Start() const noexcept
 {
 	auto rc = rte_eth_dev_start(kni_port_);
 	if (rc)
@@ -137,7 +137,7 @@ rte_eth_conf KernelInterfaceHandle::DefaultConfig() noexcept
 	return eth_conf;
 }
 
-bool KernelInterfaceHandle::Configure(const rte_eth_conf& eth_conf)
+bool KernelInterfaceHandle::Configure(const rte_eth_conf& eth_conf) noexcept
 {
 	int ret = rte_eth_dev_configure(kni_port_,
 	                                1,
@@ -153,7 +153,7 @@ bool KernelInterfaceHandle::Configure(const rte_eth_conf& eth_conf)
 
 bool KernelInterfaceHandle::CloneMTU(const uint16_t port_id) const noexcept
 {
-	uint16_t mtu;
+	uint16_t mtu = 0;
 	if (rte_eth_dev_get_mtu(port_id, &mtu) != 0)
 		return false;
 

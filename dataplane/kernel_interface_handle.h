@@ -25,8 +25,8 @@ public:
 	MakeKernelInterfaceHandle(std::string_view name,
 	                          tPortId port,
 	                          uint16_t queue_size) noexcept;
-	const tPortId& Id() const noexcept { return kni_port_; }
-	bool Start() const noexcept;
+	[[nodiscard]] const tPortId& Id() const noexcept { return kni_port_; }
+	[[nodiscard]] bool Start() const noexcept;
 	[[nodiscard]] bool SetUp() const noexcept;
 	bool SetupRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool) noexcept;
 	bool SetupTxQueue(tQueueId queue, tSocketId socket) noexcept;
@@ -38,7 +38,7 @@ private:
 	void Remove() noexcept;
 	static rte_eth_conf DefaultConfig() noexcept;
 	bool Configure(const rte_eth_conf& eth_conf) noexcept;
-	bool CloneMTU(const uint16_t) const noexcept;
+	[[nodiscard]] bool CloneMTU(const uint16_t) const noexcept;
 	void MarkInvalid() noexcept { kni_port_ = INVALID_PORT_ID; }
 	[[nodiscard]] bool Valid() const { return kni_port_ != INVALID_PORT_ID; }
 };

@@ -21,10 +21,6 @@ cControlPlane::cControlPlane() :
 {
 }
 
-cControlPlane::~cControlPlane()
-{
-}
-
 eResult cControlPlane::init(const std::string& jsonFilePath)
 {
 	eResult result = eResult::success;
@@ -485,7 +481,7 @@ common::icp::acl_lookup::response cControlPlane::acl_lookup(const common::icp::a
 	std::map<uint32_t, std::string> labels;
 	for (const auto& [module, acl] : acls)
 	{
-		(void)module;
+		YANET_GCC_BUG_UNUSED(module);
 
 		for (const auto& [label, info] : acl.firewall->labels())
 		{
@@ -507,7 +503,7 @@ common::icp::acl_lookup::response cControlPlane::acl_lookup(const common::icp::a
 
 		for (const auto& [id, gen_text, orig_text] : rules)
 		{
-			(void)gen_text;
+			YANET_GCC_BUG_UNUSED(gen_text);
 
 			if (ids.count(id))
 			{
@@ -607,7 +603,7 @@ common::icp::getFwLabels::response cControlPlane::command_getFwLabels()
 	for (const auto& [module, acl] : current.acls)
 	{
 		const auto& fw = acl.firewall;
-		(void)module;
+		YANET_GCC_BUG_UNUSED(module);
 		for (const auto& [label, info] : fw->labels())
 		{
 			auto ruleno = std::get<unsigned int>(info);
@@ -657,7 +653,7 @@ common::icp::getFwList::response cControlPlane::command_getFwList(const common::
 
 		for (const auto& [id, gen_text, unused_text] : current.dispatcher)
 		{
-			(void)unused_text;
+			YANET_GCC_BUG_UNUSED(unused_text);
 			// XXX: if we need accounting for dispatcher rules
 			//      we can prepare id mappings for them.
 			response_rules.emplace_back(id, 0, gen_text);
@@ -849,7 +845,7 @@ common::icp::convert::response cControlPlane::convert_logical_module()
 
 	for (auto [id, name] : logicalport_id_to_name)
 	{
-		response.push_back({id, name});
+		response.emplace_back(id, name);
 	}
 
 	return response;
@@ -1008,7 +1004,7 @@ std::vector<uint64_t> cControlPlane::getAclCounters()
 	uint64_t start_acl_counters = sdp_data.metadata_worker.start_acl_counters;
 	for (const auto& iter : sdp_data.workers)
 	{
-		uint64_t* aclCounters = common::sdp::ShiftBuffer<uint64_t*>(iter.second.buffer, start_acl_counters);
+		auto* aclCounters = common::sdp::ShiftBuffer<uint64_t*>(iter.second.buffer, start_acl_counters);
 		for (size_t i = 0; i < YANET_CONFIG_ACL_COUNTERS_SIZE; i++)
 		{
 			response[i] += aclCounters[i];

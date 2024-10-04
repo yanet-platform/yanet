@@ -9,70 +9,64 @@ namespace common::acl
 class tree_value_t
 {
 public:
-	tree_value_t() :
-	        id(0)
-	{
-	}
+	tree_value_t() = default;
 
 	constexpr bool operator<(const tree_value_t& second) const
 	{
 		return id < second.id;
 	}
 
-	inline bool is_empty() const
+	[[nodiscard]] bool is_empty() const
 	{
 		return !id;
 	}
 
-	inline uint32_t get_group_id() const
+	[[nodiscard]] uint32_t get_group_id() const
 	{
 		return id;
 	}
 
-	inline void set_group_id(const uint32_t group_id)
+	void set_group_id(const uint32_t group_id)
 	{
 		id = group_id;
 	}
 
-	inline bool is_chunk_id() const
+	[[nodiscard]] bool is_chunk_id() const
 	{
 		return id & 0x80000000u;
 	}
 
-	inline uint32_t get_chunk_id() const
+	[[nodiscard]] uint32_t get_chunk_id() const
 	{
 		return id ^ 0x80000000u;
 	}
 
-	inline void set_chunk_id(const uint32_t chunk_id)
+	void set_chunk_id(const uint32_t chunk_id)
 	{
 		id = chunk_id ^ 0x80000000u;
 	}
 
 protected:
-	uint32_t id; ///< stored group_id or chunk_id
+	uint32_t id{}; ///< stored group_id or chunk_id
 };
 
 template<unsigned int bits = 8>
 class tree_chunk_t
 {
 public:
-	tree_chunk_t() :
-	        is_multirefs(0)
-	{
-	}
+	tree_chunk_t() = default;
 
-	inline void pop(common::stream_in_t& stream)
+	void pop(common::stream_in_t& stream)
 	{
 		stream.pop(values);
 	}
 
-	inline void push(common::stream_out_t& stream) const
+	void push(common::stream_out_t& stream) const
 	{
 		stream.push(values);
 	}
 
-	uint8_t is_multirefs;
+	uint8_t is_multirefs{};
 	tree_value_t values[1u << bits];
 };
 
@@ -142,12 +136,12 @@ public:
 	}
 
 public:
-	inline type_t from() const
+	type_t from() const
 	{
 		return std::get<0>(from_to);
 	}
 
-	inline type_t to() const
+	type_t to() const
 	{
 		return std::get<1>(from_to);
 	}

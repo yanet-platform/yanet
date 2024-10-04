@@ -5,7 +5,6 @@
 
 #include "base.h"
 #include "dpdk.h"
-#include "metadata.h"
 
 namespace dataplane
 {
@@ -40,8 +39,8 @@ public:
 	DirectionStats FlushTracked();
 	void Push(rte_mbuf* mbuf);
 	DirectionStats PushTracked(rte_mbuf* mbuf);
-	const tPortId& port() const;
-	const tQueueId& queue() const;
+	[[nodiscard]] const tPortId& port() const;
+	[[nodiscard]] const tQueueId& queue() const;
 };
 
 struct KernelInterfaceBundleConfig
@@ -87,9 +86,9 @@ private:
 
 public:
 	KernelInterfaceWorker(const KernelInterfaceWorkerConfig& config);
-	ConstPortArrayRange<tPortId> PortsIds() const;
-	ConstPortArrayRange<sKniStats> PortsStats() const;
-	std::optional<std::reference_wrapper<const sKniStats>> PortStats(tPortId pid) const;
+	[[nodiscard]] ConstPortArrayRange<tPortId> PortsIds() const;
+	[[nodiscard]] ConstPortArrayRange<sKniStats> PortsStats() const;
+	[[nodiscard]] std::optional<std::reference_wrapper<const sKniStats>> PortStats(tPortId pid) const;
 
 	/// @brief Transmit accumulated packets. Those that could not be sent are freed
 	void Flush();

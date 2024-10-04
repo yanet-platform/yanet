@@ -1,8 +1,10 @@
 #pragma once
 
+#include <rte_byteorder.h>
+
 #include "common/result.h"
 #include "common/sdpcommon.h"
-#include "type.h"
+#include "common/shared_memory.h"
 
 namespace common::sdp
 {

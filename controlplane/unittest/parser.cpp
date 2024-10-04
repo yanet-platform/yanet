@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include "common/type.h"
 #include "libfwparser/fw_parser.h"
 
 namespace
@@ -8,7 +7,7 @@ namespace
 
 auto parse_rules(const std::string& rules, bool validation = false)
 {
-	bool ret;
+	bool ret = false;
 
 	ipfw::fw_config_t firewall;
 	firewall.schedule_string(rules);

@@ -14,10 +14,7 @@ namespace interface
 class dataPlane
 {
 public:
-	dataPlane() :
-	        clientSocket(-1)
-	{
-	}
+	dataPlane() = default;
 
 	~dataPlane()
 	{
@@ -283,7 +280,7 @@ protected:
 	}
 
 	template<common::idp::requestType T, class Req>
-	inline common::idp::response call(const Req& request) const
+	common::idp::response call(const Req& request) const
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		connectToDataPlane();
@@ -297,7 +294,7 @@ protected:
 	}
 
 	template<common::idp::requestType T, class Req>
-	inline common::idp::response call(Req&& request) const
+	common::idp::response call(Req&& request) const
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		connectToDataPlane();
@@ -305,7 +302,7 @@ protected:
 	}
 
 protected:
-	mutable int clientSocket;
+	mutable int clientSocket{-1};
 	mutable std::mutex mutex;
 };
 

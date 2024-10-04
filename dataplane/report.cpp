@@ -35,9 +35,7 @@ nlohmann::json convertHashtable(const hashtable_mod_T& hashtable, const stats_T&
 
 } // namespace
 
-namespace common
-{
-namespace dregress
+namespace common::dregress
 {
 void to_json(nlohmann::json& j, const stats_t& stats)
 {
@@ -57,8 +55,7 @@ void to_json(nlohmann::json& j, const stats_t& stats)
 	        {"tcp_timeout_sessions", stats.tcp_timeout_sessions},
 	        {"tcp_unknown_sessions", stats.tcp_unknown_sessions}};
 }
-} // namespace dregress
-} // namespace common
+} // namespace common::dregress
 
 cReport::cReport(cDataPlane* dataPlane) :
         dataPlane(dataPlane)
@@ -76,7 +73,7 @@ nlohmann::json cReport::getReport()
 
 	for (const auto& [core_id, worker] : dataPlane->worker_gcs)
 	{
-		(void)core_id;
+		YANET_GCC_BUG_UNUSED(core_id);
 		jsonReport["worker_gcs"].emplace_back(convertWorkerGC(worker));
 	}
 

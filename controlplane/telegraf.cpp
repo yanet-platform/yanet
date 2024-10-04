@@ -4,8 +4,7 @@
 using common::int64;
 using controlplane::module::telegraf;
 
-YANET_UNUSED
-static inline double perSecond(const int64_t& valueDiff, const uint64_t& timeDiff)
+[[maybe_unused]] static inline double perSecond(const int64_t& valueDiff, const uint64_t& timeDiff)
 {
 	if (timeDiff == 0)
 	{
@@ -52,10 +51,6 @@ telegraf_t::telegraf_t() :
 {
 }
 
-telegraf_t::~telegraf_t()
-{
-}
-
 eResult telegraf_t::init()
 {
 	controlPlane->register_command(common::icp::requestType::telegraf_unsafe, [this]() {
@@ -92,10 +87,8 @@ void telegraf_t::reload_before()
 
 void telegraf_t::reload(const controlplane::base_t& base_prev,
                         const controlplane::base_t& base_next,
-                        common::idp::updateGlobalBase::request& globalbase)
+                        [[maybe_unused]] common::idp::updateGlobalBase::request& globalbase)
 {
-	(void)globalbase;
-
 	generations.next().update(base_prev, base_next);
 }
 
@@ -145,7 +138,7 @@ common::icp::telegraf_unsafe::response telegraf_t::telegraf_unsafe()
 		{
 			const auto& [encap_packets, encap_bytes, encap_dropped, decap_packets, decap_bytes, decap_unknown] = tun64Stats.at(name);
 
-			(void)tunnel;
+			YANET_GCC_BUG_UNUSED(tunnel);
 			responseTun64[name] = {encap_packets, encap_bytes, encap_dropped, decap_packets, decap_bytes, decap_unknown};
 		}
 	}
@@ -181,7 +174,7 @@ common::icp::telegraf_mappings::response telegraf_t::telegraf_mappings()
 				const auto& [encap_packets, encap_bytes, decap_packets, decap_bytes] = counters.at({name, ipv4_address});
 				const common::tun64mapping::stats_t stats = {encap_packets, encap_bytes, decap_packets, decap_bytes};
 
-				(void)location;
+				YANET_GCC_BUG_UNUSED(location);
 				response.emplace_back(name, ipv4_address, ipv6_address, stats);
 			}
 		}
@@ -224,7 +217,7 @@ common::icp::telegraf_dregress_traffic::response telegraf_t::telegraf_dregress_t
 		{
 			const auto& [is_ipv4, peer_id, nexthop, origin_as] = key;
 			const auto& [packets, bytes] = value;
-			(void)origin_as;
+			YANET_GCC_BUG_UNUSED(origin_as);
 
 			auto it = dregress_traffic_counters_prev.find(key);
 			if (it != dregress_traffic_counters_prev.end())
@@ -310,7 +303,7 @@ common::icp::telegraf_other::response telegraf_t::telegraf_other()
 	for (const auto& [coreId, worker_info] : sdp_data->workers)
 	{
 		std::array<uint64_t, CONFIG_YADECAP_MBUFS_BURST_SIZE + 1> bursts;
-		uint64_t* worker_bursts =
+		auto* worker_bursts =
 		        common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer, sdp_data->metadata_worker.start_bursts);
 		memcpy(&bursts[0], worker_bursts, sizeof(uint64_t) * (CONFIG_YADECAP_MBUFS_BURST_SIZE + 1));
 		currWorkers[coreId] = bursts;

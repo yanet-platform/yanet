@@ -1,7 +1,6 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -90,7 +89,7 @@ int main(int argc, char* argv[])
 	common::acl::iface_map_t ifmap;
 	std::set<std::string> oif, iif;
 	std::string fname;
-	char ch;
+	char ch = 0;
 
 	while ((ch = getopt(argc, argv, "f:o:i:hI")) != -1)
 	{

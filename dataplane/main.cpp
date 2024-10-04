@@ -1,4 +1,4 @@
-#include <signal.h>
+#include <csignal>
 #include <systemd/sd-daemon.h>
 
 #include <iostream>
@@ -58,7 +58,7 @@ int main(int argc,
 	/** @todo
 	if (signal(SIGINT, handleSignal) == SIG_ERR)
 	{
-		return 3;
+	        return 3;
 	}
 	*/
 

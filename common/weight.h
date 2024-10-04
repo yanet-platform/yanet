@@ -16,7 +16,6 @@ class weight_t
 
 public:
 	weight_t() :
-	        size(0),
 	        current(0)
 	{
 		base.resize(size_T, 0);
@@ -114,7 +113,7 @@ protected:
 
 	mutable std::vector<index_type_T> base;
 
-	uint32_t size;
+	uint32_t size{};
 	mutable std::atomic<uint32_t> current;
 };
 

@@ -1,8 +1,6 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
-#include "common/fallback.h"
-
 #include "checksum.h"
 #include "dataplane.h"
 #include "dregress.h"
@@ -115,11 +113,11 @@ void dregress_t::insert(rte_mbuf* mbuf)
 		}
 
 		const auto& [prefix, nexthop, is_best, label, community, peer_as, origin_as] = *direction;
-		(void)prefix;
-		(void)is_best;
-		(void)community;
-		(void)peer_as;
-		(void)origin_as;
+		YANET_GCC_BUG_UNUSED(prefix);
+		YANET_GCC_BUG_UNUSED(is_best);
+		YANET_GCC_BUG_UNUSED(community);
+		YANET_GCC_BUG_UNUSED(peer_as);
+		YANET_GCC_BUG_UNUSED(origin_as);
 
 		labelled_nexthop = ipv6_address_t::convert(nexthop);
 		labelled_label = label;
@@ -128,13 +126,13 @@ void dregress_t::insert(rte_mbuf* mbuf)
 	}
 	else
 	{
-		dregress::connection_value_t* value;
-		dataplane::spinlock_t* locker;
+		dregress::connection_value_t* value = nullptr;
+		dataplane::spinlock_t* locker = nullptr;
 
 		connections->lookup(key, value, locker);
 
-		uint32_t loss_count;
-		uint32_t ack_count;
+		uint32_t loss_count = 0;
+		uint32_t ack_count = 0;
 
 		int32_t ack_diff = 0;
 		int32_t loss_diff = 0;
@@ -158,7 +156,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 			labelled_label = label;
 
 			ipv6_address_t prefix_address;
-			uint8_t prefix_mask;
+			uint8_t prefix_mask = 0;
 			if (prefix.is_ipv4())
 			{
 				prefix_address = ipv6_address_t::convert(prefix.get_ipv4().address());
@@ -334,7 +332,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 		}
 	}
 
-	uint16_t payload_length;
+	uint16_t payload_length = 0;
 	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
 	{
 		rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
@@ -545,11 +543,11 @@ std::optional<dregress::direction_t> dregress_t::lookup(rte_mbuf* mbuf)
 	auto direction = (*std::next(directions.begin(), rand() % directions.size())).second;
 	{
 		auto& [prefix, nexthop, is_best, label, community, peer_as, origin_as] = direction;
-		(void)nexthop;
-		(void)label;
-		(void)community;
-		(void)peer_as;
-		(void)origin_as;
+		YANET_GCC_BUG_UNUSED(nexthop);
+		YANET_GCC_BUG_UNUSED(label);
+		YANET_GCC_BUG_UNUSED(community);
+		YANET_GCC_BUG_UNUSED(peer_as);
+		YANET_GCC_BUG_UNUSED(origin_as);
 
 		if (prefix.mask() != mask_max)
 		{

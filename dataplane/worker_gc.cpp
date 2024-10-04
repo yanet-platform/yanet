@@ -1,14 +1,11 @@
-#include <thread>
-
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 
 #include "common/counters.h"
 #include "common/fallback.h"
-
-#include "dataplane.h"
-#include "worker.h"
-#include "worker_gc.h"
+#include "dataplane/globalbase.h"
+#include "dataplane/sdpserver.h"
+#include "dataplane/worker_gc.h"
 
 worker_gc_t::worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, SamplersVector&& samplers) :
         mempool(nullptr),
@@ -246,11 +243,8 @@ void worker_gc_t::handle_nat64stateful_gc()
 		const auto& nat64stateful = base.globalBase->nat64statefuls[wan_key.nat64stateful_id];
 
 		/// check other wan tables
-		for (unsigned int numa_i = 0;
-		     numa_i < YANET_CONFIG_NUMA_SIZE;
-		     numa_i++)
+		for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 		{
-			auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 			if (globalbase_atomic == base_permanently.globalBaseAtomic)
 			{
 				continue;
@@ -260,8 +254,8 @@ void worker_gc_t::handle_nat64stateful_gc()
 				break;
 			}
 
-			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
-			dataplane::spinlock_nonrecursive_t* wan_locker;
+			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup = nullptr;
+			dataplane::spinlock_nonrecursive_t* wan_locker = nullptr;
 			globalbase_atomic->nat64stateful_wan_state->lookup(wan_key, wan_value_lookup, wan_locker);
 			if (wan_value_lookup)
 			{
@@ -282,18 +276,15 @@ void worker_gc_t::handle_nat64stateful_gc()
 		lan_key.port_destination = wan_key.port_source;
 
 		/// check lan tables
-		for (unsigned int numa_i = 0;
-		     numa_i < YANET_CONFIG_NUMA_SIZE;
-		     numa_i++)
+		for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 		{
-			auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 			if (globalbase_atomic == nullptr)
 			{
 				break;
 			}
 
-			dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup;
-			dataplane::spinlock_nonrecursive_t* lan_locker;
+			dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup = nullptr;
+			dataplane::spinlock_nonrecursive_t* lan_locker = nullptr;
 			globalbase_atomic->nat64stateful_lan_state->lookup(lan_key, lan_value_lookup, lan_locker);
 			if (lan_value_lookup)
 			{
@@ -431,11 +422,8 @@ void worker_gc_t::handle_balancer_gc()
 				auto value = *iter.value();
 				iter.unlock();
 
-				for (unsigned int numa_i = 0;
-				     numa_i < YANET_CONFIG_NUMA_SIZE;
-				     numa_i++)
+				for (auto globalbase_atomic_other : base_permanently.globalBaseAtomics)
 				{
-					dataplane::globalBase::atomic* globalbase_atomic_other = base_permanently.globalBaseAtomics[numa_i];
 					if (globalbase_atomic_other == nullptr)
 					{
 						break;
@@ -449,9 +437,9 @@ void worker_gc_t::handle_balancer_gc()
 					bool saved = true;
 					bool updated = false;
 
-					dataplane::globalBase::balancer_state_value_t* ht_value;
-					dataplane::spinlock_nonrecursive_t* locker;
-					uint32_t old_real_id;
+					dataplane::globalBase::balancer_state_value_t* ht_value = nullptr;
+					dataplane::spinlock_nonrecursive_t* locker = nullptr;
+					uint32_t old_real_id = 0;
 
 					uint32_t hash = globalbase_atomic_other->balancer_state->lookup(*iter.key(), ht_value, locker);
 					if (ht_value)
@@ -954,7 +942,7 @@ void worker_gc_t::handle_callbacks()
 void worker_gc_t::handle_free_mbuf()
 {
 	rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
-	unsigned int mbufs_count;
+	unsigned int mbufs_count = 0;
 
 	for (auto& ring : toFree_)
 	{
@@ -972,7 +960,7 @@ inline bool worker_gc_t::is_timeout(const uint32_t timestamp,
 inline void worker_gc_t::correct_timestamp(uint16_t& timestamp,
                                            const uint16_t last_seen_max)
 {
-	uint16_t last_seen = (uint16_t)(current_time - timestamp);
+	auto last_seen = (uint16_t)(current_time - timestamp);
 	if (last_seen > last_seen_max)
 	{
 		timestamp = (uint16_t)(current_time - last_seen_max);
@@ -988,11 +976,8 @@ void worker_gc_t::nat64stateful_remove_state(const dataplane::globalBase::nat64s
                                              const dataplane::globalBase::nat64stateful_wan_key& wan_key)
 {
 	/// remove on other numas
-	for (unsigned int numa_i = 0;
-	     numa_i < YANET_CONFIG_NUMA_SIZE;
-	     numa_i++)
+	for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 	{
-		auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 		if (globalbase_atomic == base_permanently.globalBaseAtomic)
 		{
 			continue;
@@ -1110,11 +1095,8 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 			uint16_t wan_last_seen = calc_last_seen(wan_value.timestamp_last_packet);
 
 			/// check other wan tables
-			for (unsigned int numa_i = 0;
-			     numa_i < YANET_CONFIG_NUMA_SIZE;
-			     numa_i++)
+			for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 			{
-				auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 				if (globalbase_atomic == base_permanently.globalBaseAtomic)
 				{
 					continue;
@@ -1124,8 +1106,8 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 					break;
 				}
 
-				dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
-				dataplane::spinlock_nonrecursive_t* wan_locker;
+				dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup = nullptr;
+				dataplane::spinlock_nonrecursive_t* wan_locker = nullptr;
 				globalbase_atomic->nat64stateful_wan_state->lookup(wan_key, wan_value_lookup, wan_locker);
 				if (wan_value_lookup)
 				{
@@ -1145,18 +1127,15 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 			lan_key.port_destination = wan_key.port_source;
 
 			/// check lan tables
-			for (unsigned int numa_i = 0;
-			     numa_i < YANET_CONFIG_NUMA_SIZE;
-			     numa_i++)
+			for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 			{
-				auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 				if (globalbase_atomic == nullptr)
 				{
 					break;
 				}
 
-				dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup;
-				dataplane::spinlock_nonrecursive_t* lan_locker;
+				dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup = nullptr;
+				dataplane::spinlock_nonrecursive_t* lan_locker = nullptr;
 				globalbase_atomic->nat64stateful_lan_state->lookup(lan_key, lan_value_lookup, lan_locker);
 				if (lan_value_lookup)
 				{

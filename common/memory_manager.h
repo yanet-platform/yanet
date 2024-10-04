@@ -38,10 +38,7 @@ inline uint64_t convert_string_to_bytes(std::string string)
 class memory_group
 {
 public:
-	memory_group() :
-	        limit(0)
-	{
-	}
+	memory_group() = default;
 
 	template<typename callback_t>
 	std::set<std::string> for_each(const callback_t& callback) const
@@ -84,7 +81,7 @@ public:
 
 public:
 	std::string name;
-	uint64_t limit;
+	uint64_t limit{};
 	std::vector<std::shared_ptr<memory_group>> memory_groups;
 };
 

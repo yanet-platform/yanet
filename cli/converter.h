@@ -1,11 +1,12 @@
 #pragma once
 
-#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
 #include <variant>
 #include <vector>
+
+#include "common/traits.h"
 
 namespace converter
 {
@@ -18,128 +19,73 @@ struct config_t
 	std::string set_empty = "n/s";
 };
 
-template<typename arg_T>
-std::string to_string(const std::optional<arg_T>& value, const config_t config = {});
-template<typename... args_T>
-std::string to_string(const std::variant<args_T...>& value, const config_t config = {});
-template<typename arg_T>
-std::string to_string(const std::vector<arg_T>& vector, const config_t config = {});
-template<typename arg_T>
-std::string to_string(const std::set<arg_T>& set, const config_t config = {});
-std::string to_string(const bool& value, const config_t config = {});
-std::string to_string(const std::string& string, const config_t config = {});
-template<typename arg_T>
-std::string to_string(const arg_T& value, const config_t config = {});
-
-template<typename arg_T>
-std::string to_string(const std::optional<arg_T>& value,
-                      const config_t config)
+template<typename T>
+std::string to_string(const T& value, const config_t& config = {})
 {
-	if (value)
+	if constexpr (std::is_same_v<T, std::string>)
 	{
-		return to_string(*value, config);
+		return value.empty() ? config.string_empty : value;
 	}
-	else
+	else if constexpr (std::is_same_v<T, std::string_view>)
 	{
-		return config.optional_null;
+		return value.empty() ? config.string_empty : std::string(value);
 	}
-};
-
-template<typename... args_T>
-std::string to_string(const std::variant<args_T...>& value,
-                      const config_t config)
-{
-	return std::visit([&config](const auto& value) -> std::string { return to_string(value, config); }, value);
-};
-
-template<typename arg_T>
-std::string to_string(const std::vector<arg_T>& vector,
-                      const config_t config)
-{
-	if (vector.empty())
-	{
-		return config.vector_empty;
-	}
-
-	bool first = true;
-	std::ostringstream result;
-	for (const auto& item : vector)
-	{
-		if (!first)
-		{
-			result << ","; ///< @todo: config
-		}
-
-		result << to_string(item, config);
-		first = false;
-	}
-	return result.str();
-}
-
-template<typename arg_T>
-std::string to_string(const std::set<arg_T>& set,
-                      const config_t config)
-{
-	if (set.empty())
-	{
-		return config.set_empty;
-	}
-
-	bool first = true;
-	std::ostringstream result;
-	for (const auto& item : set)
-	{
-		if (!first)
-		{
-			result << ","; ///< @todo: config
-		}
-
-		result << to_string(item, config);
-		first = false;
-	}
-	return result.str();
-}
-
-std::string to_string(const bool& value,
-                      const config_t config)
-{
-	(void)config;
-	if (value)
-	{
-		return "true";
-	}
-	else
-	{
-		return "false";
-	}
-};
-
-std::string to_string(const std::string& string,
-                      const config_t config)
-{
-	if (string.empty())
-	{
-		return config.string_empty;
-	}
-	else
-	{
-		return string;
-	}
-};
-
-template<typename arg_T>
-std::string to_string(const arg_T& value,
-                      const config_t config)
-{
-	(void)config;
-	if constexpr (std::is_constructible_v<std::string, decltype(value)>)
+	else if constexpr (std::is_constructible_v<std::string, T>)
 	{
 		return value;
 	}
-	else
+	else if constexpr (std::is_same_v<T, bool>)
+	{
+		return value ? "true" : "false";
+	}
+	else if constexpr (std::is_arithmetic_v<T>)
 	{
 		return std::to_string(value);
 	}
-};
+	else if constexpr (traits::is_variant_v<T>)
+	{
+		return std::visit([&config](const auto& val) { return to_string(val, config); }, value);
+	}
+	else if constexpr (traits::is_optional_v<T>)
+	{
+		return value ? to_string(*value, config) : config.optional_null;
+	}
+	else if constexpr (traits::is_container_v<T>)
+	{
+		if (value.empty())
+		{
+			if constexpr (traits::is_vector_v<T>)
+			{
+				return config.vector_empty;
+			}
+			else if constexpr (traits::is_set_v<T>)
+			{
+				return config.set_empty;
+			}
+			else
+			{
+				static_assert(traits::always_false_v<T>,
+				              "Container does not have default empty representation in struct config_t");
+			}
+		}
 
+		std::ostringstream oss;
+		auto it = std::begin(value);
+		oss << to_string(*it, config);
+		++it;
+
+		for (; it != std::end(value); ++it)
+		{
+			oss << ',' << to_string(*it, config);
+		}
+
+		return oss.str();
+	}
+	else
+	{
+		static_assert(std::is_constructible_v<std::string, T>,
+		              "Type is not convertible to std::string and no overload of to_string is provided");
+	}
 }
+
+} // namespace converter

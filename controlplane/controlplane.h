@@ -1,8 +1,5 @@
 #pragma once
 
-#include <atomic>
-#include <functional>
-#include <map>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
@@ -11,17 +8,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "balancer.h"
 #include "common/generation.h"
 #include "common/icp.h"
 #include "common/idataplane.h"
 #include "common/idp.h"
 #include "common/result.h"
-#include "common/sdpclient.h"
-#include "libprotobuf/controlplane.pb.h"
-
-#include "balancer.h"
-#include "base.h"
-#include "counter.h"
 #include "dregress.h"
 #include "durations.h"
 #include "fqdn.h"
@@ -38,7 +30,7 @@ class cControlPlane
 {
 public:
 	cControlPlane();
-	~cControlPlane();
+	~cControlPlane() = default;
 
 	eResult init(const std::string& jsonFilePath);
 	void start();
@@ -68,14 +60,14 @@ public:
 		else if constexpr (std::is_invocable_r_v<common::icp::response, decltype(function)>)
 		{
 			commands[type] = [function](const common::icp::request& request) {
-				(void)request;
+				YANET_GCC_BUG_UNUSED(request);
 				return function();
 			};
 		}
 		else if constexpr (std::is_invocable_r_v<void, decltype(function)>)
 		{
 			commands[type] = [function](const common::icp::request& request) {
-				(void)request;
+				YANET_GCC_BUG_UNUSED(request);
 				function();
 				return std::tuple<>{};
 			};

@@ -9,6 +9,7 @@
 #include <rte_ring.h>
 
 #include "common/result.h"
+#include "common/sdpcommon.h"
 #include "common/tsc_deltas.h"
 #include "common/type.h"
 
@@ -16,7 +17,6 @@
 #include "common.h"
 #include "globalbase.h"
 #include "samples.h"
-#include "sdpserver.h"
 #include "sharedmemory.h"
 
 namespace dataplane
@@ -32,10 +32,7 @@ template<unsigned int TSize = CONFIG_YADECAP_MBUFS_BURST_SIZE>
 class tStack
 {
 public:
-	tStack() :
-	        mbufsCount(0)
-	{
-	}
+	tStack() = default;
 
 	inline void insert(rte_mbuf** mbufs, unsigned int mbufsCount)
 	{
@@ -55,7 +52,7 @@ public:
 	}
 
 public:
-	unsigned int mbufsCount;
+	unsigned int mbufsCount{};
 	rte_mbuf* mbufs[TSize];
 };
 
@@ -73,7 +70,7 @@ public:
 	static void FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata);
 	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorker& metadata);
 
-	const dataplane::base::generation& current_base() const { return bases[localBaseId & 1]; }
+	[[nodiscard]] const dataplane::base::generation& current_base() const { return bases[localBaseId & 1]; }
 
 protected:
 	eResult sanityCheck();
@@ -236,7 +233,7 @@ public:
 	YANET_NEVER_INLINE void slowWorkerTranslation(rte_mbuf* mbuf, const dataplane::globalBase::tNat64stateless& nat64stateless, const dataplane::globalBase::nat64stateless_translation_t& translation, bool direction); /** true: ingress, false: egress */
 	const dataplane::base::generation& CurrentBase() { return bases[localBaseId & 1]; }
 	void IncrementCounter(common::globalBase::static_counter_type type) { counters[(uint32_t)type]++; }
-	uint32_t CurrentTime() const { return basePermanently.globalBaseAtomic->currentTime; }
+	[[nodiscard]] uint32_t CurrentTime() const { return basePermanently.globalBaseAtomic->currentTime; }
 
 	friend class cDataPlane;
 	friend class cReport;

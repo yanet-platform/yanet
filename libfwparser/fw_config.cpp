@@ -16,17 +16,13 @@ using namespace ipfw;
 			std::cerr << "DEBUG: " << __func__ << ": " << msg << std::endl; \
 	} while (0)
 
-fw_config_t::fw_config_t(int step)
+fw_config_t::fw_config_t(int step) :
+        m_curr_entity(entity_type::NONE), m_debug(0), m_ruleid_last(0), m_ruleno_last(0)
 {
 	// use limits like in FreeBSD kernel
 	const auto value = std::clamp(step, 1, 1000);
 
-	m_debug = 0;
-	m_ruleid_last = 0;
-	m_ruleno_last = 0;
 	m_ruleno_step = value;
-
-	m_curr_entity = entity_type::NONE;
 	m_curr_rule = std::make_shared<rule_t>();
 	m_prev_rule = nullptr;
 
@@ -273,7 +269,7 @@ void fw_config_t::set_fqdn(const std::string& s)
 
 		location = {(unsigned int)l.begin.line, m_fileno.top()};
 		addresses.clear();
-		(void)used;
+		YANET_GCC_BUG_UNUSED(used);
 	}
 	else
 	{
@@ -651,7 +647,7 @@ void fw_config_t::add_rule_table(const std::string& name)
 
 	for (const auto& [prefix, label] : std::get<tables::prefix_skipto_t>(table))
 	{
-		(void)label;
+		YANET_GCC_BUG_UNUSED(label);
 		add_rule_addr(prefix);
 	}
 }
@@ -1201,7 +1197,7 @@ bool fw_config_t::validate()
 	}
 	for (auto& [ruleno, rules] : m_rules)
 	{
-		(void)ruleno;
+		YANET_GCC_BUG_UNUSED(ruleno);
 		for (auto rulep : rules)
 		{
 			if (!validate_rule(rulep))

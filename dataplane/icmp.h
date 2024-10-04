@@ -10,7 +10,7 @@ inline bool yanet_icmp_translate_v6_to_v4(icmp_header_t* icmpHeader,
                                           uint16_t length,
                                           uint16_t checksum6)
 {
-	uint8_t type;
+	uint8_t type = 0;
 
 	if (icmpHeader->type == ICMP6_ECHO_REQUEST)
 	{
@@ -46,7 +46,7 @@ inline bool yanet_icmp_translate_v4_to_v6(icmp_header_t* icmpHeader,
                                           uint16_t length,
                                           uint16_t checksum6)
 {
-	uint8_t type;
+	uint8_t type = 0;
 
 	if (icmpHeader->type == ICMP_ECHO)
 	{

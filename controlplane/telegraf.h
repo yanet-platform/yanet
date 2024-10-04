@@ -1,7 +1,6 @@
 #pragma once
 
 #include <map>
-#include <mutex>
 
 #include "common/icp.h"
 #include "common/idataplane.h"
@@ -17,18 +16,14 @@ namespace telegraf
 class generation_t
 {
 public:
-	generation_t()
-	{
-	}
+	generation_t() = default;
 
-	void update(const controlplane::base_t& base_prev,
+	void update([[maybe_unused]] const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
 	{
-		(void)base_prev;
-
 		for (const auto& [module_name, dregress] : base_next.dregresses)
 		{
-			(void)module_name;
+			YANET_GCC_BUG_UNUSED(module_name);
 
 			communities.insert(dregress.communities.begin(), dregress.communities.end());
 		}
@@ -36,19 +31,19 @@ public:
 
 		for (const auto& [module_name, route] : base_next.routes)
 		{
-			(void)module_name;
+			YANET_GCC_BUG_UNUSED(module_name);
 
 			peers.insert(route.peers.begin(), route.peers.end());
 		}
 		peers[0] = "unknown";
 	}
 
-	const std::map<community_t, std::string>* get_communities() const
+	[[nodiscard]] const std::map<community_t, std::string>* get_communities() const
 	{
 		return &communities;
 	}
 
-	const std::map<uint32_t, std::string>* get_peers() const
+	[[nodiscard]] const std::map<uint32_t, std::string>* get_peers() const
 	{
 		return &peers;
 	}
@@ -64,7 +59,7 @@ class telegraf_t : public module_t
 {
 public:
 	telegraf_t();
-	~telegraf_t();
+	~telegraf_t() override = default;
 
 	eResult init() override;
 	void reload_before() override;

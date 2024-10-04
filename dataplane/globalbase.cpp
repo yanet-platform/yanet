@@ -18,7 +18,7 @@ using namespace dataplane::globalBase;
 atomic::atomic(cDataPlane* dataPlane,
                const tSocketId& socketId) :
         dataPlane(dataPlane),
-        socketId(socketId)
+        socketId(socketId), tsc_active_state(dataPlane->getConfigValues().tsc_active_state)
 {
 	fw_state_config.tcp_timeout = dataPlane->getConfigValues().stateful_firewall_tcp_timeout;
 	fw_state_config.udp_timeout = dataPlane->getConfigValues().stateful_firewall_udp_timeout;
@@ -28,12 +28,6 @@ atomic::atomic(cDataPlane* dataPlane,
 	memset(physicalPort_flags, 0, sizeof(physicalPort_flags));
 	memset(counter_shifts, 0, sizeof(counter_shifts));
 	memset(gc_counter_shifts, 0, sizeof(gc_counter_shifts));
-
-	tsc_active_state = dataPlane->getConfigValues().tsc_active_state;
-}
-
-atomic::~atomic()
-{
 }
 
 generation::generation(cDataPlane* dataPlane,
@@ -48,10 +42,6 @@ generation::generation(cDataPlane* dataPlane,
 	std::fill(balancer_real_states,
 	          balancer_real_states + YANET_CONFIG_BALANCER_REALS_SIZE,
 	          balancer_real_state_t());
-}
-
-generation::~generation()
-{
 }
 
 eResult generation::init()
@@ -551,53 +541,39 @@ eResult generation::get(const common::idp::getGlobalBase::request& request,
 
 eResult generation::clear()
 {
-	for (unsigned int logicalPortId = 0;
-	     logicalPortId < CONFIG_YADECAP_LOGICALPORTS_SIZE;
-	     logicalPortId++)
+	for (auto& logicalPort : logicalPorts)
 	{
-		logicalPorts[logicalPortId] = dataplane::globalBase::tLogicalPort();
+		logicalPort = dataplane::globalBase::tLogicalPort();
 	}
 
-	for (tun64_id_t tun64Id = 0;
-	     tun64Id < CONFIG_YADECAP_TUN64_SIZE;
-	     tun64Id++)
+	for (auto& tun64tunnel : tun64tunnels)
 	{
-		tun64tunnels[tun64Id] = dataplane::globalBase::tun64_t();
+		tun64tunnel = dataplane::globalBase::tun64_t();
 	}
 
-	for (unsigned int decapId = 0;
-	     decapId < CONFIG_YADECAP_DECAPS_SIZE;
-	     decapId++)
+	for (auto& decap : decaps)
 	{
-		decaps[decapId] = dataplane::globalBase::tDecap();
+		decap = dataplane::globalBase::tDecap();
 	}
 
-	for (unsigned int interfaceId = 0;
-	     interfaceId < CONFIG_YADECAP_INTERFACES_SIZE;
-	     interfaceId++)
+	for (auto& interface : interfaces)
 	{
-		interfaces[interfaceId] = dataplane::globalBase::tInterface();
+		interface = dataplane::globalBase::tInterface();
 	}
 
-	for (unsigned int nat64statefulId = 0;
-	     nat64statefulId < YANET_CONFIG_NAT64STATEFULS_SIZE;
-	     nat64statefulId++)
+	for (auto& nat64stateful : nat64statefuls)
 	{
-		nat64statefuls[nat64statefulId] = dataplane::globalBase::nat64stateful_t();
+		nat64stateful = dataplane::globalBase::nat64stateful_t();
 	}
 
-	for (unsigned int nat64statelessId = 0;
-	     nat64statelessId < CONFIG_YADECAP_NAT64STATELESSES_SIZE;
-	     nat64statelessId++)
+	for (auto& nat64statelesse : nat64statelesses)
 	{
-		nat64statelesses[nat64statelessId] = dataplane::globalBase::tNat64stateless();
+		nat64statelesse = dataplane::globalBase::tNat64stateless();
 	}
 
-	for (unsigned int balancer_id = 0;
-	     balancer_id < YANET_CONFIG_BALANCERS_SIZE;
-	     balancer_id++)
+	for (auto& balancer : balancers)
 	{
-		balancers[balancer_id] = dataplane::globalBase::balancer_t();
+		balancer = dataplane::globalBase::balancer_t();
 	}
 
 	tun64_enabled = 0;
@@ -612,11 +588,9 @@ eResult generation::clear()
 
 	tun64mappingsTable.clear();
 
-	for (unsigned int fw_state_sync_config_id = 0;
-	     fw_state_sync_config_id < CONFIG_YADECAP_ACLS_SIZE;
-	     fw_state_sync_config_id++)
+	for (auto& fw_state_sync_config : fw_state_sync_configs)
 	{
-		fw_state_sync_configs[fw_state_sync_config_id] = fw_state_sync_config_t{};
+		fw_state_sync_config = fw_state_sync_config_t{};
 	}
 
 	// NOTE: we don't explicitly clear current fw states, as there might be responding packets.
@@ -1544,7 +1518,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 				}
 				for (const auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 				{
-					(void)core_id;
+					YANET_GCC_BUG_UNUSED(core_id);
 					sum_gc += worker_gc->counters[counter_id + i];
 				}
 				for (const auto& item : dataPlane->globalBaseAtomics)
@@ -1636,7 +1610,7 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 	uint64_t sessions_destroyed_gc = 0;
 	for (const auto& [node_id, worker_gc] : dataPlane->worker_gcs)
 	{
-		(void)node_id;
+		YANET_GCC_BUG_UNUSED(node_id);
 		sessions_created_gc += worker_gc->counters[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_created];
 		sessions_destroyed_gc += worker_gc->counters[counter_id + (tCounterId)::balancer::gc_real_counter::sessions_destroyed];
 	}
@@ -2342,9 +2316,10 @@ eResult generation::dregress_prefix_update(const common::idp::updateGlobalBase::
 {
 	eResult result = eResult::success;
 
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		::dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		::dregress_t& dregress = slow->Dregress();
 		for (const auto& [prefix, value_id] : request)
 		{
 			std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
@@ -2359,9 +2334,10 @@ eResult generation::dregress_prefix_remove(const common::idp::updateGlobalBase::
 {
 	eResult result = eResult::success;
 
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		::dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		::dregress_t& dregress = slow->Dregress();
 		for (const auto& prefix : request)
 		{
 			std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
@@ -2375,9 +2351,10 @@ eResult generation::dregress_prefix_clear()
 {
 	eResult result = eResult::success;
 
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		::dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		::dregress_t& dregress = slow->Dregress();
 		std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
 		dregress.prefixes.clear();
 	}
@@ -2389,9 +2366,10 @@ eResult generation::dregress_local_prefix_update(const common::idp::updateGlobal
 {
 	eResult result = eResult::success;
 
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		::dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		::dregress_t& dregress = slow->Dregress();
 		std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
 
 		dregress.local_prefixes_v4.clear();
@@ -2416,9 +2394,10 @@ eResult generation::dregress_value_update(const common::idp::updateGlobalBase::d
 {
 	eResult result = eResult::success;
 
-	for (auto it : dataPlane->slow_workers)
+	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		::dregress_t& dregress = it.second->Dregress();
+		YANET_GCC_BUG_UNUSED(core);
+		::dregress_t& dregress = slow->Dregress();
 		std::lock_guard<std::mutex> guard(dregress.prefixes_mutex);
 
 		for (const auto& [value_id, value] : request)

@@ -2,6 +2,7 @@
 
 #include "helper.h"
 #include "influxdb_format.h"
+#include "table_printer.h"
 
 namespace bus
 {
@@ -11,7 +12,7 @@ using bus_request_info = std::tuple<std::string, uint64_t, uint64_t>;
 inline std::vector<bus_request_info> get_bus_requests(common::sdp::DataPlaneInSharedMemory& sdp_data)
 {
 	auto [requests, errors, durations] = sdp_data.BuffersBus();
-	(void)errors;
+	YANET_GCC_BUG_UNUSED(errors);
 
 	std::map<common::idp::requestType, std::string> names = {
 	        {common::idp::requestType::updateGlobalBase, "updateGlobalBase"},
@@ -78,24 +79,24 @@ inline void bus_requests()
 	OpenSharedMemoryDataplaneBuffers(sdp_data, false);
 	auto requests = get_bus_requests(sdp_data);
 
-	table_t table;
-	table.insert("request", "count", "duration_ms");
+	TablePrinter table;
+	table.insert_row("request", "count", "duration_ms");
 	for (const auto& [request, count, duration] : requests)
 	{
 		if ((count != 0) || (duration != 0))
 		{
-			table.insert(request, count, duration);
+			table.insert_row(request, count, duration);
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline std::vector<std::pair<std::string, uint64_t>> get_bus_errors(const common::sdp::DataPlaneInSharedMemory& sdp_data)
 {
 	auto [requests, errors, durations] = sdp_data.BuffersBus();
-	(void)requests;
-	(void)durations;
+	YANET_GCC_BUG_UNUSED(requests);
+	YANET_GCC_BUG_UNUSED(durations);
 
 	std::map<common::idp::errorType, std::string> names = {
 	        {common::idp::errorType::busRead, "busRead"},
@@ -119,14 +120,7 @@ inline void bus_errors()
 	OpenSharedMemoryDataplaneBuffers(sdp_data, false);
 	auto errors = get_bus_errors(sdp_data);
 
-	table_t table;
-	table.insert("error", "count");
-	for (const auto& [error, count] : errors)
-	{
-		table.insert(error, count);
-	}
-
-	table.print();
+	FillAndPrintTable({"error", "count"}, errors);
 }
 
 inline void bus_telegraf()

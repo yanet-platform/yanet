@@ -1,19 +1,7 @@
 #pragma once
 
-#include <arpa/inet.h>
-
-#include <array>
-#include <thread>
-#include <variant>
-#include <vector>
-
-#include <rte_ether.h>
-
-#include "common/idp.h"
-#include "common/result.h"
-
-#include "sdpserver.h"
-#include "type.h"
+#include "common/sdpcommon.h"
+#include "controlplane.h"
 
 class cBus
 {
@@ -33,9 +21,8 @@ protected:
 	void clientThread(int clientSocket);
 
 protected:
-	void call(void (cControlPlane::*function)(), const common::idp::request& request)
+	void call(void (cControlPlane::*function)(), [[maybe_unused]] const common::idp::request& request)
 	{
-		(void)request; ///< @todo: [[maybe_unused]]
 		(controlPlane->*function)();
 	}
 
@@ -46,16 +33,14 @@ protected:
 	}
 
 	template<typename TResult>
-	TResult callWithResponse(TResult (cControlPlane::*function)(), const common::idp::request& request)
+	TResult callWithResponse(TResult (cControlPlane::*function)(), [[maybe_unused]] const common::idp::request& request)
 	{
-		(void)request; ///< @todo: [[maybe_unused]]
 		return (controlPlane->*function)();
 	}
 
 	template<typename TResult>
-	TResult callWithResponse(TResult (cControlPlane::*function)() const, const common::idp::request& request) const
+	TResult callWithResponse(TResult (cControlPlane::*function)() const, [[maybe_unused]] const common::idp::request& request) const
 	{
-		(void)request; ///< @todo: [[maybe_unused]]
 		return (controlPlane->*function)();
 	}
 

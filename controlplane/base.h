@@ -1,11 +1,11 @@
 #pragma once
 
-#include <array>
 #include <map>
+#include <utility>
 #include <vector>
 
 #include "common/controlplaneconfig.h"
-#include "common/idp.h"
+#include "common/memory_manager.h"
 #include "common/nat46clat.h"
 #include "common/type.h"
 #include "libfwparser/fw_parser.h"
@@ -21,20 +21,16 @@ namespace base
 class logical_port_t
 {
 public:
-	logical_port_t() :
-	        vlanId(0),
-	        promiscuousMode(0)
-	{
-	}
+	logical_port_t() = default;
 
 public:
 	tLogicalPortId logicalPortId;
 
 	std::string physicalPort;
 	tPortId physicalPortId;
-	uint16_t vlanId;
+	uint16_t vlanId{};
 	mac_address_t macAddress;
-	uint8_t promiscuousMode;
+	uint8_t promiscuousMode{};
 	std::string nextModule;
 	common::globalBase::tFlow flow;
 };
@@ -42,13 +38,9 @@ public:
 class decap_t
 {
 public:
-	decap_t() :
-	        dscpMarkType(common::eDscpMarkType::never),
-	        dscp(0)
-	{
-	}
+	decap_t() = default;
 
-	std::set<ipv6_prefix_t> prefixes() const
+	[[nodiscard]] std::set<ipv6_prefix_t> prefixes() const
 	{
 		std::set<ipv6_prefix_t> prefixes;
 		for (const auto& prefix : ipv6DestinationPrefixes)
@@ -62,8 +54,8 @@ public:
 	tDecapId decapId;
 
 	std::set<ipv6_prefix_with_announces_t> ipv6DestinationPrefixes;
-	common::eDscpMarkType dscpMarkType;
-	uint8_t dscp;
+	common::eDscpMarkType dscpMarkType{common::eDscpMarkType::never};
+	uint8_t dscp{};
 	uint8_t ipv6_enabled;
 	std::string nextModule;
 	common::globalBase::tFlow flow;
@@ -72,19 +64,13 @@ public:
 class nat64stateless_t
 {
 public:
-	nat64stateless_t() :
-	        dscpMarkType(common::eDscpMarkType::never),
-	        dscp(0),
-	        firewall(1),
-	        farm(0)
-	{
-	}
+	nat64stateless_t() = default;
 
 public:
 	tNat64statelessId nat64statelessId;
 
-	common::eDscpMarkType dscpMarkType;
-	uint8_t dscp;
+	common::eDscpMarkType dscpMarkType{common::eDscpMarkType::never};
+	uint8_t dscp{};
 
 	std::map<std::tuple<ipv6_address_t, ///< ipv6Address
 	                    ipv6_address_t, ///< ipv6DestinationAddress
@@ -94,7 +80,7 @@ public:
 	                    tNat64statelessTranslationId>>
 	        translations;
 
-	uint8_t firewall;
+	uint8_t firewall{1};
 	std::optional<ipv6_prefix_t> nat64_wkp_prefix;
 	std::optional<ipv6_prefix_t> nat64_src_prefix;
 
@@ -105,7 +91,7 @@ public:
 
 	std::optional<ipv6_address_t> defrag_farm_prefix;
 	std::optional<ipv6_address_t> defrag_source_prefix;
-	uint8_t farm;
+	uint8_t farm{};
 
 	/// @todo: ingressFlow;
 	/// @todo: egressFlow;
@@ -114,9 +100,7 @@ public:
 class acl_rule_network_ipv4_t
 {
 public:
-	acl_rule_network_ipv4_t()
-	{
-	}
+	acl_rule_network_ipv4_t() = default;
 
 	acl_rule_network_ipv4_t(const std::set<ipv4_prefix_t>& sourcePrefixes,
 	                        const std::set<ipv4_prefix_t>& destinationPrefixes) :
@@ -133,9 +117,7 @@ public:
 class acl_rule_network_ipv6_t
 {
 public:
-	acl_rule_network_ipv6_t()
-	{
-	}
+	acl_rule_network_ipv6_t() = default;
 
 	acl_rule_network_ipv6_t(const std::set<ipv6_prefix_t>& sourcePrefixes,
 	                        const std::set<ipv6_prefix_t>& destinationPrefixes) :
@@ -152,14 +134,12 @@ public:
 class acl_rule_transport_tcp_t
 {
 public:
-	acl_rule_transport_tcp_t()
-	{
-	}
+	acl_rule_transport_tcp_t() = default;
 
-	acl_rule_transport_tcp_t(const ranges_t& sourcePorts,
-	                         const ranges_t& destinationPorts) :
-	        sourcePorts(sourcePorts),
-	        destinationPorts(destinationPorts)
+	acl_rule_transport_tcp_t(ranges_t sourcePorts,
+	                         ranges_t destinationPorts) :
+	        sourcePorts(std::move(sourcePorts)),
+	        destinationPorts(std::move(destinationPorts))
 	{
 	}
 
@@ -172,14 +152,12 @@ public:
 class acl_rule_transport_udp_t
 {
 public:
-	acl_rule_transport_udp_t()
-	{
-	}
+	acl_rule_transport_udp_t() = default;
 
-	acl_rule_transport_udp_t(const ranges_t& sourcePorts,
-	                         const ranges_t& destinationPorts) :
-	        sourcePorts(sourcePorts),
-	        destinationPorts(destinationPorts)
+	acl_rule_transport_udp_t(ranges_t sourcePorts,
+	                         ranges_t destinationPorts) :
+	        sourcePorts(std::move(sourcePorts)),
+	        destinationPorts(std::move(destinationPorts))
 	{
 	}
 
@@ -198,27 +176,27 @@ public:
 	{
 	}
 
-	acl_rule_transport_icmpv4_t(const ranges_t& types) :
-	        types(types),
+	acl_rule_transport_icmpv4_t(ranges_t types) :
+	        types(std::move(types)),
 	        codes(range_t{0x00, 0xFF}),
 	        identifiers(range_t{0x0000, 0xFFFF})
 	{
 	}
 
-	acl_rule_transport_icmpv4_t(const ranges_t& types,
-	                            const ranges_t& codes) :
-	        types(types),
-	        codes(codes),
+	acl_rule_transport_icmpv4_t(ranges_t types,
+	                            ranges_t codes) :
+	        types(std::move(types)),
+	        codes(std::move(codes)),
 	        identifiers(range_t{0x0000, 0xFFFF})
 	{
 	}
 
-	acl_rule_transport_icmpv4_t(const ranges_t& types,
-	                            const ranges_t& codes,
-	                            const ranges_t& identifiers) :
-	        types(types),
-	        codes(codes),
-	        identifiers(identifiers)
+	acl_rule_transport_icmpv4_t(ranges_t types,
+	                            ranges_t codes,
+	                            ranges_t identifiers) :
+	        types(std::move(types)),
+	        codes(std::move(codes)),
+	        identifiers(std::move(identifiers))
 	{
 	}
 
@@ -238,27 +216,27 @@ public:
 	{
 	}
 
-	acl_rule_transport_icmpv6_t(const ranges_t& types) :
-	        types(types),
+	acl_rule_transport_icmpv6_t(ranges_t types) :
+	        types(std::move(types)),
 	        codes(range_t{0x00, 0xFF}),
 	        identifiers(range_t{0x0000, 0xFFFF})
 	{
 	}
 
-	acl_rule_transport_icmpv6_t(const ranges_t& types,
-	                            const ranges_t& codes) :
-	        types(types),
-	        codes(codes),
+	acl_rule_transport_icmpv6_t(ranges_t types,
+	                            ranges_t codes) :
+	        types(std::move(types)),
+	        codes(std::move(codes)),
 	        identifiers(range_t{0x0000, 0xFFFF})
 	{
 	}
 
-	acl_rule_transport_icmpv6_t(const ranges_t& types,
-	                            const ranges_t& codes,
-	                            const ranges_t& identifiers) :
-	        types(types),
-	        codes(codes),
-	        identifiers(identifiers)
+	acl_rule_transport_icmpv6_t(ranges_t types,
+	                            ranges_t codes,
+	                            ranges_t identifiers) :
+	        types(std::move(types)),
+	        codes(std::move(codes)),
+	        identifiers(std::move(identifiers))
 	{
 	}
 
@@ -271,12 +249,10 @@ public:
 class acl_rule_transport_other_t
 {
 public:
-	acl_rule_transport_other_t()
-	{
-	}
+	acl_rule_transport_other_t() = default;
 
-	acl_rule_transport_other_t(const ranges_t& protocolTypes) :
-	        protocolTypes(protocolTypes)
+	acl_rule_transport_other_t(ranges_t protocolTypes) :
+	        protocolTypes(std::move(protocolTypes))
 	{
 	}
 
@@ -295,9 +271,7 @@ public:
 	};
 
 public:
-	acl_rule_t()
-	{
-	}
+	acl_rule_t() = default;
 
 	template<typename transport_T>
 	acl_rule_t(const std::variant<acl_rule_network_ipv4_t, acl_rule_network_ipv6_t>& network,
@@ -395,9 +369,7 @@ public:
 class acl_t
 {
 public:
-	acl_t()
-	{
-	}
+	acl_t() = default;
 
 public:
 	tAclId aclId;
@@ -430,26 +402,18 @@ public:
 class base_t
 {
 public:
-	base_t() :
-	        interfacesCount(0),
-	        nat64statelessTranslationsCount(0),
-	        services_count(0),
-	        reals_count(0),
-	        tun64MappingsCount(0),
-	        storeSamples(false),
-	        serial(0),
-	        nat64stateful_pool_size(0)
+	base_t()
 	{
 		variables["balancer_real_timeout"] = 900;
 	}
 
 public:
 	std::map<std::string, std::string> moduleTypes;
-	tInterfaceId interfacesCount;
-	tNat64statelessTranslationId nat64statelessTranslationsCount;
-	balancer_service_id_t services_count;
-	balancer_real_id_t reals_count;
-	tun64_id_t tun64MappingsCount;
+	tInterfaceId interfacesCount{};
+	tNat64statelessTranslationId nat64statelessTranslationsCount{};
+	balancer_service_id_t services_count{};
+	balancer_real_id_t reals_count{};
+	tun64_id_t tun64MappingsCount{};
 	std::map<tInterfaceId, std::string> interfaceNames; ///< @todo: per route
 	std::map<tSocketId, std::set<tInterfaceId>> socket_interfaces; ///< @todo: per route
 
@@ -470,8 +434,8 @@ public:
 	acl::iface_map_t result_iface_map;
 	std::vector<std::string> dump_id_to_tag;
 	std::map<unsigned int, std::string> logicalport_id_to_name;
-	bool storeSamples;
-	uint32_t serial;
+	bool storeSamples{};
+	uint32_t serial{};
 
 	std::map<std::string, common::uint64> variables;
 	std::map<std::string, ///< vrf
@@ -479,7 +443,7 @@ public:
 	                  std::vector<std::string>>>
 	        vrf_fqdns;
 
-	uint32_t nat64stateful_pool_size;
+	uint32_t nat64stateful_pool_size{};
 
 	std::map<std::string, ///< vrf_name
 	         std::vector<base_rib>>

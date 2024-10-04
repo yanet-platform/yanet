@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-//#define SOCK_DEV_PREFIX "sock_dev:"
+// #define SOCK_DEV_PREFIX "sock_dev:"
 using namespace std::string_literals;
 const std::string SOCK_DEV_PREFIX = "sock_dev:"s;
 

@@ -1,7 +1,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#define STATIC_VECTOR_USE_EXCEPTIONS
 #include "../static_vector.h"
 
 namespace
@@ -12,7 +11,7 @@ static constexpr std::string_view hw = "Hello World!";
 
 TEST(StaticVector, 001_Basic_element_store)
 {
-	StaticVector<char, hw.length()> v;
+	StaticVector<char, hw.length(), true> v; // Enable exceptions
 	ASSERT_TRUE(v.empty());
 	for (auto& c : hw)
 	{

@@ -25,8 +25,7 @@ struct ctree
 			root_node = new node_base_t();
 		}
 	}
-	ctree(ctree&& other) :
-	        root_node{}
+	ctree(ctree&& other)
 	{
 		if (this != &other)
 		{
@@ -147,8 +146,8 @@ struct ctree
 		                   const std::vector<std::string>& key_names,
 		                   const std::function<void(const std::string& key, const values_t&)>& callback) const
 		{
-			(void)key_index;
-			(void)key_names;
+			YANET_GCC_BUG_UNUSED(key_index);
+			YANET_GCC_BUG_UNUSED(key_names);
 
 			callback(key, values);
 		}
@@ -196,7 +195,7 @@ struct ctree
 		{
 			for (auto& [next_counter, next_node] : next)
 			{
-				(void)next_counter;
+				YANET_GCC_BUG_UNUSED(next_counter);
 				delete next_node;
 			}
 		}
@@ -272,7 +271,7 @@ struct ctree
 			{
 				for (const auto& [next_counter, next_node] : next)
 				{
-					(void)next_counter;
+					YANET_GCC_BUG_UNUSED(next_counter);
 					static_cast<node_t<next_counters_T...>*>(next_node)->convert_update(next_converts...);
 				}
 			}
@@ -392,7 +391,7 @@ struct ctree
 		        convert;
 	};
 
-	node_base_t* root_node;
+	node_base_t* root_node{};
 };
 
 } // namespace common

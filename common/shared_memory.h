@@ -1,10 +1,10 @@
 #pragma once
 
+#include <cstring>
 #include <fcntl.h>
 #include <numa.h>
 #include <numaif.h>
 #include <optional>
-#include <string.h>
 #include <sys/mman.h>
 #include <sys/shm.h>
 #include <sys/stat.h>
@@ -33,7 +33,7 @@ public:
 		const char* str_hugetlb = "Hugetlb:";
 
 		FILE* fd = fopen(path_meminfo, "r");
-		if (fd == NULL)
+		if (fd == nullptr)
 		{
 			YANET_LOG_ERROR("Cannot open %s, error %d: %s\n", path_meminfo, errno, strerror(errno));
 			return false;
@@ -52,7 +52,7 @@ public:
 				{
 					str++;
 				}
-				char* endptr;
+				char* endptr = nullptr;
 				unsigned long long size = strtoull(str, &endptr, 0);
 				// The string still contains kB (or mB, gB), but it only matters to us
 				// whether the value is 0 or not
@@ -282,11 +282,11 @@ private:
 	static std::pair<struct bitmask*, int> SetMemoryPolicy(std::optional<tSocketId> socket_id)
 	{
 		struct bitmask* oldmask = nullptr;
-		int oldpolicy;
+		int oldpolicy = 0;
 		if (socket_id.has_value())
 		{
 			oldmask = numa_allocate_nodemask();
-			if (get_mempolicy(&oldpolicy, oldmask->maskp, oldmask->size + 1, 0, 0) < 0)
+			if (get_mempolicy(&oldpolicy, oldmask->maskp, oldmask->size + 1, nullptr, 0) < 0)
 			{
 				YANET_LOG_WARNING("get_mempolicy(): %s, continue with the use of sockets turned off\n", strerror(errno));
 				oldpolicy = MPOL_DEFAULT;

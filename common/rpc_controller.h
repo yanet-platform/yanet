@@ -11,23 +11,23 @@ class RpcController : public google::protobuf::RpcController
 {
 public:
 	RpcController() { _reset(); }
-	virtual ~RpcController() {}
+	~RpcController() override = default;
 
-	virtual void Reset()
+	void Reset() override
 	{
 		_reset();
 	}
 
-	virtual bool Failed() const { return is_failed_; }
-	virtual void SetFailed(const std::string& reason)
+	[[nodiscard]] bool Failed() const override { return is_failed_; }
+	void SetFailed(const std::string& reason) override
 	{
 		is_failed_ = true;
 		error_code_ = reason;
 	}
-	virtual std::string ErrorText() const { return error_code_; }
-	virtual void StartCancel(){};
-	virtual bool IsCanceled() const { return false; };
-	virtual void NotifyOnCancel(::google::protobuf::Closure* /* callback */){};
+	[[nodiscard]] std::string ErrorText() const override { return error_code_; }
+	void StartCancel() override {};
+	[[nodiscard]] bool IsCanceled() const override { return false; };
+	void NotifyOnCancel(::google::protobuf::Closure* /* callback */) override {};
 
 private:
 	bool is_failed_;

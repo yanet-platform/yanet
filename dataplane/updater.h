@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mutex>
 #include <nlohmann/json.hpp>
 #include <rte_malloc.h>
 
@@ -181,22 +180,22 @@ private:
 		return eResult::success;
 	}
 
-	bool NeedToGrow() const
+	[[nodiscard]] bool NeedToGrow() const
 	{
 		return stats_.extended_chunks_size - stats_.extended_chunks_count < ObjectType::extended_chunks_size_min;
 	}
 
-	std::size_t GrowSize() const
+	[[nodiscard]] std::size_t GrowSize() const
 	{
 		return stats_.extended_chunks_size * 2;
 	}
 
-	std::size_t ShrinkSize() const
+	[[nodiscard]] std::size_t ShrinkSize() const
 	{
 		return stats_.extended_chunks_size / 2;
 	}
 
-	bool NeedToShrink() const
+	[[nodiscard]] bool NeedToShrink() const
 	{
 		return ShrinkSize() > std::max(ObjectType::extended_chunks_size_min, GrowSize());
 	}
@@ -216,8 +215,7 @@ public:
 	                             const tSocketId socket_id) :
 	        name(name),
 	        memory_manager(memory_manager),
-	        socket_id(socket_id),
-	        pointer(nullptr)
+	        socket_id(socket_id)
 	{
 	}
 
@@ -291,7 +289,7 @@ protected:
 	object_type::stats_t stats;
 
 public:
-	object_type* pointer;
+	object_type* pointer{};
 };
 
 //
@@ -306,8 +304,7 @@ public:
 	                          const tSocketId socket_id) :
 	        name(name),
 	        memory_manager(memory_manager),
-	        socket_id(socket_id),
-	        pointer(nullptr)
+	        socket_id(socket_id)
 	{
 	}
 
@@ -381,7 +378,7 @@ protected:
 	object_type::stats_t stats;
 
 public:
-	object_type* pointer;
+	object_type* pointer{};
 };
 
 //

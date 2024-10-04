@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base.h"
+#include "isystem.h"
 #include "module.h"
 #include "rib.h"
 #include "type.h"
@@ -26,33 +27,29 @@ using value_key_t = std::tuple<std::tuple<std::string, ///< vrf
 class generation_t
 {
 public:
-	generation_t()
-	{
-	}
+	generation_t() = default;
 
-	void update(const controlplane::base_t& base_prev,
+	void update([[maybe_unused]] const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
 	{
-		(void)base_prev;
-
 		routes = base_next.routes;
 		dregresses = base_next.dregresses;
 
 		/// @todo: VRF
 		for (const auto& [moduleName, dregress] : dregresses)
 		{
-			(void)moduleName;
+			YANET_GCC_BUG_UNUSED(moduleName);
 
 			our_as.insert(dregress.ourAs.begin(), dregress.ourAs.end());
 		}
 	}
 
-	std::optional<community_t> get_peer_link_community(const std::set<community_t>& communities) const
+	[[nodiscard]] std::optional<community_t> get_peer_link_community(const std::set<community_t>& communities) const
 	{
 		/// @todo: VRF
 		for (const auto& [moduleName, dregress] : dregresses)
 		{
-			(void)moduleName;
+			YANET_GCC_BUG_UNUSED(moduleName);
 
 			for (const auto& community : communities)
 			{

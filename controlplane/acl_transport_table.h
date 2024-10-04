@@ -2,11 +2,9 @@
 
 #include <thread>
 
-#include "acl/bitset.h"
 #include "acl_base.h"
 #include "acl_table.h"
 
-#include "common/acl.h"
 #include "common/idp.h"
 
 namespace acl::compiler

@@ -13,10 +13,7 @@ namespace interface
 class controlPlane
 {
 public:
-	controlPlane() :
-	        clientSocket(-1)
-	{
-	}
+	controlPlane() = default;
 
 	~controlPlane()
 	{
@@ -387,7 +384,7 @@ protected:
 	}
 
 	template<common::icp::requestType T, class Req = std::tuple<>>
-	inline common::icp::response call(const Req& request = Req()) const
+	common::icp::response call(const Req& request = Req()) const
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		connectToControlPlane();
@@ -395,7 +392,7 @@ protected:
 	}
 
 protected:
-	mutable int clientSocket;
+	mutable int clientSocket{-1};
 	mutable std::mutex mutex;
 };
 

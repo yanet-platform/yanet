@@ -1,8 +1,8 @@
 #include <arpa/inet.h>
 #include <bitset>
 #include <cstdint>
+#include <cstring>
 #include <limits>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -25,19 +25,18 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <sys/mman.h>
 
 #include "common.h"
+#include "common/define.h"
 #include "common/idp.h"
 #include "common/result.h"
 #include "common/tsc_deltas.h"
 #include "dataplane.h"
-#include "debug_latch.h"
+#include "dataplane/sdpserver.h"
 #include "globalbase.h"
-#include "lpm.h"
-#include "report.h"
 #include "sock_dev.h"
 #include "work_runner.h"
 #include "worker.h"
@@ -67,9 +66,10 @@ cDataPlane::~cDataPlane()
 	{
 		rte_mempool_free(mempool_log);
 	}
-	for (auto it : socket_cplane_mempools)
+	for (auto& [socket_id, rte_mempool] : socket_cplane_mempools)
 	{
-		rte_mempool_free(it.second);
+		YANET_GCC_BUG_UNUSED(socket_id);
+		rte_mempool_free(rte_mempool);
 	}
 }
 
@@ -131,7 +131,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		}
 	}
 
-	mempool_log = rte_mempool_create("log", YANET_CONFIG_SAMPLES_SIZE, sizeof(samples::sample_t), 0, 0, NULL, NULL, NULL, NULL, SOCKET_ID_ANY, MEMPOOL_F_NO_IOVA_CONTIG);
+	mempool_log = rte_mempool_create("log", YANET_CONFIG_SAMPLES_SIZE, sizeof(samples::sample_t), 0, 0, nullptr, nullptr, nullptr, nullptr, SOCKET_ID_ANY, MEMPOOL_F_NO_IOVA_CONTIG);
 
 	result = initGlobalBases();
 	if (result != eResult::success)
@@ -211,7 +211,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 
 		for (const auto& [core_id, worker_gc] : worker_gcs)
 		{
-			(void)core_id;
+			YANET_GCC_BUG_UNUSED(core_id);
 			gc_sockets_used.emplace(worker_gc->socket_id);
 		}
 
@@ -457,9 +457,9 @@ eResult cDataPlane::initPorts()
 	{
 		const std::string& interfaceName = configPortIter.first;
 		const auto& [pci, name, symmetric_mode, rss_flags] = configPortIter.second;
-		(void)pci;
+		YANET_GCC_BUG_UNUSED(pci);
 
-		tPortId portId;
+		tPortId portId = 0;
 
 		if (StartsWith(name, SOCK_DEV_PREFIX))
 		{
@@ -904,8 +904,8 @@ eResult cDataPlane::initWorkers()
 		for (const auto& [port_id, port] : ports)
 		{
 			const auto& [interface_name, rx_queues, tx_queues_count, mac_address, pci, symmetric_mode] = port;
-			(void)mac_address;
-			(void)pci;
+			YANET_GCC_BUG_UNUSED(mac_address);
+			YANET_GCC_BUG_UNUSED(pci);
 
 			if (!basePermanently.ports.Register(port_id))
 				return eResult::invalidPortsCount;
@@ -1003,7 +1003,7 @@ eResult cDataPlane::initWorkers()
 	worker_gc_t::PortToSocketArray port_to_socket;
 	for (const auto& [port_id, port] : ports)
 	{
-		(void)port;
+		YANET_GCC_BUG_UNUSED(port);
 		port_to_socket[port_id] = rte_eth_dev_socket_id(port_id);
 	}
 
@@ -1148,7 +1148,7 @@ eResult cDataPlane::InitSlowWorker(const tCoreId core, const CPlaneWorkerConfig&
 	{
 		for (auto& iface : cfg.interfaces)
 		{
-			tPortId port;
+			tPortId port = 0;
 			if (rte_eth_dev_get_port_by_name(iface.data(), &port))
 			{
 				YANET_LOG_ERROR("Failed to get port id by interface name \"%s\"\n", iface.data());
@@ -1190,7 +1190,7 @@ eResult cDataPlane::InitSlowWorker(const tCoreId core, const CPlaneWorkerConfig&
 	std::vector<dpdk::RingConn<rte_mbuf*>> rings_from_gcs;
 	for (auto& gccore : cfg.gcs)
 	{
-		auto r = worker_gcs.at(gccore)->RegisterSlowWorker("cw" + core,
+		auto r = worker_gcs.at(gccore)->RegisterSlowWorker("cw" + std::to_string(core),
 		                                                   config_values_.ring_normalPriority_size,
 		                                                   config_values_.ring_toFreePackets_size);
 		if (r)
@@ -1326,7 +1326,7 @@ void cDataPlane::init_worker_base()
 
 	for (auto& [core_id, worker] : worker_gcs)
 	{
-		(void)core_id;
+		YANET_GCC_BUG_UNUSED(core_id);
 
 		auto* base = &worker->bases[worker->current_base_id];
 		auto* base_next = &worker->bases[worker->current_base_id ^ 1];
@@ -1349,7 +1349,7 @@ void cDataPlane::timestamp_thread()
 		{
 			for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
 			{
-				(void)socket_id;
+				YANET_GCC_BUG_UNUSED(socket_id);
 				globalbase_atomic->currentTime = current_time;
 			}
 
@@ -1379,9 +1379,10 @@ void cDataPlane::SWRateLimiterTimeTracker()
 				__atomic_store_n(&worker->packetsToSWNPRemainder, config.SWNormalPriorityRateLimitPerWorker, __ATOMIC_RELAXED);
 			}
 
-			for (auto it : slow_workers)
+			for (auto& [core, slow] : slow_workers)
 			{
-				it.second->ResetIcmpOutRemainder(config.SWICMPOutRateLimit / config.rateLimitDivisor);
+				YANET_GCC_BUG_UNUSED(core);
+				slow->ResetIcmpOutRemainder(config.SWICMPOutRateLimit / config.rateLimitDivisor);
 			}
 
 			prevTimePointForSWRateLimiter = curTimePointForSWRateLimiter;
@@ -1604,9 +1605,9 @@ eResult cDataPlane::allocateSharedMemory()
 		int shmid = shmget(key, 0, 0);
 		if (shmid != -1)
 		{
-			if (shmctl(shmid, IPC_RMID, NULL) < 0)
+			if (shmctl(shmid, IPC_RMID, nullptr) < 0)
 			{
-				YADECAP_LOG_ERROR("shmctl(%d, IPC_RMID, NULL): %s\n", shmid, strerror(errno));
+				YADECAP_LOG_ERROR("shmctl(%d, IPC_RMID, nullptr): %s\n", shmid, strerror(errno));
 				return eResult::errorInitSharedMemory;
 			}
 		}
@@ -1624,10 +1625,10 @@ eResult cDataPlane::allocateSharedMemory()
 			return eResult::errorInitSharedMemory;
 		}
 
-		void* shmaddr = shmat(shmid, NULL, 0);
+		void* shmaddr = shmat(shmid, nullptr, 0);
 		if (shmaddr == (void*)-1)
 		{
-			YADECAP_LOG_ERROR("shmat(%d, NULL, %d): %s\n", shmid, 0, strerror(errno));
+			YADECAP_LOG_ERROR("shmat(%d, nullptr, %d): %s\n", shmid, 0, strerror(errno));
 			return eResult::errorInitSharedMemory;
 		}
 
@@ -1711,8 +1712,9 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 		const auto& [key, shm] = it->second;
 
 		auto offset = offsets[shm];
-		worker->tsc_deltas = (dataplane::perf::tsc_deltas*)((intptr_t)shm + offset);
-		memset(worker->tsc_deltas, 0, sizeof(dataplane::perf::tsc_deltas));
+		worker->tsc_deltas = reinterpret_cast<dataplane::perf::tsc_deltas*>(reinterpret_cast<intptr_t>(shm) + offset);
+		// Use value-initialization to reset the object
+		*worker->tsc_deltas = {};
 		offsets[shm] += sizeof(dataplane::perf::tsc_deltas);
 
 		auto meta = common::idp::get_shm_tsc_info::tsc_meta(worker->coreId, socket_id, key, offset);
@@ -1842,7 +1844,7 @@ void cDataPlane::switch_worker_base()
 
 	for (auto& [core_id, worker] : worker_gcs)
 	{
-		(void)core_id;
+		YANET_GCC_BUG_UNUSED(core_id);
 
 		auto* base_next = &worker->bases[worker->current_base_id ^ 1];
 		base_nexts.emplace_back(worker->socket_id, base_next);
@@ -2122,9 +2124,10 @@ std::set<InterfaceName> cDataPlane::workerInterfacesToService()
 const std::set<tCoreId> cDataPlane::FastWorkerCores() const
 {
 	std::set<tCoreId> cores;
-	for (auto it : config.workers)
+	for (auto& [core, workers] : config.workers)
 	{
-		if (!cores.insert(it.first).second)
+		YANET_GCC_BUG_UNUSED(workers);
+		if (!cores.insert(core).second)
 		{
 			YANET_LOG_ERROR("Same core specified in config for multiple workers\n");
 		}
@@ -2278,9 +2281,9 @@ eResult cDataPlane::checkConfig()
 		for (const auto& portIter : config.ports)
 		{
 			const auto& [pci, name, symmetric_mode, rss_flags] = portIter.second;
-			(void)pci;
-			(void)symmetric_mode;
-			(void)rss_flags;
+			YANET_GCC_BUG_UNUSED(pci);
+			YANET_GCC_BUG_UNUSED(symmetric_mode);
+			YANET_GCC_BUG_UNUSED(rss_flags);
 
 			if (exist(names, name))
 			{
@@ -2424,9 +2427,9 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 	for (const auto& port : config.ports)
 	{
 		const auto& [pci, name, symmetric_mode, rss_flags] = port.second;
-		(void)name;
-		(void)symmetric_mode;
-		(void)rss_flags;
+		YANET_GCC_BUG_UNUSED(name);
+		YANET_GCC_BUG_UNUSED(symmetric_mode);
+		YANET_GCC_BUG_UNUSED(rss_flags);
 
 		// Do not whitelist sock dev virtual devices
 		if (StartsWith(name, SOCK_DEV_PREFIX))

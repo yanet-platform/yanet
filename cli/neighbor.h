@@ -1,8 +1,7 @@
 #pragma once
 
+#include "cli/helper.h"
 #include "common/idataplane.h"
-
-#include "helper.h"
 
 namespace neighbor
 {
@@ -12,27 +11,13 @@ void show()
 	interface::dataPlane dataplane;
 	const auto response = dataplane.neighbor_show();
 
-	table_t table({.optional_null = "static"});
-	table.insert("route_name",
-	             "interface_name",
-	             "ip_address",
-	             "mac_address",
-	             "last_update");
-
-	for (const auto& [route_name,
-	                  interface_name,
-	                  ip_address,
-	                  mac_address,
-	                  last_update] : response)
-	{
-		table.insert(route_name,
-		             interface_name,
-		             ip_address,
-		             mac_address,
-		             last_update);
-	}
-
-	table.print();
+	FillAndPrintTable({"route_name",
+	                   "interface_name",
+	                   "ip_address",
+	                   "mac_address",
+	                   "last_update"},
+	                  response,
+	                  {.optional_null = "static"});
 }
 
 void insert(const std::string& route_name,

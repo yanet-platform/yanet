@@ -1,6 +1,5 @@
 #pragma once
 
-#include "acl/bitset.h"
 #include "acl_base.h"
 
 #include "common/acl.h"

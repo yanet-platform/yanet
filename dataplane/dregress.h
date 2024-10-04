@@ -3,7 +3,6 @@
 #include <mutex>
 
 #include "common/btree.h"
-#include "common/idp.h"
 #include "common/type.h"
 
 #include "hashtable.h"

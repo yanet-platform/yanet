@@ -1,9 +1,10 @@
 #pragma once
 
+#include "cli/helper.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace nat64stateful
 {
@@ -13,10 +14,10 @@ void summary()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.nat64stateful_config();
 
-	table_t table;
-	table.insert("module",
-	             "ipv4_pool_size",
-	             "next_module");
+	TablePrinter table;
+	table.insert_row("module",
+	                 "ipv4_pool_size",
+	                 "next_module");
 
 	for (const auto& [name, nat64stateful] : response)
 	{
@@ -26,12 +27,12 @@ void summary()
 			ipv4_pool_size += (1u << (32 - ipv4_prefix.mask()));
 		}
 
-		table.insert(name,
-		             ipv4_pool_size,
-		             nat64stateful.next_module);
+		table.insert_row(name,
+		                 ipv4_pool_size,
+		                 nat64stateful.next_module);
 	}
 
-	table.print();
+	table.Print();
 }
 
 void announce()
@@ -39,17 +40,7 @@ void announce()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.nat64stateful_announce();
 
-	table_t table;
-	table.insert("module",
-	             "announces");
-
-	for (const auto& [module, announces] : response)
-	{
-		table.insert(module,
-		             announces);
-	}
-
-	table.print();
+	FillAndPrintTable({"module", "announces"}, response);
 }
 
 /// @todo: move
@@ -152,19 +143,19 @@ void state(std::optional<std::string> module)
 	interface::dataPlane dataplane;
 	const auto response = dataplane.nat64stateful_state({module_id});
 
-	table_t table;
-	table.insert("module",
-	             "ipv6_source",
-	             "ipv4_source",
-	             "ipv4_destination",
-	             "proto",
-	             "origin_port_source",
-	             "port_source",
-	             "port_destination",
-	             "lan_flags",
-	             "wan_flags",
-	             "lan_last_seen",
-	             "wan_last_seen");
+	TablePrinter table;
+	table.insert_row("module",
+	                 "ipv6_source",
+	                 "ipv4_source",
+	                 "ipv4_destination",
+	                 "proto",
+	                 "origin_port_source",
+	                 "port_source",
+	                 "port_destination",
+	                 "lan_flags",
+	                 "wan_flags",
+	                 "lan_last_seen",
+	                 "wan_last_seen");
 
 	for (const auto& [nat64stateful_id,
 	                  proto,
@@ -185,21 +176,21 @@ void state(std::optional<std::string> module)
 			it = modules.emplace_hint(it, nat64stateful_id, "unknown");
 		}
 
-		table.insert(it->second,
-		             ipv6_source,
-		             ipv4_source,
-		             ipv6_destination.get_mapped_ipv4_address().toString().data(),
-		             proto_to_string(proto).data(),
-		             port_source,
-		             wan_port_source,
-		             port_destination,
-		             tcp_flags_to_string(lan_flags),
-		             tcp_flags_to_string(wan_flags),
-		             lan_last_seen,
-		             wan_last_seen);
+		table.insert_row(it->second,
+		                 ipv6_source,
+		                 ipv4_source,
+		                 ipv6_destination.get_mapped_ipv4_address().toString().data(),
+		                 proto_to_string(proto).data(),
+		                 port_source,
+		                 wan_port_source,
+		                 port_destination,
+		                 tcp_flags_to_string(lan_flags),
+		                 tcp_flags_to_string(wan_flags),
+		                 lan_last_seen,
+		                 wan_last_seen);
 	}
 
-	table.print();
+	table.Print();
 }
 
 }

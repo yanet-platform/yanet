@@ -1,5 +1,6 @@
 #include "slow_worker.h"
 
+#include "checksum.h"
 #include "common/fallback.h"
 #include "dataplane.h"
 #include "icmp_translations.h"
@@ -422,7 +423,7 @@ bool SlowWorker::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 		return false;
 	}
 
-	tAclId aclId;
+	tAclId aclId = 0;
 	if (!slow_worker_->dataPlane->controlPlane->fw_state_multicast_acl_ids.apply([&](auto& fw_state_multicast_acl_ids) {
 		    auto it = fw_state_multicast_acl_ids.find(common::ipv6_address_t(ipv6Header->dst_addr));
 		    if (it == fw_state_multicast_acl_ids.end())
@@ -518,10 +519,10 @@ bool SlowWorker::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 
 			for (auto& [socketId, globalBaseAtomic] : slow_worker_->dataPlane->globalBaseAtomics)
 			{
-				(void)socketId;
+				YANET_GCC_BUG_UNUSED(socketId);
 
-				dataplane::globalBase::fw_state_value_t* lookup_value;
-				dataplane::spinlock_nonrecursive_t* locker;
+				dataplane::globalBase::fw_state_value_t* lookup_value = nullptr;
+				dataplane::spinlock_nonrecursive_t* locker = nullptr;
 				const uint32_t hash = globalBaseAtomic->fw6_state->lookup(key, lookup_value, locker);
 				if (lookup_value)
 				{
@@ -599,10 +600,10 @@ bool SlowWorker::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 
 			for (auto& [socketId, globalBaseAtomic] : slow_worker_->dataPlane->globalBaseAtomics)
 			{
-				(void)socketId;
+				YANET_GCC_BUG_UNUSED(socketId);
 
-				dataplane::globalBase::fw_state_value_t* lookup_value;
-				dataplane::spinlock_nonrecursive_t* locker;
+				dataplane::globalBase::fw_state_value_t* lookup_value = nullptr;
+				dataplane::spinlock_nonrecursive_t* locker = nullptr;
 				const uint32_t hash = globalBaseAtomic->fw4_state->lookup(key, lookup_value, locker);
 				if (lookup_value)
 				{
@@ -636,7 +637,7 @@ void SlowWorker::BalancerICMPForwardCriticalSection(
 
 	common::ip_address_t original_src_from_icmp_payload;
 	common::ip_address_t src_from_ip_header;
-	uint16_t original_src_port_from_icmp_payload;
+	uint16_t original_src_port_from_icmp_payload = 0;
 
 	uint32_t balancer_id = metadata->flow.data.balancer.id;
 

@@ -6,10 +6,6 @@ cModule::cModule() :
 {
 }
 
-cModule::~cModule()
-{
-}
-
 eResult cModule::moduleInit(cControlPlane* controlPlane)
 {
 	this->controlPlane = controlPlane;
@@ -66,27 +62,22 @@ void cModule::moduleJoin()
 	join();
 }
 
-void cModule::limit(common::icp::limit_summary::response& limits) const
+void cModule::limit([[maybe_unused]] common::icp::limit_summary::response& limits) const
 {
-	(void)limits;
 }
 
-void cModule::controlplane_values(common::icp::controlplane_values::response& controlplane_values) const
+void cModule::controlplane_values([[maybe_unused]] common::icp::controlplane_values::response& controlplane_values) const
 {
-	(void)controlplane_values;
 }
 
 void cModule::reload_before()
 {
 }
 
-void cModule::reload(const controlplane::base_t& base_prev,
-                     const controlplane::base_t& base_next,
-                     common::idp::updateGlobalBase::request& globalbase)
+void cModule::reload([[maybe_unused]] const controlplane::base_t& base_prev,
+                     [[maybe_unused]] const controlplane::base_t& base_next,
+                     [[maybe_unused]] common::idp::updateGlobalBase::request& globalbase)
 {
-	(void)base_prev;
-	(void)base_next;
-	(void)globalbase;
 }
 
 void cModule::reload_after()
