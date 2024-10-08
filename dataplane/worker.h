@@ -63,6 +63,8 @@ public:
 
 class cWorker
 {
+	unsigned int MempoolSize() const;
+
 public:
 	cWorker(cDataPlane* dataPlane);
 	~cWorker();

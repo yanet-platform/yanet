@@ -20,12 +20,12 @@ bool KernelInterfaceHandle::SetUp() const noexcept
 	struct ifreq request;
 	memset(&request, 0, sizeof request);
 
-	strncpy(request.ifr_name, vdev_name_.data(), IFNAMSIZ);
+	strncpy(request.ifr_name, name_.data(), IFNAMSIZ);
 
 	request.ifr_flags |= IFF_UP;
 	if (auto res = ioctl(socket, SIOCSIFFLAGS, &request))
 	{
-		YANET_LOG_ERROR("failed to set interface %s up, ioctl returned (%d)", vdev_name_.data(), res);
+		YANET_LOG_ERROR("failed to set interface %s up, ioctl returned (%d)", name_.data(), res);
 		return false;
 	}
 	return true;
@@ -61,6 +61,7 @@ KernelInterfaceHandle& KernelInterfaceHandle::operator=(KernelInterfaceHandle&& 
 	if (this != &other)
 	{
 		std::swap(kni_port_, other.kni_port_);
+		std::swap(name_, other.name_);
 		std::swap(vdev_name_, other.vdev_name_);
 		std::swap(queue_size_, other.queue_size_);
 	}
@@ -75,6 +76,7 @@ KernelInterfaceHandle::MakeKernelInterfaceHandle(
 {
 	KernelInterfaceHandle kni;
 	kni.queue_size_ = queue_size;
+	kni.name_ = name;
 	kni.vdev_name_ = VdevName(name, port);
 	std::string vdev_args = VdevArgs(name, port, queue_size);
 	if (!kni.Add(kni.vdev_name_, vdev_args) ||
@@ -82,7 +84,7 @@ KernelInterfaceHandle::MakeKernelInterfaceHandle(
 	{
 		return std::nullopt;
 	}
-
+	YANET_LOG_INFO("Created vdev device %s (%d)\n", kni.name_.c_str(), kni.kni_port_);
 	return std::optional<KernelInterfaceHandle>{std::move(kni)};
 }
 
@@ -121,6 +123,7 @@ bool KernelInterfaceHandle::Add(const std::string& vdev_name, const std::string&
 		YADECAP_LOG_ERROR("vdev interface '%s' not found\n", vdev_name.data());
 		return false;
 	}
+	YANET_LOG_INFO("Successfully added vdev interface '%s' with pid %d (%s)\n", vdev_name.data(), kni_port_, args.data());
 	return true;
 }
 
@@ -132,9 +135,7 @@ void KernelInterfaceHandle::Remove() noexcept
 
 rte_eth_conf KernelInterfaceHandle::DefaultConfig() noexcept
 {
-	rte_eth_conf eth_conf;
-	memset(&eth_conf, 0, sizeof(eth_conf));
-	return eth_conf;
+	return rte_eth_conf{};
 }
 
 bool KernelInterfaceHandle::Configure(const rte_eth_conf& eth_conf)
@@ -151,14 +152,14 @@ bool KernelInterfaceHandle::Configure(const rte_eth_conf& eth_conf)
 	return true;
 }
 
-bool KernelInterfaceHandle::CloneMTU(const uint16_t port_id) const noexcept
+bool KernelInterfaceHandle::CloneMTU(const uint16_t port_id) noexcept
 {
 	uint16_t mtu;
-	if (rte_eth_dev_get_mtu(port_id, &mtu) != 0)
-		return false;
-
-	rte_eth_dev_set_mtu(kni_port_, mtu);
-	return true;
+	if (rte_eth_dev_get_mtu(port_id, &mtu))
+	{
+		return (rte_eth_dev_set_mtu(kni_port_, mtu) == 0);
+	}
+	return false;
 }
 
 bool KernelInterfaceHandle::SetupRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool) noexcept

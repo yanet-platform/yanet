@@ -81,6 +81,17 @@ cWorker::~cWorker()
 	}
 }
 
+unsigned int cWorker::MempoolSize() const
+{
+	const auto& config = dataPlane->getConfigValues();
+	unsigned int rx_points_factor = 2 * basePermanently.rx_points.size();
+	return rx_points_factor * config.port_rx_queue_size +
+	       rx_points_factor * config.port_tx_queue_size +
+	       2 * config.ring_highPriority_size +
+	       2 * config.ring_normalPriority_size +
+	       2 * config.ring_lowPriority_size;
+}
+
 eResult cWorker::init(const tCoreId& coreId,
                       const dataplane::base::permanently& basePermanently,
                       const dataplane::base::generation& base)
@@ -95,11 +106,7 @@ eResult cWorker::init(const tCoreId& coreId,
 	this->bases[currentBaseId] = base;
 	this->bases[currentBaseId ^ 1] = base;
 
-	unsigned int elements_count = 2 * basePermanently.rx_points.size() * dataPlane->getConfigValues().port_rx_queue_size +
-	                              2 * basePermanently.rx_points.size() * dataPlane->getConfigValues().port_tx_queue_size +
-	                              2 * dataPlane->getConfigValues().ring_highPriority_size +
-	                              2 * dataPlane->getConfigValues().ring_normalPriority_size +
-	                              2 * dataPlane->getConfigValues().ring_lowPriority_size;
+	unsigned int elements_count = MempoolSize();
 
 	YADECAP_LOG_DEBUG("elements_count: %u\n", elements_count);
 
@@ -199,20 +206,7 @@ void cWorker::start()
 
 	/// @todo: prepare()
 
-	unsigned int mbufs_count_expect = 2 * basePermanently.rx_points.size() * dataPlane->getConfigValues().port_rx_queue_size +
-	                                  2 * basePermanently.rx_points.size() * dataPlane->getConfigValues().port_tx_queue_size +
-	                                  2 * dataPlane->getConfigValues().ring_highPriority_size +
-	                                  2 * dataPlane->getConfigValues().ring_normalPriority_size +
-	                                  2 * dataPlane->getConfigValues().ring_lowPriority_size;
-
 	unsigned int mbufs_count = rte_mempool_avail_count(mempool);
-	if (mbufs_count != mbufs_count_expect)
-	{
-		YADECAP_LOG_ERROR("mbufs_count: %u != %u\n",
-		                  mbufs_count,
-		                  mbufs_count_expect);
-		abort();
-	}
 
 	std::vector<rte_mbuf*> mbufs;
 	mbufs.resize(mbufs_count);

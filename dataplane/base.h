@@ -22,13 +22,33 @@ class PortMapper
 	uint16_t ports_count_ = 0;
 	tPortId dpdk_ports_[std::numeric_limits<tPortId>::max() + 1]; // logical to dpdk
 	tPortId logical_ports_[std::numeric_limits<tPortId>::max() + 1]; // dpdk to logical
+
 public:
 	PortMapper()
 	{
 		std::fill(std::begin(dpdk_ports_), std::end(dpdk_ports_), INVALID_PORT_ID);
 		std::fill(std::begin(logical_ports_), std::end(logical_ports_), INVALID_PORT_ID);
 	}
+
+	PortMapper(const PortMapper& other)
+	{
+		*this = other;
+	}
+
+	PortMapper& operator=(const PortMapper& other)
+	{
+		ports_count_ = other.ports_count_;
+		std::copy(std::begin(other.dpdk_ports_),
+		          std::end(other.dpdk_ports_),
+		          std::begin(dpdk_ports_));
+		std::copy(std::begin(other.logical_ports_),
+		          std::end(other.logical_ports_),
+		          std::begin(logical_ports_));
+		return *this;
+	}
+
 	uint16_t size() const { return ports_count_; }
+
 	[[nodiscard]] std::optional<tPortId> Register(tPortId dpdk_port)
 	{
 		if (ports_count_ < CONFIG_YADECAP_PORTS_SIZE)
@@ -51,6 +71,7 @@ public:
 			return {};
 		}
 	}
+
 	tPortId ToDpdk(tPortId logical) const { return dpdk_ports_[logical]; }
 	tPortId ToLogical(tPortId dpdk) const { return logical_ports_[dpdk]; }
 	bool ValidDpdk(tPortId dpdk) const { return logical_ports_[dpdk] != INVALID_PORT_ID; }

@@ -2,6 +2,7 @@
 #include <optional>
 #include <string>
 
+#include <rte_ethdev.h>
 #include <rte_mbuf.h>
 #include <rte_ring.h>
 
@@ -75,9 +76,14 @@ struct Endpoint
 {
 	tPortId port;
 	tQueueId queue;
-	Endpoint() = default;
+	Endpoint() :
+	        Endpoint(-1, -1) {}
 	Endpoint(tPortId port, tQueueId queue) :
 	        port{port}, queue{queue} {}
 };
+
+std::optional<std::string> GetNameByPort(tPortId pid);
+
+std::optional<common::mac_address_t> GetMacAddress(tPortId pid);
 
 } // namespace dpdk

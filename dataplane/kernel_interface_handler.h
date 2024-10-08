@@ -53,12 +53,6 @@ struct KernelInterfaceBundleConfig
 	dpdk::Endpoint drop_dump;
 };
 
-struct KernelInterfaceWorkerConfig
-{
-	std::vector<KernelInterfaceBundleConfig> interfaces;
-	dataplane::base::PortMapper* port_mapper;
-};
-
 class KernelInterfaceWorker
 {
 public:
@@ -76,8 +70,9 @@ private:
 	PortArray<KernelInterface> in_dump_;
 	PortArray<KernelInterface> out_dump_;
 	PortArray<KernelInterface> drop_dump_;
-	const dataplane::base::PortMapper* port_mapper_;
+	dataplane::base::PortMapper port_mapper_;
 	uint64_t unknown_dump_interface_ = 0;
+	uint64_t unknown_forward_interface_ = 0;
 
 	/**
 	 * @brief Receive packets from interface and free them.
@@ -86,7 +81,9 @@ private:
 	void RecvFree(const KernelInterface& iface);
 
 public:
-	KernelInterfaceWorker(const KernelInterfaceWorkerConfig& config);
+	KernelInterfaceWorker(std::vector<KernelInterfaceBundleConfig>& config);
+	KernelInterfaceWorker(KernelInterfaceWorker&& other);
+	KernelInterfaceWorker& operator=(KernelInterfaceWorker&& other);
 	ConstPortArrayRange<tPortId> PortsIds() const;
 	ConstPortArrayRange<sKniStats> PortsStats() const;
 	std::optional<std::reference_wrapper<const sKniStats>> PortStats(tPortId pid) const;
