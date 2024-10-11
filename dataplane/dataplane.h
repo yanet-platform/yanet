@@ -100,6 +100,7 @@ public:
 
 	eResult init(const std::string& binaryPath,
 	             const std::string& configFilePath);
+	eResult DryRun(const std::string& configFilePath);
 
 	void start();
 	void join();

@@ -31,6 +31,7 @@ int main(int argc,
 	return 1;
 #endif
 
+	bool dry_run = false;
 	int config = argc;
 	for (int i = 1; i < argc; i++)
 	{
@@ -38,15 +39,26 @@ int main(int argc,
 		{
 			common::log::logPriority = common::log::TLOG_DEBUG;
 		}
+		else if (strcmp(argv[i], "-t") == 0)
+		{
+			dry_run = true;
+		}
 		else if (strcmp(argv[i], "-c") == 0)
 		{
 			config = i + 1;
+			++i;
 		}
 	}
 	if (config >= argc)
 	{
-		std::cout << "usage: " << argv[0] << " [-d] -c <dataplane.conf>" << std::endl;
+		std::cout << "usage: " << argv[0] << " [-d] [-t] -c <dataplane.conf>" << std::endl;
 		return 1;
+	}
+
+	if (dry_run)
+	{
+		eResult res = dataPlane.DryRun(argv[config]);
+		return (res == eResult::success) ? 0 : 2;
 	}
 
 	auto result = dataPlane.init(argv[0], argv[config]);
