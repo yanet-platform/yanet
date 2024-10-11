@@ -1196,7 +1196,6 @@ eResult cDataPlane::InitSlowWorker(tCoreId core, const CPlaneWorkerConfig& cfg, 
 		}
 		YANET_LOG_INFO("controlplane worker on core %d, serving [%s]\n", core, ss.str().c_str());
 	}
-	YANET_LOG_ERROR("ending with kni bundleconf\n");
 
 	std::vector<cWorker*> workers_to_service;
 	for (auto& core : cfg.workers)
