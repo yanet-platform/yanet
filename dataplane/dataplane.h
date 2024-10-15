@@ -32,13 +32,6 @@
 
 using InterfaceName = std::string;
 
-struct CPlaneWorkerConfig
-{
-	std::set<InterfaceName> interfaces;
-	std::set<tCoreId> workers;
-	std::set<tCoreId> gcs;
-};
-
 struct tDataPlaneConfig
 {
 	/*
@@ -57,7 +50,7 @@ struct tDataPlaneConfig
 
 	std::set<tCoreId> workerGCs;
 	tCoreId controlPlaneCoreId;
-	std::map<tCoreId, CPlaneWorkerConfig> controlplane_workers;
+	std::map<tCoreId, std::set<tCoreId>> controlplane_workers;
 	std::map<tCoreId, std::vector<InterfaceName>> workers;
 	bool useHugeMem = true;
 	bool use_kernel_interface = true;
@@ -70,6 +63,35 @@ struct tDataPlaneConfig
 	std::map<std::string, std::tuple<unsigned int, unsigned int>> shared_memory;
 
 	std::vector<std::string> ealArgs;
+	std::set<InterfaceName> WorkersInterfaces(std::set<tCoreId> cores)
+	{
+		std::set<InterfaceName> ifaces;
+		for (auto core : cores)
+		{
+			auto worker = workers.at(core);
+			ifaces.insert(worker.begin(), worker.end());
+		}
+		return ifaces;
+	}
+	std::map<InterfaceName, tQueueId> VdevQueues()
+	{
+		std::map<InterfaceName, tQueueId> total;
+		for (auto& [_, cores] : controlplane_workers)
+		{
+			(void)_;
+			std::set<InterfaceName> ifaces;
+			for (auto core : cores)
+			{
+				const auto& w = workers.at(core);
+				ifaces.insert(w.begin(), w.end());
+			}
+			for (auto& iface : ifaces)
+			{
+				++total[iface];
+			}
+		}
+		return total;
+	}
 };
 
 class hugepage_pointer
@@ -123,16 +145,13 @@ public:
 protected:
 	eResult parseConfig(const std::string& configFilePath);
 	eResult parseJsonPorts(const nlohmann::json& json);
-	void ChooseGCs(tCoreId core, CPlaneWorkerConfig& cfg) const;
-	std::optional<std::map<tCoreId, CPlaneWorkerConfig>> parseControlPlaneWorkers(const nlohmann::json& config);
-	std::optional<std::pair<tCoreId, CPlaneWorkerConfig>> parseControlPlaneWorker(const nlohmann::json& cpwj);
+	std::optional<std::map<tCoreId, std::set<tCoreId>>> parseControlPlaneWorkers(const nlohmann::json& config);
+	std::optional<std::pair<tCoreId, std::set<tCoreId>>> parseControlPlaneWorker(const nlohmann::json& cpwj);
 	nlohmann::json makeLegacyControlPlaneWorkerConfig();
-	std::set<InterfaceName> workerInterfacesToService();
 	eResult parseConfigValues(const nlohmann::json& json);
 	eResult parseRateLimits(const nlohmann::json& json);
 	eResult parseSharedMemory(const nlohmann::json& json);
 	eResult checkConfig();
-	bool checkControlPlaneWorkersConfig();
 
 	eResult initEal(const std::string& binaryPath, const std::string& filePrefix);
 	eResult initPorts();
@@ -140,16 +159,32 @@ protected:
 	std::map<tCoreId, std::function<void()>> coreFunctions_;
 	static int LcoreFunc(void* args);
 
+	struct KniHandleBundle
+	{
+		tQueueId queues = 0;
+		dataplane::KernelInterfaceHandle forward;
+		dataplane::KernelInterfaceHandle in_dump;
+		dataplane::KernelInterfaceHandle out_dump;
+		dataplane::KernelInterfaceHandle drop_dump;
+		bool Start()
+		{
+			return forward.Start() &&
+			       in_dump.Start() &&
+			       out_dump.Start() &&
+			       drop_dump.Start();
+		}
+	};
+
 public:
 	void StartInterfaces();
 
 protected:
 	eResult init_kernel_interfaces();
-	bool KNIAddTxQueue(tQueueId queue, tSocketId socket);
-	bool KNIAddRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool);
+	bool KNIAddTxQueue(KniHandleBundle& bundle, tQueueId queue, tSocketId socket);
+	bool KNIAddRxQueue(KniHandleBundle& bundle, tQueueId queue, tSocketId socket, rte_mempool* mempool);
 	eResult initGlobalBases();
 	eResult initWorkers();
-	eResult InitSlowWorker(tCoreId core, const CPlaneWorkerConfig& ports, tQueueId phy_queue);
+	eResult InitSlowWorker(tCoreId core, const std::set<tCoreId>& workers, tQueueId phy_queue);
 	eResult InitSlowWorkers();
 	eResult initKniQueues();
 	eResult InitTxQueues();
@@ -177,20 +212,6 @@ protected:
 	tDataPlaneConfig config;
 	ConfigValues config_values_;
 
-	struct KniHandleBundle
-	{
-		dataplane::KernelInterfaceHandle forward;
-		dataplane::KernelInterfaceHandle in_dump;
-		dataplane::KernelInterfaceHandle out_dump;
-		dataplane::KernelInterfaceHandle drop_dump;
-		bool Start()
-		{
-			return forward.Start() &&
-			       in_dump.Start() &&
-			       out_dump.Start() &&
-			       drop_dump.Start();
-		}
-	};
 	std::map<tPortId, KniHandleBundle> kni_interface_handles;
 
 	std::map<tPortId,

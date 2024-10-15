@@ -140,10 +140,25 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	}
 
 	std::set<tSocketId> slow_sockets;
-	for (auto [port, info] : ports)
+	for (const auto& [core, serviced] : config.controlplane_workers)
 	{
-		(void)info;
-		slow_sockets.insert(rte_eth_dev_socket_id(port));
+		auto ifaces = config.WorkersInterfaces(serviced);
+		for (const auto& iface : ifaces)
+		{
+			std::string device_name = std::get<0>(config.ports.at(iface));
+			if (StartsWith(device_name, SOCK_DEV_PREFIX))
+			{
+				device_name = iface;
+			}
+			auto port = dpdk::GetPortByName(device_name);
+			if (!port)
+			{
+				YANET_LOG_ERROR("No port!\n");
+				std::abort();
+			}
+			slow_sockets.insert(rte_eth_dev_socket_id(port.value()));
+		}
+		slow_sockets.insert(rte_lcore_to_socket_id(core));
 	}
 
 	for (auto socket : slow_sockets)
@@ -650,14 +665,21 @@ void cDataPlane::StartInterfaces()
 eResult cDataPlane::init_kernel_interfaces()
 {
 	const uint16_t queue_size = getConfigValues().kernel_interface_queue_size;
+	auto vdev_queues = config.VdevQueues();
 	for (const auto& [port_id, info] : ports)
 	{
 		const auto& interface_name = std::get<0>(info);
+		if (vdev_queues.find(interface_name) == vdev_queues.end())
+		{
+			YANET_LOG_INFO("Not creating kernel interface for '%s'", interface_name.c_str());
+			continue;
+		}
+		const auto& queues = vdev_queues.at(interface_name);
 
-		auto forward = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle(interface_name, port_id, queue_size);
-		auto in = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle("in." + interface_name, port_id, queue_size);
-		auto out = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle("out." + interface_name, port_id, queue_size);
-		auto drop = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle("drop." + interface_name, port_id, queue_size);
+		auto forward = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle(interface_name, port_id, queues, queue_size);
+		auto in = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle("in." + interface_name, port_id, queues, queue_size);
+		auto out = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle("out." + interface_name, port_id, queues, queue_size);
+		auto drop = dataplane::KernelInterfaceHandle::MakeKernelInterfaceHandle("drop." + interface_name, port_id, queues, queue_size);
 
 		if (!forward || !in || !out || !drop)
 		{
@@ -669,41 +691,29 @@ eResult cDataPlane::init_kernel_interfaces()
 		out->CloneMTU(port_id);
 		drop->CloneMTU(port_id);
 
-		kni_interface_handles.emplace(port_id, KniHandleBundle{std::move(forward.value()), std::move(in.value()), std::move(out.value()), std::move(drop.value())});
+		kni_interface_handles.emplace(port_id, KniHandleBundle{0, std::move(forward.value()), std::move(in.value()), std::move(out.value()), std::move(drop.value())});
 	}
 
 	return eResult::success;
 }
 
-bool cDataPlane::KNIAddTxQueue(tQueueId queue, tSocketId socket)
+bool cDataPlane::KNIAddTxQueue(KniHandleBundle& bundle, tQueueId queue, tSocketId socket)
 {
-	for (auto& bundle : kni_interface_handles)
-	{
-		auto& [fwd, in, out, drop] = bundle.second;
-		if (!fwd.SetupTxQueue(queue, socket) ||
-		    !in.SetupTxQueue(queue, socket) ||
-		    !out.SetupTxQueue(queue, socket) ||
-		    !drop.SetupTxQueue(queue, socket))
-		{
-			return false;
-		}
-	}
-	return true;
+	auto& [_, fwd, in, out, drop] = bundle;
+	(void)_;
+	return fwd.SetupTxQueue(queue, socket) &&
+	       in.SetupTxQueue(queue, socket) &&
+	       out.SetupTxQueue(queue, socket) &&
+	       drop.SetupTxQueue(queue, socket);
 }
-bool cDataPlane::KNIAddRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool)
+bool cDataPlane::KNIAddRxQueue(KniHandleBundle& bundle, tQueueId queue, tSocketId socket, rte_mempool* mempool)
 {
-	for (auto& bundle : kni_interface_handles)
-	{
-		auto& [fwd, in, out, drop] = bundle.second;
-		if (!fwd.SetupRxQueue(queue, socket, mempool) ||
-		    !in.SetupRxQueue(queue, socket, mempool) ||
-		    !out.SetupRxQueue(queue, socket, mempool) ||
-		    !drop.SetupRxQueue(queue, socket, mempool))
-		{
-			return false;
-		}
-	}
-	return true;
+	auto& [_, fwd, in, out, drop] = bundle;
+	(void)_;
+	return fwd.SetupRxQueue(queue, socket, mempool) &&
+	       in.SetupRxQueue(queue, socket, mempool) &&
+	       out.SetupRxQueue(queue, socket, mempool) &&
+	       drop.SetupRxQueue(queue, socket, mempool);
 }
 
 eResult cDataPlane::initGlobalBases()
@@ -1125,7 +1135,7 @@ eResult cDataPlane::initWorkers()
 	return eResult::success;
 }
 
-eResult cDataPlane::InitSlowWorker(tCoreId core, const CPlaneWorkerConfig& cfg, tQueueId phy_queue)
+eResult cDataPlane::InitSlowWorker(tCoreId core, const std::set<tCoreId>& worker_cores, tQueueId phy_queue)
 {
 	const tSocketId socket_id = rte_lcore_to_socket_id(core);
 
@@ -1170,24 +1180,26 @@ eResult cDataPlane::InitSlowWorker(tCoreId core, const CPlaneWorkerConfig& cfg, 
 	std::vector<tPortId> ports_to_service;
 	if (config.use_kernel_interface)
 	{
-		for (auto& iface : cfg.interfaces)
+		std::set<std::string> interfaces = config.WorkersInterfaces(worker_cores);
+		for (auto& iface : interfaces)
 		{
-			tPortId port;
 			const auto name = std::get<0>(config.ports.at(iface.data())).c_str();
-			if (rte_eth_dev_get_port_by_name(name, &port))
+			auto port = dpdk::GetPortByName(name);
+			if (!port)
 			{
-				YANET_LOG_ERROR("Failed to get port id for interface \"%s\" by name \"%s\"\n", iface.data(), name);
+				YANET_LOG_ERROR("No port\n");
 				std::terminate();
 			}
-			ports_to_service.push_back(port);
-			auto& [fwd, in, out, drop] = kni_interface_handles.at(port);
+			ports_to_service.push_back(port.value());
+			auto& [kni_queue, fwd, in, out, drop] = kni_interface_handles.at(port.value());
 			kni_bundleconf.emplace_back(
 			        dataplane::KernelInterfaceBundleConfig{
-			                {port, phy_queue},
-			                {fwd.Id(), 0},
-			                {in.Id(), 0},
-			                {out.Id(), 0},
-			                {drop.Id(), 0}});
+			                {port.value(), phy_queue},
+			                {fwd.Id(), kni_queue},
+			                {in.Id(), kni_queue},
+			                {out.Id(), kni_queue},
+			                {drop.Id(), kni_queue}});
+			++kni_queue;
 		}
 		std::stringstream ss;
 		for (auto p : ports_to_service)
@@ -1198,19 +1210,32 @@ eResult cDataPlane::InitSlowWorker(tCoreId core, const CPlaneWorkerConfig& cfg, 
 	}
 
 	std::vector<cWorker*> workers_to_service;
-	for (auto& core : cfg.workers)
+	for (auto& core : worker_cores)
 	{
-		workers_to_service.push_back(workers.at(core));
+		workers_to_service.push_back(cDataPlane::workers.at(core));
 	}
 
-	std::vector<worker_gc_t*> gcs_to_service;
-	for (auto& core : cfg.gcs)
+	std::vector<tCoreId> gcs_to_service;
+	if (config.controlplane_workers.size() == 1)
 	{
-		gcs_to_service.push_back(worker_gcs.at(core));
+		for (auto gc : config.workerGCs)
+		{
+			gcs_to_service.push_back(gc);
+		}
+	}
+	else
+	{
+		for (auto gc : config.workerGCs)
+		{
+			if (rte_lcore_to_socket_id(gc) == rte_lcore_to_socket_id(core))
+			{
+				gcs_to_service.push_back(gc);
+			}
+		}
 	}
 
 	std::vector<dpdk::RingConn<rte_mbuf*>> rings_from_gcs;
-	for (auto& gccore : cfg.gcs)
+	for (auto& gccore : gcs_to_service)
 	{
 		auto r = worker_gcs.at(gccore)->RegisterSlowWorker("cw" + std::to_string(core),
 		                                                   config_values_.ring_normalPriority_size,
@@ -1242,29 +1267,17 @@ eResult cDataPlane::InitSlowWorker(tCoreId core, const CPlaneWorkerConfig& cfg, 
 	return eResult::success;
 }
 
-void cDataPlane::ChooseGCs(tCoreId core, CPlaneWorkerConfig& cfg) const
-{
-	for (const auto& gc : config.workerGCs)
-	{
-		if (rte_lcore_to_socket_id(gc) == rte_lcore_to_socket_id(core))
-		{
-			cfg.gcs.insert(gc);
-		}
-	}
-}
-
 eResult cDataPlane::InitSlowWorkers()
 {
 	auto q = tx_queues_;
 	for (auto& [core, cfg] : config.controlplane_workers)
 	{
-		ChooseGCs(core, cfg);
 		if (auto res = InitSlowWorker(core, cfg, q--); res != eResult::success)
 		{
 			return res;
 		}
 	}
-	YANET_LOG_ERROR("slow workers size is %lu\n", slow_workers.size());
+	YANET_LOG_INFO("slow workers size is %lu\n", slow_workers.size());
 
 	return eResult::success;
 }
@@ -1320,18 +1333,23 @@ eResult cDataPlane::InitRxQueues()
 
 eResult cDataPlane::initKniQueues()
 {
-	for (auto& it : kni_interface_handles)
+	for (auto& [port_id, bundle] : kni_interface_handles)
 	{
-		uint16_t port_id = it.first;
 		const auto& socket_id = rte_eth_dev_socket_id(port_id);
-		if (!KNIAddTxQueue(0, socket_id))
+		for (tQueueId q = 0; q < bundle.queues; ++q)
 		{
-			return eResult::errorInitQueue;
+			if (!KNIAddTxQueue(bundle, q, socket_id))
+			{
+				return eResult::errorInitQueue;
+			}
 		}
 
-		if (!KNIAddRxQueue(0, socket_id, socket_cplane_mempools.at(socket_id)))
+		for (tQueueId q = 0; q < bundle.queues; ++q)
 		{
-			return eResult::errorInitQueue;
+			if (!KNIAddRxQueue(bundle, q, socket_id, socket_cplane_mempools.at(socket_id)))
+			{
+				return eResult::errorInitQueue;
+			}
 		}
 	}
 	return eResult::success;
@@ -2089,7 +2107,7 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 	return eResult::success;
 }
 
-std::optional<std::map<tCoreId, CPlaneWorkerConfig>> cDataPlane::parseControlPlaneWorkers(const nlohmann::json& root)
+std::optional<std::map<tCoreId, std::set<tCoreId>>> cDataPlane::parseControlPlaneWorkers(const nlohmann::json& root)
 {
 	nlohmann::json dflt;
 	auto cpw = root.find("controlPlaneWorkers");
@@ -2101,7 +2119,7 @@ std::optional<std::map<tCoreId, CPlaneWorkerConfig>> cDataPlane::parseControlPla
 		cpw = dflt.find("controlPlaneWorkers");
 	}
 
-	std::map<tCoreId, CPlaneWorkerConfig> result;
+	std::map<tCoreId, std::set<tCoreId>> result;
 
 	auto add_worker = [&](const nlohmann::json& j) {
 		auto worker = parseControlPlaneWorker(j);
@@ -2131,6 +2149,7 @@ std::optional<std::map<tCoreId, CPlaneWorkerConfig>> cDataPlane::parseControlPla
 			}
 		}
 	}
+
 	return std::optional{std::move(result)};
 }
 
@@ -2138,23 +2157,8 @@ nlohmann::json cDataPlane::makeLegacyControlPlaneWorkerConfig()
 {
 	nlohmann::json j;
 	j["core"] = config.controlPlaneCoreId;
-	j["interfaces"] = workerInterfacesToService();
 	j["serviced_cores"] = FastWorkerCores();
 	return nlohmann::json{{"controlPlaneWorkers", j}};
-}
-
-std::set<InterfaceName> cDataPlane::workerInterfacesToService()
-{
-	std::set<InterfaceName> res;
-	for (const auto& p : config.workers)
-	{
-		const auto& ifaces = p.second;
-		for (const auto& i : ifaces)
-		{
-			res.emplace(i);
-		}
-	}
-	return res;
 }
 
 const std::set<tCoreId> cDataPlane::FastWorkerCores() const
@@ -2170,7 +2174,7 @@ const std::set<tCoreId> cDataPlane::FastWorkerCores() const
 	return cores;
 }
 
-std::optional<std::pair<tCoreId, CPlaneWorkerConfig>> cDataPlane::parseControlPlaneWorker(const nlohmann::json& cpwj)
+std::optional<std::pair<tCoreId, std::set<tCoreId>>> cDataPlane::parseControlPlaneWorker(const nlohmann::json& cpwj)
 {
 	auto jcore = cpwj.find("core");
 	if (jcore == cpwj.end())
@@ -2184,30 +2188,7 @@ std::optional<std::pair<tCoreId, CPlaneWorkerConfig>> cDataPlane::parseControlPl
 		return std::nullopt;
 	}
 	tCoreId core = jcore.value();
-
-	auto jports = cpwj.find("interfaces");
-	if (jports == cpwj.end())
-	{
-		YADECAP_LOG_ERROR("controlPlaneWorker entry has no \"interfaces\" field\n");
-		return std::nullopt;
-	}
-
-	if (!jports.value().is_array())
-	{
-		YADECAP_LOG_ERROR("controlPlaneWorker entry \"interfaces\" has invalid type.\n");
-		return std::nullopt;
-	}
-
-	std::set<InterfaceName> worker_ports;
-	for (auto j : jports.value())
-	{
-		if (!j.is_string())
-		{
-			YADECAP_LOG_ERROR("controlPlaneWorker entry \"interfaces\" contains invalid type.");
-			return std::nullopt;
-		}
-		worker_ports.insert(InterfaceName{j});
-	}
+	std::set<tCoreId> worker_cores;
 
 	auto jworkers = cpwj.find("serviced_cores");
 	if (!jworkers.value().is_array())
@@ -2216,7 +2197,6 @@ std::optional<std::pair<tCoreId, CPlaneWorkerConfig>> cDataPlane::parseControlPl
 		return std::nullopt;
 	}
 
-	std::set<tCoreId> worker_cores;
 	for (auto& j : jworkers.value())
 	{
 		if (!j.is_number_unsigned())
@@ -2227,7 +2207,7 @@ std::optional<std::pair<tCoreId, CPlaneWorkerConfig>> cDataPlane::parseControlPl
 		tCoreId id = j;
 		if (config.workers.find(id) == config.workers.end())
 		{
-			YANET_LOG_ERROR("controlPlaneWorker entry in \"serviced_cores\" is not a valid worker core id\n");
+			YANET_LOG_ERROR("controlPlaneWorker entry %d in \"serviced_cores\" is not a valid worker core id\n", id);
 		}
 		if (!worker_cores.insert(id).second)
 		{
@@ -2235,10 +2215,7 @@ std::optional<std::pair<tCoreId, CPlaneWorkerConfig>> cDataPlane::parseControlPl
 		}
 	}
 
-	return std::make_pair(core,
-	                      CPlaneWorkerConfig{std::move(worker_ports),
-	                                         std::move(worker_cores),
-	                                         {}});
+	return std::make_pair(core, std::move(worker_cores));
 }
 
 eResult cDataPlane::parseConfigValues(const nlohmann::json& json)
@@ -2346,53 +2323,7 @@ eResult cDataPlane::checkConfig()
 		}
 	}
 
-	if (!checkControlPlaneWorkersConfig())
-	{
-		return eResult::invalidConfigurationFile;
-	}
-
 	return eResult::success;
-}
-
-bool cDataPlane::checkControlPlaneWorkersConfig()
-{
-	std::set<InterfaceName> assigned;
-	std::set<InterfaceName> to_assign = workerInterfacesToService();
-	bool result = true;
-	for (const auto& [core, cfg] : config.controlplane_workers)
-	{
-		for (const auto& p : cfg.interfaces)
-		{
-
-			if (assigned.find(p) != assigned.end())
-			{
-				YADECAP_LOG_ERROR("Duplicate port in control plane worker config: core: %d, port: %s\n", core, p.c_str());
-				result = false;
-				continue;
-			}
-
-			if (to_assign.find(p) == to_assign.end())
-			{
-				YADECAP_LOG_ERROR("Control plane worker config contains port not assigned to fast worker: core: %d, port: %s\n", core, p.c_str());
-				result = false;
-				continue;
-			}
-
-			assigned.emplace(p);
-			to_assign.erase(p);
-		}
-	}
-	if (!to_assign.empty())
-	{
-		std::stringstream ss;
-		for (const auto& p : to_assign)
-		{
-			ss << p << ' ';
-		}
-		YADECAP_LOG_ERROR("Ports { %s } are not assigned a control plane worker\n", ss.str().c_str());
-		result = false;
-	}
-	return result;
 }
 
 eResult cDataPlane::initEal(const std::string& binaryPath,

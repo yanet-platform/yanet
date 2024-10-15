@@ -25,6 +25,7 @@ public:
 	[[nodiscard]] static std::optional<KernelInterfaceHandle>
 	MakeKernelInterfaceHandle(std::string_view name,
 	                          tPortId port,
+	                          tQueueId queue_count,
 	                          uint16_t queue_size) noexcept;
 	const tPortId& Id() const noexcept { return kni_port_; }
 	bool Start() const noexcept;
@@ -34,12 +35,12 @@ public:
 	bool CloneMTU(const uint16_t) noexcept;
 
 private:
-	static std::string VdevName(std::string_view name, const tPortId port_id);
-	static std::string VdevArgs(std::string_view name, const tPortId port_id, uint64_t queue_size);
+	static std::string VdevName(std::string_view name, tPortId port_id);
+	static std::string VdevArgs(std::string_view name, tPortId port_id, tQueueId queues_count, uint64_t queue_size);
 	bool Add(const std::string& vdev_name, const std::string& args) noexcept;
 	void Remove() noexcept;
 	static rte_eth_conf DefaultConfig() noexcept;
-	bool Configure(const rte_eth_conf& eth_conf) noexcept;
+	bool Configure(const rte_eth_conf& eth_conf, tQueueId queue_count) noexcept;
 	void MarkInvalid() noexcept { kni_port_ = INVALID_PORT_ID; }
 	[[nodiscard]] bool Valid() const { return kni_port_ != INVALID_PORT_ID; }
 };
