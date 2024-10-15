@@ -83,6 +83,7 @@ struct Endpoint
 };
 
 std::optional<std::string> GetNameByPort(tPortId pid);
+std::optional<tPortId> GetPortByName(const std::string& name);
 
 std::optional<common::mac_address_t> GetMacAddress(tPortId pid);
 

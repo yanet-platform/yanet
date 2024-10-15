@@ -72,36 +72,36 @@ std::optional<KernelInterfaceHandle>
 KernelInterfaceHandle::MakeKernelInterfaceHandle(
         std::string_view name,
         tPortId port,
+        tQueueId queue_count,
         uint16_t queue_size) noexcept
 {
 	KernelInterfaceHandle kni;
 	kni.queue_size_ = queue_size;
 	kni.name_ = name;
 	kni.vdev_name_ = VdevName(name, port);
-	std::string vdev_args = VdevArgs(name, port, queue_size);
+	std::string vdev_args = VdevArgs(name, port, queue_count, queue_size);
 	if (!kni.Add(kni.vdev_name_, vdev_args) ||
-	    !kni.Configure(DefaultConfig()))
+	    !kni.Configure(DefaultConfig(), queue_count))
 	{
 		return std::nullopt;
 	}
-	YANET_LOG_INFO("Created vdev device %s (%d)\n", kni.name_.c_str(), kni.kni_port_);
 	return std::optional<KernelInterfaceHandle>{std::move(kni)};
 }
 
-std::string KernelInterfaceHandle::VdevName(std::string_view name, const tPortId port_id)
+std::string KernelInterfaceHandle::VdevName(std::string_view name, tPortId port_id)
 {
 	std::stringstream ss;
 	ss << "virtio_user_" << name << "_" << port_id;
 	return ss.str();
 }
 
-std::string KernelInterfaceHandle::VdevArgs(std::string_view name, const tPortId port_id, uint64_t queue_size)
+std::string KernelInterfaceHandle::VdevArgs(std::string_view name, tPortId port_id, tQueueId queues, uint64_t queue_size)
 {
 	rte_ether_addr ether_addr;
 	rte_eth_macaddr_get(port_id, &ether_addr);
 	std::stringstream ss;
 	ss << "path=/dev/vhost-net"
-	   << ",queues=1"
+	   << ",queues=" << static_cast<int>(queues)
 	   << ",queue_size=" << queue_size
 	   << ",iface=" << name
 	   << ",mac=" << common::mac_address_t(ether_addr.addr_bytes).toString();
@@ -123,7 +123,7 @@ bool KernelInterfaceHandle::Add(const std::string& vdev_name, const std::string&
 		YADECAP_LOG_ERROR("vdev interface '%s' not found\n", vdev_name.data());
 		return false;
 	}
-	YANET_LOG_INFO("Successfully added vdev interface '%s' with pid %d (%s)\n", vdev_name.data(), kni_port_, args.data());
+	YANET_LOG_INFO("vdev '%s' with portId %d (%s)\n", vdev_name.data(), kni_port_, args.data());
 	return true;
 }
 
@@ -138,11 +138,11 @@ rte_eth_conf KernelInterfaceHandle::DefaultConfig() noexcept
 	return rte_eth_conf{};
 }
 
-bool KernelInterfaceHandle::Configure(const rte_eth_conf& eth_conf)
+bool KernelInterfaceHandle::Configure(const rte_eth_conf& eth_conf, tQueueId queue_count)
 {
 	int ret = rte_eth_dev_configure(kni_port_,
-	                                1,
-	                                1,
+	                                queue_count,
+	                                queue_count,
 	                                &eth_conf);
 	if (ret < 0)
 	{
@@ -172,7 +172,7 @@ bool KernelInterfaceHandle::SetupRxQueue(tQueueId queue, tSocketId socket, rte_m
 	                                mempool);
 	if (rc < 0)
 	{
-		YADECAP_LOG_ERROR("rte_eth_rx_queue_setup(%u, %u) = %d\n", kni_port_, 0, rc);
+		YADECAP_LOG_ERROR("rte_eth_rx_queue_setup(%u, %u) = %d\n", kni_port_, queue, rc);
 		return false;
 	}
 
@@ -188,7 +188,7 @@ bool KernelInterfaceHandle::SetupTxQueue(tQueueId queue, tSocketId socket) noexc
 	                                nullptr);
 	if (rc < 0)
 	{
-		YADECAP_LOG_ERROR("rte_eth_tx_queue_setup(%u, %u) = %d\n", kni_port_, 0, rc);
+		YADECAP_LOG_ERROR("rte_eth_tx_queue_setup(%u, %u) = %d\n", kni_port_, queue, rc);
 		return false;
 	}
 
