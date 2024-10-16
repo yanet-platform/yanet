@@ -10,3 +10,6 @@
 [submodule "subprojects/ankerl"]
 	path = subprojects/ankerl
 	url = https://github.com/martinus/unordered_dense
+[submodule "subprojects/pcap"]
+	path = subprojects/pcap
+	url = https://github.com/yanet-platform/PcapPlusPlus.git
