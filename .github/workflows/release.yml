@@ -1,9 +1,6 @@
-name: Release
+name: Release Docker image
 
-on:
-  push:
-    branch:
-      - 'release/*'
+on: push
 
 jobs:
   build-debian-package-jammy:
