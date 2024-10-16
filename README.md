@@ -89,6 +89,7 @@ meson test -C build_unittest -v
 - [DPDK](https://github.com/DPDK/dpdk)
 - [JSON](https://github.com/nlohmann/json)
 - [Protocol Buffers](https://github.com/protocolbuffers/protobuf)
+- [PcapPlusPlus](https://github.com/seladb/PcapPlusPlus)
 
 ## License
 [Apache License, Version 2.0](LICENSE)
