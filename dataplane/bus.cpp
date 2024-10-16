@@ -333,6 +333,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::get_shm_info, request);
 		}
+		else if (type == common::idp::requestType::hexdump_ring)
+		{
+			response = callWithResponse(&cControlPlane::hexdump_ring, request);
+		}
 		else if (type == common::idp::requestType::get_shm_tsc_info)
 		{
 			response = callWithResponse(&cControlPlane::get_shm_tsc_info, request);
