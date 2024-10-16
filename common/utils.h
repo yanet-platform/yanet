@@ -2,6 +2,10 @@
 
 #include <iomanip>
 #include <vector>
+#include <type_traits>
+#include <iomanip>
+#include <string>
+#include <type_traits>
 
 namespace utils
 {
@@ -46,5 +50,56 @@ inline std::vector<std::string> split(const std::string& str, char delimiter)
 	return split(std::string_view(str), delimiter);
 }
 
+inline std::string hexdump(std::string_view data)
+{
+	std::ostringstream oss;
+	oss << std::hex << std::setfill('0'); // Set hexadecimal formatting and fill character
+
+	const size_t size = data.size();
+
+	for (size_t offset = 0; offset < size; offset += 16)
+	{
+		// Output the offset
+		oss << std::setw(8) << offset << "  ";
+
+		// Prepare ASCII representation
+		std::string ascii_representation;
+		ascii_representation.reserve(16);
+
+		const size_t line_size = std::min(size - offset, size_t(16));
+
+		for (size_t i = 0; i < 16; ++i)
+		{
+			// Add extra space after 8 bytes
+			if (i == 8)
+			{
+				oss << "  ";
+			}
+			else if (i != 0)
+			{
+				oss << ' ';
+			}
+
+			if (i < line_size)
+			{
+				const auto byte = static_cast<unsigned char>(data[offset + i]);
+				oss << std::setw(2) << static_cast<int>(byte);
+
+				ascii_representation += std::isprint(byte) ? byte : '.';
+			}
+			else
+			{
+				// Fill in spaces for alignment if line is shorter than 16 bytes
+				oss << "  ";
+				ascii_representation += ' ';
+			}
+		}
+
+		// Append ASCII representation
+		oss << "  |" << ascii_representation << "|\n";
+	}
+
+	return oss.str();
+}
 }
 // namespace utils

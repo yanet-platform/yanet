@@ -180,6 +180,11 @@ public:
 		return get<common::idp::requestType::get_shm_info, common::idp::get_shm_info::response>();
 	}
 
+	auto hexdump_ring(const common::idp::hexdump_ring::request& request) const
+	{
+		return get<common::idp::requestType::hexdump_ring, common::idp::hexdump_ring::response>(request);
+	}
+
 	auto get_shm_tsc_info() const
 	{
 		return get<common::idp::requestType::get_shm_tsc_info, common::idp::get_shm_tsc_info::response>();
