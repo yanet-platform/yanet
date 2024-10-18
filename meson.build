@@ -65,6 +65,24 @@ libdpdk = subproject('dpdk', default_options: [
 
 libjson = subproject('json')
 
+cmake = import('cmake')
+
+pcapplusplus_options = cmake.subproject_options()
+pcapplusplus_options.add_cmake_defines({
+  'PCAPPP_BUILD_EXAMPLES': 'OFF',
+  'PCAPPP_BUILD_TESTS': 'OFF',
+  'PCAPPP_INSTALL': 'OFF',
+  'CMAKE_CXX_FLAGS': '-fexceptions',
+})
+
+libpcapplusplus = cmake.subproject('pcap', options: pcapplusplus_options)
+
+pcapplusplus_deps = [
+    libpcapplusplus.dependency('Common++'),
+    libpcapplusplus.dependency('Packet++'),
+    libpcapplusplus.dependency('Pcap++'),
+]
+
 if target_option.contains('buildenv')
     subdir('libprotobuf')
     subdir('libfwparser')
