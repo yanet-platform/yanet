@@ -1,6 +1,5 @@
 #pragma once
 
-#include "stream.h"
 #include "type.h"
 
 namespace nat46clat
@@ -20,31 +19,7 @@ class config
 public:
 	config() = default;
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(nat46clat_id);
-		stream.pop(ipv6_source);
-		stream.pop(ipv6_destination);
-		stream.pop(dscp_mark_type);
-		stream.pop(dscp);
-		stream.pop(ipv6_prefixes);
-		stream.pop(ipv4_prefixes);
-		stream.pop(announces);
-		stream.pop(next_module);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(nat46clat_id);
-		stream.push(ipv6_source);
-		stream.push(ipv6_destination);
-		stream.push(dscp_mark_type);
-		stream.push(dscp);
-		stream.push(ipv6_prefixes);
-		stream.push(ipv4_prefixes);
-		stream.push(announces);
-		stream.push(next_module);
-	}
+	SERIALIZABLE(nat46clat_id, ipv6_source, ipv6_destination, dscp_mark_type, dscp, ipv6_prefixes, ipv4_prefixes, announces, next_module);
 
 public:
 	nat46clat_id_t nat46clat_id;
@@ -58,5 +33,4 @@ public:
 	std::string next_module;
 	common::globalBase::flow_t flow;
 };
-
 }

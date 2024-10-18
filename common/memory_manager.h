@@ -1,9 +1,10 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
-#include "stream.h"
+#include "common/define.h"
 
 namespace common::memory_manager
 {
@@ -65,19 +66,7 @@ public:
 		return object_names;
 	}
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(name);
-		stream.pop(limit);
-		stream.pop(memory_groups);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(name);
-		stream.push(limit);
-		stream.push(memory_groups);
-	}
+	SERIALIZABLE(name, limit, memory_groups);
 
 public:
 	std::string name;
