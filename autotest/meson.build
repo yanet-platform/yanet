@@ -7,6 +7,7 @@ dependencies += dependency('libsystemd')
 dependencies += dependency('yaml-cpp', static: true)
 dependencies += dependency('libpcap', static: true)
 dependencies += dependency('gmock')
+dependencies += pcapplusplus_deps
 
 executable('yanet-autotest',
            sources,
