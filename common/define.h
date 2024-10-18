@@ -125,6 +125,31 @@ extern LogPriority logPriority;
 
 #define YANET_NEXTHOP_FLAG_DIRECTLY ((uint16_t)(1u << 0))
 
+/*
+ * @brief Macro to define serialization-friendly tuple accessors.
+ *
+ * Example usage:
+ * \code
+ * class MyClass {
+ * public:
+ *     int a;
+ *     std::string b;
+ *
+ *     // Automatically defines as_tuple() methods
+ *     SERIALIZABLE(a, b);
+ * };
+ * \endcode
+ *
+ * In cases where serialization/deserialization logic for a class is not
+ * straightforward or requires custom handling, you should define explicit
+ * `pop` and `push` methods as before, instead of using this macro.
+ *
+ * @param __VA_ARGS__ List of member variables to include in the tuple.
+ */
+#define SERIALIZABLE(...)                                 \
+	auto as_tuple() { return std::tie(__VA_ARGS__); } \
+	auto as_tuple() const { return std::tie(__VA_ARGS__); }
+
 /// @todo: move
 template<typename map_T,
          typename key_T>

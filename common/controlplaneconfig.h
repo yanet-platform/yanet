@@ -4,7 +4,6 @@
 
 #include "balancer.h"
 #include "scheduler.h"
-#include "stream.h"
 #include "type.h"
 
 namespace controlplane
@@ -89,33 +88,7 @@ public:
 	nlohmann::json save() const;
 	*/
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(interfaceId);
-		stream.pop(ip_prefixes);
-		stream.pop(neighborIPv4Address);
-		stream.pop(neighborIPv6Address);
-		stream.pop(static_neighbor_mac_address_v4);
-		stream.pop(static_neighbor_mac_address_v6);
-		stream.pop(nextModule);
-		stream.pop(acl);
-		stream.pop(aclId);
-		stream.pop(flow);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(interfaceId);
-		stream.push(ip_prefixes);
-		stream.push(neighborIPv4Address);
-		stream.push(neighborIPv6Address);
-		stream.push(static_neighbor_mac_address_v4);
-		stream.push(static_neighbor_mac_address_v6);
-		stream.push(nextModule);
-		stream.push(acl);
-		stream.push(aclId);
-		stream.push(flow);
-	}
+	SERIALIZABLE(interfaceId, ip_prefixes, neighborIPv4Address, neighborIPv6Address, static_neighbor_mac_address_v4, static_neighbor_mac_address_v6, nextModule, acl, aclId, flow);
 
 public:
 	tInterfaceId interfaceId;
@@ -141,35 +114,7 @@ public:
 	nlohmann::json save() const;
 	*/
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(routeId);
-		stream.pop(to_kernel_prefixes);
-		stream.pop(vrf);
-		stream.pop(tunnel_enabled);
-		stream.pop(ignore_tables);
-		stream.pop(ipv4_source_address);
-		stream.pop(ipv6_source_address);
-		stream.pop(udp_destination_port);
-		stream.pop(local_prefixes);
-		stream.pop(peers);
-		stream.pop(interfaces);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(routeId);
-		stream.push(to_kernel_prefixes);
-		stream.push(vrf);
-		stream.push(tunnel_enabled);
-		stream.push(ignore_tables);
-		stream.push(ipv4_source_address);
-		stream.push(ipv6_source_address);
-		stream.push(udp_destination_port);
-		stream.push(local_prefixes);
-		stream.push(peers);
-		stream.push(interfaces);
-	}
+	SERIALIZABLE(routeId, to_kernel_prefixes, vrf, tunnel_enabled, ignore_tables, ipv4_source_address, ipv6_source_address, udp_destination_port, local_prefixes, peers, interfaces);
 
 public:
 	tRouteId routeId;
@@ -198,37 +143,7 @@ public:
 	nlohmann::json save() const;
 	*/
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(dregressId);
-		stream.pop(ipv6SourcePrefixes);
-		stream.pop(ipv6DestinationPrefix);
-		stream.pop(ipv4SourceAddress);
-		stream.pop(ipv6SourceAddress);
-		stream.pop(udpDestinationPort);
-		stream.pop(onlyLongest);
-		stream.pop(communities);
-		stream.pop(localPrefixes);
-		stream.pop(announces);
-		stream.pop(ourAs);
-		stream.pop(nextModule);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(dregressId);
-		stream.push(ipv6SourcePrefixes);
-		stream.push(ipv6DestinationPrefix);
-		stream.push(ipv4SourceAddress);
-		stream.push(ipv6SourceAddress);
-		stream.push(udpDestinationPort);
-		stream.push(onlyLongest);
-		stream.push(communities);
-		stream.push(localPrefixes);
-		stream.push(announces);
-		stream.push(ourAs);
-		stream.push(nextModule);
-	}
+	SERIALIZABLE(dregressId, ipv6SourcePrefixes, ipv6DestinationPrefix, ipv4SourceAddress, ipv6SourceAddress, udpDestinationPort, onlyLongest, communities, localPrefixes, announces, ourAs, nextModule);
 
 public:
 	dregress_id_t dregressId;
@@ -308,27 +223,7 @@ public:
 	nlohmann::json save() const;
 	*/
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(balancer_id);
-		stream.pop(services);
-		stream.pop(source_ipv6);
-		stream.pop(source_ipv4);
-		stream.pop(vip_to_balancers);
-		stream.pop(default_wlc_power);
-		stream.pop(next_module);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(balancer_id);
-		stream.push(services);
-		stream.push(source_ipv6);
-		stream.push(source_ipv4);
-		stream.push(vip_to_balancers);
-		stream.push(default_wlc_power);
-		stream.push(next_module);
-	}
+	SERIALIZABLE(balancer_id, services, source_ipv6, source_ipv4, vip_to_balancers, default_wlc_power, next_module);
 
 public:
 	balancer_id_t balancer_id;
@@ -363,29 +258,7 @@ public:
        nlohmann::json save() const;
        */
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(tun64Id);
-		stream.pop(dscpMarkType);
-		stream.pop(dscp);
-		stream.pop(ipv6SourceAddress);
-		stream.pop(srcRndEnabled);
-		stream.pop(prefixes);
-		stream.pop(mappings);
-		stream.pop(nextModule);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(tun64Id);
-		stream.push(dscpMarkType);
-		stream.push(dscp);
-		stream.push(ipv6SourceAddress);
-		stream.push(srcRndEnabled);
-		stream.push(prefixes);
-		stream.push(mappings);
-		stream.push(nextModule);
-	}
+	SERIALIZABLE(tun64Id, dscpMarkType, dscp, ipv6SourceAddress, srcRndEnabled, prefixes, mappings, nextModule);
 
 public:
 	tun64_id_t tun64Id;
@@ -416,27 +289,7 @@ class config_t
 public:
 	config_t() = default;
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(nat64stateful_id);
-		stream.pop(dscp_mark_type);
-		stream.pop(dscp);
-		stream.pop(ipv6_prefixes);
-		stream.pop(ipv4_prefixes);
-		stream.pop(announces);
-		stream.pop(next_module);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(nat64stateful_id);
-		stream.push(dscp_mark_type);
-		stream.push(dscp);
-		stream.push(ipv6_prefixes);
-		stream.push(ipv4_prefixes);
-		stream.push(announces);
-		stream.push(next_module);
-	}
+	SERIALIZABLE(nat64stateful_id, dscp_mark_type, dscp, ipv6_prefixes, ipv4_prefixes, announces, next_module);
 
 public:
 	nat64stateful_id_t nat64stateful_id;

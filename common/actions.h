@@ -39,17 +39,7 @@ public:
 		       std::tie(o.dump_id, o.dump_tag);
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(dump_id);
-		stream.pop(dump_tag);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(dump_id);
-		stream.push(dump_tag);
-	}
+	SERIALIZABLE(dump_id, dump_tag);
 
 	uint64_t dump_id;
 	std::string dump_tag;
@@ -96,15 +86,7 @@ struct state_timeout_t
 		return timeout < o.timeout;
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(timeout);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(timeout);
-	}
+	SERIALIZABLE(timeout);
 
 	uint32_t timeout;
 };
@@ -135,15 +117,7 @@ struct DumpAction final
 
 	[[nodiscard]] bool terminating() const { return false; }
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(dump_id);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(dump_id);
-	}
+	SERIALIZABLE(dump_id);
 
 	[[nodiscard]] std::string to_string() const
 	{
@@ -178,17 +152,7 @@ struct FlowAction final
 
 	[[nodiscard]] bool terminating() const { return true; }
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(flow);
-		stream.pop(timeout);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(flow);
-		stream.push(timeout);
-	}
+	SERIALIZABLE(flow, timeout);
 
 	[[nodiscard]] std::string to_string() const
 	{
@@ -250,15 +214,7 @@ struct StateTimeoutAction final
 
 	[[nodiscard]] bool terminating() const { return false; }
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(timeout);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(timeout);
-	}
+	SERIALIZABLE(timeout);
 
 	[[nodiscard]] std::string to_string() const
 	{
@@ -284,19 +240,12 @@ struct Action
 	Action(T action) :
 	        raw_action(std::move(action)) {}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(raw_action);
-	}
-	void push(stream_out_t& stream) const
-	{
-		stream.push(raw_action);
-	}
-
 	[[nodiscard]] std::string to_string() const
 	{
 		return std::visit([](auto&& action) { return action.to_string(); }, raw_action);
 	}
+
+	SERIALIZABLE(raw_action);
 };
 
 namespace acl
@@ -611,15 +560,7 @@ public:
 		return get_flow() < second.get_flow();
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(path_);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(path_);
-	}
+	SERIALIZABLE(path_);
 };
 
 template<>
@@ -670,17 +611,7 @@ public:
 		return check_state_path_.back().raw_action;
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(path_);
-		stream.pop(check_state_path_);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(path_);
-		stream.push(check_state_path_);
-	}
+	SERIALIZABLE(path_, check_state_path_);
 };
 
 /**

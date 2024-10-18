@@ -244,15 +244,7 @@ public:
 		return address.data();
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(address);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(address);
-	}
+	SERIALIZABLE(address);
 
 protected:
 	std::array<uint8_t, 6> address;
@@ -351,15 +343,7 @@ public:
 		return (address >> (31 - index)) & 1;
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(address);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(address);
-	}
+	SERIALIZABLE(address);
 
 protected:
 	uint32_t address;
@@ -532,15 +516,7 @@ public:
 		return (address >> (31 - (index % 32))) & 1;
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(address);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(address);
-	}
+	SERIALIZABLE(address);
 
 	/// Returns true if this is a multicast address (ff00::/8).
 	///
@@ -705,15 +681,7 @@ public:
 		}
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(address);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(address);
-	}
+	SERIALIZABLE(address);
 
 protected:
 	std::variant<ipv4_address_t, ipv6_address_t> address;
@@ -826,15 +794,7 @@ public:
 		        {address() | (1u << (32u - mask() - 1u)), (uint8_t)(mask() + 1)}};
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(prefix);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(prefix);
-	}
+	SERIALIZABLE(prefix);
 
 	[[nodiscard]] bool subnetOf(const ipv4_prefix_t& other) const
 	{
@@ -915,17 +875,7 @@ public:
 		return prefix < second.prefix;
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(prefix);
-		stream.pop(announces);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(prefix);
-		stream.push(announces);
-	}
+	SERIALIZABLE(prefix, announces);
 
 public:
 	ipv4_prefix_t prefix;
@@ -1091,15 +1041,7 @@ public:
 		return 0xFFFFFFFFu << (32u + offset - mask());
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(prefix);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(prefix);
-	}
+	SERIALIZABLE(prefix);
 
 	[[nodiscard]] bool subnetFor(const ipv6_address_t& other) const
 	{
@@ -1183,17 +1125,7 @@ public:
 		return prefix < second.prefix;
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(prefix);
-		stream.pop(announces);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(prefix);
-		stream.push(announces);
-	}
+	SERIALIZABLE(prefix, announces);
 
 public:
 	ipv6_prefix_t prefix;
@@ -1415,15 +1347,7 @@ public:
 		return false;
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(prefix);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(prefix);
-	}
+	SERIALIZABLE(prefix);
 
 protected:
 	std::variant<ipv4_prefix_t, ipv6_prefix_t> prefix;
@@ -1499,15 +1423,7 @@ public:
 		}
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(prefix);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(prefix);
-	}
+	SERIALIZABLE(prefix);
 
 protected:
 	variant_t prefix;
@@ -1576,15 +1492,7 @@ public:
 		return std::to_string(value >> 16) + ":" + std::to_string(value & 0xFFFF);
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(value);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(value);
-	}
+	SERIALIZABLE(value);
 
 protected:
 	uint32_t value;
@@ -1661,15 +1569,7 @@ public:
 		return std::to_string(value[0]) + ":" + std::to_string(value[1]) + ":" + std::to_string(value[2]);
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(value);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(value);
-	}
+	SERIALIZABLE(value);
 
 public:
 	std::array<uint32_t, 3> value;
@@ -1809,15 +1709,7 @@ public:
 		return std::get<1>(range);
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(range);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(range);
-	}
+	SERIALIZABLE(range);
 
 protected:
 	std::tuple<uint64_t, uint64_t> range;

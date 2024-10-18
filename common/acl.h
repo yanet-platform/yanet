@@ -1,6 +1,5 @@
 #pragma once
 
-#include "stream.h"
 #include "type.h"
 
 namespace common::acl
@@ -56,15 +55,7 @@ class tree_chunk_t
 public:
 	tree_chunk_t() = default;
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(values);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(values);
-	}
+	SERIALIZABLE(values);
 
 	uint8_t is_multirefs{};
 	tree_value_t values[1u << bits];
@@ -146,15 +137,7 @@ public:
 		return std::get<1>(from_to);
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(from_to);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(from_to);
-	}
+	SERIALIZABLE(from_to);
 
 public:
 	std::tuple<type_t, type_t> from_to;
@@ -170,15 +153,7 @@ public:
 	}
 
 public:
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(vector);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(vector);
-	}
+	SERIALIZABLE(vector);
 
 	void insert_any()
 	{
