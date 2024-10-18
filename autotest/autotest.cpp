@@ -16,9 +16,11 @@
 
 #include <gmock/gmock.h>
 
+#include "PcapFileDevice.h"
 #include "autotest.h"
 #include "common.h"
 
+#include "common/define.h"
 #include "common/sdpclient.h"
 #include "common/utils.h"
 
@@ -1925,74 +1927,91 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 			ring = &it->second;
 		}
 
-		pcap_t* pcap = nullptr;
-		{ /// open pcap file with expected data
-			char pcap_errbuf[PCAP_ERRBUF_SIZE];
-			pcap = pcap_open_offline(expectFilePath.data(), pcap_errbuf);
-			if (!pcap)
-			{
-				YANET_LOG_ERROR("dump [%s]: error: pcap_open_offline(): %s\n", tag.data(), pcap_errbuf);
-				throw "";
-			}
+		// Open pcap file using PcapPlusPlus
+		pcpp::IFileReaderDevice* reader = pcpp::IFileReaderDevice::getReader(expectFilePath);
+		if (reader == nullptr)
+		{
+			YANET_LOG_ERROR("dump [%s]: error: cannot determine reader for file %s\n", tag.data(), expectFilePath.data());
+			throw "";
 		}
 
-		struct pcap_pkthdr header;
-		const u_char* pcap_packet = nullptr;
-		common::bufferring::item_t* shm_packet = nullptr;
+		if (!reader->open())
+		{
+			YANET_LOG_ERROR("dump [%s]: error: cannot open pcap file %s\n", tag.data(), expectFilePath.data());
+			throw "";
+		}
+
+		pcpp::RawPacket rawPacket;
+		common::bufferring::item_t* shm_packet;
 		uint64_t position = 0;
 
 		/// read packets from pcap and compare them with packets from memory ring
-		while ((pcap_packet = pcap_next(pcap, &header)))
+		while (reader->getNextPacket(rawPacket))
 		{
 			shm_packet = read_shm_packet(ring, position);
 			position++;
 
-			if (shm_packet && header.len == shm_packet->header.size &&
-			    memcmp(shm_packet->memory, pcap_packet, header.len) == 0)
-			{ /// packets are the same
-				continue;
+			if (!shm_packet)
+			{
+				success = false;
+				YANET_LOG_ERROR("dump [%s]: error: missing packet #%lu in shared memory\n", tag.data(), position);
+				break;
 			}
 
-			/// packets are different, so...
-			success = false;
-			YANET_LOG_ERROR("dump [%s]: error: wrong packet #%lu (%s)\n",
-			                tag.data(),
-			                position,
-			                expectFilePath.data());
-
-			if (dumpPackets && shm_packet)
+			// Compare the packet data
+			if (static_cast<size_t>(rawPacket.getRawDataLen()) == shm_packet->header.size &&
+			    memcmp(rawPacket.getRawData(), shm_packet->memory, rawPacket.getRawDataLen()) == 0)
 			{
-				YANET_LOG_DEBUG("dump [%s]: expected %u, got %u\n", tag.data(), header.len, shm_packet->header.size);
-				dumper.dump(pcap_packet, pcap_packet + shm_packet->header.size, shm_packet->memory, shm_packet->memory + header.len);
+				/// packets are the same
+				continue;
+			}
+			else
+			{
+				/// packets are different
+				success = false;
+				YANET_LOG_ERROR("dump [%s]: error: packet #%lu does not match (%s)\n",
+				                tag.data(),
+				                position,
+				                expectFilePath.data());
+
+				if (dumpPackets)
+				{
+					YANET_LOG_DEBUG("dump [%s]: expected %u bytes, got %u bytes\n",
+					                tag.data(),
+					                rawPacket.getRawDataLen(),
+					                shm_packet->header.size);
+					dumper.dump(rawPacket.getRawData(),
+					            rawPacket.getRawData() + rawPacket.getRawDataLen(),
+					            shm_packet->memory,
+					            shm_packet->memory + shm_packet->header.size);
+				}
+				break;
 			}
 		}
 
-		/// read the remaining packets from memory ring
-		for (;;)
+		/// Check for extra packets in shared memory
+		shm_packet = read_shm_packet(ring, position);
+		if (shm_packet)
 		{
-			shm_packet = read_shm_packet(ring, position);
-			if (!shm_packet)
-			{
-				break;
-			}
-			position++;
-
 			success = false;
+			YANET_LOG_ERROR("dump [%s]: error: extra packet #%lu in shared memory\n", tag.data(), position + 1);
 
 			if (dumpPackets)
 			{
-				YANET_LOG_DEBUG("dump [%s]: unexpected %u\n", tag.data(), shm_packet->header.size);
-				dumper.dump(nullptr, nullptr, shm_packet->memory, shm_packet->memory + header.len);
+				YANET_LOG_DEBUG("dump [%s]: unexpected packet size %u bytes\n",
+				                tag.data(),
+				                shm_packet->header.size);
+				dumper.dump(nullptr, nullptr, shm_packet->memory, shm_packet->memory + shm_packet->header.size);
 			}
 		}
 
-		YANET_LOG_DEBUG("dump [%s]: recv %lu packets\n", tag.data(), position);
+		YANET_LOG_DEBUG("dump [%s]: compared %lu packets\n", tag.data(), position);
 
-		pcap_close(pcap);
+		reader->close();
 
 		if (!success)
 		{
-			YANET_LOG_ERROR("dump [%s]: error: unknown packet (%s)\n", tag.data(), expectFilePath.data());
+			YANET_LOG_ERROR("dump [%s]: error: packet comparison failed (%s)\n", tag.data(), expectFilePath.data());
 			throw "";
 		}
 	}
