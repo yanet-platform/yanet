@@ -2237,16 +2237,6 @@ public:
 		return data.atomic;
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(reinterpret_cast<uint8_t(&)[sizeof(*this)]>(*this));
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(reinterpret_cast<const uint8_t(&)[sizeof(*this)]>(*this));
-	}
-
 	[[nodiscard]] std::string to_string() const
 	{
 		std::ostringstream oss;
