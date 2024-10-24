@@ -202,6 +202,13 @@ void KernelInterfaceWorker::ForwardToPhy()
 	}
 }
 
+//Cli sets flag on which the packets in worker.cpp gets copied (mbuf) is copied
+//and we write them in slow worker queue. Then we handle it there.
+//
+//We don't want to enter slow worker at all. maybe on that flag we should not leave dataplane
+//and just call related Pcap++ method to wirte packets to shared memory?
+//I.e we can already do this on the `dump` rule, but what's stopping us on doing so
+//right in like logicalPort_egress_handle?
 void KernelInterfaceWorker::HandlePacketDump(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);

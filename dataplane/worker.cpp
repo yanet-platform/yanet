@@ -1042,6 +1042,7 @@ inline void cWorker::physicalPort_ingress_handle(const dpdk::Endpoint& rx_point)
 
 		preparePacket(mbuf);
 
+		//we have basePermanently.globalBaseAtomic->currentTime?
 		if (basePermanently.globalBaseAtomic->physicalPort_flags[metadata->fromPortId] & YANET_PHYSICALPORT_FLAG_IN_DUMP)
 		{
 			if (!rte_ring_full(ring_lowPriority))
