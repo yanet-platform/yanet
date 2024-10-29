@@ -15,6 +15,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: CCache
+        id: cache-ccache
+        uses: actions/cache@v3
+        with:
+          key: default
+          path: /ccache
       - name: version
         run: |
           export YANET_VERSION=${{github.ref_name}}
