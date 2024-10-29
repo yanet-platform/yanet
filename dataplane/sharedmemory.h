@@ -3,7 +3,6 @@
 #include <rte_mbuf.h>
 
 #include "common/bufferring.h"
-#include "common/result.h"
 #include "common/type.h"
 
 #include "config.h"
@@ -11,27 +10,32 @@
 namespace sharedmemory
 {
 
-using ring_header_t = common::bufferring::ring_header_t;
-using ring_t = common::bufferring::ring_t;
-using item_header_t = common::bufferring::item_header_t;
-using item_t = common::bufferring::item_t;
+using ring_header_t = common::PacketBufferRing::ring_header_t;
+using ring_t = common::PacketBufferRing::ring_t;
+using item_header_t = common::PacketBufferRing::item_header_t;
+using item_t = common::PacketBufferRing::item_t;
 using DumpFormat = tDataPlaneConfig::DumpFormat;
 
-class cSharedMemory
+class SharedMemoryDumpRing
 {
 	DumpFormat format_;
+	size_t capacity_;
 
 public:
-	cSharedMemory() :
-	        format_(DumpFormat::kRaw) {}
+	SharedMemoryDumpRing() :
+	        format_(DumpFormat::kRaw), capacity_(0) {}
 
-	cSharedMemory(DumpFormat format) :
-	        format_(format) {}
+	SharedMemoryDumpRing(DumpFormat format, void* memory, size_t dump_size, size_t dump_count);
 
-	eResult init(void* memory, int unit_size, int units_number);
 	void write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type);
 
-	common::bufferring buffer;
+	// FIXME: make it private. I've made it public to simplify hexdump code
+	common::PacketBufferRing buffer;
+
+	[[nodiscard]] size_t Capacity() const
+	{
+		return capacity_;
+	}
 };
 
 } // namespace sharedmemory
