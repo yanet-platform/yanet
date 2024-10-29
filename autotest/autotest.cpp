@@ -22,6 +22,7 @@
 
 #include "common/define.h"
 #include "common/sdpclient.h"
+#include "common/sdpcommon.h"
 #include "common/utils.h"
 
 #define MAX_PACK_LEN 16384
@@ -177,7 +178,7 @@ eResult tAutotest::initSharedMemory()
 
 		void* shm = shm_by_key[ipcKey];
 		auto memaddr = (void*)((intptr_t)shm + offset);
-		dumpRings[name] = common::bufferring(memaddr, unitSize, unitsNumber);
+		dumpRings[name] = common::PacketBufferRing(memaddr, unitSize, unitsNumber);
 	}
 
 	return eResult::success;
@@ -1881,14 +1882,16 @@ bool tAutotest::step_cli_check(const YAML::Node& yamlStep)
 	return true;
 }
 
-common::bufferring::item_t* read_shm_packet(common::bufferring* buffer, uint64_t position)
+common::PacketBufferRing::item_t* read_shm_packet(common::PacketBufferRing* buffer, uint64_t position)
 {
-	if (position >= buffer->ring->header.after)
+	common::PacketBufferRing::ring_t* ring = buffer->ring;
+
+	if (position >= ring->header.after)
 	{
 		return nullptr;
 	}
-	auto* item = (common::bufferring::item_t*)((uintptr_t)buffer->ring->memory + (position * buffer->unit_size));
-	return item;
+
+	return common::sdp::ShiftBuffer<common::PacketBufferRing::item_t*>(ring->memory, position * buffer->unit_size);
 }
 
 bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
@@ -1901,7 +1904,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 		std::string expectFilePath = path + "/" + yamlDump["expect"].as<std::string>();
 		bool success = true;
 
-		common::bufferring* ring = nullptr;
+		common::PacketBufferRing* ring = nullptr;
 		{ /// searching memory ring by tag
 			auto it = dumpRings.find(tag);
 			if (it == dumpRings.end())
@@ -1924,7 +1927,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 		}
 
 		pcpp::RawPacket rawPacket;
-		common::bufferring::item_t* shm_packet;
+		common::PacketBufferRing::item_t* shm_packet;
 		uint64_t position = 0;
 
 		/// read packets from pcap and compare them with packets from memory ring
