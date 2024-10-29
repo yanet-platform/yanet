@@ -1626,13 +1626,9 @@ eResult cDataPlane::allocateSharedMemory()
 		const auto& [format, dump_size, dump_count] = ring_cfg.second;
 		GCC_BUG_UNUSED(format);
 
-		auto unit_size = sizeof(sharedmemory::item_header_t) + dump_size;
-		if (unit_size % RTE_CACHE_LINE_SIZE != 0)
-		{
-			unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
-		}
-
-		auto size = sizeof(sharedmemory::ring_header_t) + unit_size * dump_count;
+		// temporarily materialization will occur to create an object and get it's capacity.
+		// It's okay, because this object is lightweight
+		auto size = common::PacketBufferRing(nullptr, dump_size, dump_count).capacity;
 
 		for (const auto& [socket_id, num] : number_of_workers_per_socket)
 		{
@@ -1728,19 +1724,7 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 		int ring_id = 0;
 		for (const auto& [tag, ring_cfg] : config.shared_memory)
 		{
-			const auto& [format, dump_size, units_number] = ring_cfg;
-
-			auto unit_size = sizeof(sharedmemory::item_header_t) + dump_size;
-			if (unit_size % RTE_CACHE_LINE_SIZE != 0)
-			{
-				unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
-			}
-
-			auto size = sizeof(sharedmemory::ring_header_t) + unit_size * units_number;
-			if (size % RTE_CACHE_LINE_SIZE != 0)
-			{
-				size += RTE_CACHE_LINE_SIZE - size % RTE_CACHE_LINE_SIZE; /// round up
-			}
+			const auto& [format, dump_size, dump_count] = ring_cfg;
 
 			auto name = "shm_" + std::to_string(worker->coreId) + "_" + std::to_string(ring_id);
 
@@ -1748,15 +1732,15 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 
 			auto memaddr = (void*)((intptr_t)shm + offset);
 
-			sharedmemory::cSharedMemory ring(format);
+			sharedmemory::SharedMemoryDumpRing ring(format, memaddr, dump_size, dump_count);
 
-			ring.init(memaddr, unit_size, units_number);
-
-			offsets[shm] += size;
+			// we have Capacity of shared memory.
+			// this is only a shard of all available shared memory.
+			offsets[shm] += ring.Capacity();
 
 			worker->dumpRings[ring_id] = ring;
 
-			auto meta = common::idp::get_shm_info::dump_meta(name, tag, unit_size, units_number, worker->coreId, socket_id, key, offset);
+			auto meta = common::idp::get_shm_info::dump_meta(name, tag, dump_size, dump_count, worker->coreId, socket_id, key, offset);
 			dumps_meta.emplace_back(meta);
 
 			tag_to_id[tag] = ring_id;

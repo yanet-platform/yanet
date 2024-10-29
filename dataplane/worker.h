@@ -371,7 +371,7 @@ protected:
 	// will decrease with each new packet sent to slow worker, replenishes each N mseconds
 	int32_t packetsToSWNPRemainder;
 
-	sharedmemory::cSharedMemory dumpRings[YANET_CONFIG_SHARED_RINGS_NUMBER];
+	sharedmemory::SharedMemoryDumpRing dumpRings[YANET_CONFIG_SHARED_RINGS_NUMBER];
 
 	samples::Sampler sampler;
 

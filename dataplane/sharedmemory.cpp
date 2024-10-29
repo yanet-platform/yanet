@@ -4,27 +4,29 @@
 
 using namespace sharedmemory;
 
-eResult cSharedMemory::init(void* memory, int unit_size, int units_number)
+SharedMemoryDumpRing::SharedMemoryDumpRing(DumpFormat format, void* memory, size_t dump_size, size_t dump_count) :
+        format_(format)
 {
 	switch (format_)
 	{
 		case DumpFormat::kPcap:
 			// init somehow with pcaps
-			return eResult::success;
+			break;
 
 		case DumpFormat::kRaw:
-			buffer = common::bufferring(memory, unit_size, units_number);
+			buffer = common::PacketBufferRing(memory, dump_size, dump_count);
+			capacity_ = buffer.capacity;
 
 			buffer.ring->header.before = 0;
 			buffer.ring->header.after = 0;
 
-			return eResult::success;
+			break;
 		default:
 			YANET_THROW("Wrong shared memory dump format");
 	}
 }
 
-void cSharedMemory::write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type)
+void SharedMemoryDumpRing::write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type)
 {
 	// Each ring has its own header, the header contains absolute position
 	// to which next packet should be written. Position has two state:
