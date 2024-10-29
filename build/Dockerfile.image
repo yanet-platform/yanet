@@ -24,7 +24,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         protobuf-compiler \
         libprotobuf-dev \
         bison \
-        debhelper-compat
+        debhelper-compat \
+        ccache
 
 RUN python3 -m pip install meson==0.61.2
 
@@ -49,7 +50,7 @@ RUN meson setup --prefix=/target \
         -Dversion_custom=$YANET_VERSION_CUSTOM \
         build
 
-RUN meson compile -C build
+RUN --mount=type=cache,target=/ccache/ meson compile -C build
 
 
 FROM --platform=linux/amd64 ubuntu:${RELEASE}
