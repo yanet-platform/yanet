@@ -15,12 +15,22 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: CCache
         id: cache-ccache
         uses: actions/cache@v3
         with:
           key: default
-          path: /ccache
+          path: ccache-build
+      - name: inject cache into docker
+        uses: reproducible-containers/buildkit-cache-dance@v3.1.0
+        with:
+          cache-map: |
+            {
+              "ccache-build": "/root/.ccache/ccache"
+            }
+          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
       - name: version
         run: |
           export YANET_VERSION=${{github.ref_name}}
@@ -49,3 +59,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

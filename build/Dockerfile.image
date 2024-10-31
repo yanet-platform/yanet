@@ -50,7 +50,7 @@ RUN meson setup --prefix=/target \
         -Dversion_custom=$YANET_VERSION_CUSTOM \
         build
 
-RUN --mount=type=cache,target=/ccache/ meson compile -C build
+RUN --mount=type=cache,target=/root/.cache/ccache/ meson compile -C build
 
 
 FROM --platform=linux/amd64 ubuntu:${RELEASE}
