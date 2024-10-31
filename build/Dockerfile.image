@@ -51,7 +51,7 @@ RUN meson setup --prefix=/target \
         build
 
 RUN --mount=type=cache,target=/root/.cache/ccache/ meson compile -C build
-
+RUN find / -name ccache
 
 FROM --platform=linux/amd64 ubuntu:${RELEASE}
 
