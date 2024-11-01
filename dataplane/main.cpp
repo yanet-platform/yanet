@@ -45,7 +45,7 @@ int main(int argc,
 	}
 	if (config >= argc)
 	{
-		std::cout << "elf usage: " << argv[0] << " [-d] -c <dataplane.conf>" << std::endl;
+		std::cout << "usage: " << argv[0] << " [-d] -c <dataplane.conf>" << std::endl;
 		return 1;
 	}
 
