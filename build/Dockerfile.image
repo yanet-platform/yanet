@@ -29,6 +29,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 
 RUN python3 -m pip install meson==0.61.2
 
+RUN find /root/.cache/ccache
+
 
 FROM environment AS builder
 
@@ -40,6 +42,7 @@ ARG YANET_VERSION_CUSTOM=development
 
 COPY . /opt/yanet
 WORKDIR /opt/yanet
+RUN find /root/.cache/ccache
 RUN meson setup --prefix=/target \
         -Dtarget=release \
         -Darch=corei7 \
