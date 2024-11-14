@@ -58,6 +58,7 @@ enum class requestType : uint32_t
 	lpm6LookupAddress,
 	nat64stateful_state,
 	balancer_connection,
+	balancerInspectLookup,
 	balancer_service_connections,
 	balancer_real_connections,
 	limits,
@@ -295,7 +296,6 @@ using service = std::tuple<balancer_service_id_t, /// service id
                            tCounterId, ///< size 4
                            balancer::scheduler,
                            balancer::forwarding_method, // tunneling method (default ipip)
-                           uint32_t, /// default_wlc_power
                            uint32_t, ///< real_start
                            uint32_t, ///< real_size
                            std::optional<common::ipv4_prefix_t>, ///< ipv4_outer_source_network
@@ -587,6 +587,23 @@ using request = std::vector<std::tuple<requestType,
 
 using response = eResult;
 }
+
+namespace BalancerInspectLookup
+{
+struct request
+{
+	std::uint32_t service_id;
+};
+
+struct Real
+{
+	ipv6_address_t ip;
+	uint32_t weight;
+	uint32_t cells;
+};
+
+using response = std::vector<Real>;
+} // namespace BalancerInspectLookup
 
 namespace getGlobalBase ///< @todo: delete
 {
@@ -1010,6 +1027,7 @@ using request = std::tuple<requestType,
                                         lpm6LookupAddress::request,
                                         nat64stateful_state::request,
                                         balancer_connection::request,
+                                        BalancerInspectLookup::request,
                                         debug_latch_update::request,
                                         unrdup_vip_to_balancers::request,
                                         update_vip_vport_proto::request,
@@ -1041,6 +1059,7 @@ using response = std::variant<std::tuple<>,
                               balancer_connection::response,
                               balancer_service_connections::response,
                               balancer_real_connections::response,
+                              BalancerInspectLookup::response,
                               version::response,
                               limits::response,
                               samples::response,

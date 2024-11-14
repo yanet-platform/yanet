@@ -74,6 +74,7 @@ public:
 	common::idp::balancer_connection::response balancer_connection(const common::idp::balancer_connection::request& request);
 	common::idp::balancer_service_connections::response balancer_service_connections();
 	common::idp::balancer_real_connections::response balancer_real_connections();
+	common::idp::BalancerInspectLookup::response balancer_inspect_lookup(const common::idp::BalancerInspectLookup::request& request);
 	eResult debug_latch_update(const common::idp::debug_latch_update::request& request);
 	eResult unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request);
 	eResult update_vip_vport_proto(const common::idp::update_vip_vport_proto::request& request);
