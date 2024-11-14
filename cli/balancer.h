@@ -135,6 +135,40 @@ inline common::ip_address_t convert_to_ip_address(const common::icp_proto::IPAdd
 	}
 }
 
+void lookup_inspect(std::string module_string,
+                    std::optional<common::ip_address_t> virtual_ip,
+                    std::optional<std::string> proto_string,
+                    std::optional<std::string> virtual_port_string)
+{
+	common::icp_proto::BalancerInspectLookupRequest request;
+
+	if (module_string != "" &&
+	    module_string != "any")
+	{
+		request.set_module(module_string);
+	}
+
+	if (virtual_ip)
+	{
+		setip(request.mutable_virtual_ip(), virtual_ip.value());
+	}
+
+	interface::protoControlPlane controlPlane;
+	auto response = controlPlane.balancer_inspect_lookup(request);
+
+	TablePrinter t;
+	t.insert_row("real_ip",
+	             "adm_weight",
+	             "cells");
+
+	for (auto& real : response.reals())
+	{
+		t.insert_row(convert_to_ip_address(real.ip()), real.weight(), real.cells());
+	}
+
+	t.Print();
+}
+
 void real_find(std::string module_string,
                std::optional<common::ip_address_t> virtual_ip,
                std::optional<std::string> proto_string,

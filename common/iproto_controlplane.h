@@ -16,6 +16,14 @@ public:
 	{
 	}
 
+	auto balancer_inspect_lookup(const common::icp_proto::BalancerInspectLookupRequest& request)
+	{
+		common::proto::RpcController ctl;
+		common::icp_proto::BalancerInspectLookupResponse response;
+		stub.InspectLookup(&ctl, &request, &response, nullptr);
+		return response;
+	}
+
 	auto balancer_real_flush()
 	{
 		common::icp_proto::Empty request;
