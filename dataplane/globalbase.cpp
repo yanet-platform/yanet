@@ -1622,10 +1622,11 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 	return (sessions_created - sessions_destroyed + sessions_created_gc - sessions_destroyed_gc) / dataPlane->numaNodesInUse;
 }
 
-balancer_real_id_t* generation::evaluate_service_ring_one(balancer_real_id_t* start,
-                                                          const balancer_real_id_t* const do_not_exceed,
-                                                          const balancer_service_t& service,
-                                                          balancer_service_range_t& range)
+balancer_real_id_t* generation::evaluate_service_ring_one_wrr(
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service,
+        balancer_service_range_t& range)
 {
 	for (uint32_t real_idx = service.real_start;
 	     real_idx < service.real_start + service.real_size;
@@ -1656,6 +1657,41 @@ balancer_real_id_t* generation::evaluate_service_ring_one(balancer_real_id_t* st
 finish:
 	YADECAP_MEMORY_BARRIER_COMPILE;
 	return start;
+}
+
+balancer_real_id_t* generation::evaluate_service_ring_one_chash(
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service,
+        balancer_service_range_t& range)
+{
+	return start;
+}
+
+balancer_real_id_t* generation::evaluate_service_ring_one(
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service,
+        balancer_service_range_t& range)
+{
+	balancer_real_id_t* end{start};
+	using scheduler = ::balancer::scheduler;
+	switch (service.scheduler)
+	{
+		case scheduler::rr:
+		case scheduler::wrr:
+			end = evaluate_service_ring_one_wrr(
+			        start, do_not_exceed, service, range);
+			break;
+		case scheduler::wlc:
+		case scheduler::chash:
+			end = evaluate_service_ring_one_chash(
+			        start, do_not_exceed, service, range);
+			break;
+		default:
+			YANET_LOG_ERROR("Unknown balancer service scheduler type\n");
+	}
+	return end;
 }
 
 void generation::evaluate_service_ring()
