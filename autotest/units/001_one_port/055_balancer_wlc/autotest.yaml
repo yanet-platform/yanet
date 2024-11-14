@@ -14,10 +14,11 @@ steps:
     YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
     module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
     ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
-    balancer0  10.1.0.55   tcp    443           wlc        2443::1  443        true     2       16           16       1568
-    balancer0  10.1.0.55   tcp    443           wlc        2443::2  443        true     1       8            8        784
-    balancer0  10.1.0.55   tcp    443           wlc        2443::3  443        true     1       8            8        784
+    balancer0  10.1.0.55   tcp    443           wlc        2443::1  443        true     2       34           34       3332
+    balancer0  10.1.0.55   tcp    443           wlc        2443::2  443        true     1       19           19       1862
+    balancer0  10.1.0.55   tcp    443           wlc        2443::3  443        true     1       11           11       1078
     balancer0  10.1.0.55   tcp    443           wlc        2443::4  443        false    4       0            0        0
+
 
 - cli:
     - balancer real enable balancer0 10.1.0.55 tcp 443 2443::4 443
@@ -30,10 +31,10 @@ steps:
     YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
     module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
     ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
-    balancer0  10.1.0.55   tcp    443           wlc        2443::1  443        true     2       17           17       1666
-    balancer0  10.1.0.55   tcp    443           wlc        2443::2  443        true     1       10           10       980
-    balancer0  10.1.0.55   tcp    443           wlc        2443::3  443        true     1       9            9        882
-    balancer0  10.1.0.55   tcp    443           wlc        2443::4  443        true     4       28           28       2744
+    balancer0  10.1.0.55   tcp    443           wlc        2443::1  443        true     2       35           35       3430
+    balancer0  10.1.0.55   tcp    443           wlc        2443::2  443        true     1       23           23       2254
+    balancer0  10.1.0.55   tcp    443           wlc        2443::3  443        true     1       11           11       1078
+    balancer0  10.1.0.55   tcp    443           wlc        2443::4  443        true     4       59           59       5782
 
 - sleep: 2
 - sendPackets:
@@ -44,7 +45,8 @@ steps:
     YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real any
     module     virtual_ip  proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
     ---------  ----------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
-    balancer0  10.1.0.55   tcp    443           wlc        2443::1  443        true     2       24           24       2352
-    balancer0  10.1.0.55   tcp    443           wlc        2443::2  443        true     1       11           11       1078
-    balancer0  10.1.0.55   tcp    443           wlc        2443::3  443        true     1       12           12       1176
-    balancer0  10.1.0.55   tcp    443           wlc        2443::4  443        true     4       49           49       4802
+    balancer0  10.1.0.55   tcp    443           wlc        2443::1  443        true     2       40           40       3920
+    balancer0  10.1.0.55   tcp    443           wlc        2443::2  443        true     1       27           27       2646
+    balancer0  10.1.0.55   tcp    443           wlc        2443::3  443        true     1       20           20       1960
+    balancer0  10.1.0.55   tcp    443           wlc        2443::4  443        true     4       73           73       7154
+

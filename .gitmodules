@@ -13,3 +13,6 @@
 [submodule "subprojects/pcap"]
 	path = subprojects/pcap
 	url = https://github.com/yanet-platform/PcapPlusPlus.git
+[submodule "subprojects/chash"]
+	path = subprojects/chash
+	url = https://github.com/yanet-platform/chash.git

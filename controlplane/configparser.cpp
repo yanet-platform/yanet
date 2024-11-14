@@ -1665,8 +1665,8 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 		std::string scheduler_string = service_json["scheduler"];
 
 		balancer::scheduler scheduler{};
-		balancer::scheduler_params scheduler_params{};
 		uint8_t flags = 0;
+		uint32_t wlc_power = 0;
 		if (scheduler_string == "rr")
 		{
 			scheduler = balancer::scheduler::rr;
@@ -1680,8 +1680,12 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			scheduler = balancer::scheduler::wlc;
 			if (exist(service_json, "scheduler_params") && exist(service_json["scheduler_params"], "wlc_power"))
 			{
-				scheduler_params.wlc_power = std::stoll(service_json["scheduler_params"]["wlc_power"].get<std::string>(), nullptr, 10);
+				wlc_power = service_json["scheduler_params"]["wlc_power"];
 			}
+		}
+		else if (scheduler_string == "chash")
+		{
+			scheduler = balancer::scheduler::chash;
 		}
 		else if (scheduler_string == "purr")
 		{
@@ -1769,7 +1773,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 		                               exist(service_json, "vport") ? std::make_optional(std::stoll(service_json["vport"].get<std::string>(), nullptr, 0)) : std::nullopt,
 		                               service_version,
 		                               scheduler,
-		                               scheduler_params,
+		                               wlc_power,
 		                               forwarding_method,
 		                               flags,
 		                               ipv4_outer_source_network,

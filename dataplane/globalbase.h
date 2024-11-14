@@ -1,11 +1,15 @@
 #pragma once
 
 #include <memory>
+#include <tuple>
+#include <vector>
 
 #include <rte_byteorder.h>
 #include <rte_common.h>
 #include <rte_ether.h>
 #include <rte_ip.h>
+
+#include <chash/service.hpp>
 
 #include "common/idp.h"
 #include "common/result.h"
@@ -171,6 +175,7 @@ public: ///< @todo
 };
 
 //
+using namespace std::chrono_literals;
 
 class generation
 {
@@ -202,7 +207,10 @@ protected:
 	eResult updateNat64statelessTranslation(const common::idp::updateGlobalBase::updateNat64statelessTranslation::request& request);
 	eResult nat46clat_update(const common::idp::updateGlobalBase::nat46clat_update::request& request);
 	eResult update_balancer(const common::idp::updateGlobalBase::update_balancer::request& request);
+
 	eResult update_balancer_services(const common::idp::updateGlobalBase::update_balancer_services::request& request);
+
+protected:
 	eResult update_balancer_unordered_real(const common::idp::updateGlobalBaseBalancer::update_balancer_unordered_real::request& request);
 	eResult route_lpm_update(const common::idp::updateGlobalBase::route_lpm_update::request& request);
 	eResult route_value_update(const common::idp::updateGlobalBase::route_value_update::request& request);
@@ -234,7 +242,35 @@ protected:
 	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 	eResult update_host_config(const common::idp::updateGlobalBase::update_host_config::request& request);
 
-	void evaluate_service_ring();
+	using RealWeight = std::pair<balancer_real_id_t, decltype(balancer_real_state_t::weight)>;
+
+	std::vector<std::uint32_t> BalancerServiceWeights(const balancer_service_t& service);
+
+	using ChashService = chash::Service<balancer_real_id_t>;
+	std::size_t ChashMemorySize(const std::vector<balancer_service_id_t>& ids);
+	std::pair<std::vector<balancer_service_id_t>,
+	          std::vector<balancer_service_id_t>>
+	GetBalancerActiveServicesByType();
+	eResult RebuildBalancerServiceRings();
+	eResult RebuildBalancerChashServiceRings(const std::vector<balancer_service_id_t>& ids);
+	eResult RebuildBalancerWrrServiceRings(const std::vector<balancer_service_id_t>& ids);
+	void SetBalancerChashServiceRanges(std::unordered_map<balancer_service_id_t, ChashService>& services);
+
+protected:
+	struct ServiceSize
+	{
+		balancer_real_id_t* end;
+		balancer_real_id_t* reserved;
+	};
+
+	std::chrono::milliseconds chash_update;
+	std::chrono::milliseconds chash_make;
+	std::chrono::milliseconds chash_adjust;
+
+	ServiceSize rebuild_service_ring_one_wrr(
+	        balancer_real_id_t* start,
+	        const balancer_real_id_t* const do_not_exceed,
+	        const balancer_service_t& service);
 	inline uint64_t count_real_connections(uint32_t counter_id);
 
 public: ///< @todo
@@ -367,6 +403,9 @@ public: ///< @todo
 
 	balancer_real_state_t balancer_real_states[YANET_CONFIG_BALANCER_REALS_SIZE];
 	balancer_service_ring_t balancer_service_ring;
+
+	std::shared_ptr<std::unordered_map<balancer_service_id_t, ChashService>> chash_balancer_services;
+	std::unordered_map<balancer_service_id_t, balancer_real_id_t*> chash_balancer_rings;
 
 	int64_t dump_id_to_tag[YANET_CONFIG_DUMP_ID_TO_TAG_SIZE];
 
