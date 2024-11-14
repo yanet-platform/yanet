@@ -186,6 +186,10 @@ protected:
 	eResult tsc_state_update(const common::idp::updateGlobalBase::tsc_state_update::request& request);
 	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 
+	balancer_real_id_t* evaluate_service_ring_one(balancer_real_id_t* start,
+	                                   const balancer_real_id_t* const do_not_exceed,
+	                                   const balancer_service_t& service,
+	                                   balancer_service_range_t& range);
 	void evaluate_service_ring();
 	inline uint64_t count_real_connections(uint32_t counter_id);
 
