@@ -42,6 +42,7 @@ common::idp::updateGlobalBase::response cControlPlane::updateGlobalBase(const co
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
 	auto result = eResult::success;
+	dataPlane->set_worker_base_state_update(true);
 	for (auto& iter : dataPlane->globalBases)
 	{
 		auto* globalBaseNext = iter.second[dataPlane->currentGlobalBaseId ^ 1];
@@ -69,6 +70,7 @@ common::idp::updateGlobalBase::response cControlPlane::updateGlobalBase(const co
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
 	result = eResult::success;
+	dataPlane->set_worker_base_state_update(false);
 	for (auto& iter : dataPlane->globalBases)
 	{
 		auto* globalBaseNext = iter.second[dataPlane->currentGlobalBaseId ^ 1];
@@ -131,6 +133,8 @@ eResult cControlPlane::updateGlobalBaseBalancer(const common::idp::updateGlobalB
 			break;
 		}
 	}
+
+	dataPlane->UpdateChashWeights();
 
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
@@ -975,6 +979,43 @@ common::idp::balancer_service_connections::response cControlPlane::balancer_serv
 	return response;
 }
 
+namespace
+{
+std::unordered_map<balancer_real_id_t, std::uint32_t> get_cell_distribution(
+        dataplane::globalBase::balancer_service_range_t& range)
+{
+	std::unordered_map<balancer_real_id_t, std::uint32_t> dist;
+	for (auto cell = range.start, end = cell + range.size; cell != end; ++cell)
+	{
+		++dist[*cell];
+	}
+	return dist;
+}
+}
+
+common::idp::BalancerInspectLookup::response cControlPlane::balancer_inspect_lookup(const common::idp::BalancerInspectLookup::request& request)
+{
+	common::idp::BalancerInspectLookup::response response;
+	const auto& base = dataPlane->globalBases.begin()->second[dataPlane->currentGlobalBaseId];
+	const auto& service = base->balancer_services[request.service_id];
+
+	auto dist = get_cell_distribution(base->balancer_service_ring.ranges[request.service_id]);
+
+	for (auto real_id = base->balancer_service_reals + service.real_start,
+	          end = real_id + service.real_size;
+	     real_id != end;
+	     ++real_id)
+	{
+		common::idp::BalancerInspectLookup::Real entry{
+		        common::ipv6_address_t{base->balancer_reals[*real_id].destination.bytes},
+		        base->balancer_real_states[*real_id].weight,
+		        dist[*real_id]};
+		response.emplace_back(std::move(entry));
+	}
+
+	return response;
+}
+
 common::idp::balancer_real_connections::response cControlPlane::balancer_real_connections()
 {
 	common::idp::balancer_real_connections::response response;
@@ -1175,54 +1216,12 @@ void cControlPlane::switchBase()
 
 void cControlPlane::switchGlobalBase()
 {
-	YADECAP_MEMORY_BARRIER_COMPILE;
-
-	{
-		std::lock_guard<std::mutex> guard(dataPlane->currentGlobalBaseId_mutex);
-		dataPlane->currentGlobalBaseId ^= 1;
-	}
-
-	YADECAP_MEMORY_BARRIER_COMPILE;
-
-	dataPlane->switch_worker_base();
-
-	YADECAP_MEMORY_BARRIER_COMPILE;
+	dataPlane->switchGlobalBase();
 }
 
 void cControlPlane::waitAllWorkers()
 {
-	if (!dataPlane->WorkersStarted())
-	{
-		return;
-	}
-
-	YADECAP_MEMORY_BARRIER_COMPILE;
-
-	for (const cWorker* worker : dataPlane->workers_vector)
-	{
-		uint64_t startIteration = worker->iteration;
-		uint64_t nextIteration = startIteration;
-		while (nextIteration - startIteration <= (uint64_t)16)
-		{
-			YADECAP_MEMORY_BARRIER_COMPILE;
-			nextIteration = worker->iteration;
-		}
-	}
-
-	for (const auto& [core_id, worker] : dataPlane->worker_gcs)
-	{
-		GCC_BUG_UNUSED(core_id);
-
-		uint64_t startIteration = worker->iteration;
-		uint64_t nextIteration = startIteration;
-		while (nextIteration - startIteration <= (uint64_t)16)
-		{
-			YADECAP_MEMORY_BARRIER_COMPILE;
-			nextIteration = worker->iteration;
-		}
-	}
-
-	YADECAP_MEMORY_BARRIER_COMPILE;
+	dataPlane->waitAllWorkers();
 }
 
 void cControlPlane::flush_kernel_interface(KniPortData& port_data, sKniStats& stats)

@@ -1,0 +1,55 @@
+steps:
+- ipv4Update:
+  - "0.0.0.0/0 -> 200.0.0.1"
+  - "100.0.0.0/8 -> 100.0.0.5"
+- ipv6Update: "::/0 -> fe80::1"
+- cli:
+  - balancer real enable balancer0 2004:dead:beef::2 udp 80 2006::1 80
+  - balancer real enable balancer0 2004:dead:beef::2 udp 80 2006::2 80
+  - balancer real enable balancer0 2004:dead:beef::2 udp 80 2006::3 80
+  - balancer real enable balancer0 2004:dead:beef::2 udp 80 2006::4 80
+  - balancer real flush
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 2004:dead:beef::2
+    module     virtual_ip         proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::1  80         true     1       0            0        0
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::2  80         true     1       0            0        0
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::3  80         true     1       0            0        0
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::4  80         true     1       0            0        0
+- cli:
+  - balancer real enable balancer0 2004:dead:beef::2 udp 80 2006::3 80 100
+  - balancer real flush
+  - balancer lookup any
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 2004:dead:beef::2
+    module     virtual_ip         proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::1  80         true     1       5            5        530
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::2  80         true     1       5            5        530
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::3  80         true     100     117          117      12402
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::4  80         true     1       1            1        106
+
+- cli:
+  - balancer real enable balancer0 2004:dead:beef::2 udp 80 2006::1 80 10
+  - balancer real enable balancer0 2004:dead:beef::2 udp 80 2006::2 80 10
+  - balancer real enable balancer0 2004:dead:beef::2 udp 80 2006::3 80 10
+  - balancer real enable balancer0 2004:dead:beef::2 udp 80 2006::4 80 10
+  - balancer real flush
+- sleep: 1
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+- cli_check: |
+    YANET_FORMAT_COLUMNS=module,virtual_ip,proto,virtual_port,scheduler,real_ip,real_port,enabled,weight,connections,packets,bytes balancer real balancer0 2004:dead:beef::2
+    module     virtual_ip         proto  virtual_port  scheduler  real_ip  real_port  enabled  weight  connections  packets  bytes
+    ---------  -----------------  -----  ------------  ---------  -------  ---------  -------  ------  -----------  -------  -----
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::1  80         true     10      43           43       4558
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::2  80         true     10      41           41       4346
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::3  80         true     10      145          145      15370
+    balancer0  2004:dead:beef::2  udp    80            chash      2006::4  80         true     10      27           27       2862
