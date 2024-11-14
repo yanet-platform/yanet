@@ -1622,41 +1622,53 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 	return (sessions_created - sessions_destroyed + sessions_created_gc - sessions_destroyed_gc) / dataPlane->numaNodesInUse;
 }
 
+balancer_real_id_t* generation::evaluate_service_ring_one(
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service)
+{
+	balancer_real_id_t* end = start;
+	for (uint32_t real_idx = service.real_start;
+	     real_idx < service.real_start + service.real_size;
+	     ++real_idx)
+	{
+		uint32_t real_id = balancer_service_reals[real_idx];
+		balancer_real_state_t* state = balancer_real_states + real_id;
+
+		const auto& weight = state->weight;
+
+		if (end + weight > do_not_exceed)
+		{
+			YANET_LOG_ERROR("Balancer service exceeded ring chunk bounds\n");
+			return end;
+		}
+
+		std::fill_n(end, weight, real_id);
+		end += weight;
+	}
+
+	YADECAP_MEMORY_BARRIER_COMPILE;
+	return end;
+}
+
 void generation::evaluate_service_ring()
 {
 	balancer_service_ring_t* ring = &balancer_service_ring;
-	uint32_t weight_pos = 0;
-	for (uint32_t service_idx = 0; service_idx < balancer_services_count; ++service_idx)
+	balancer_real_id_t* service_start = ring->reals;
+	for (uint32_t service_idx = 0;
+	     service_idx < balancer_services_count;
+	     ++service_idx, service_start += YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX)
 	{
 		balancer_service_t* service = balancer_services + balancer_active_services[service_idx];
 
 		balancer_service_range_t* range = ring->ranges + balancer_active_services[service_idx];
 
-		range->start = weight_pos;
-		for (uint32_t real_idx = service->real_start;
-		     real_idx < service->real_start + service->real_size;
-		     ++real_idx)
-		{
-			uint32_t real_id = balancer_service_reals[real_idx];
-			balancer_real_state_t* state = balancer_real_states + real_id;
-
-			if (state->weight == 0)
-			{
-				continue;
-			}
-
-			auto weight = state->weight;
-
-			while (weight-- > 0)
-			{
-				ring->reals[weight_pos++] = real_id;
-			}
-		}
-
-		YADECAP_MEMORY_BARRIER_COMPILE;
-
-		range->size = weight_pos - range->start;
-		weight_pos = range->start + service->real_size * YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX;
+		range->start = std::distance(ring->reals, service_start);
+		auto service_end = evaluate_service_ring_one(
+		        service_start,
+		        service_start + YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX,
+		        *service);
+		range->size = std::distance(service_start, service_end);
 	}
 }
 
