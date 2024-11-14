@@ -9,6 +9,7 @@ enum class scheduler : uint8_t
 	rr,
 	wrr,
 	wlc,
+	chash
 };
 
 class scheduler_params
@@ -23,20 +24,16 @@ public:
 	switch (scheduler)
 	{
 		case scheduler::rr:
-		{
 			return "rr";
-		}
 		case scheduler::wrr:
-		{
 			return "wrr";
-		}
 		case scheduler::wlc:
-		{
 			return "wlc";
-		}
+		case scheduler::chash:
+			return "chash";
+		default:
+			return "unknown";
 	}
-
-	return "unknown";
 }
 
 }
