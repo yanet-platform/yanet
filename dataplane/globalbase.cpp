@@ -1692,7 +1692,7 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 	return (sessions_created - sessions_destroyed + sessions_created_gc - sessions_destroyed_gc) / dataPlane->numaNodesInUse;
 }
 
-balancer_real_id_t* generation::evaluate_service_ring_one(
+balancer_real_id_t* generation::evaluate_service_ring_one_wrr(
         balancer_real_id_t* start,
         const balancer_real_id_t* const do_not_exceed,
         const balancer_service_t& service)
@@ -1718,6 +1718,39 @@ balancer_real_id_t* generation::evaluate_service_ring_one(
 	}
 
 	YADECAP_MEMORY_BARRIER_COMPILE;
+	return end;
+}
+
+balancer_real_id_t* generation::evaluate_service_ring_one_chash(
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service)
+{
+	return start;
+}
+
+balancer_real_id_t* generation::evaluate_service_ring_one(
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service)
+{
+	balancer_real_id_t* end{start};
+	using scheduler = ::balancer::scheduler;
+	switch (service.scheduler)
+	{
+		case scheduler::rr:
+		case scheduler::wrr:
+			end = evaluate_service_ring_one_wrr(
+			        start, do_not_exceed, service);
+			break;
+		case scheduler::wlc:
+		case scheduler::chash:
+			end = evaluate_service_ring_one_chash(
+			        start, do_not_exceed, service);
+			break;
+		default:
+			YANET_LOG_ERROR("Unknown balancer service scheduler type\n");
+	}
 	return end;
 }
 

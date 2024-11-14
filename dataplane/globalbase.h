@@ -234,6 +234,14 @@ protected:
 	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 	eResult update_host_config(const common::idp::updateGlobalBase::update_host_config::request& request);
 
+	balancer_real_id_t* evaluate_service_ring_one_wrr(
+	        balancer_real_id_t* start,
+	        const balancer_real_id_t* const do_not_exceed,
+	        const balancer_service_t& service);
+	balancer_real_id_t* evaluate_service_ring_one_chash(
+	        balancer_real_id_t* start,
+	        const balancer_real_id_t* const do_not_exceed,
+	        const balancer_service_t& service);
 	balancer_real_id_t* evaluate_service_ring_one(
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,
