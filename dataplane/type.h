@@ -568,6 +568,11 @@ struct balancer_service_ring_t
 
 static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid size");
 
+struct ChashServiceConfig
+{
+	std::size_t segments_per_real;
+};
+
 struct balancer_service_t
 {
 	/// @todo
@@ -587,7 +592,8 @@ struct balancer_service_t
 	uint32_t real_size;
 	::balancer::scheduler scheduler;
 	::balancer::forwarding_method forwarding_method;
-	uint32_t wlc_power;
+
+	std::optional<ChashServiceConfig> details;
 
 	/*
 		outer_source_network_flag:
