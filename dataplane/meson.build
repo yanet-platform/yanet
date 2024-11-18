@@ -1,6 +1,7 @@
 dependencies = []
 dependencies += libdpdk.get_variable('dpdk_dep')
 dependencies += libjson.get_variable('nlohmann_json_dep')
+dependencies += libchash.get_variable('balancer_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
 

@@ -58,6 +58,8 @@ libdpdk = subproject('dpdk', default_options: [
 
 libjson = subproject('json')
 
+libchash = subproject('balancer')
+
 if target_option.contains('buildenv')
     subdir('libprotobuf')
     subdir('libfwparser')
