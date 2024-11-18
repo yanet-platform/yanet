@@ -2,6 +2,8 @@
 
 #include <rte_errno.h>
 
+#include <chash.hpp>
+
 #include "common.h"
 #include "dataplane.h"
 #include "globalbase.h"
@@ -1424,7 +1426,6 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 	                  counter_id,
 	                  scheduler,
 	                  forwarding_method,
-	                  default_wlc_power,
 	                  real_start,
 	                  real_size,
 	                  ipv4_outer_source_network,
@@ -1475,7 +1476,6 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		balancer_service.real_start = real_start;
 		balancer_service.real_size = real_size;
 		balancer_service.scheduler = scheduler;
-		balancer_service.wlc_power = default_wlc_power;
 		balancer_service.forwarding_method = forwarding_method;
 		balancer_service.outer_source_network_flag = outer_source_network_flag;
 		balancer_service.ipv4_outer_source_network = ipv4_prefix;
@@ -1556,7 +1556,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 
 	std::copy(binding.begin(), binding.end(), balancer_service_reals);
 
-	evaluate_service_ring();
+	evaluate_service_ring(ServiceRingOp::Rebuild);
 
 	return eResult::success;
 }
@@ -1579,7 +1579,7 @@ eResult generation::update_balancer_unordered_real(const common::idp::updateGlob
 		real_state = new_state;
 	}
 
-	evaluate_service_ring();
+	evaluate_service_ring(ServiceRingOp::Update);
 
 	return eResult::success;
 }
@@ -1609,14 +1609,14 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 	return (sessions_created - sessions_destroyed + sessions_created_gc - sessions_destroyed_gc) / dataPlane->numaNodesInUse;
 }
 
-balancer_real_id_t* generation::evaluate_service_ring_one_wrr(
+balancer_real_id_t* generation::rebuild_service_ring_one_wrr(
         balancer_real_id_t* start,
         const balancer_real_id_t* const do_not_exceed,
-        const balancer_service_t& service,
+        const balancer_service_t* service,
         balancer_service_range_t& range)
 {
-	for (uint32_t real_idx = service.real_start;
-	     real_idx < service.real_start + service.real_size;
+	for (uint32_t real_idx = service->real_start;
+	     real_idx < service->real_start + service->real_size;
 	     ++real_idx)
 	{
 		uint32_t real_id = balancer_service_reals[real_idx];
@@ -1646,34 +1646,85 @@ finish:
 	return start;
 }
 
-balancer_real_id_t* generation::evaluate_service_ring_one_chash(
+std::vector<std::pair<balancer_real_id_t, decltype(balancer_real_state_t::weight)>>
+generation::ServiceWeights(const balancer_service_t* service)
+{
+	std::vector<std::pair<balancer_real_id_t, decltype(balancer_real_state_t::weight)>> weights;
+	for (uint32_t real_idx = service->real_start;
+	     real_idx < service->real_start + service->real_size;
+	     ++real_idx)
+	{
+		uint32_t real_id = balancer_service_reals[real_idx];
+		uint32_t weight = (balancer_real_states + real_id)->weight;
+
+		weights.emplace_back(real_id, weight);
+	}
+}
+
+balancer_real_id_t* generation::rebuild_service_ring_one_chash(
         balancer_real_id_t* start,
         const balancer_real_id_t* const do_not_exceed,
-        const balancer_service_t& service,
+        const balancer_service_t* service,
         balancer_service_range_t& range)
 {
+	std::vector<std::pair<ipv6_address_t, balancer_real_id_t>> reals;
+	for (uint32_t real_idx = service->real_start;
+	     real_idx < service->real_start + service->real_size;
+	     ++real_idx)
+	{
+		uint32_t real_id = balancer_service_reals[real_idx];
+		ipv6_address_t& ip = balancer_reals[real_id].destination;
+		reals.emplace_back(ip, real_id);
+	}
+	auto updater = chash::WeightUpdater::MakeWeightUpdater(reals, service->details->segments_per_real);
+	updater.InitLookup(ServiceWeights(service), start);
+
+	chash_updaters.emplace(service, std::move(updater));
 	return start;
 }
 
-balancer_real_id_t* generation::evaluate_service_ring_one(
+void generation::update_service_ring_one_chash(
         balancer_real_id_t* start,
         const balancer_real_id_t* const do_not_exceed,
-        const balancer_service_t& service,
+        const balancer_service_t* service,
+        balancer_service_range_t& range)
+{
+	if (chash_updaters.find(service) == chash_updaters.end())
+	{
+		YANET_LOG_ERROR("No state information for updating requested service.\n");
+		return;
+	}
+	auto& updater = chash_updaters.at(service);
+	updater.UpdateLookup(ServiceWeights(service), start);
+}
+
+balancer_real_id_t* generation::evaluate_service_ring_one(
+        ServiceRingOp op,
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t* service,
         balancer_service_range_t& range)
 {
 	balancer_real_id_t* end{start};
 	using scheduler = ::balancer::scheduler;
-	switch (service.scheduler)
+	switch (service->scheduler)
 	{
 		case scheduler::rr:
 		case scheduler::wrr:
-			end = evaluate_service_ring_one_wrr(
+			end = rebuild_service_ring_one_wrr(
 			        start, do_not_exceed, service, range);
 			break;
 		case scheduler::wlc:
 		case scheduler::chash:
-			end = evaluate_service_ring_one_chash(
-			        start, do_not_exceed, service, range);
+			if (op == ServiceRingOp::Rebuild)
+			{
+				end = rebuild_service_ring_one_chash(
+				        start, do_not_exceed, service, range);
+			}
+			else
+			{
+				update_service_ring_one_chash(start, do_not_exceed, service, range);
+			}
 			break;
 		default:
 			YANET_LOG_ERROR("Unknown balancer service scheduler type\n");
@@ -1681,7 +1732,7 @@ balancer_real_id_t* generation::evaluate_service_ring_one(
 	return end;
 }
 
-void generation::evaluate_service_ring()
+void generation::evaluate_service_ring(ServiceRingOp op)
 {
 	balancer_service_ring_t* ring = &balancer_service_ring;
 	balancer_real_id_t* service_start = ring->reals;
@@ -1694,10 +1745,12 @@ void generation::evaluate_service_ring()
 		balancer_service_range_t* range = ring->ranges + balancer_active_services[service_idx];
 
 		range->start = std::distance(ring->reals, service_start);
-		auto service_end = evaluate_service_ring_one(service_start,
-		                                             service_start + YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX,
-		                                             *service,
-		                                             *range);
+		auto service_end = evaluate_service_ring_one(
+		        op,
+		        service_start,
+		        service_start + YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX,
+		        service,
+		        *range);
 		range->size = std::distance(service_start, service_end);
 	}
 }
