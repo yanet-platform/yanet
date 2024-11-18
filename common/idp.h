@@ -286,7 +286,6 @@ using service = std::tuple<balancer_service_id_t, /// service id
                            tCounterId, ///< size 4
                            balancer::scheduler,
                            balancer::forwarding_method, // tunneling method (default ipip)
-                           uint32_t, /// default_wlc_power
                            uint32_t, ///< real_start
                            uint32_t, ///< real_size
                            std::optional<common::ipv4_prefix_t>, ///< ipv4_outer_source_network

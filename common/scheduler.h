@@ -12,13 +12,6 @@ enum class scheduler : uint8_t
 	chash
 };
 
-class scheduler_params
-{
-public:
-	scheduler_params() = default;
-	uint32_t wlc_power;
-};
-
 [[maybe_unused]] constexpr const char* to_string(const scheduler& scheduler)
 {
 	switch (scheduler)

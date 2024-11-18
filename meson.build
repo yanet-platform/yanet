@@ -59,6 +59,8 @@ libdpdk = subproject('dpdk', default_options: [
 
 libjson = subproject('json')
 
+libchash = subproject('chash', default_options: [ 'tests=false' ])
+
 if target_option.contains('buildenv')
     subdir('libprotobuf')
     subdir('libfwparser')
