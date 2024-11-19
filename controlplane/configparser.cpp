@@ -1906,6 +1906,7 @@ void config_parser_t::loadConfig_rib(controlplane::base_t& baseNext,
 			controlplane::base_rib base_rib;
 			base_rib.prefix = json_rib_item["prefix"].get<std::string>();
 			base_rib.nexthop = json_rib_item["nexthop"].get<std::string>();
+			base_rib.is_tunnel = (exist(json_rib_item, "tunnel") && json_rib_item["tunnel"].get<bool>());
 
 			vrf.emplace_back(std::move(base_rib));
 		}

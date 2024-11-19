@@ -1241,7 +1241,7 @@ inline void cWorker::logicalPort_ingress_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -1863,7 +1863,7 @@ inline void cWorker::acl_ingress_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -2040,7 +2040,7 @@ inline void cWorker::tun64_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -2110,7 +2110,7 @@ inline void cWorker::decap_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -2803,6 +2803,7 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		return;
 	}
 
+	bool skip_udp_mpls = (metadata->flow == common::globalBase::eFlowType::route_tunnel_ipip);
 	uint16_t payload_length;
 	bool is_ipv4 = metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
 	if (is_ipv4 && !nexthop.is_ipv6)
@@ -2810,9 +2811,10 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 
 		/// @todo: mpls_header_t
-		rte_pktmbuf_prepend(mbuf, sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE);
+		size_t size_mbuf = sizeof(rte_ipv4_hdr) + (skip_udp_mpls ?  0 : sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE);
+		rte_pktmbuf_prepend(mbuf, size_mbuf);
 		rte_memcpy(rte_pktmbuf_mtod(mbuf, char*),
-		           rte_pktmbuf_mtod_offset(mbuf, char*, sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE),
+		           rte_pktmbuf_mtod_offset(mbuf, char*, size_mbuf),
 		           metadata->network_headerOffset);
 
 		/// @todo: check for ethernetHeader or vlanHeader
@@ -2823,11 +2825,11 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 
 		ipv4Header->version_ihl = 0x45;
 		ipv4Header->type_of_service = ipv4HeaderInner->type_of_service;
-		ipv4Header->total_length = rte_cpu_to_be_16((sizeof(rte_ipv4_hdr) + sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE) + rte_be_to_cpu_16(ipv4HeaderInner->total_length));
+		ipv4Header->total_length = rte_cpu_to_be_16(size_mbuf + rte_be_to_cpu_16(ipv4HeaderInner->total_length));
 		ipv4Header->packet_id = ipv4HeaderInner->packet_id;
 		ipv4Header->fragment_offset = 0;
 		ipv4Header->time_to_live = 64;
-		ipv4Header->next_proto_id = IPPROTO_UDP;
+		ipv4Header->next_proto_id = (skip_udp_mpls ? IPPROTO_IPIP : IPPROTO_UDP);
 		ipv4Header->hdr_checksum = 0;
 		ipv4Header->src_addr = route.ipv4AddressSource.address;
 		ipv4Header->dst_addr = nexthop.nexthop_address.mapped_ipv4_address.address;
@@ -2846,7 +2848,7 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		{
 			rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 			vtc_flow = rte_cpu_to_be_32((0x6 << 28) | (ipv4HeaderInner->type_of_service << 20)); ///< @todo: flow label
-			payload_len = rte_cpu_to_be_16(sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE + rte_be_to_cpu_16(ipv4HeaderInner->total_length));
+			payload_len = rte_cpu_to_be_16((skip_udp_mpls ? 0 : sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE) + rte_be_to_cpu_16(ipv4HeaderInner->total_length));
 			payload_length = rte_be_to_cpu_16(ipv4HeaderInner->total_length);
 		}
 		else
@@ -2858,9 +2860,10 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		}
 
 		/// @todo: mpls_header_t
-		rte_pktmbuf_prepend(mbuf, sizeof(rte_ipv6_hdr) + sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE);
+		size_t size_mbuf = sizeof(rte_ipv6_hdr) + (skip_udp_mpls ?  0 : sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE);
+		rte_pktmbuf_prepend(mbuf, size_mbuf);
 		rte_memcpy(rte_pktmbuf_mtod(mbuf, char*),
-		           rte_pktmbuf_mtod_offset(mbuf, char*, sizeof(rte_ipv6_hdr) + sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE),
+		           rte_pktmbuf_mtod_offset(mbuf, char*, size_mbuf),
 		           metadata->network_headerOffset);
 
 		/// @todo: check for ethernetHeader or vlanHeader
@@ -2872,7 +2875,7 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		ipv6Header->vtc_flow = vtc_flow;
 		ipv6Header->payload_len = payload_len;
 
-		ipv6Header->proto = IPPROTO_UDP;
+		ipv6Header->proto = (skip_udp_mpls ? IPPROTO_IPIP : IPPROTO_UDP);
 		ipv6Header->hop_limits = 64;
 		rte_memcpy(ipv6Header->src_addr, route.ipv6AddressSource.bytes, 16);
 		rte_memcpy(ipv6Header->dst_addr, nexthop.nexthop_address.bytes, 16);
@@ -2880,6 +2883,7 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv6_hdr);
 	}
 
+	if (!skip_udp_mpls)
 	{
 		rte_udp_hdr* udpHeader = rte_pktmbuf_mtod_offset(mbuf, rte_udp_hdr*, metadata->transport_headerOffset);
 
@@ -2889,6 +2893,7 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		udpHeader->dgram_cksum = 0;
 	}
 
+	if (!skip_udp_mpls)
 	{
 		uint32_t* mplsHeaderTransport = rte_pktmbuf_mtod_offset(mbuf, uint32_t*, metadata->transport_headerOffset + sizeof(rte_udp_hdr));
 
@@ -3265,7 +3270,7 @@ inline void cWorker::nat64stateful_lan_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3424,7 +3429,7 @@ inline void cWorker::nat64stateful_wan_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3504,7 +3509,7 @@ inline void cWorker::nat64stateless_ingress_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3623,7 +3628,7 @@ inline void cWorker::nat64stateless_egress_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3795,7 +3800,7 @@ inline void cWorker::nat46clat_lan_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3874,7 +3879,7 @@ inline void cWorker::nat46clat_wan_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -5996,7 +6001,7 @@ YANET_NEVER_INLINE void cWorker::slowWorkerFlow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}

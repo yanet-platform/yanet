@@ -231,13 +231,13 @@ void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_
 
 						for (const auto& large_community : large_communities)
 						{
-							if (large_community.value[0] == 13238 && ///< @todo: DEFINE
+							if (large_community.value[0] == YANET_DEFAULT_BGP_AS &&
 							    large_community.value[1] == 1) ///< @todo: DEFINE
 							{
 								weight = large_community.value[2];
 							}
 
-							if (large_community.value[0] == 13238 && ///< @todo: DEFINE
+							if (large_community.value[0] == YANET_DEFAULT_BGP_AS &&
 							    large_community.value[1] == 1000) ///< @todo: DEFINE
 							{
 								override_length = large_community.value[2];
