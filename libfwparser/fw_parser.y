@@ -131,7 +131,7 @@
 		SRCPRJID DSTPRJID RED ALL LMAX DSTIP6 SRCIP6 TCPSETMSS
 		NAT64CLAT NAT64LSN NAT64STL NPTV6 SRCADDR QM DSTADDR
 		SRCPORT DSTPORT SRCIP DSTIP EQUAL COMMA MINUS EOL M4LQ M4RQ DUMP
-		STATETIMEOUT
+		STATETIMEOUT HITCOUNT
 
 // QUEUE could be an argument to *MASK
 %precedence	QUEUE
@@ -509,6 +509,12 @@ action:
 	STATETIMEOUT NUMBER
 	{
 		cfg.set_rule_action(rule_action_t::STATETIMEOUT);
+		cfg.set_rule_action_arg($2);
+	}
+	|
+	HITCOUNT TOKEN
+	{
+		cfg.set_rule_action(rule_action_t::HITCOUNT);
 		cfg.set_rule_action_arg($2);
 	}
 	|

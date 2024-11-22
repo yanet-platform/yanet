@@ -171,6 +171,7 @@ enum class rule_action_t
 	DSTPRJID,
 	DUMP,
 	STATETIMEOUT,
+	HITCOUNT,
 };
 
 enum class rule_action_modifier_t
