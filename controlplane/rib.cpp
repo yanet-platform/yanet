@@ -72,6 +72,10 @@ eResult rib_t::init()
 		rib_thread();
 	});
 
+	funcThreads.emplace_back([this]() {
+		bird_thread();
+	});
+
 	return eResult::success;
 }
 
