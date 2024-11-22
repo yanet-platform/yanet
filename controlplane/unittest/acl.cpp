@@ -101,6 +101,11 @@ template<typename T>
 	return HoldsAlternative<common::DumpAction>();
 }
 
+::testing::Matcher<const common::RawAction&> IsHitcountAction()
+{
+	return HoldsAlternative<common::HitCountAction>();
+}
+
 class ACL : public ::testing::Test
 {
 protected:
@@ -669,6 +674,24 @@ add allow ip from any to any
 		const auto& flow_action = std::get<common::FlowAction>(actions.default_path_last_raw_action());
 		// Check that by default timeout in flow_action is std::nullopt
 		EXPECT_EQ(flow_action.timeout, std::nullopt);
+	});
+}
+
+TEST_F(ACL, HitCount_Basic)
+{
+	compile_acl(R"IPFW(
+:BEGIN
+add hitcount SomeRandomString123 ip from any to any
+)IPFW");
+
+	ASSERT_EQ(result.acl_total_table.size(), 1);
+
+	visit_actions([&](const auto& actions) {
+		const auto& raw_action = actions.default_path_raw_action(0);
+		EXPECT_THAT(raw_action, IsHitcountAction());
+
+		const auto& hitcount_action = std::get<common::HitCountAction>(raw_action);
+		EXPECT_EQ(hitcount_action.id, "SomeRandomString123");
 	});
 }
 

@@ -145,6 +145,11 @@ struct ActionDispatcher
 			args.worker->acl_ingress_flow(args.mbuf, flow);
 		}
 	}
+
+	static void execute(const common::HitCountAction& action, const Flow& flow, const ActionDispatcherArgs& args)
+	{
+		YANET_LOG_DEBUG("PLACEHOLDER");
+	}
 };
 
 } // namespace dataplane
