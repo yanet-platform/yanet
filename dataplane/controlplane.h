@@ -70,6 +70,7 @@ public:
 	common::idp::lpm6LookupAddress::response lpm6LookupAddress(const common::idp::lpm6LookupAddress::request& request);
 	common::idp::limits::response limits();
 	common::idp::samples::response samples();
+	common::idp::hitcount_dump::response hitcount_dump();
 	common::idp::balancer_connection::response balancer_connection(const common::idp::balancer_connection::request& request);
 	common::idp::balancer_service_connections::response balancer_service_connections();
 	common::idp::balancer_real_connections::response balancer_real_connections();

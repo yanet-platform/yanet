@@ -698,6 +698,28 @@ inline void samples_dump()
 	std::cout << "]\n";
 }
 
+inline void hitcount_dump()
+{
+	interface::dataPlane dataplane;
+	const auto& response = dataplane.hitcount_dump();
+
+	std::cout << "[\n";
+
+	bool first = true;
+	for (const auto& [id, data] : response)
+	{
+		if (!first)
+		{
+			std::cout << "\n";
+		}
+		first = false;
+
+		std::cout << "  " << id << ": " << data.count << ", " << data.bytes;
+	}
+
+	std::cout << "\n]\n";
+}
+
 inline void values()
 {
 	interface::controlPlane controlplane;
