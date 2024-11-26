@@ -778,6 +778,11 @@ common::idp::samples::response cControlPlane::samples()
 	return common::idp::samples::response(samples.begin(), samples.end());
 }
 
+common::idp::hitcount_dump::response cControlPlane::hitcount_dump()
+{
+	return dataPlane->getHitcountMap();
+}
+
 eResult cControlPlane::debug_latch_update(const common::idp::debug_latch_update::request& request)
 {
 	const auto& [latch_id, state] = request;

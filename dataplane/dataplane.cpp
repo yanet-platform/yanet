@@ -1800,6 +1800,11 @@ common::idp::get_shm_tsc_info::response cDataPlane::getShmTscInfo()
 	return result;
 }
 
+const common::idp::hitcount_dump::response& cDataPlane::getHitcountMap()
+{
+	return hitcount_map_;
+}
+
 std::map<std::string, common::uint64> cDataPlane::getPortStats(const tPortId& portId) const
 {
 	/// unsafe

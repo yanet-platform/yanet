@@ -196,6 +196,7 @@ protected:
 
 	common::idp::get_shm_info::response getShmInfo();
 	common::idp::get_shm_tsc_info::response getShmTscInfo();
+	const common::idp::hitcount_dump::response& getHitcountMap();
 
 	void timestamp_thread();
 	void SWRateLimiterTimeTracker();
