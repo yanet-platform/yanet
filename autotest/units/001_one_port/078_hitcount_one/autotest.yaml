@@ -1,0 +1,45 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 10.0.0.2"
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+  # Check hitcount dump. The single packet matches "c1".
+  # Packet size calculation:
+  #   - Ethernet Header: 14 bytes
+  #   - IPv4 Header: 20 bytes
+  #   - TCP Header: 20 bytes
+  #   - Payload: 50 bytes
+  #   Total: 14 + 20 + 20 + 50 = 104 bytes
+- cli_check: |
+    hitcount dump
+    [
+      c1: 1, 104
+    ]
+
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+
+  # Check hitcount dump. Two packets now match "c1".
+  # Byte count increments by 104 (packet size) for each additional packet.
+- cli_check: |
+    hitcount dump
+    [
+      c1: 2, 208
+    ]
+
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+
+  # Check hitcount dump. Three packets now match "c1".
+- cli_check: |
+    hitcount dump
+    [
+      c1: 3, 312
+    ]
