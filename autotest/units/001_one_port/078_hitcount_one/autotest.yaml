@@ -14,7 +14,7 @@ steps:
   #   - Payload: 50 bytes
   #   Total: 14 + 20 + 20 + 50 = 104 bytes
 - cli_check: |
-    hitcount dump
+    hitcount dump acl
     [
       c1: 1, 104
     ]
@@ -27,7 +27,7 @@ steps:
   # Check hitcount dump. Two packets now match "c1".
   # Byte count increments by 104 (packet size) for each additional packet.
 - cli_check: |
-    hitcount dump
+    hitcount dump acl
     [
       c1: 2, 208
     ]
@@ -39,7 +39,7 @@ steps:
 
   # Check hitcount dump. Three packets now match "c1".
 - cli_check: |
-    hitcount dump
+    hitcount dump acl
     [
       c1: 3, 312
     ]

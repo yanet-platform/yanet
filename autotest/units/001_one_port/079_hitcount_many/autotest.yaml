@@ -19,4 +19,4 @@ steps:
     send: 003-send.pcap
     expect: 003-expect.pcap
 
-- cli: "hitcount dump | diff - TESTDIR/hitcount_expected.txt"
+- cli: "hitcount dump acl | diff - TESTDIR/hitcount_expected.txt"
