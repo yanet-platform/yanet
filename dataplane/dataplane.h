@@ -252,6 +252,8 @@ protected:
 
 	common::idp::get_shm_tsc_info::response tscs_meta;
 
+	common::idp::hitcount_dump::response hitcount_map_;
+
 	std::map<tSocketId, std::tuple<key_t, void*>> shm_by_socket_id;
 
 	std::set<tSocketId> socket_ids;

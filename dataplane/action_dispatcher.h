@@ -148,7 +148,10 @@ struct ActionDispatcher
 
 	static void execute(const common::HitCountAction& action, const Flow& flow, const ActionDispatcherArgs& args)
 	{
-		YANET_LOG_DEBUG("PLACEHOLDER");
+		auto worker = args.worker;
+		auto mbuf = args.mbuf;
+
+		worker->populate_hitcount_map(action.id, mbuf);
 	}
 };
 

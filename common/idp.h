@@ -893,6 +893,19 @@ using sample_t = std::tuple<uint8_t, ///< proto
 using response = std::vector<sample_t>;
 }
 
+namespace hitcount_dump
+{
+using id = std::string;
+
+struct Data
+{
+	uint64_t count; // Number of times a rule has been hit
+	uint64_t bytes; // Amount of packet bytes passed through the rule
+};
+
+using response = std::unordered_map<id, Data>;
+}
+
 namespace debug_latch_update
 {
 enum class id : uint32_t

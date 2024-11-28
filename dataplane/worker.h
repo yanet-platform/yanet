@@ -220,6 +220,8 @@ protected:
 	inline uint32_t get_tcp_state_timeout(uint8_t flags, const dataplane::globalBase::state_timeout_config_t& state_timeout_config);
 	inline uint32_t get_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, const dataplane::globalBase::state_timeout_config_t& state_timeout_config);
 
+	inline void populate_hitcount_map(const std::string& id, rte_mbuf* mbuf);
+
 protected:
 	/// @todo: move to slow_worker_t
 public:
