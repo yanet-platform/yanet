@@ -5950,3 +5950,11 @@ inline uint32_t cWorker::get_state_timeout(rte_mbuf* mbuf, dataplane::metadata* 
 	}
 	return state_timeout_config.default_timeout;
 }
+
+inline void cWorker::populate_hitcount_map(const std::string& id, rte_mbuf* mbuf)
+{
+	common::idp::hitcount_dump::Data& entry = dataPlane->hitcount_map_[id];
+
+	entry.count++;
+	entry.bytes += mbuf->pkt_len;
+}
