@@ -1033,7 +1033,7 @@ const int64_t DISPATCHER = -1;
 // sense.
 //
 // Additionally, we might have another variant for representing rules that are suitable for execution in the dataplane.
-using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::dump_t, common::acl::check_state_t, common::acl::state_timeout_t>;
+using rule_action = std::variant<int64_t, common::globalBase::tFlow, common::acl::dump_t, common::acl::check_state_t, common::acl::state_timeout_t, common::acl::hit_count_t>;
 
 struct rule_t
 {
@@ -1103,6 +1103,9 @@ public:
 				break;
 			case ipfw::rule_action_t::STATETIMEOUT:
 				action = common::acl::state_timeout_t(std::get<int64_t>(rulep->action_arg));
+				break;
+			case ipfw::rule_action_t::HITCOUNT:
+				action = common::acl::hit_count_t(std::get<std::string>(rulep->action_arg));
 				break;
 			default:
 				YANET_LOG_WARNING("unexpected rule action in rule '%s'\n", rulep->text.data());
@@ -1186,6 +1189,10 @@ public:
 			else if constexpr (std::is_same_v<T, common::acl::state_timeout_t>)
 			{
 				text = "state-timeout(" + std::to_string(rule.timeout) + ")";
+			}
+			else if constexpr (std::is_same_v<T, common::acl::hit_count_t>)
+			{
+				text = "hitcount(" + rule.id + ")";
 			}
 			else if constexpr (std::is_same_v<T, int64_t>)
 			{
@@ -1386,6 +1393,10 @@ struct hash<acl::rule_t>
 			else if constexpr (std::is_same_v<T, common::acl::state_timeout_t>)
 			{
 				action_value = action.timeout;
+			}
+			else if constexpr (std::is_same_v<T, common::acl::hit_count_t>)
+			{
+				action_value = std::hash<std::string>{}(action.id);
 			}
 		},
 		           r.action);

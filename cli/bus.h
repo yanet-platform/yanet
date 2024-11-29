@@ -41,6 +41,7 @@ inline std::vector<bus_request_info> get_bus_requests(common::sdp::DataPlaneInSh
 	        {common::idp::requestType::balancer_real_connections, "balancer_real_connections"},
 	        {common::idp::requestType::limits, "limits"},
 	        {common::idp::requestType::samples, "samples"},
+	        {common::idp::requestType::hitcount_dump, "hitcount_dump"},
 	        {common::idp::requestType::debug_latch_update, "debug_latch_update"},
 	        {common::idp::requestType::unrdup_vip_to_balancers, "unrdup_vip_to_balancers"},
 	        {common::idp::requestType::update_vip_vport_proto, "update_vip_vport_proto"},

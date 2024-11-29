@@ -1,0 +1,16 @@
+:BEGIN
+add skipto :IN ip from any to any in
+
+:IN
+add hitcount allow_tcp_from_11_0_0_0_24_to_any_53 tcp from 11.0.0.0/24 to any 53
+add allow tcp from 11.0.0.0/24 to any 53 record-state
+
+add hitcount allow_tcp_from_any_to_2111_aaa_ff1c_2030_60_53 tcp from any to 2111:aaa:ff1c:2030::/60 53
+add allow tcp from any to 2111:aaa:ff1c:2030::/60 53 record-state
+
+add hitcount check_state_ip_from_any_to_any ip from any to any
+add check-state
+
+add hitcount deny_ip_from_any_to_any ip from any to any
+add deny ip from any to any
+

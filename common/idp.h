@@ -61,6 +61,7 @@ enum class requestType : uint32_t
 	balancer_real_connections,
 	limits,
 	samples,
+	hitcount_dump,
 	debug_latch_update,
 	unrdup_vip_to_balancers,
 	update_vip_vport_proto,
@@ -893,6 +894,19 @@ using sample_t = std::tuple<uint8_t, ///< proto
 using response = std::vector<sample_t>;
 }
 
+namespace hitcount_dump
+{
+using id = std::string;
+
+struct Data
+{
+	uint64_t count; // Number of times a rule has been hit
+	uint64_t bytes; // Amount of packet bytes passed through the rule
+};
+
+using response = std::unordered_map<id, Data>;
+}
+
 namespace debug_latch_update
 {
 enum class id : uint32_t
@@ -1009,6 +1023,7 @@ using response = std::variant<std::tuple<>,
                               version::response,
                               limits::response,
                               samples::response,
+                              hitcount_dump::response,
                               get_shm_info::response,
                               get_shm_tsc_info::response,
                               neighbor_show::response,

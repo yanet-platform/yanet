@@ -91,6 +91,42 @@ struct state_timeout_t
 	uint32_t timeout;
 };
 
+struct hit_count_t
+{
+	hit_count_t() :
+	        id("") {}
+
+	hit_count_t(std::string id) :
+	        id(std::move(id)) {}
+
+	bool operator==(const hit_count_t& o) const
+	{
+		return id == o.id;
+	}
+
+	bool operator!=(const hit_count_t& o) const
+	{
+		return !operator==(o);
+	}
+
+	constexpr bool operator<(const hit_count_t& o) const
+	{
+		return std::tie(id) < std::tie(o.id);
+	}
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(id);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(id);
+	}
+
+	std::string id;
+};
+
 } // namespace acl
 
 // TODO: When rewriting the current ACL library into LibFilter, we could consider using inheritance.
@@ -224,7 +260,44 @@ struct StateTimeoutAction final
 	}
 };
 
-using RawAction = std::variant<FlowAction, DumpAction, CheckStateAction, StateTimeoutAction>;
+/**
+ * @brief Represents an action that sets timeout for the dynamic firewall rule.
+ */
+struct HitCountAction final
+{
+	// Maximum count of HitCountActions objects allowed.
+	// TODO: Add an actual constant (these actions are a lot)
+	static constexpr size_t MAX_COUNT = 10000;
+	// Id of a rule
+	std::string id;
+
+	HitCountAction(const acl::hit_count_t& hitcount_action) :
+	        id(std::move(hitcount_action.id)){};
+
+	HitCountAction() :
+	        id(""){};
+
+	[[nodiscard]] bool terminating() const { return false; }
+
+	void pop(stream_in_t& stream)
+	{
+		stream.pop(id);
+	}
+
+	void push(stream_out_t& stream) const
+	{
+		stream.push(id);
+	}
+
+	[[nodiscard]] std::string to_string() const
+	{
+		std::ostringstream oss;
+		oss << "HitCountAction(id=" << id << ")";
+		return oss.str();
+	}
+};
+
+using RawAction = std::variant<FlowAction, DumpAction, CheckStateAction, StateTimeoutAction, HitCountAction>;
 
 /**
  * @brief Represents a generic action.

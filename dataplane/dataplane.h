@@ -196,6 +196,7 @@ protected:
 
 	common::idp::get_shm_info::response getShmInfo();
 	common::idp::get_shm_tsc_info::response getShmTscInfo();
+	const common::idp::hitcount_dump::response& getHitcountMap();
 
 	void timestamp_thread();
 	void SWRateLimiterTimeTracker();
@@ -251,6 +252,8 @@ protected:
 	std::map<std::string, uint64_t> tag_to_id;
 
 	common::idp::get_shm_tsc_info::response tscs_meta;
+
+	common::idp::hitcount_dump::response hitcount_map_;
 
 	std::map<tSocketId, std::tuple<key_t, void*>> shm_by_socket_id;
 

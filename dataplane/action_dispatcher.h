@@ -145,6 +145,14 @@ struct ActionDispatcher
 			args.worker->acl_ingress_flow(args.mbuf, flow);
 		}
 	}
+
+	static void execute(const common::HitCountAction& action, const Flow& flow, const ActionDispatcherArgs& args)
+	{
+		auto worker = args.worker;
+		auto mbuf = args.mbuf;
+
+		worker->populate_hitcount_map(action.id, mbuf);
+	}
 };
 
 } // namespace dataplane

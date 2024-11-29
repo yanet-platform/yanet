@@ -155,6 +155,11 @@ public:
 		return get<common::idp::requestType::samples, common::idp::samples::response>();
 	}
 
+	auto hitcount_dump() const
+	{
+		return get<common::idp::requestType::hitcount_dump, common::idp::hitcount_dump::response>();
+	}
+
 	eResult debug_latch_update(const common::idp::debug_latch_update::request& request) const
 	{
 		return get<common::idp::requestType::debug_latch_update, common::idp::debug_latch_update::response>(request);

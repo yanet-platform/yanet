@@ -593,6 +593,8 @@ eResult generation::clear()
 		fw_state_sync_config = fw_state_sync_config_t{};
 	}
 
+	dataPlane->hitcount_map_.clear();
+
 	// NOTE: we don't explicitly clear current fw states, as there might be responding packets.
 	// Eventually the state-table will be flushed even if the a ruleset forbids
 	// opening packets.
