@@ -2,8 +2,6 @@
 
 #include <rte_errno.h>
 
-#include <chash.hpp>
-
 #include "common.h"
 #include "dataplane.h"
 #include "globalbase.h"
@@ -1452,6 +1450,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 	                  counter_id,
 	                  scheduler,
 	                  forwarding_method,
+	                  scheduler_params,
 	                  real_start,
 	                  real_size,
 	                  ipv4_outer_source_network,
@@ -1503,6 +1502,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		balancer_service.real_size = real_size;
 		balancer_service.scheduler = scheduler;
 		balancer_service.forwarding_method = forwarding_method;
+		balancer_service.details = (scheduler == ::balancer::scheduler::chash) ? std::make_optional(std::get<::balancer::chash_params>(scheduler_params)) : std::nullopt;
 		balancer_service.outer_source_network_flag = outer_source_network_flag;
 		balancer_service.ipv4_outer_source_network = ipv4_prefix;
 		balancer_service.ipv6_outer_source_network = ipv6_prefix;
@@ -1685,6 +1685,7 @@ generation::ServiceWeights(const balancer_service_t* service)
 
 		weights.emplace_back(real_id, weight);
 	}
+	return weights;
 }
 
 balancer_real_id_t* generation::rebuild_service_ring_one_chash(
@@ -1702,10 +1703,18 @@ balancer_real_id_t* generation::rebuild_service_ring_one_chash(
 		ipv6_address_t& ip = balancer_reals[real_id].destination;
 		reals.emplace_back(ip, real_id);
 	}
-	auto updater = chash::WeightUpdater::MakeWeightUpdater(reals, service->details->segments_per_real);
-	updater.InitLookup(ServiceWeights(service), start);
+	auto updater = chash::WeightUpdater::MakeWeightUpdater(
+	        reals,
+	        service->details->siderings_count,
+	        service->details->segments_per_weight);
+	if (!updater)
+	{
+		YANET_LOG_ERROR("Failed to intialize updater for balancer service");
+		std::abort();
+	}
+	updater.value().InitLookup(ServiceWeights(service), start);
 
-	chash_updaters.emplace(service, std::move(updater));
+	chash_updaters.emplace(service, std::move(updater.value()));
 	return start;
 }
 
