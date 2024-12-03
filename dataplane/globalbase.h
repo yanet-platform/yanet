@@ -7,6 +7,8 @@
 #include <rte_ether.h>
 #include <rte_ip.h>
 
+#include <chash.hpp>
+
 #include "common/idp.h"
 #include "common/result.h"
 #include "common/tsc_deltas.h"
@@ -194,7 +196,7 @@ protected:
 	};
 
 	std::vector<std::pair<balancer_real_id_t, decltype(balancer_real_state_t::weight)>>
-	generation::ServiceWeights(const balancer_service_t* service);
+	ServiceWeights(const balancer_service_t* service);
 	balancer_real_id_t* rebuild_service_ring_one_wrr(
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,

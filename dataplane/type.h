@@ -211,6 +211,11 @@ struct ipv6_address_t
 		memset(bytes, 0, std::size(bytes));
 	}
 
+	bool operator<(ipv6_address_t other) const
+	{
+		return std::memcmp(bytes, other.bytes, 16) < 0;
+	}
+
 	union
 	{
 		uint8_t bytes[16]; ///< @todo: rename to address
@@ -565,11 +570,6 @@ struct balancer_service_ring_t
 
 static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid size");
 
-struct ChashServiceConfig
-{
-	std::size_t segments_per_real;
-};
-
 struct balancer_service_t
 {
 	/// @todo
@@ -590,7 +590,7 @@ struct balancer_service_t
 	::balancer::scheduler scheduler;
 	::balancer::forwarding_method forwarding_method;
 
-	std::optional<ChashServiceConfig> details;
+	std::optional<::balancer::chash_params> details;
 
 	/*
 	        outer_source_network_flag:

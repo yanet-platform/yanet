@@ -808,7 +808,7 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 			        counter_id,
 			        scheduler,
 			        forwarding_method,
-			        balancer.default_wlc_power, // todo use scheduler_params.wlc_power when other services will be able to set it
+			        scheduler_params,
 			        (uint32_t)real_start,
 			        (uint32_t)(req_reals.size() - real_start),
 			        ipv4_outer_source_network,
@@ -1026,7 +1026,7 @@ bool balancer_t::reconfigure_wlc()
 			           effective_weight,
 			           connections] : service_reals_usage_info)
 			{
-				uint32_t wlc_power = scheduler_params.wlc_power;
+				uint32_t wlc_power = std::get<balancer::wlc_params>(scheduler_params).wlc_power;
 				if (wlc_power < 1 || wlc_power > 100)
 				{
 					wlc_power = YANET_CONFIG_BALANCER_WLC_DEFAULT_POWER;
