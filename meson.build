@@ -85,6 +85,8 @@ pcapplusplus_deps = [
     libpcapplusplus.dependency('Pcap++'),
 ]
 
+libchash = subproject('chash', default_options: [ 'tests=false' ])
+
 if target_option.contains('buildenv')
     subdir('libprotobuf')
     subdir('libfwparser')

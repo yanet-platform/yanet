@@ -8,6 +8,7 @@ dataplane_common_sources = files(
 dataplane_common_dependencies = []
 dataplane_common_dependencies += libdpdk.get_variable('dpdk_dep')
 dataplane_common_dependencies += libjson.get_variable('nlohmann_json_dep')
+dataplane_common_dependencies += libchash.get_variable('chash_dep')
 dataplane_common_dependencies += pcapplusplus_deps
 
 dataplane_common_lib = static_library('dataplane_common',
@@ -24,6 +25,9 @@ dataplane_common_dep = declare_dependency(
 )
 
 dependencies = []
+dependencies += libdpdk.get_variable('dpdk_dep')
+dependencies += libjson.get_variable('nlohmann_json_dep')
+dependencies += libchash.get_variable('chash_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
 dependencies += [dataplane_common_dep]
