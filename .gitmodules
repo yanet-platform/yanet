@@ -7,3 +7,4 @@
 [submodule "subprojects/chash"]
 	path = subprojects/chash
 	url = https://github.com/yanet-platform/chash.git
+	branch = master
