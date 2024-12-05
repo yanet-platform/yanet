@@ -4,6 +4,7 @@ project('yanet', 'cpp',
                           'buildtype=release',
                           'warning_level=2',
                           'werror=true',
+                          'default_library=static',
                           'b_lto=true'])
 
 yanet_rootdir = include_directories('.')
