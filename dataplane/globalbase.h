@@ -7,6 +7,8 @@
 #include <rte_ether.h>
 #include <rte_ip.h>
 
+#include <chash.hpp>
+
 #include "common/idp.h"
 #include "common/result.h"
 #include "common/tsc_deltas.h"
@@ -186,7 +188,36 @@ protected:
 	eResult tsc_state_update(const common::idp::updateGlobalBase::tsc_state_update::request& request);
 	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 
-	void evaluate_service_ring();
+	enum class ServiceRingOp
+	{
+		Update,
+		Rebuild
+	};
+
+	std::vector<std::pair<balancer_real_id_t, decltype(balancer_real_state_t::weight)>>
+	ServiceWeights(const balancer_service_t* service);
+	balancer_real_id_t* rebuild_service_ring_one_wrr(
+	        balancer_real_id_t* start,
+	        const balancer_real_id_t* const do_not_exceed,
+	        const balancer_service_t* service,
+	        balancer_service_range_t& range);
+	balancer_real_id_t* rebuild_service_ring_one_chash(
+	        balancer_real_id_t* start,
+	        const balancer_real_id_t* const do_not_exceed,
+	        const balancer_service_t* service,
+	        balancer_service_range_t& range);
+	void update_service_ring_one_chash(
+	        balancer_real_id_t* start,
+	        const balancer_real_id_t* const do_not_exceed,
+	        const balancer_service_t* service,
+	        balancer_service_range_t& range);
+	balancer_real_id_t* evaluate_service_ring_one(
+	        ServiceRingOp op,
+	        balancer_real_id_t* start,
+	        const balancer_real_id_t* const do_not_exceed,
+	        const balancer_service_t* service,
+	        balancer_service_range_t& range);
+	void evaluate_service_ring(ServiceRingOp op);
 	inline uint64_t count_real_connections(uint32_t counter_id);
 
 public: ///< @todo
@@ -309,6 +340,7 @@ public: ///< @todo
 
 	balancer_real_state_t balancer_real_states[YANET_CONFIG_BALANCER_REALS_SIZE];
 	balancer_service_ring_t balancer_service_ring;
+	std::map<const balancer_service_t*, chash::WeightUpdater> chash_updaters;
 
 	int64_t dump_id_to_tag[YANET_CONFIG_DUMP_ID_TO_TAG_SIZE];
 

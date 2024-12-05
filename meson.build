@@ -4,6 +4,7 @@ project('yanet', 'cpp',
                           'buildtype=release',
                           'warning_level=2',
                           'werror=true',
+                          'default_library=static',
                           'b_lto=true'])
 
 yanet_rootdir = include_directories('.')
@@ -57,6 +58,8 @@ libdpdk = subproject('dpdk', default_options: [
     'default_library=static', 'tests=false' ] )
 
 libjson = subproject('json')
+
+libchash = subproject('chash', default_options: [ 'tests=false' ])
 
 if target_option.contains('buildenv')
     subdir('libprotobuf')

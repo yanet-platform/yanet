@@ -1664,7 +1664,20 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			scheduler = balancer::scheduler::wlc;
 			if (exist(service_json, "scheduler_params") && exist(service_json["scheduler_params"], "wlc_power"))
 			{
-				scheduler_params.wlc_power = std::stoll(service_json["scheduler_params"]["wlc_power"].get<std::string>(), nullptr, 10);
+				auto& params = std::get<balancer::wlc_params>(scheduler_params);
+				params.wlc_power = std::stoll(service_json["scheduler_params"]["wlc_power"].get<std::string>(), nullptr, 10);
+			}
+		}
+		else if (scheduler_string == "chash")
+		{
+			scheduler = balancer::scheduler::chash;
+			if (exist(service_json, "scheduler_params"))
+			{
+				auto& params = std::get<balancer::chash_params>(scheduler_params);
+				params.segments_per_weight = service_json.value(
+				        "/scheduler_params/segments_per_weight"_json_pointer, 20);
+				params.siderings_count = service_json.value(
+				        "/scheduler_params/siderings_count"_json_pointer, 10000);
 			}
 		}
 		else
