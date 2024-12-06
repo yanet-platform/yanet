@@ -9,6 +9,7 @@
 #include "worker_gc.h"
 
 #include "common/counters.h"
+#include "common/deferer.h"
 #include "common/define.h"
 
 #include "debug_latch.h"
@@ -1625,6 +1626,7 @@ balancer_real_id_t* generation::rebuild_service_ring_one_wrr(
         const balancer_real_id_t* const do_not_exceed,
         const balancer_service_t& service)
 {
+	utils::Deferer defer([]() { YADECAP_MEMORY_BARRIER_COMPILE; });
 	balancer_real_id_t* end = start;
 	for (uint32_t real_idx = service.real_start;
 	     real_idx < service.real_start + service.real_size;
@@ -1645,7 +1647,6 @@ balancer_real_id_t* generation::rebuild_service_ring_one_wrr(
 		end += weight;
 	}
 
-	YADECAP_MEMORY_BARRIER_COMPILE;
 	return end;
 }
 
@@ -1654,6 +1655,7 @@ balancer_real_id_t* generation::rebuild_service_ring_one_chash(
         const balancer_real_id_t* const do_not_exceed,
         const balancer_service_t& service)
 {
+	utils::Deferer defer([]() { YADECAP_MEMORY_BARRIER_COMPILE; });
 	std::vector<ipv6_address_t> reals;
 	std::vector<std::uint32_t> weights;
 	reals.reserve(service.real_size);
@@ -1681,7 +1683,6 @@ balancer_real_id_t* generation::rebuild_service_ring_one_chash(
 	}
 	updater.value().InitLookup(start);
 	chash_updaters.emplace(&service, std::move(updater.value()));
-	YADECAP_MEMORY_BARRIER_COMPILE;
 	return start + updater.value().LookupSize();
 }
 
