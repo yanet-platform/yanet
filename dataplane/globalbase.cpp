@@ -9,6 +9,7 @@
 #include "worker_gc.h"
 
 #include "common/counters.h"
+#include "common/deferer.h"
 #include "common/define.h"
 
 #include "debug_latch.h"
@@ -1612,6 +1613,7 @@ balancer_real_id_t* generation::rebuild_service_ring_one_wrr(
         const balancer_real_id_t* const do_not_exceed,
         const balancer_service_t* service)
 {
+	utils::Deferer defer([]() { YADECAP_MEMORY_BARRIER_COMPILE; });
 	for (uint32_t real_idx = service->real_start;
 	     real_idx < service->real_start + service->real_size;
 	     ++real_idx)
@@ -1631,15 +1633,13 @@ balancer_real_id_t* generation::rebuild_service_ring_one_wrr(
 			if (start == do_not_exceed)
 			{
 				YANET_LOG_ERROR("Balancer service exceeded ring chunk bounds\n");
-				goto finish;
+				return start;
 			}
 			*start = real_id;
 			++start;
 		}
 	}
 
-finish:
-	YADECAP_MEMORY_BARRIER_COMPILE;
 	return start;
 }
 
