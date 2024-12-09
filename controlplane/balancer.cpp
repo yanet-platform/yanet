@@ -1026,7 +1026,7 @@ bool balancer_t::reconfigure_wlc()
 			           effective_weight,
 			           connections] : service_reals_usage_info)
 			{
-				uint32_t wlc_power = std::get<balancer::wlc_params>(scheduler_params).wlc_power;
+				uint32_t wlc_power = scheduler_params;
 				if (wlc_power < 1 || wlc_power > 100)
 				{
 					wlc_power = YANET_CONFIG_BALANCER_WLC_DEFAULT_POWER;
