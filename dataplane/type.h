@@ -584,7 +584,7 @@ struct balancer_service_t
 	::balancer::scheduler scheduler;
 	::balancer::forwarding_method forwarding_method;
 
-	std::optional<::balancer::chash_params> details;
+	std::uint32_t wlc_power;
 
 	/*
 	        outer_source_network_flag:

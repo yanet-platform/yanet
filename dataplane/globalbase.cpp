@@ -1424,7 +1424,6 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 	                  counter_id,
 	                  scheduler,
 	                  forwarding_method,
-	                  scheduler_params,
 	                  real_start,
 	                  real_size,
 	                  ipv4_outer_source_network,
@@ -1476,7 +1475,6 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		balancer_service.real_size = real_size;
 		balancer_service.scheduler = scheduler;
 		balancer_service.forwarding_method = forwarding_method;
-		balancer_service.details = (scheduler == ::balancer::scheduler::chash) ? std::make_optional(std::get<::balancer::chash_params>(scheduler_params)) : std::nullopt;
 		balancer_service.outer_source_network_flag = outer_source_network_flag;
 		balancer_service.ipv4_outer_source_network = ipv4_prefix;
 		balancer_service.ipv6_outer_source_network = ipv6_prefix;
@@ -1679,11 +1677,12 @@ balancer_real_id_t* generation::rebuild_service_ring_one_chash(
 	}
 	auto updater = chash::WeightUpdater::MakeWeightUpdater(
 	        reals,
-	        service->details->siderings_count,
-	        service->details->segments_per_weight);
+			20000,
+			20);
 	if (!updater)
 	{
-		YANET_LOG_ERROR("Failed to intialize updater for balancer service");
+		YANET_LOG_ERROR("Failed to intialize updater for balancer service reals: %ld\n",
+		                reals.size());
 		std::abort();
 	}
 	updater.value().InitLookup(ServiceWeights(service), start);
