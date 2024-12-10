@@ -38,6 +38,7 @@
 #include "common/utils.h"
 #include "dataplane.h"
 #include "dataplane/sdpserver.h"
+#include "sharedmemory.h"
 #include "globalbase.h"
 #include "sock_dev.h"
 #include "work_runner.h"
@@ -1624,7 +1625,8 @@ eResult cDataPlane::allocateSharedMemory()
 	std::map<tSocketId, uint64_t> shm_size_per_socket;
 	for (const auto& ring_cfg : config.shared_memory)
 	{
-		const auto& [dump_size, dump_count] = ring_cfg.second;
+		const auto& [format, dump_size, dump_count] = ring_cfg.second;
+		GCC_BUG_UNUSED(format);
 
 		auto unit_size = sizeof(sharedmemory::item_header_t) + dump_size;
 		if (unit_size % RTE_CACHE_LINE_SIZE != 0)
@@ -1728,7 +1730,7 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 		int ring_id = 0;
 		for (const auto& [tag, ring_cfg] : config.shared_memory)
 		{
-			const auto& [dump_size, units_number] = ring_cfg;
+			const auto& [format, dump_size, units_number] = ring_cfg;
 
 			auto unit_size = sizeof(sharedmemory::item_header_t) + dump_size;
 			if (unit_size % RTE_CACHE_LINE_SIZE != 0)
@@ -1748,7 +1750,7 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 
 			auto memaddr = (void*)((intptr_t)shm + offset);
 
-			sharedmemory::cSharedMemory ring;
+			sharedmemory::cSharedMemory ring(format);
 
 			ring.init(memaddr, unit_size, units_number);
 
@@ -2268,6 +2270,7 @@ eResult cDataPlane::parseSharedMemory(const nlohmann::json& json)
 		std::string tag = shmJson["tag"];
 		unsigned int size = shmJson["dump_size"];
 		unsigned int count = shmJson["dump_count"];
+		std::string format_str = shmJson.value("dump_format", "raw");
 
 		if (exist(config.shared_memory, tag))
 		{
@@ -2275,7 +2278,7 @@ eResult cDataPlane::parseSharedMemory(const nlohmann::json& json)
 			return eResult::invalidConfigurationFile;
 		}
 
-		config.shared_memory[tag] = {size, count};
+		config.shared_memory[tag] = {format_str, size, count};
 	}
 
 	return eResult::success;
