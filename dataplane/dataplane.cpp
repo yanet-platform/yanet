@@ -700,7 +700,7 @@ eResult cDataPlane::init_kernel_interfaces()
 bool cDataPlane::KNIAddTxQueue(KniHandleBundle& bundle, tQueueId queue, tSocketId socket)
 {
 	auto& [_, fwd, in, out, drop] = bundle;
-	(void)_;
+	YANET_GCC_BUG_UNUSED(_);
 	return fwd.SetupTxQueue(queue, socket) &&
 	       in.SetupTxQueue(queue, socket) &&
 	       out.SetupTxQueue(queue, socket) &&
@@ -709,7 +709,7 @@ bool cDataPlane::KNIAddTxQueue(KniHandleBundle& bundle, tQueueId queue, tSocketI
 bool cDataPlane::KNIAddRxQueue(KniHandleBundle& bundle, tQueueId queue, tSocketId socket, rte_mempool* mempool)
 {
 	auto& [_, fwd, in, out, drop] = bundle;
-	(void)_;
+	YANET_GCC_BUG_UNUSED(_);
 	return fwd.SetupRxQueue(queue, socket, mempool) &&
 	       in.SetupRxQueue(queue, socket, mempool) &&
 	       out.SetupRxQueue(queue, socket, mempool) &&
@@ -837,7 +837,7 @@ eResult cDataPlane::initGlobalBases()
 	/// slow worker
 	for (const auto& [core, _] : config.controlplane_workers)
 	{
-		(void)_;
+		YANET_GCC_BUG_UNUSED(_);
 		tSocketId socketId = rte_lcore_to_socket_id(core);
 
 		result = create_globalbase_atomics(socketId);
@@ -1594,7 +1594,7 @@ eResult cDataPlane::allocateSharedMemory()
 	/// slow worker
 	for (const auto& [coreId, _] : config.controlplane_workers)
 	{
-		(void)_;
+		YANET_GCC_BUG_UNUSED(_);
 
 		auto socket_id = numa_node_of_cpu(coreId);
 		if (socket_id == -1)
@@ -2278,7 +2278,7 @@ eResult cDataPlane::checkConfig()
 
 	for (auto& [core, _] : config.controlplane_workers)
 	{
-		(void)_;
+		YANET_GCC_BUG_UNUSED(_);
 		if (core >= std::thread::hardware_concurrency())
 		{
 			YADECAP_LOG_ERROR("invalid coreId: '%u'\n", core);
