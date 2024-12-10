@@ -6,12 +6,22 @@ using namespace sharedmemory;
 
 eResult cSharedMemory::init(void* memory, int unit_size, int units_number)
 {
-	buffer = common::bufferring(memory, unit_size, units_number);
+	switch (format_)
+	{
+		case DumpFormat::kPcap:
+			// init somehow with pcaps
+			return eResult::success;
 
-	buffer.ring->header.before = 0;
-	buffer.ring->header.after = 0;
+		case DumpFormat::kRaw:
+			buffer = common::bufferring(memory, unit_size, units_number);
 
-	return eResult::success;
+			buffer.ring->header.before = 0;
+			buffer.ring->header.after = 0;
+
+			return eResult::success;
+		default:
+			YANET_THROW("Wrong shared memory dump format");
+	}
 }
 
 void cSharedMemory::write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type)
