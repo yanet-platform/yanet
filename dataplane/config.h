@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/define.h"
 #include "common/type.h"
 #include "rte_ethdev.h"
 #include <set>
@@ -7,8 +8,39 @@
 
 using InterfaceName = std::string;
 
+struct CPlaneWorkerConfig
+{
+	std::set<InterfaceName> interfaces;
+	std::set<tCoreId> workers;
+	std::set<tCoreId> gcs;
+};
+
 struct tDataPlaneConfig
 {
+	enum class DumpFormat
+	{
+		kRaw,
+		kPcap
+	};
+
+	struct DumpConfig
+	{
+		unsigned int size;
+		unsigned int count;
+		DumpFormat format;
+	};
+
+	static DumpFormat StringToDumpFormat(const std::string& format_str)
+	{
+		if (format_str == "raw")
+			return DumpFormat::kRaw;
+		else if (format_str == "pcap")
+			return DumpFormat::kPcap;
+
+		YANET_LOG_WARNING("Invalid dump format %s, will use raw format", format_str.data());
+		return DumpFormat::kRaw;
+	}
+
 	/*
 	   DPDK ports used by `dataplane`.
 	   Each port has a name with which is exposed into host system
@@ -35,7 +67,7 @@ struct tDataPlaneConfig
 	uint32_t SWICMPOutRateLimit = 0;
 	uint32_t rateLimitDivisor = 1;
 	std::string memory;
-	std::map<std::string, std::tuple<unsigned int, unsigned int>> shared_memory;
+	std::map<std::string, DumpConfig> shared_memory;
 
 	std::vector<std::string> ealArgs;
 	std::set<InterfaceName> WorkersInterfaces(std::set<tCoreId> cores)
