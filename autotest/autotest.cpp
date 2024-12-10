@@ -237,8 +237,7 @@ void tAutotest::sendThread(std::string interfaceName,
 	                                 pcap_errbuf);
 	if (!pcap)
 	{
-		YANET_LOG_ERROR("error: pcap_open_offline(): %s\n", pcap_errbuf);
-		throw "";
+		YANET_THROW("error: pcap_open_offline(): ", pcap_errbuf);
 	}
 
 	pcap_pkthdr* header = nullptr;
@@ -272,8 +271,7 @@ void tAutotest::sendThread(std::string interfaceName,
 
 		if (writeIovCount(iface, iov, iov_count) < 0)
 		{
-			YANET_LOG_ERROR("error: write packet(): %s\n", strerror(errno));
-			throw "";
+			YANET_THROW("error: write packet(): ", strerror(errno));
 		}
 
 		packetsCount++;
@@ -328,8 +326,7 @@ static bool readPacket(int fd, pcap_pkthdr* header, u_char* data, Duration timel
 
 	if (hdr.data_length == 0)
 	{
-		YANET_LOG_ERROR("error: read size is 0\n");
-		throw "";
+		YANET_THROW("error: read size is 0");
 	}
 
 	if (!readTimeLimited(fd, data, hdr.data_length, time_to_give_up))
@@ -418,16 +415,14 @@ public:
 
 		if (!pcap)
 		{
-			YANET_LOG_ERROR("error: pcap_open_dead()\n");
-			throw "";
+			YANET_THROW("error: pcap_open_dead()");
 		}
 
 		dumper = pcap_dump_open(pcap, tmpFilePath.data());
 		if (!dumper)
 		{
 			pcap_close(pcap);
-			YANET_LOG_ERROR("error: pcap_dump_open()\n");
-			throw "";
+			YANET_THROW("error: pcap_dump_open()");
 		}
 	}
 
@@ -486,8 +481,7 @@ public:
 		pcap = pcap_open_offline(filename.c_str(), pcap_errbuf);
 		if (!pcap)
 		{
-			YANET_LOG_ERROR("error: pcap_open_offline(): %s\n", pcap_errbuf);
-			throw "";
+			YANET_THROW("error: pcap_open_offline(): ", pcap_errbuf);
 		}
 		memset(&header, 0, sizeof(struct pcap_pkthdr));
 		advance();
@@ -611,8 +605,7 @@ void tAutotest::recvThread(std::string interfaceName,
 		auto now = std::chrono::system_clock::now();
 		if (now > time_to_give_up)
 		{
-			YANET_LOG_ERROR("error[%s]: step time limit exceeded\n", interfaceName.data());
-			throw "";
+			YANET_THROW("error[", interfaceName, "]: step time limit exceeded");
 		}
 		if (!readPacket(iface, &tmp_pcap_packetHeader, buffer, time_to_give_up - now))
 		{
@@ -635,11 +628,7 @@ void tAutotest::recvThread(std::string interfaceName,
 			                packetsCount + 1,
 			                buf.str().data());
 
-			YANET_LOG_ERROR("pcap[%s]: %s\n",
-			                interfaceName.data(),
-			                pcapDumper.path().data());
-
-			throw "";
+			YANET_LOG_ERROR("pcap[%s]: %s\n", interfaceName.data(), pcapDumper.path().data());
 		}
 
 		if (dumpPackets)
@@ -737,8 +726,6 @@ void tAutotest::recvThread(std::string interfaceName,
 		YANET_LOG_ERROR("pcap[%s]: %s\n",
 		                interfaceName.data(),
 		                pcapDumper.path().data());
-
-		throw "";
 	}
 
 	unlink(pcapDumper.path().data());
@@ -962,7 +949,7 @@ bool tAutotest::step_sendPackets(const YAML::Node& yamlStep,
 
 	if (!success)
 	{
-		throw "";
+		YANET_THROW("");
 	}
 
 	return true;
@@ -1329,8 +1316,7 @@ void tAutotest::mainThread()
 				const auto result = controlPlane.loadConfig(request);
 				if (result != eResult::success)
 				{
-					YANET_LOG_ERROR("invalid config: eResult %d\n", static_cast<std::uint32_t>(result));
-					throw "";
+					YANET_THROW("invalid config: eResult ", common::result_to_c_str(result));
 				}
 				controlPlane.rib_flush();
 
@@ -1485,13 +1471,12 @@ void tAutotest::mainThread()
 				}
 				else
 				{
-					YANET_LOG_ERROR("unknown step\n");
-					throw "";
+					YANET_THROW("unknown step");
 				}
 
 				if (!result)
 				{
-					throw "";
+					YANET_THROW("");
 				}
 			}
 		}
@@ -1921,8 +1906,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 			auto it = dumpRings.find(tag);
 			if (it == dumpRings.end())
 			{
-				YANET_LOG_ERROR("dump [%s]: error: dump ring not found\n", tag.data());
-				throw "";
+				YANET_THROW("dump [", tag, "]: error: dump ring not found");
 			}
 			ring = &it->second;
 		}
@@ -1931,14 +1915,12 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 		pcpp::IFileReaderDevice* reader = pcpp::IFileReaderDevice::getReader(expectFilePath);
 		if (reader == nullptr)
 		{
-			YANET_LOG_ERROR("dump [%s]: error: cannot determine reader for file %s\n", tag.data(), expectFilePath.data());
-			throw "";
+			YANET_THROW("dump [", tag, "]: error: cannot determine reader for file ", expectFilePath);
 		}
 
 		if (!reader->open())
 		{
-			YANET_LOG_ERROR("dump [%s]: error: cannot open pcap file %s\n", tag.data(), expectFilePath.data());
-			throw "";
+			YANET_THROW("dump [", tag, "]: error: cannot open pcap file", expectFilePath);
 		}
 
 		pcpp::RawPacket rawPacket;
@@ -2011,8 +1993,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 
 		if (!success)
 		{
-			YANET_LOG_ERROR("dump [%s]: error: packet comparison failed (%s)\n", tag.data(), expectFilePath.data());
-			throw "";
+			YANET_THROW("dump [", tag, "]: error: packet comparison failed", expectFilePath);
 		}
 	}
 
