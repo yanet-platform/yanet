@@ -554,6 +554,11 @@ static inline nlohmann::json convertFlow(const common::globalBase::tFlow& flow)
 		result["type"] = "route_tunnel";
 		result["id"] = flow.data.routeId;
 	}
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
+	{
+		result["type"] = "route_tunnel_ipip";
+		result["id"] = flow.data.routeId;
+	}
 	else if (flow.type == common::globalBase::eFlowType::acl_egress)
 	{
 		result["type"] = "acl_egress";

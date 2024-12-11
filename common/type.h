@@ -2018,6 +2018,7 @@ enum class eFlowType : uint8_t
 	route,
 	route_local,
 	route_tunnel,
+	route_tunnel_ipip,
 	acl_egress,
 	dregress,
 	controlPlane,
@@ -2084,6 +2085,8 @@ inline const char* eFlowType_toString(eFlowType t)
 			return "route_local";
 		case eFlowType::route_tunnel:
 			return "route_tunnel";
+		case eFlowType::route_tunnel_ipip:
+			return "route_tunnel_ipip";
 		case eFlowType::acl_egress:
 			return "acl_egress";
 		case eFlowType::dregress:
