@@ -1676,7 +1676,7 @@ eResult cDataPlane::allocateSharedMemory()
 
 		// TODO: mlock to lock shared memory to RAM to avoid page faults therefore increasing performance?
 
-		shm_by_socket_id[socket_id] = std::make_tuple(key, shmaddr);
+		shm_by_socket_id[socket_id] = {key, shmaddr, 0};
 
 		key++;
 	}
@@ -1684,73 +1684,49 @@ eResult cDataPlane::allocateSharedMemory()
 	return eResult::success;
 }
 
+/// split memory per worker
 eResult cDataPlane::splitSharedMemoryPerWorkers()
 {
-	std::map<void*, uint64_t> offsets;
-	for (const auto& it : shm_by_socket_id)
-	{
-		const auto& addr = std::get<1>(it.second);
-		offsets[addr] = 0;
-	}
-
-	/// split memory per worker
 	for (cWorker* worker : workers_vector)
 	{
-		const auto& socket_id = worker->socketId;
+		tSocketId socket_id = worker->socketId;
+		tCoreId core_id = worker->coreId;
+
 		const auto& it = shm_by_socket_id.find(socket_id);
 		if (it == shm_by_socket_id.end())
 		{
+			// No shared memory allocated for this socket, skip this worker
 			continue;
 		}
 
-		const auto& [key, shm] = it->second;
+		auto& [key, shm, offset] = it->second;
 
 		int ring_id = 0;
 		for (const auto& [tag, ring_cfg] : config.shared_memory)
 		{
 			const auto& [format, dump_size, dump_count] = ring_cfg;
 
-			auto name = "shm_" + std::to_string(worker->coreId) + "_" + std::to_string(ring_id);
-
-			auto offset = offsets[shm];
-
-			auto memaddr = (void*)((intptr_t)shm + offset);
+			auto memaddr = common::sdp::ShiftBuffer<void*>(shm, offset);
 
 			sharedmemory::SharedMemoryDumpRing ring(format, memaddr, dump_size, dump_count);
-
-			// we have Capacity of shared memory.
-			// this is only a shard of all available shared memory.
-			offsets[shm] += ring.Capacity();
-
 			worker->dumpRings[ring_id] = ring;
 
-			auto meta = common::idp::get_shm_info::dump_meta(name, tag, dump_size, dump_count, worker->coreId, socket_id, key, offset);
-			dumps_meta.emplace_back(meta);
+			offset += ring.Capacity();
+
+			std::string name = "shm_" + std::to_string(core_id) + "_" + std::to_string(ring_id);
+			dumps_meta.emplace_back(name, tag, dump_size, dump_count, core_id, socket_id, key, offset);
 
 			tag_to_id[tag] = ring_id;
 
 			ring_id++;
 		}
-	}
 
-	for (cWorker* worker : workers_vector)
-	{
-		const auto& socket_id = worker->socketId;
-		const auto& it = shm_by_socket_id.find(socket_id);
-		if (it == shm_by_socket_id.end())
-		{
-			continue;
-		}
-		const auto& [key, shm] = it->second;
+		auto memaddr = common::sdp::ShiftBuffer<void*>(shm, offset);
+		worker->tsc_deltas = new (memaddr) dataplane::perf::tsc_deltas{};
 
-		auto offset = offsets[shm];
-		worker->tsc_deltas = reinterpret_cast<dataplane::perf::tsc_deltas*>(reinterpret_cast<intptr_t>(shm) + offset);
-		// Use value-initialization to reset the object
-		*worker->tsc_deltas = {};
-		offsets[shm] += sizeof(dataplane::perf::tsc_deltas);
+		offset += sizeof(dataplane::perf::tsc_deltas);
 
-		auto meta = common::idp::get_shm_tsc_info::tsc_meta(worker->coreId, socket_id, key, offset);
-		tscs_meta.emplace_back(meta);
+		tscs_meta.emplace_back(core_id, socket_id, key, offset);
 	}
 
 	return eResult::success;
