@@ -192,7 +192,7 @@ void route_t::prefix_update(const rib::vrf_priority_t& vrf_priority,
 
 void route_t::tunnel_prefix_update(const rib::vrf_priority_t& vrf_priority_orig,
                                    const ip_prefix_t& prefix,
-                                   const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value)
+                                   const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t, std::tuple<>>& value)
 {
 	auto vrf_priority = vrf_priority_orig;
 	auto& [vrf, priority] = vrf_priority;
@@ -317,6 +317,10 @@ void route_t::tunnel_prefix_update(const rib::vrf_priority_t& vrf_priority_orig,
 			/// legacy лукап
 			destination_next = destination_legacy_next.begin()->second;
 		}
+	}
+	else if (const auto directly_connected = std::get_if<route::directly_connected_destination_t>(&value))
+	{
+		destination_next = *directly_connected;
 	}
 	else if (const auto virtual_port_id = std::get_if<uint32_t>(&value))
 	{
@@ -971,6 +975,10 @@ void route_t::reload(const controlplane::base_t& base_prev,
 						              ip_prefix.applyMask(ip_prefix.mask()),
 						              {},
 						              std::monostate());
+
+						tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+						                     ip_prefix.applyMask(ip_prefix.mask()),
+						                     std::monostate());
 					}
 				}
 			}
@@ -993,6 +1001,10 @@ void route_t::reload(const controlplane::base_t& base_prev,
 						              ip_prefix.applyMask(ip_prefix.mask()),
 						              {},
 						              directly_connected);
+
+						tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+						                     ip_prefix.applyMask(ip_prefix.mask()),
+						                     directly_connected);
 					}
 				}
 			}
@@ -1713,6 +1725,19 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 				                               nexthop);
 			}
 		}
+	}
+	else if (const auto directly_connected = std::get_if<route::directly_connected_destination_t>(&destination))
+	{
+		const auto& [interface_id, interface_name] = *directly_connected;
+
+		request_interface.emplace_back(ipv4_address_t(), ///< default
+		                               interface_id,
+		                               3, ///< @todo: DEFINE
+		                               interface_name,
+		                               0,
+		                               0,
+		                               1,
+		                               ipv4_address_t()); ///< default
 	}
 	else if (const auto virtual_port_id = std::get_if<uint32_t>(&destination))
 	{
