@@ -278,7 +278,7 @@ void insert(const std::string& vrf,
 	std::set<common::large_community_t> large_communities;
 	if (weight)
 	{
-		large_communities.emplace(13238, 1, *weight); ///< @todo: DEFINE
+		large_communities.emplace(YANET_DEFAULT_BGP_AS, 1, *weight);
 	}
 
 	common::icp::rib_update::insert insert = {"static",
