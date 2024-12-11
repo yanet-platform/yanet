@@ -30,21 +30,20 @@ using destination_t = std::variant<destination_interface_t,
                                    directly_connected_destination_t, ///< via interface
                                    uint32_t>; ///< virtual_port_id
 
-using value_key_t = std::tuple<std::tuple<std::string, ///< vrf
-                                          uint32_t>, ///< priority
-                               route::destination_t,
+using value_key_t = std::tuple<rib::vrf_priority_t, ///< vrf + priority
+                               route::destination_t, ///< destination
                                ip_prefix_t>; ///< fallback
 
-using value_interface_t = std::tuple<ip_address_t,
-                                     tInterfaceId,
-                                     std::string,
-                                     std::vector<uint32_t>,
+using value_interface_t = std::tuple<ip_address_t, ///< nexthop
+                                     tInterfaceId, ///< interface_id
+                                     std::string, ///< interface_name
+                                     std::vector<uint32_t>, ///< labels
                                      ip_address_t, ///< neighbor_address
                                      uint32_t, ///< peer_id
                                      ip_prefix_t>; ///< prefix
 
 using lookup_t = std::tuple<ip_address_t, ///< nexthop
-                            std::string,
+                            std::string, ///< egress_interface_name
                             std::vector<uint32_t>>; ///< labels
 using route_counter_key_t = std::tuple<uint32_t, ///< peer_id
                                        ip_address_t, ///< nexthop
@@ -63,18 +62,17 @@ using tunnel_destination_legacy_t = std::set<ip_address_t>; ///< nexthop
 using tunnel_destination_default_t = std::tuple<>;
 
 using tunnel_destination_t = std::variant<
-        tunnel_destination_interface_t,
+        tunnel_destination_interface_t, ///< nexthops
         tunnel_destination_legacy_t,
         tunnel_destination_default_t,
         uint32_t>; ///< virtual_port_id
 
-using tunnel_value_key_t = std::tuple<std::tuple<std::string, ///< vrf
-                                                 uint32_t>, ///< priority
-                                      route::tunnel_destination_t,
+using tunnel_value_key_t = std::tuple<rib::vrf_priority_t, ///< vrf + priority
+                                      route::tunnel_destination_t, ///< destination
                                       ip_prefix_t>; ///< fallback
 
 using tunnel_value_interface_t = std::tuple<ip_address_t, ///< nexthop
-                                            tInterfaceId,
+                                            tInterfaceId, ///< interface_id
                                             uint32_t, ///< label
                                             std::string, ///< interface_name
                                             uint32_t, ///< peer_id
@@ -217,8 +215,13 @@ public:
 	void reload(const controlplane::base_t& base_prev, const controlplane::base_t& base_next, common::idp::updateGlobalBase::request& globalbase) override;
 	void reload_after() override;
 
-	void prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix, const std::vector<rib::pptn_t>& pptns, const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value);
-	void tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority_orig, const ip_prefix_t& prefix, const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value);
+	void prefix_update(const rib::vrf_priority_t& vrf_priority,
+	                   const ip_prefix_t& prefix,
+	                   const std::vector<rib::pptn_t>& pptns,
+	                   const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value);
+	void tunnel_prefix_update(const rib::vrf_priority_t& vrf_priority_orig,
+	                          const ip_prefix_t& prefix,
+	                          const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value);
 
 	void prefix_flush();
 
@@ -246,13 +249,27 @@ protected:
 
 	std::optional<uint32_t> value_insert(const route::value_key_t& value_key);
 	void value_remove(const uint32_t& value_id);
-	void value_compile(common::idp::updateGlobalBase::request& globalbase, const route::generation_t& generation, const uint32_t& value_id, const route::value_key_t& value_key);
-	void value_compile_label(common::idp::updateGlobalBase::request& globalbase, const route::generation_t& generation, const uint32_t& value_id, const std::vector<uint32_t>& service_labels, std::vector<route::value_interface_t>& request_interface, const ip_address_t& first_nexthop);
-	void value_compile_fallback(common::idp::updateGlobalBase::request& globalbase, const route::generation_t& generation, const uint32_t& value_id, std::vector<route::value_interface_t>& request_interface);
+	void value_compile(common::idp::updateGlobalBase::request& globalbase,
+	                   const route::generation_t& generation,
+	                   const uint32_t& value_id,
+	                   const route::value_key_t& value_key);
+	void value_compile_label(common::idp::updateGlobalBase::request& globalbase,
+	                         const route::generation_t& generation,
+	                         const uint32_t& value_id,
+	                         const std::vector<uint32_t>& service_labels,
+	                         std::vector<route::value_interface_t>& request_interface,
+	                         const ip_address_t& first_nexthop);
+	void value_compile_fallback(common::idp::updateGlobalBase::request& globalbase,
+	                            const route::generation_t& generation,
+	                            const uint32_t& value_id,
+	                            std::vector<route::value_interface_t>& request_interface);
 
 	std::optional<uint32_t> tunnel_value_insert(const route::tunnel_value_key_t& value_key);
 	void tunnel_value_remove(const uint32_t& value_id);
-	void tunnel_value_compile(common::idp::updateGlobalBase::request& globalbase, const route::generation_t& generation, const uint32_t& value_id, const route::tunnel_value_key_t& value);
+	void tunnel_value_compile(common::idp::updateGlobalBase::request& globalbase,
+	                          const route::generation_t& generation,
+	                          const uint32_t& value_id,
+	                          const route::tunnel_value_key_t& value);
 
 	std::set<std::string> get_ingress_physical_ports(const tSocketId& socket_id);
 

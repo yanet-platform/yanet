@@ -78,7 +78,10 @@ eResult route_t::init()
 	return eResult::success;
 }
 
-void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority, const ip_prefix_t& prefix, const std::vector<rib::pptn_t>& pptns, const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value)
+void route_t::prefix_update(const rib::vrf_priority_t& vrf_priority,
+                            const ip_prefix_t& prefix,
+                            const std::vector<rib::pptn_t>& pptns,
+                            const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value)
 {
 	const auto& [vrf, priority] = vrf_priority;
 
@@ -189,7 +192,9 @@ void route_t::prefix_update(const std::tuple<std::string, uint32_t>& vrf_priorit
 	}
 }
 
-void route_t::tunnel_prefix_update(const std::tuple<std::string, uint32_t>& vrf_priority_orig, const ip_prefix_t& prefix, const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value)
+void route_t::tunnel_prefix_update(const rib::vrf_priority_t& vrf_priority_orig,
+                                   const ip_prefix_t& prefix,
+                                   const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value)
 {
 	auto vrf_priority = vrf_priority_orig;
 	auto& [vrf, priority] = vrf_priority;
