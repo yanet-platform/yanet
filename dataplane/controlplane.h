@@ -79,6 +79,7 @@ public:
 	common::idp::version::response version();
 	common::idp::nat64stateful_state::response nat64stateful_state(const common::idp::nat64stateful_state::request& request);
 	common::idp::get_shm_info::response get_shm_info();
+	common::idp::hexdump_ring::response hexdump_ring(const common::idp::hexdump_ring::request& request);
 	common::idp::get_shm_tsc_info::response get_shm_tsc_info();
 	eResult dump_physical_port(const common::idp::dump_physical_port::request& request);
 	eResult balancer_state_clear();

@@ -827,6 +827,14 @@ inline void shm_info()
 	                  response);
 }
 
+inline void hexdump_ring(const std::string& ring)
+{
+	interface::dataPlane dataplane;
+	const auto& response = dataplane.hexdump_ring(ring);
+	std::cout << "Hexdump for the dump ring " << ring << ":\n"
+	          << response.hexdumped_ring << std::endl;
+}
+
 void shm_tsc_info()
 {
 	interface::dataPlane dataplane;

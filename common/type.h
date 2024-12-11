@@ -269,9 +269,7 @@ public:
 		// i.e. 192.168.0.010
 		if (inet_aton(string.data(), (struct in_addr*)&address) != 1)
 		{
-			std::ostringstream error;
-			error << "'" << string << "' is not a valid IPv4 address";
-			YANET_THROW(error.str());
+			YANET_THROW("'", string, "' is not a valid IPv4 address");
 		}
 		address = ntohl(address);
 	}
@@ -383,9 +381,7 @@ public:
 	{
 		if (inet_pton(AF_INET6, string.data(), address.data()) != 1)
 		{
-			std::ostringstream error;
-			error << "'" << string << "' is not a valid IPv6 address";
-			YANET_THROW(error.str());
+			YANET_THROW("'", string, "' is not a valid IPv6 address");
 		}
 	}
 
@@ -839,24 +835,18 @@ public:
 				ipv4_prefix_t announce{announceRaw.get<std::string>()};
 				if (!announce.isValid())
 				{
-					std::ostringstream error;
-					error << "prefix has invalid announce: '" << announce.toString()
-					      << "' that isn' t a subnet of prefix ";
-					YANET_THROW(error.str());
+					YANET_THROW("prefix has invalid announce: '", announce.toString(), "' that isn' t a subnet of prefix");
 				}
 				if (!announce.subnetOf(prefix))
 				{
-					std::ostringstream error;
-					error << "prefix: '" << prefix.toString() << "' has announce: '"
-					      << announce.toString() << "' that isn' t a subnet of prefix ";
-					YANET_THROW(error.str());
+					YANET_THROW("prefix: '", prefix.toString(), "' has announce: '", announce.toString(), "' that isn' t a subnet of prefix");
 				}
 				announces.emplace_back(std::move(announce));
 			}
 		}
 		else
 		{
-			YANET_THROW(std::string("prefix has invalid type"));
+			YANET_THROW("prefix has invalid type");
 		}
 	}
 
@@ -1089,24 +1079,18 @@ public:
 				ipv6_prefix_t announce{announceRaw.get<std::string>()};
 				if (!announce.isValid())
 				{
-					std::ostringstream error;
-					error << "prefix has invalid announce: '" << announce.toString()
-					      << "' that isn' t a subnet of prefix ";
-					YANET_THROW(error.str());
+					YANET_THROW("prefix has invalid announce: '", announce.toString(), "' that isn' t a subnet of prefix");
 				}
 				if (!announce.subnetOf(prefix))
 				{
-					std::ostringstream error;
-					error << "prefix: '" << prefix.toString() << "' has announce: '"
-					      << announce.toString() << "' that isn' t a subnet of prefix ";
-					YANET_THROW(error.str());
+					YANET_THROW("prefix: '", prefix.toString(), "' has announce: '", announce.toString(), "' that isn' t a subnet of prefix");
 				}
 				announces.emplace_back(std::move(announce));
 			}
 		}
 		else
 		{
-			YANET_THROW(std::string("prefix has invalid type"));
+			YANET_THROW("prefix has invalid type");
 		}
 	}
 
