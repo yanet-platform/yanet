@@ -82,7 +82,7 @@ void dregress_t::prefix_insert(const std::tuple<std::string, uint32_t>& vrf_prio
 					{
 						try
 						{
-							communities.emplace(13238, std::stoll(path_info.substr(pi_it + 1), nullptr, 0)); ///< @todo: remove 13238, and use RD
+							communities.emplace(YANET_DEFAULT_BGP_AS, std::stoll(path_info.substr(pi_it + 1), nullptr, 0));
 						}
 						catch (...)
 						{

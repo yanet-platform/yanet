@@ -104,6 +104,8 @@ extern LogPriority logPriority;
 #define YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK ((uint32_t)11000)
 #define YANET_RIB_PRIORITY_ROUTE_REPEAT ((uint32_t)12000)
 
+#define YANET_DEFAULT_BGP_AS ((uint32_t)13238)
+
 #define YANET_NETWORK_FLAG_FRAGMENT ((uint8_t)(1u << 0))
 #define YANET_NETWORK_FLAG_NOT_FIRST_FRAGMENT ((uint8_t)(1u << 1))
 #define YANET_NETWORK_FLAG_HAS_EXTENSION ((uint8_t)(1u << 2))
