@@ -192,7 +192,13 @@ protected:
 
 	common::idp::hitcount_dump::response hitcount_map_;
 
-	std::map<tSocketId, std::tuple<key_t, void*>> shm_by_socket_id;
+	struct ShmInfo
+	{
+		key_t key;
+		void* addr;
+		size_t offset;
+	};
+	std::unordered_map<tSocketId, ShmInfo> shm_by_socket_id;
 
 	std::set<tSocketId> socket_ids;
 	std::map<tSocketId, worker_gc_t*> socket_worker_gcs;
