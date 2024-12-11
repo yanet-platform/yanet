@@ -423,6 +423,9 @@ class base_rib
 public:
 	ip_prefix_t prefix;
 	ip_address_t nexthop;
+	bool is_tunnel;
+	std::string path_information;
+	uint32_t label;
 };
 
 //
