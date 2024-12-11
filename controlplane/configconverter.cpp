@@ -115,9 +115,9 @@ void config_converter_t::convertToFlow(const std::string& nextModule,
 		{
 			flow.type = common::globalBase::eFlowType::route_local;
 		}
-		else if (entry == "tunnel")
+		else if (entry == "tunnel" || entry == "tunnel_ipip")
 		{
-			flow.type = common::globalBase::eFlowType::route_tunnel;
+			flow.type = (entry == "tunnel" ? common::globalBase::eFlowType::route_tunnel : common::globalBase::eFlowType::route_tunnel_ipip);
 
 			if (!it->second.tunnel_enabled)
 			{
@@ -460,6 +460,7 @@ void config_converter_t::processDecap()
 
 		if (decap.flow.type != common::globalBase::eFlowType::route &&
 		    decap.flow.type != common::globalBase::eFlowType::route_tunnel &&
+		    decap.flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
 		    decap.flow.type != common::globalBase::eFlowType::controlPlane &&
 		    decap.flow.type != common::globalBase::eFlowType::drop)
 		{
@@ -490,6 +491,7 @@ void config_converter_t::processNat64stateful()
 
 		if (nat64stateful.flow.type != common::globalBase::eFlowType::route &&
 		    nat64stateful.flow.type != common::globalBase::eFlowType::route_tunnel &&
+		    nat64stateful.flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
 		    nat64stateful.flow.type != common::globalBase::eFlowType::controlPlane &&
 		    nat64stateful.flow.type != common::globalBase::eFlowType::drop)
 		{
@@ -515,6 +517,7 @@ void config_converter_t::processTun64()
 
 		if (tunnel.flow.type != common::globalBase::eFlowType::route &&
 		    tunnel.flow.type != common::globalBase::eFlowType::route_tunnel &&
+		    tunnel.flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
 		    tunnel.flow.type != common::globalBase::eFlowType::controlPlane &&
 		    tunnel.flow.type != common::globalBase::eFlowType::drop)
 		{
@@ -539,6 +542,7 @@ void config_converter_t::processNat64()
 
 		if (nat64stateless.flow.type != common::globalBase::eFlowType::route &&
 		    nat64stateless.flow.type != common::globalBase::eFlowType::route_tunnel &&
+		    nat64stateless.flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
 		    nat64stateless.flow.type != common::globalBase::eFlowType::controlPlane &&
 		    nat64stateless.flow.type != common::globalBase::eFlowType::drop)
 		{
@@ -598,6 +602,7 @@ void config_converter_t::processNat46clat()
 
 		if (nat46clat.flow.type != common::globalBase::eFlowType::route &&
 		    nat46clat.flow.type != common::globalBase::eFlowType::route_tunnel &&
+		    nat46clat.flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
 		    nat46clat.flow.type != common::globalBase::eFlowType::controlPlane &&
 		    nat46clat.flow.type != common::globalBase::eFlowType::drop)
 		{
@@ -765,6 +770,10 @@ void config_converter_t::processAcl()
 					acl_rules_route_forward(acl, nextModule);
 				}
 				else if (entry == "tunnel")
+				{
+					acl_rules_route_forward(acl, nextModule);
+				}
+				else if (entry == "tunnel_ipip")
 				{
 					acl_rules_route_forward(acl, nextModule);
 				}

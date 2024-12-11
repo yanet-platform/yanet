@@ -1241,7 +1241,7 @@ inline void cWorker::logicalPort_ingress_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -1863,7 +1863,7 @@ inline void cWorker::acl_ingress_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -2040,7 +2040,7 @@ inline void cWorker::tun64_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -2110,7 +2110,7 @@ inline void cWorker::decap_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3271,7 +3271,7 @@ inline void cWorker::nat64stateful_lan_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3430,7 +3430,7 @@ inline void cWorker::nat64stateful_wan_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3510,7 +3510,7 @@ inline void cWorker::nat64stateless_ingress_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3629,7 +3629,7 @@ inline void cWorker::nat64stateless_egress_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3801,7 +3801,7 @@ inline void cWorker::nat46clat_lan_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -3880,7 +3880,7 @@ inline void cWorker::nat46clat_wan_flow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
@@ -6002,7 +6002,7 @@ YANET_NEVER_INLINE void cWorker::slowWorkerFlow(rte_mbuf* mbuf,
 	{
 		route_entry(mbuf);
 	}
-	else if (flow.type == common::globalBase::eFlowType::route_tunnel)
+	else if (flow.type == common::globalBase::eFlowType::route_tunnel || flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		route_tunnel_entry(mbuf);
 	}
