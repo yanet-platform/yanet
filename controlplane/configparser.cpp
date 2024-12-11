@@ -1900,6 +1900,12 @@ void config_parser_t::loadConfig_rib(controlplane::base_t& baseNext,
 			controlplane::base_rib base_rib;
 			base_rib.prefix = json_rib_item["prefix"].get<std::string>();
 			base_rib.nexthop = json_rib_item["nexthop"].get<std::string>();
+			base_rib.is_tunnel = (exist(json_rib_item, "tunnel") && json_rib_item["tunnel"].get<bool>());
+			if (base_rib.is_tunnel)
+			{
+				base_rib.path_information = (exist(json_rib_item, "path_information") ? json_rib_item["path_information"].get<std::string>() : YANET_DEFAULT_ROUTE_TUNNEL_PATH_INFORMATION);
+				base_rib.label = (exist(json_rib_item, "label") ? json_rib_item["label"].get<uint32_t>() : YANET_DEFAULT_ROUTE_TUNNEL_LABEL);
+			}
 
 			vrf.emplace_back(std::move(base_rib));
 		}

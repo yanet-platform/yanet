@@ -84,10 +84,21 @@ void rib_t::reload([[maybe_unused]] const controlplane::base_t& base_prev,
 
 		for (const auto& rib_item : rib_items)
 		{
-			auto& prefixes = std::get<3>(request_insert)[{ip_address_t("::"), "", 0, {}, {}, {}, 0}]
-			                                            [""]
-			                                            [rib_item.nexthop];
-			prefixes.emplace_back(rib_item.prefix, "", std::vector<uint32_t>());
+			if (rib_item.is_tunnel)
+			{
+				common::large_community_t large_community(YANET_DEFAULT_BGP_AS, 1, 1);
+				auto& prefixes = std::get<3>(request_insert)[{ip_address_t("::"), "", 0, {}, {}, {large_community}, 0}]
+				                                            [""]
+				                                            [rib_item.nexthop];
+				prefixes.emplace_back(rib_item.prefix, rib_item.path_information, std::vector<uint32_t>(1, rib_item.label));
+			}
+			else
+			{
+				auto& prefixes = std::get<3>(request_insert)[{ip_address_t("::"), "", 0, {}, {}, {}, 0}]
+				                                            [""]
+				                                            [rib_item.nexthop];
+				prefixes.emplace_back(rib_item.prefix, "", std::vector<uint32_t>());
+			}
 		}
 
 		request.emplace_back(std::move(request_insert));
