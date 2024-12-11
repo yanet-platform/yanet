@@ -1573,84 +1573,66 @@ eResult cDataPlane::initSharedMemory()
 	return common::sdp::SdrSever::PrepareSharedMemoryData(sdp_data, workers_id, workers_gc_id, config.useHugeMem);
 }
 
-eResult cDataPlane::allocateSharedMemory()
+static int get_numa_node(unsigned int core_id)
 {
-	/// precalculation of shared memory size for each numa
-	std::map<tSocketId, uint64_t> number_of_workers_per_socket;
-	for (const auto& worker : config.workers)
+	int socket_id = numa_node_of_cpu(static_cast<int>(core_id));
+	if (socket_id == -1)
 	{
-		const int coreId = worker.first;
+		YADECAP_LOG_ERROR("numa_node_of_cpu error: %s\n", strerror(errno));
+		return 0; // Default to socket 0
+	}
+	return socket_id;
+}
 
-		auto socket_id = numa_node_of_cpu(coreId);
-		if (socket_id == -1)
-		{
-			YADECAP_LOG_ERROR("numa_node_of_cpu err: %s\n", strerror(errno));
-			socket_id = 0;
-		}
+static std::unordered_map<tSocketId, size_t> calculate_shared_memory_size(const tDataPlaneConfig& config)
+{
+	/// helper for calculation of shared memory size for each numa
+	std::unordered_map<tSocketId, uint64_t> workers_per_socket;
 
-		if (number_of_workers_per_socket.find(socket_id) == number_of_workers_per_socket.end())
-		{
-			number_of_workers_per_socket[socket_id] = 1;
-		}
-		else
-		{
-			number_of_workers_per_socket[socket_id]++;
-		}
+	for (const auto& [core_id, _] : config.workers)
+	{
+		GCC_BUG_UNUSED(_);
+		workers_per_socket[get_numa_node(core_id)]++;
 	}
 
 	/// slow worker
-	for (const auto& [coreId, _] : config.controlplane_workers)
+	for (const auto& [core_id, _] : config.controlplane_workers)
 	{
-		(void)_;
-
-		auto socket_id = numa_node_of_cpu(coreId);
-		if (socket_id == -1)
-		{
-			YADECAP_LOG_ERROR("numa_node_of_cpu err: %s\n", strerror(errno));
-			socket_id = 0;
-		}
-
-		if (number_of_workers_per_socket.find(socket_id) == number_of_workers_per_socket.end())
-		{
-			number_of_workers_per_socket[socket_id] = 1;
-		}
-		else
-		{
-			number_of_workers_per_socket[socket_id]++;
-		}
+		GCC_BUG_UNUSED(_);
+		workers_per_socket[get_numa_node(core_id)]++;
 	}
 
-	std::map<tSocketId, uint64_t> shm_size_per_socket;
+	std::unordered_map<tSocketId, size_t> shm_size_per_socket;
+
+	// Calculate sizes based on shared memory configuration
 	for (const auto& ring_cfg : config.shared_memory)
 	{
 		const auto& [format, dump_size, dump_count] = ring_cfg.second;
 		GCC_BUG_UNUSED(format);
 
-		// temporarily materialization will occur to create an object and get it's capacity.
+		// Temporarily materialization will occur to create an object and get it's capacity.
 		// It's okay, because this object is lightweight
-		auto size = common::PacketBufferRing(nullptr, dump_size, dump_count).capacity;
+		size_t size = common::PacketBufferRing(nullptr, dump_size, dump_count).capacity;
 
-		for (const auto& [socket_id, num] : number_of_workers_per_socket)
+		for (const auto& [socket_id, worker_count] : workers_per_socket)
 		{
-			auto it = shm_size_per_socket.find(socket_id);
-			if (it == shm_size_per_socket.end())
-			{
-				it = shm_size_per_socket.emplace_hint(it, socket_id, 0);
-			}
-			it->second += size * num;
+			shm_size_per_socket[socket_id] += size * worker_count;
 		}
 	}
 
-	for (const auto& [socket_id, num] : number_of_workers_per_socket)
+	// Add additional memory for performance-related data
+	for (const auto& [socket_id, worker_count] : workers_per_socket)
 	{
-		auto it = shm_size_per_socket.find(socket_id);
-		if (it == shm_size_per_socket.end())
-		{
-			it = shm_size_per_socket.emplace_hint(it, socket_id, 0);
-		}
-
-		it->second += sizeof(dataplane::perf::tsc_deltas) * (num + 1);
+		shm_size_per_socket[socket_id] += sizeof(dataplane::perf::tsc_deltas) * (worker_count + 1);
 	}
+
+	return shm_size_per_socket;
+}
+
+eResult cDataPlane::allocateSharedMemory()
+{
+	// shared memory size for each numa
+	std::unordered_map<tSocketId, size_t> shm_size_per_socket = calculate_shared_memory_size(config);
 
 	/// allocating IPC shared memory
 	key_t key = YANET_DEFAULT_IPC_SHMKEY;
@@ -1691,6 +1673,8 @@ eResult cDataPlane::allocateSharedMemory()
 			YADECAP_LOG_ERROR("shmat(%d, nullptr, %d): %s\n", shmid, 0, strerror(errno));
 			return eResult::errorInitSharedMemory;
 		}
+
+		// TODO: mlock to lock shared memory to RAM to avoid page faults therefore increasing performance?
 
 		shm_by_socket_id[socket_id] = std::make_tuple(key, shmaddr);
 
