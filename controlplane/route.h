@@ -65,6 +65,7 @@ using tunnel_destination_t = std::variant<
         tunnel_destination_interface_t, ///< nexthops
         tunnel_destination_legacy_t,
         tunnel_destination_default_t,
+        directly_connected_destination_t, ///< via interface
         uint32_t>; ///< virtual_port_id
 
 using tunnel_value_key_t = std::tuple<rib::vrf_priority_t, ///< vrf + priority
@@ -221,7 +222,7 @@ public:
 	                   const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t>& value);
 	void tunnel_prefix_update(const rib::vrf_priority_t& vrf_priority_orig,
 	                          const ip_prefix_t& prefix,
-	                          const std::variant<std::monostate, rib::nexthop_map_t, uint32_t, std::tuple<>>& value);
+	                          const std::variant<std::monostate, rib::nexthop_map_t, route::directly_connected_destination_t, uint32_t, std::tuple<>>& value);
 
 	void prefix_flush();
 
