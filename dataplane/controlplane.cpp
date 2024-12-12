@@ -1096,7 +1096,7 @@ common::idp::hexdump_ring::response cControlPlane::hexdump_ring(const common::id
 			return {};
 		}
 
-		auto addr = common::sdp::ShiftBuffer<char*>(shmaddr, offset);
+		auto addr = utils::ShiftBuffer<char*>(shmaddr, offset);
 	}
 
 	response.hexdumped_ring = //hexdump addr, size (what size) here;
