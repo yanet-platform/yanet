@@ -1005,7 +1005,7 @@ std::vector<uint64_t> cControlPlane::getAclCounters()
 	uint64_t start_acl_counters = sdp_data.metadata_worker.start_acl_counters;
 	for (const auto& iter : sdp_data.workers)
 	{
-		auto* aclCounters = common::sdp::ShiftBuffer<uint64_t*>(iter.second.buffer, start_acl_counters);
+		auto* aclCounters = utils::ShiftBuffer<uint64_t*>(iter.second.buffer, start_acl_counters);
 		for (size_t i = 0; i < YANET_CONFIG_ACL_COUNTERS_SIZE; i++)
 		{
 			response[i] += aclCounters[i];
