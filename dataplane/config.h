@@ -23,11 +23,12 @@ struct tDataPlaneConfig
 		kPcap
 	};
 
+	//TODO: add here path, prefix, pcap files count? like std::variant if format == pcap?
 	struct DumpConfig
 	{
+		DumpFormat format;
 		unsigned int size;
 		unsigned int count;
-		DumpFormat format;
 	};
 
 	static DumpFormat StringToDumpFormat(const std::string& format_str)
