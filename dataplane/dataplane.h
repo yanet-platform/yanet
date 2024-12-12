@@ -194,9 +194,9 @@ protected:
 
 	struct ShmInfo
 	{
-		key_t key;
-		void* addr;
-		size_t offset;
+		key_t key = 0;
+		void* addr = nullptr;
+		size_t offset = 0;
 	};
 	std::unordered_map<tSocketId, ShmInfo> shm_by_socket_id;
 
