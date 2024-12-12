@@ -1610,8 +1610,7 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 balancer_real_id_t* generation::rebuild_service_ring_one_wrr(
         balancer_real_id_t* start,
         const balancer_real_id_t* const do_not_exceed,
-        const balancer_service_t* service,
-        balancer_service_range_t& range)
+        const balancer_service_t* service)
 {
 	for (uint32_t real_idx = service->real_start;
 	     real_idx < service->real_start + service->real_size;
@@ -1663,8 +1662,7 @@ generation::ServiceWeights(const balancer_service_t* service)
 balancer_real_id_t* generation::rebuild_service_ring_one_chash(
         balancer_real_id_t* start,
         const balancer_real_id_t* const do_not_exceed,
-        const balancer_service_t* service,
-        balancer_service_range_t& range)
+        const balancer_service_t* service)
 {
 	std::vector<std::pair<ipv6_address_t, balancer_real_id_t>> reals;
 	for (uint32_t real_idx = service->real_start;
@@ -1677,8 +1675,8 @@ balancer_real_id_t* generation::rebuild_service_ring_one_chash(
 	}
 	auto updater = chash::WeightUpdater::MakeWeightUpdater(
 	        reals,
-			20000,
-			20);
+	        20000,
+	        20);
 	if (!updater)
 	{
 		YANET_LOG_ERROR("Failed to intialize updater for balancer service reals: %ld\n",
@@ -1688,30 +1686,29 @@ balancer_real_id_t* generation::rebuild_service_ring_one_chash(
 	updater.value().InitLookup(ServiceWeights(service), start);
 
 	chash_updaters.emplace(service, std::move(updater.value()));
-	return start;
+	return start + updater.value().LookupSize();
 }
 
-void generation::update_service_ring_one_chash(
+balancer_real_id_t* generation::update_service_ring_one_chash(
         balancer_real_id_t* start,
         const balancer_real_id_t* const do_not_exceed,
-        const balancer_service_t* service,
-        balancer_service_range_t& range)
+        const balancer_service_t* service)
 {
 	if (chash_updaters.find(service) == chash_updaters.end())
 	{
 		YANET_LOG_ERROR("No state information for updating requested service.\n");
-		return;
+		return start;
 	}
 	auto& updater = chash_updaters.at(service);
 	updater.UpdateLookup(ServiceWeights(service), start);
+	return start + updater.LookupSize();
 }
 
 balancer_real_id_t* generation::evaluate_service_ring_one(
         ServiceRingOp op,
         balancer_real_id_t* start,
         const balancer_real_id_t* const do_not_exceed,
-        const balancer_service_t* service,
-        balancer_service_range_t& range)
+        const balancer_service_t* service)
 {
 	balancer_real_id_t* end{start};
 	using scheduler = ::balancer::scheduler;
@@ -1720,18 +1717,25 @@ balancer_real_id_t* generation::evaluate_service_ring_one(
 		case scheduler::rr:
 		case scheduler::wrr:
 			end = rebuild_service_ring_one_wrr(
-			        start, do_not_exceed, service, range);
+			        start, do_not_exceed, service);
 			break;
 		case scheduler::wlc:
 		case scheduler::chash:
 			if (op == ServiceRingOp::Rebuild)
 			{
 				end = rebuild_service_ring_one_chash(
-				        start, do_not_exceed, service, range);
+				        start, do_not_exceed, service);
 			}
 			else
 			{
-				update_service_ring_one_chash(start, do_not_exceed, service, range);
+				end = update_service_ring_one_chash(start, do_not_exceed, service);
+			}
+			{
+				std::unordered_map<balancer_real_id_t, std::size_t> freq;
+				for (auto c = start; c != end; ++c)
+				{
+					freq[*c]++;
+				}
 			}
 			break;
 		default:
@@ -1757,8 +1761,7 @@ void generation::evaluate_service_ring(ServiceRingOp op)
 		        op,
 		        service_start,
 		        service_start + YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX,
-		        service,
-		        *range);
+		        service);
 		range->size = std::distance(service_start, service_end);
 	}
 }
