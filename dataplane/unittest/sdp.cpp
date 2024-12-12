@@ -38,12 +38,12 @@ public:
 
 	void CompareWithClient(const common::sdp::DataPlaneInSharedMemory& sdp_data_client)
 	{
-		void* buffer = common::sdp::ShiftBuffer<void*>(sdp_data_client.dataplane_data, sdp_data_client.start_bus_section);
+		void* buffer = utils::ShiftBuffer(sdp_data_client.dataplane_data, sdp_data_client.start_bus_section);
 		auto count_errors = static_cast<uint32_t>(common::idp::errorType::size);
 		auto count_requests = static_cast<uint32_t>(common::idp::requestType::size);
-		auto* requests = common::sdp::ShiftBuffer<uint64_t*>(buffer, 0);
-		auto* errors = common::sdp::ShiftBuffer<uint64_t*>(buffer, count_requests * sizeof(uint64_t));
-		auto* durations = common::sdp::ShiftBuffer<uint64_t*>(buffer, (count_requests + count_errors) * sizeof(uint64_t));
+		auto* requests = utils::ShiftBuffer<uint64_t*>(buffer, 0);
+		auto* errors = utils::ShiftBuffer<uint64_t*>(buffer, count_requests * sizeof(uint64_t));
+		auto* durations = utils::ShiftBuffer<uint64_t*>(buffer, (count_requests + count_errors) * sizeof(uint64_t));
 
 		for (uint32_t index = 0; index < static_cast<uint32_t>(common::idp::requestType::size); index++)
 		{
@@ -160,11 +160,11 @@ public:
 
 	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorker& metadata)
 	{
-		counters = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
-		aclCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_acl_counters);
-		bursts = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_bursts);
-		stats = common::sdp::ShiftBuffer<common::worker::stats::common*>(buffer, metadata.start_stats);
-		statsPorts = common::sdp::ShiftBuffer<common::worker::stats::port*>(buffer, metadata.start_stats_ports);
+		counters = utils::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
+		aclCounters = utils::ShiftBuffer<uint64_t*>(buffer, metadata.start_acl_counters);
+		bursts = utils::ShiftBuffer<uint64_t*>(buffer, metadata.start_bursts);
+		stats = utils::ShiftBuffer<common::worker::stats::common*>(buffer, metadata.start_stats);
+		statsPorts = utils::ShiftBuffer<common::worker::stats::port*>(buffer, metadata.start_stats_ports);
 	}
 
 	void SetTestValues(tCoreId coreId)
@@ -208,7 +208,7 @@ public:
 		ASSERT_EQ(common::sdp::SdpClient::GetCounterByName(sdp_data_client, "dropPackets", coreId)[coreId], stats->dropPackets);
 
 		// statsPorts
-		auto* bufStatsPorts = common::sdp::ShiftBuffer<common::worker::stats::port*>(buffer, sdp_data_client.metadata_worker.start_stats_ports);
+		auto* bufStatsPorts = utils::ShiftBuffer<common::worker::stats::port*>(buffer, sdp_data_client.metadata_worker.start_stats_ports);
 		for (uint32_t index = 0; index < CONFIG_YADECAP_PORTS_SIZE + 1; index++)
 		{
 			ASSERT_EQ(statsPorts[index].controlPlane_drops, bufStatsPorts[index].controlPlane_drops);
@@ -216,21 +216,21 @@ public:
 		}
 
 		// bursts
-		auto* bufBursts = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_bursts);
+		auto* bufBursts = utils::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_bursts);
 		for (uint32_t index = 0; index < CONFIG_YADECAP_MBUFS_BURST_SIZE + 1; index++)
 		{
 			ASSERT_EQ(bursts[index], bufBursts[index]);
 		}
 
 		// counters
-		auto* bufCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_counters);
+		auto* bufCounters = utils::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_counters);
 		for (uint32_t index = 0; index < YANET_CONFIG_COUNTERS_SIZE; index++)
 		{
 			ASSERT_EQ(counters[index], bufCounters[index]);
 		}
 
 		// aclCounters
-		auto* bufAclCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_acl_counters);
+		auto* bufAclCounters = utils::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker.start_acl_counters);
 		for (uint32_t index = 0; index < YANET_CONFIG_ACL_COUNTERS_SIZE; index++)
 		{
 			ASSERT_EQ(aclCounters[index], bufAclCounters[index]);
@@ -277,8 +277,8 @@ public:
 
 	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorkerGc& metadata)
 	{
-		counters = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
-		stats = common::sdp::ShiftBuffer<common::worker_gc::stats_t*>(buffer, metadata.start_stats);
+		counters = utils::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
+		stats = utils::ShiftBuffer<common::worker_gc::stats_t*>(buffer, metadata.start_stats);
 	}
 
 	void SetTestValues(tCoreId coreId)
@@ -303,7 +303,7 @@ public:
 		ASSERT_EQ(common::sdp::SdpClient::GetCounterByName(sdp_data_client, "drop_samples", coreId)[coreId], stats->drop_samples);
 
 		// counters
-		auto* bufCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker_gc.start_counters);
+		auto* bufCounters = utils::ShiftBuffer<uint64_t*>(buffer, sdp_data_client.metadata_worker_gc.start_counters);
 		for (uint32_t index = 0; index < YANET_CONFIG_COUNTERS_SIZE; index++)
 		{
 			ASSERT_EQ(counters[index], bufCounters[index]);

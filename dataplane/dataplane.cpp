@@ -38,8 +38,8 @@
 #include "common/utils.h"
 #include "dataplane.h"
 #include "dataplane/sdpserver.h"
-#include "sharedmemory.h"
 #include "globalbase.h"
+#include "sharedmemory.h"
 #include "sock_dev.h"
 #include "work_runner.h"
 #include "worker.h"
@@ -1689,6 +1689,9 @@ eResult cDataPlane::allocateSharedMemory()
 /// split memory per worker
 eResult cDataPlane::splitSharedMemoryPerWorkers()
 {
+	using sharedmemory::SharedMemoryDumpRing;
+	using utils::ShiftBuffer;
+
 	for (cWorker* worker : workers_vector)
 	{
 		tSocketId socket_id = worker->socketId;
@@ -1708,7 +1711,7 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 		{
 			const auto& [format, dump_size, dump_count] = ring_cfg;
 
-			auto memaddr = common::sdp::ShiftBuffer<void*>(shm, offset);
+			auto memaddr = utils::ShiftBuffer(shm, offset);
 
 			sharedmemory::SharedMemoryDumpRing ring(format, memaddr, dump_size, dump_count);
 			worker->dumpRings[ring_id] = ring;
@@ -1723,7 +1726,7 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 			ring_id++;
 		}
 
-		auto memaddr = common::sdp::ShiftBuffer<void*>(shm, offset);
+		auto memaddr = utils::ShiftBuffer(shm, offset);
 		worker->tsc_deltas = new (memaddr) dataplane::perf::tsc_deltas{};
 
 		offset += sizeof(dataplane::perf::tsc_deltas);
