@@ -2,7 +2,6 @@
 
 #include "common/define.h"
 #include "common/type.h"
-#include "rte_ethdev.h"
 #include <set>
 #include <string>
 
@@ -23,11 +22,18 @@ struct tDataPlaneConfig
 		kPcap
 	};
 
+	// TODO: add here path, prefix, pcap files count? like std::variant if format == pcap?
 	struct DumpConfig
 	{
+		DumpFormat format;
 		unsigned int size;
 		unsigned int count;
-		DumpFormat format;
+
+		//TODO: temporary, adjust after we refactor cli?
+		[[nodiscard]] std::string ToString() const
+		{
+			return DumpFormatToString(format) + " " + std::to_string(size) + " " + std::to_string(count);
+		}
 	};
 
 	static DumpFormat StringToDumpFormat(const std::string& format_str)
@@ -39,6 +45,20 @@ struct tDataPlaneConfig
 
 		YANET_LOG_WARNING("Invalid dump format %s, will use raw format", format_str.data());
 		return DumpFormat::kRaw;
+	}
+
+	static std::string DumpFormatToString(DumpFormat format)
+	{
+		switch (format)
+		{
+			case DumpFormat::kRaw:
+				return "raw";
+			case DumpFormat::kPcap:
+				return "pcap";
+			default:
+				YANET_THROW("Invalid dump format");
+				std::abort();
+		}
 	}
 
 	/*
@@ -62,7 +82,6 @@ struct tDataPlaneConfig
 	bool useHugeMem = true;
 	bool use_kernel_interface = true;
 	bool interfaces_required = true;
-	uint64_t rssFlags = RTE_ETH_RSS_IP;
 	uint32_t SWNormalPriorityRateLimitPerWorker = 0;
 	uint32_t SWICMPOutRateLimit = 0;
 	uint32_t rateLimitDivisor = 1;

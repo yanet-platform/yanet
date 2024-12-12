@@ -3,6 +3,7 @@ dependencies += libdpdk.get_variable('dpdk_dep')
 dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
+dependencies += pcapplusplus_deps
 
 sources = files('bus.cpp',
                 'controlplane.cpp',
@@ -19,7 +20,8 @@ sources = files('bus.cpp',
                 'memory_manager.cpp',
                 'neighbor.cpp',
                 'report.cpp',
-                'sharedmemory.cpp',
+                'dump_rings.cpp',
+                'pcap_shm_device.cpp',
                 'slow_worker.cpp',
                 'sock_dev.cpp',
                 'worker.cpp',

@@ -1038,9 +1038,11 @@ common::idp::get_shm_info::response cControlPlane::get_shm_info()
 	return response;
 }
 
+// I won't need this..
 common::idp::hexdump_ring::response cControlPlane::hexdump_ring(const common::idp::hexdump_ring::request& request)
 {
 	common::idp::hexdump_ring::response response;
+#if 0
 	const std::string& requested_tag = request;
 
 	std::string combined_hexdump;
@@ -1055,7 +1057,7 @@ common::idp::hexdump_ring::response cControlPlane::hexdump_ring(const common::id
 
 	for (cWorker* worker : dataPlane->workers_vector)
 	{
-		auto ring = worker->dumpRings[ring_id];
+		auto ring = worker->dump_rings[ring_id];
 
 		auto addr = reinterpret_cast<char*>(ring.buffer.ring);
 
@@ -1063,7 +1065,7 @@ common::idp::hexdump_ring::response cControlPlane::hexdump_ring(const common::id
 		uint64_t after = ring.buffer.ring->header.after;
 
 		// Calculate the size of the valid data to dump
-		size_t valid_data_size = sizeof(sharedmemory::ring_header_t) + after * ring.buffer.unit_size;
+		size_t valid_data_size = sizeof(dumprings::ring_header_t) + after * ring.buffer.unit_size;
 
 		// Include worker-specific details in the hexdump
 		combined_hexdump += "Worker Core ID: " + std::to_string(worker->coreId) + "\n";
@@ -1073,6 +1075,7 @@ common::idp::hexdump_ring::response cControlPlane::hexdump_ring(const common::id
 	}
 
 	response.hexdumped_ring = combined_hexdump;
+#endif
 
 #if 0
 	common::idp::get_shm_info::response shm_info = dataPlane->getShmInfo();

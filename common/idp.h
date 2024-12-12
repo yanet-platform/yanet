@@ -13,6 +13,7 @@
 #include "acl.h"
 #include "balancer.h"
 #include "common/actions.h"
+#include "dataplane/config.h"
 #include "config.h"
 #include "memory_manager.h"
 #include "neighbor.h"
@@ -67,6 +68,7 @@ enum class requestType : uint32_t
 	update_vip_vport_proto,
 	version,
 	get_shm_info,
+	//TODO: I don not need this anymore, I need to make this into a cli to ask for pcap files, and to ask to switch mode of a pcap dumping
 	hexdump_ring,
 	get_shm_tsc_info,
 	set_shm_tsc_state,
@@ -855,8 +857,7 @@ namespace get_shm_info
 {
 using dump_meta = std::tuple<std::string, ///< ring name
                              std::string, ///< dump tag
-                             unsigned int, ///< dump size
-                             unsigned int, ///< dump count
+                             tDataPlaneConfig::DumpConfig, ///< dump config
                              tCoreId, ///< core id
                              tSocketId, ///< socket id
                              key_t, /// ipc shm key
