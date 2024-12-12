@@ -21,6 +21,7 @@
 #include "common/fallback.h"
 #include "common/nat46clat.h"
 
+#include "common/utils.h"
 #include "dataplane/sdpserver.h"
 
 #include "action_dispatcher.h"
@@ -347,11 +348,11 @@ void cWorker::FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata)
 
 void cWorker::SetBufferForCounters(void* buffer, const common::sdp::MetadataWorker& metadata)
 {
-	counters = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
-	aclCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_acl_counters);
-	bursts = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_bursts);
-	stats = common::sdp::ShiftBuffer<common::worker::stats::common*>(buffer, metadata.start_stats);
-	statsPorts = common::sdp::ShiftBuffer<common::worker::stats::port*>(buffer, metadata.start_stats_ports);
+	counters = utils::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
+	aclCounters = utils::ShiftBuffer<uint64_t*>(buffer, metadata.start_acl_counters);
+	bursts = utils::ShiftBuffer<uint64_t*>(buffer, metadata.start_bursts);
+	stats = utils::ShiftBuffer<common::worker::stats::common*>(buffer, metadata.start_stats);
+	statsPorts = utils::ShiftBuffer<common::worker::stats::port*>(buffer, metadata.start_stats_ports);
 }
 
 eResult cWorker::sanityCheck()
