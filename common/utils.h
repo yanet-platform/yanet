@@ -1,10 +1,19 @@
 #pragma once
 
 #include <iomanip>
+#include <string>
+#include <type_traits>
 #include <vector>
 
 namespace utils
 {
+
+template<typename TResult = void*>
+TResult ShiftBuffer(void* buffer, size_t size)
+{
+	static_assert(std::is_pointer_v<TResult>, "TResult must be a pointer type.");
+	return reinterpret_cast<TResult>(static_cast<std::byte*>(buffer) + size);
+}
 
 // Utility to calculate percentage
 // TODO C++20: use std::type_identity_t to establish non-deduced context

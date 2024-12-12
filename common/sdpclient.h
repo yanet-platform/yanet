@@ -131,7 +131,7 @@ public:
 				                shift);
 				return eResult::errorInitSharedMemory;
 			}
-			iter.second.buffer = ShiftBuffer<void*>(buffer, shift);
+			iter.second.buffer = ShiftBuffer(buffer, shift);
 		}
 		for (auto& iter : sdp_data.workers_gc)
 		{
@@ -147,7 +147,7 @@ public:
 				                shift);
 				return eResult::errorInitSharedMemory;
 			}
-			iter.second.buffer = ShiftBuffer<void*>(buffer, shift);
+			iter.second.buffer = ShiftBuffer(buffer, shift);
 		}
 
 		return eResult::success;
@@ -177,8 +177,8 @@ public:
 			{
 				if (!core_id.has_value() || worker_core_id == core_id)
 				{
-					auto* counters = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
-					                                                     sdp_data.metadata_worker.start_counters);
+					auto* counters = ShiftBuffer<uint64_t*>(worker_info.buffer,
+					                                        sdp_data.metadata_worker.start_counters);
 					result[worker_core_id] = counters[index];
 				}
 			}
@@ -193,8 +193,8 @@ public:
 			{
 				if (!core_id.has_value() || worker_core_id == core_id)
 				{
-					auto* counters = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
-					                                                     sdp_data.metadata_worker.start_counters);
+					auto* counters = ShiftBuffer<uint64_t*>(worker_info.buffer,
+					                                        sdp_data.metadata_worker.start_counters);
 					result[worker_core_id] = counters[index];
 				}
 			}
@@ -232,8 +232,8 @@ public:
 		std::vector<uint64_t*> buffers;
 		for (const auto& iter : sdp_data.workers)
 		{
-			buffers.push_back(common::sdp::ShiftBuffer<uint64_t*>(iter.second.buffer,
-			                                                      sdp_data.metadata_worker.start_counters));
+			buffers.push_back(ShiftBuffer<uint64_t*>(iter.second.buffer,
+			                                         sdp_data.metadata_worker.start_counters));
 		}
 
 		for (size_t i = 0; i < counter_ids.size(); i++)
@@ -429,7 +429,7 @@ private:
 
 	static uint64_t ReadValue(void* buffer, uint64_t index)
 	{
-		auto* data = common::sdp::ShiftBuffer<uint8_t*>(buffer, index * sizeof(uint64_t));
+		auto* data = ShiftBuffer<uint8_t*>(buffer, index * sizeof(uint64_t));
 		uint64_t result = 0;
 		for (int i = 0; i < 8; i++)
 		{
@@ -443,9 +443,9 @@ private:
 		values.clear();
 		for (uint64_t index = 0; index < count; index++)
 		{
-			void* current = common::sdp::ShiftBuffer<void*>(buffer, shift + 128 * index);
+			void* current = ShiftBuffer(buffer, shift + 128 * index);
 			uint64_t value = ReadValue(current, 0);
-			char* str = common::sdp::ShiftBuffer<char*>(current, 8);
+			char* str = ShiftBuffer<char*>(current, 8);
 			if (str[119] != 0)
 			{
 				// 119 - index of last symbol
