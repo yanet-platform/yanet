@@ -13,12 +13,6 @@ enum class scheduler : uint8_t
 	chash
 };
 
-struct chash_params
-{
-	uint32_t siderings_count;
-	uint32_t segments_per_weight;
-};
-
 [[maybe_unused]] constexpr const char* to_string(const scheduler& scheduler)
 {
 	switch (scheduler)

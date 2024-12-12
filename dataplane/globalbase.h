@@ -199,24 +199,21 @@ protected:
 	balancer_real_id_t* rebuild_service_ring_one_wrr(
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,
-	        const balancer_service_t* service,
-	        balancer_service_range_t& range);
+	        const balancer_service_t* service
+			);
 	balancer_real_id_t* rebuild_service_ring_one_chash(
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,
-	        const balancer_service_t* service,
-	        balancer_service_range_t& range);
-	void update_service_ring_one_chash(
+	        const balancer_service_t* service);
+	balancer_real_id_t* update_service_ring_one_chash(
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,
-	        const balancer_service_t* service,
-	        balancer_service_range_t& range);
+	        const balancer_service_t* service);
 	balancer_real_id_t* evaluate_service_ring_one(
 	        ServiceRingOp op,
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,
-	        const balancer_service_t* service,
-	        balancer_service_range_t& range);
+	        const balancer_service_t* service);
 	void evaluate_service_ring(ServiceRingOp op);
 	inline uint64_t count_real_connections(uint32_t counter_id);
 
