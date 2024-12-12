@@ -179,8 +179,8 @@ void worker_gc_t::FillMetadataWorkerCounters(common::sdp::MetadataWorkerGc& meta
 
 void worker_gc_t::SetBufferForCounters(void* buffer, const common::sdp::MetadataWorkerGc& metadata)
 {
-	counters = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
-	stats = common::sdp::ShiftBuffer<common::worker_gc::stats_t*>(buffer, metadata.start_stats);
+	counters = utils::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
+	stats = utils::ShiftBuffer<common::worker_gc::stats_t*>(buffer, metadata.start_stats);
 }
 
 YANET_INLINE_NEVER void worker_gc_t::thread()
