@@ -757,14 +757,14 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 		                  virtual_port,
 		                  version,
 		                  scheduler,
-		                  scheduler_params,
+		                  wlc_power,
 		                  forwarding_method,
 		                  flags,
 		                  ipv4_outer_source_network,
 		                  ipv6_outer_source_network,
 		                  reals] : balancer.services)
 		{
-			GCC_BUG_UNUSED(scheduler_params);
+			GCC_BUG_UNUSED(wlc_power);
 			GCC_BUG_UNUSED(version);
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
@@ -808,7 +808,6 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 			        counter_id,
 			        scheduler,
 			        forwarding_method,
-			        scheduler_params,
 			        (uint32_t)real_start,
 			        (uint32_t)(req_reals.size() - real_start),
 			        ipv4_outer_source_network,
@@ -955,7 +954,7 @@ bool balancer_t::reconfigure_wlc()
 		                  virtual_port,
 		                  version,
 		                  scheduler,
-		                  scheduler_params,
+		                  requested_wlc_power,
 		                  forwarding_method,
 		                  flags,
 		                  ipv4_outer_source_network,
@@ -1026,7 +1025,7 @@ bool balancer_t::reconfigure_wlc()
 			           effective_weight,
 			           connections] : service_reals_usage_info)
 			{
-				uint32_t wlc_power = scheduler_params;
+				uint32_t wlc_power = requested_wlc_power;
 				if (wlc_power < 1 || wlc_power > 100)
 				{
 					wlc_power = YANET_CONFIG_BALANCER_WLC_DEFAULT_POWER;
