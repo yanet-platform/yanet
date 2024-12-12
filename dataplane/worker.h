@@ -356,7 +356,8 @@ protected:
 	// will decrease with each new packet sent to slow worker, replenishes each N mseconds
 	int32_t packetsToSWNPRemainder;
 
-	sharedmemory::SharedMemoryDumpRing dumpRings[YANET_CONFIG_SHARED_RINGS_NUMBER];
+	using DumpRingBasePtr = std::unique_ptr<sharedmemory::DumpRingBase>;
+	std::array<DumpRingBasePtr, YANET_CONFIG_SHARED_RINGS_NUMBER> dump_rings;
 
 	samples::Sampler sampler;
 

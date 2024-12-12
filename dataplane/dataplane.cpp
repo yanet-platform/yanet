@@ -1601,12 +1601,7 @@ static std::unordered_map<tSocketId, size_t> calculate_shared_memory_size(const 
 	// Calculate sizes based on shared memory configuration
 	for (const auto& ring_cfg : config.shared_memory)
 	{
-		const auto& [dump_size, dump_count, format] = ring_cfg.second;
-		YANET_GCC_BUG_UNUSED(format);
-
-		// Temporarily materialization will occur to create an object and get it's capacity.
-		// It's okay, because this object is lightweight
-		size_t size = common::PacketBufferRing(nullptr, dump_size, dump_count).capacity;
+		size_t size = sharedmemory::GetCapacity(ring_cfg.second);
 
 		for (const auto& [socket_id, worker_count] : workers_per_socket)
 		{
@@ -1623,6 +1618,7 @@ static std::unordered_map<tSocketId, size_t> calculate_shared_memory_size(const 
 	return shm_size_per_socket;
 }
 
+//FIXME: why is this class not using class SharedMemory from common/shared_memory.h?
 eResult cDataPlane::allocateSharedMemory()
 {
 	// shared memory size for each numa
@@ -1681,8 +1677,7 @@ eResult cDataPlane::allocateSharedMemory()
 /// split memory per worker
 eResult cDataPlane::splitSharedMemoryPerWorkers()
 {
-	using sharedmemory::SharedMemoryDumpRing;
-	using utils::ShiftBuffer;
+	using namespace sharedmemory;
 
 	for (cWorker* worker : workers_vector)
 	{
@@ -1701,16 +1696,15 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 		int ring_id = 0;
 		for (const auto& [tag, ring_cfg] : config.shared_memory)
 		{
-			const auto& [dump_size, dump_count, format] = ring_cfg;
+			const auto& [format, dump_size, dump_count] = ring_cfg;
 
 			auto memaddr = utils::ShiftBuffer(shm, offset);
+			offset += GetCapacity(ring_cfg);
 
-			sharedmemory::SharedMemoryDumpRing ring(format, memaddr, dump_size, dump_count);
-			worker->dumpRings[ring_id] = ring;
-
-			offset += ring.Capacity();
+			worker->dump_rings[ring_id] = CreateSharedMemoryDumpRing(ring_cfg, memaddr);
 
 			std::string name = "shm_" + std::to_string(core_id) + "_" + std::to_string(ring_id);
+			// TODO: add format here
 			dumps_meta.emplace_back(name, tag, dump_size, dump_count, core_id, socket_id, key, offset);
 
 			tag_to_id[tag] = ring_id;
@@ -1719,9 +1713,9 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 		}
 
 		auto memaddr = utils::ShiftBuffer(shm, offset);
-		worker->tsc_deltas = new (memaddr) dataplane::perf::tsc_deltas{};
-
 		offset += sizeof(dataplane::perf::tsc_deltas);
+
+		worker->tsc_deltas = new (memaddr) dataplane::perf::tsc_deltas{};
 
 		tscs_meta.emplace_back(core_id, socket_id, key, offset);
 	}
@@ -2214,7 +2208,7 @@ eResult cDataPlane::parseSharedMemory(const nlohmann::json& json)
 			return eResult::invalidConfigurationFile;
 		}
 
-		config.shared_memory[tag] = {size, count, tDataPlaneConfig::StringToDumpFormat(format_str)};
+		config.shared_memory[tag] = {tDataPlaneConfig::StringToDumpFormat(format_str), size, count};
 	}
 
 	return eResult::success;

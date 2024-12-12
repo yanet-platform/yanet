@@ -1050,7 +1050,7 @@ common::idp::hexdump_ring::response cControlPlane::hexdump_ring(const common::id
 
 	for (cWorker* worker : dataPlane->workers_vector)
 	{
-		auto ring = worker->dumpRings[ring_id];
+		auto ring = worker->dump_rings[ring_id];
 
 		auto addr = reinterpret_cast<char*>(ring.buffer.ring);
 

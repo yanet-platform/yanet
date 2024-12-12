@@ -88,8 +88,9 @@ struct ActionDispatcher
 			return;
 		}
 
-		auto& ring = args.worker->dumpRings[ring_id];
-		ring.write(args.mbuf, flow.type);
+		// polymorphic, will execute either DumpRingRaw or DumpRingPcap method,
+		// likely to be devirtualized
+		args.worker->dump_rings[ring_id]->write(args.mbuf, flow.type);
 	}
 
 	static void execute(const common::StateTimeoutAction& action, const Flow& flow, const ActionDispatcherArgs& args)

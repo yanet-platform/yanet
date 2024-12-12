@@ -25,9 +25,9 @@ struct tDataPlaneConfig
 
 	struct DumpConfig
 	{
+		DumpFormat format;
 		unsigned int size;
 		unsigned int count;
-		DumpFormat format;
 	};
 
 	static DumpFormat StringToDumpFormat(const std::string& format_str)

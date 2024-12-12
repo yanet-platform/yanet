@@ -1,4 +1,5 @@
 #pragma once
+//TODO: RENAME TO dump_rings.h
 
 #include <rte_mbuf.h>
 
@@ -6,36 +7,80 @@
 #include "common/type.h"
 
 #include "config.h"
+#include "pcap_shm_device.h"
 
 namespace sharedmemory
 {
-
-using ring_header_t = common::PacketBufferRing::ring_header_t;
-using ring_t = common::PacketBufferRing::ring_t;
-using item_header_t = common::PacketBufferRing::item_header_t;
-using item_t = common::PacketBufferRing::item_t;
 using DumpFormat = tDataPlaneConfig::DumpFormat;
+using DumpConfig = tDataPlaneConfig::DumpConfig;
 
-class SharedMemoryDumpRing
+struct DumpRingBase
 {
-	DumpFormat format_;
-	size_t capacity_;
+	virtual ~DumpRingBase() = 0;
+
+	virtual void write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type) = 0;
+};
+
+class DumpRingRaw : public DumpRingBase
+{
+	using PacketBufferRing = common::PacketBufferRing;
+	using ring_t = PacketBufferRing::ring_t;
+	using item_t = PacketBufferRing::item_t;
+	using ring_header_t = PacketBufferRing::ring_header_t;
+
+	PacketBufferRing buffer_;
+	ring_t* ring_;
 
 public:
-	SharedMemoryDumpRing() :
-	        format_(DumpFormat::kRaw), capacity_(0) {}
+	DumpRingRaw(void* memory, size_t max_pkt_size, size_t pkt_count);
 
-	SharedMemoryDumpRing(DumpFormat format, void* memory, size_t dump_size, size_t dump_count);
+	void write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type) override;
 
-	void write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type);
-
-	// FIXME: make it private. I've made it public to simplify hexdump code
-	common::PacketBufferRing buffer;
-
-	[[nodiscard]] size_t Capacity() const
-	{
-		return capacity_;
-	}
+	static size_t GetCapacity(size_t max_pkt_size, size_t pkt_count);
 };
+
+class DumpRingPcap : public DumpRingBase
+{
+	pcpp::PcapShmWriterDevice dev_;
+
+public:
+	DumpRingPcap(void* memory, size_t max_pkt_size, size_t pkt_count);
+
+	void write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type) override;
+
+	static size_t GetCapacity(size_t max_pkt_size, size_t pkt_count);
+};
+
+inline size_t GetCapacity(const DumpConfig& config)
+{
+	auto& [format, max_pkt_size, pkt_count] = config;
+
+	switch (format)
+	{
+		case DumpFormat::kRaw:
+			return DumpRingRaw::GetCapacity(max_pkt_size, pkt_count);
+		case DumpFormat::kPcap:
+			return DumpRingPcap::GetCapacity(max_pkt_size, pkt_count);
+		default:
+			YANET_THROW("Invalid dump format");
+			std::abort();
+	}
+}
+
+inline std::unique_ptr<DumpRingBase> CreateSharedMemoryDumpRing(const DumpConfig& config, void* memory)
+{
+	auto& [format, max_pkt_size, pkt_count] = config;
+
+	switch (format)
+	{
+		case DumpFormat::kRaw:
+			return std::make_unique<DumpRingRaw>(memory, max_pkt_size, pkt_count);
+		case DumpFormat::kPcap:
+			return std::make_unique<DumpRingPcap>(memory, max_pkt_size, pkt_count);
+		default:
+			YANET_THROW("Invalid dump format");
+			std::abort();
+	}
+}
 
 } // namespace sharedmemory
