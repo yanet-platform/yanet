@@ -1906,7 +1906,7 @@ common::PacketBufferRing::item_t* read_shm_packet(common::PacketBufferRing* buff
 		return nullptr;
 	}
 
-	return common::sdp::ShiftBuffer<common::PacketBufferRing::item_t*>(ring->memory, position * buffer->unit_size);
+	return utils::ShiftBuffer<common::PacketBufferRing::item_t*>(ring->memory, position * buffer->unit_size);
 }
 
 bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
