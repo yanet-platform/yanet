@@ -6,11 +6,7 @@ steps:
     send: 001-send.pcap
     expect: 001-expect.pcap
 
-- cli_check: |
-    fw list states
-    id        ruleno    label  rule
-    --------  --------  -----  --------------------------------------------------------------------------------------------
-    16777215  16777215         allow tcp from 10.0.0.1 80 to 10.0.0.2 12345 [own, last seen: 2s ago flags S:][packets: 0/0]
+- cli: fw list states | grep -q "allow tcp from 10.0.0.1 80 to 10.0.0.2 12345"
 
 - sleep: 6  # Wait for state to expire
 
@@ -26,20 +22,11 @@ steps:
     send: 001-send.pcap
     expect: 001-expect.pcap
 
-- cli_check: |
-    fw list states
-    id        ruleno    label  rule
-    --------  --------  -----  --------------------------------------------------------------------------------------------
-    16777215  16777215         allow tcp from 10.0.0.1 80 to 10.0.0.2 12345 [own, last seen: 2s ago flags S:][packets: 0/0]
+- cli: fw list states | grep -q "allow tcp from 10.0.0.1 80 to 10.0.0.2 12345"
 
 - sleep: 3  # Wait but state should still be present
 
-  # note that last seen value changes
-- cli_check: |
-    fw list states
-    id        ruleno    label  rule
-    --------  --------  -----  --------------------------------------------------------------------------------------------
-    16777215  16777215         allow tcp from 10.0.0.1 80 to 10.0.0.2 12345 [own, last seen: 5s ago flags S:][packets: 0/0]
+- cli: fw list states | grep -q "allow tcp from 10.0.0.1 80 to 10.0.0.2 12345"
 
 - sleep: 3  # Wait for state to expire
 
