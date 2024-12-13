@@ -1806,7 +1806,7 @@ steps:
 
 # rib_save()
 - cli:
-  dontdoit podumoi controlplane rib save > rib_saved.dmp
+  dontdoit podumoi controlplane rib save > /tmp/rib_saved.dmp
 
 ## remove ALL prefixes, we will load rib tables from rib_saved.dmp
 - rib_clear:
@@ -1824,10 +1824,10 @@ steps:
     vrf      priority  prefix     protocol  peer  table_name  path_information  nexthop  labels  local_preference  aspath  origin  med  communities  large_communities
     -------  --------  ---------  --------  ----  ----------  ----------------  -------  ------  ----------------  ------  ------  ---  -----------  -----------------
     default  10000     fe80::/64  static    ::                                  ::               0                                 0    n/s          n/s
-    
+
 # rib_load()
 - cli:
-  dontdoit podumoi controlplane rib load < rib_saved.dmp
+  dontdoit podumoi controlplane rib load < /tmp/rib_saved.dmp
 
 # loaded tables are the same as those we had saved
 - cli_check: |
@@ -1962,7 +1962,7 @@ steps:
 
 # rib_save()
 - cli:
-  dontdoit podumoi controlplane rib save > rib_saved.dmp
+  dontdoit podumoi controlplane rib save > /tmp/rib_saved.dmp
 
 ## remove ALL prefixes
 - rib_clear:
@@ -2068,7 +2068,7 @@ steps:
 
 # rib_load()
 - cli:
-  dontdoit podumoi controlplane rib load < rib_saved.dmp
+  dontdoit podumoi controlplane rib load < /tmp/rib_saved.dmp
 
 # loaded tables are the same as those we had saved
 - cli_check: |
