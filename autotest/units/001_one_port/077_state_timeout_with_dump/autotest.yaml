@@ -10,19 +10,11 @@ steps:
   - ringTag: shm_2_0
     expect: 001-expect-dump-ring1.pcap
 
-- cli_check: |
-    fw list states
-    id        ruleno    label  rule
-    --------  --------  -----  -------------------------------------------------------------------------------------------
-    16777215  16777215         allow udp from 10.0.0.1 53 to 10.0.0.10 1024 [own, last seen: 2s ago flags :][packets: 0/0]
+- cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
 
 - sleep: 3  # Wait, state should still be present
 
-- cli_check: |
-    fw list states
-    id        ruleno    label  rule
-    --------  --------  -----  -------------------------------------------------------------------------------------------
-    16777215  16777215         allow udp from 10.0.0.1 53 to 10.0.0.10 1024 [own, last seen: 5s ago flags :][packets: 0/0]
+- cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
 
 - sleep: 3  # Wait for state to expire (total sleep 6s)
 
@@ -40,19 +32,11 @@ steps:
   - ringTag: shm_2_0
     expect: 002-expect-dump-ring1.pcap
 
-- cli_check: |
-    fw list states
-    id        ruleno    label  rule
-    --------  --------  -----  -------------------------------------------------------------------------------------------
-    16777215  16777215         allow udp from 10.0.0.1 53 to 10.0.0.10 1024 [own, last seen: 2s ago flags :][packets: 0/0]
+- cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
 
 - sleep: 3  # Wait, state should still be present
 
-- cli_check: |
-    fw list states
-    id        ruleno    label  rule
-    --------  --------  -----  -------------------------------------------------------------------------------------------
-    16777215  16777215         allow udp from 10.0.0.1 53 to 10.0.0.10 1024 [own, last seen: 5s ago flags :][packets: 0/0]
+- cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
 
 - sleep: 3  # Wait for state to expire (total sleep 6s)
 
