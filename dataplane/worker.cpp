@@ -2761,12 +2761,14 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 	{
 		uint32_t vtc_flow = 0;
 		uint16_t payload_len = 0;
+		uint32_t ipv4_src_addr;
 		if (is_ipv4)
 		{
 			rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 			vtc_flow = rte_cpu_to_be_32((0x6 << 28) | (ipv4HeaderInner->type_of_service << 20)); ///< @todo: flow label
 			payload_len = rte_cpu_to_be_16((is_ipip_tunnel ? 0 : sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE) + rte_be_to_cpu_16(ipv4HeaderInner->total_length));
 			payload_length = rte_be_to_cpu_16(ipv4HeaderInner->total_length);
+			ipv4_src_addr = ipv4HeaderInner->src_addr;
 		}
 		else
 		{
@@ -2796,6 +2798,11 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		ipv6Header->hop_limits = 64;
 		rte_memcpy(ipv6Header->src_addr, route.ipv6AddressSource.bytes, 16);
 		rte_memcpy(ipv6Header->dst_addr, nexthop.nexthop_address.bytes, 16);
+
+		if (route.randomSource && is_ipv4)
+		{
+			((uint32_t*)ipv6Header->src_addr)[2] = ipv4_src_addr;
+		}
 
 		metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv6_hdr);
 	}

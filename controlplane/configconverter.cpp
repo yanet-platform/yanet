@@ -432,7 +432,8 @@ void config_converter_t::serializeRoutes()
 		{
 			tunnel = {route.ipv4_source_address,
 			          route.ipv6_source_address,
-			          route.udp_destination_port};
+			          route.udp_destination_port,
+			          route.random_source};
 		}
 
 		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::update_route,
