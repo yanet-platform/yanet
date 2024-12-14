@@ -1,0 +1,27 @@
+steps:
+- ipv6Update: "::/0 -> 3333::2"
+- cli:
+  - rib static insert default 1.0.0.0/24 4444::1 1100 10000 1 1
+- rib_insert:
+    attribute:
+      protocol: autotest
+    tables:
+    - table_name: ipv6 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 5555::1
+        prefix: 2.0.0.0/24
+        path_information: 55.55.55.1:10001
+        labels:
+        - 1200
+- cli:
+  - rib prefixes
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
