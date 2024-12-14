@@ -197,6 +197,7 @@ public:
 	std::set<common::ip_prefix_t> local_prefixes; ///< for fallback to default
 	std::map<uint32_t, std::string> peers;
 	std::map<std::string, interface_t> interfaces;
+	bool random_source{};
 };
 
 }
