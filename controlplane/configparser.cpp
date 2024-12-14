@@ -367,6 +367,11 @@ void config_parser_t::loadConfig_route(controlplane::base_t& baseNext,
 		route.tunnel_enabled = false;
 	}
 
+	if (exist(moduleJson, "random_source"))
+	{
+		route.random_source = moduleJson["random_source"].get<bool>();
+	}
+
 	//
 
 	route.routeId = routeId;

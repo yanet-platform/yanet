@@ -289,6 +289,7 @@ struct route_t
 	ipv4_address_t ipv4AddressSource;
 	ipv6_address_t ipv6AddressSource;
 	uint16_t udpDestinationPort;
+	bool randomSource;
 };
 
 struct tInterface

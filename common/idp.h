@@ -204,7 +204,8 @@ namespace update_route
 {
 using tunnel = std::tuple<ipv4_address_t, ///< ipv4AddressSource
                           ipv6_address_t, ///< ipv6AddressSource
-                          uint16_t>; ///< udpDestinationPort
+                          uint16_t, ///< udpDestinationPort
+                          bool>; ///< srcRndEnabled
 
 using request = std::tuple<tRouteId,
                            std::optional<tunnel>>;
