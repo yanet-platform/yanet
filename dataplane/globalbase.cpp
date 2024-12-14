@@ -1042,11 +1042,12 @@ eResult generation::update_route(const common::idp::updateGlobalBase::update_rou
 
 	if (tunnel)
 	{
-		const auto& [ipv4AddressSource, ipv6AddressSource, udpDestinationPort] = *tunnel;
+		const auto& [ipv4AddressSource, ipv6AddressSource, udpDestinationPort, randomSource] = *tunnel;
 
 		route.ipv4AddressSource = ipv4_address_t::convert(ipv4AddressSource);
 		route.ipv6AddressSource = ipv6_address_t::convert(ipv6AddressSource);
 		route.udpDestinationPort = rte_cpu_to_be_16(udpDestinationPort);
+		route.randomSource = randomSource;
 	}
 
 	return eResult::success;
