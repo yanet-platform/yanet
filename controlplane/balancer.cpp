@@ -1019,12 +1019,12 @@ bool balancer_t::reconfigure_wlc()
 				{
 					YANET_GCC_BUG_UNUSED(socket_id);
 
-					auto it = real_connections.find(real_connections_key);
-					if (it == real_connections.end())
+					if (auto it = real_connections.find(real_connections_key); it != real_connections.end())
 					{
+						connections += it->second;
 						continue;
+						connections += it->second;
 					}
-					connections += it->second;
 				}
 
 				connection_sum += connections;
