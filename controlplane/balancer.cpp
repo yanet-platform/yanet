@@ -965,11 +965,11 @@ bool balancer_t::reconfigure_wlc()
 		                  ipv6_outer_source_network,
 		                  reals] : balancer.services)
 		{
-			(void)flags;
-			(void)version;
-			(void)forwarding_method;
-			(void)ipv4_outer_source_network;
-			(void)ipv6_outer_source_network;
+			YANET_GCC_BUG_UNUSED(flags);
+			YANET_GCC_BUG_UNUSED(version);
+			YANET_GCC_BUG_UNUSED(forwarding_method);
+			YANET_GCC_BUG_UNUSED(ipv4_outer_source_network);
+			YANET_GCC_BUG_UNUSED(ipv6_outer_source_network);
 
 			if (scheduler != ::balancer::scheduler::wlc)
 			{
@@ -1017,7 +1017,7 @@ bool balancer_t::reconfigure_wlc()
 				uint32_t connections = 0;
 				for (auto& [socket_id, real_connections] : balancer_real_connections)
 				{
-					(void)socket_id;
+					YANET_GCC_BUG_UNUSED(socket_id);
 
 					auto it = real_connections.find(real_connections_key);
 					if (it == real_connections.end())
