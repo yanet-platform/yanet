@@ -978,6 +978,7 @@ bool balancer_t::reconfigure_wlc()
 			}
 
 			std::vector<std::tuple<balancer::real_key_global_t, uint32_t, uint32_t>> service_reals_usage_info;
+			service_reals_usage_info.reserve(reals.size());
 			uint32_t connection_sum = 0;
 			uint32_t weight_sum = 0;
 
