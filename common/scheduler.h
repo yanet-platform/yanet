@@ -1,4 +1,5 @@
 #pragma once
+#include <variant>
 
 #include <cstdint>
 namespace balancer
@@ -9,13 +10,7 @@ enum class scheduler : uint8_t
 	rr,
 	wrr,
 	wlc,
-};
-
-class scheduler_params
-{
-public:
-	scheduler_params() = default;
-	uint32_t wlc_power;
+	chash
 };
 
 [[maybe_unused]] constexpr const char* to_string(const scheduler& scheduler)
@@ -23,20 +18,16 @@ public:
 	switch (scheduler)
 	{
 		case scheduler::rr:
-		{
 			return "rr";
-		}
 		case scheduler::wrr:
-		{
 			return "wrr";
-		}
 		case scheduler::wlc:
-		{
 			return "wlc";
-		}
+		case scheduler::chash:
+			return "chash";
+		default:
+			return "unknown";
 	}
-
-	return "unknown";
 }
 
 }
