@@ -321,7 +321,6 @@ static bool readPacket(int fd, pcap_pkthdr* header, u_char* data, Duration timel
 	struct packHeader hdr;
 	if (!readTimeLimited(fd, hdr, time_to_give_up))
 	{
-		YANET_LOG_ERROR("Failed to read packet header\n");
 		return false;
 	}
 
