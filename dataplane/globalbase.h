@@ -194,25 +194,26 @@ protected:
 		Rebuild
 	};
 
-	std::vector<std::pair<balancer_real_id_t, decltype(balancer_real_state_t::weight)>>
-	ServiceWeights(const balancer_service_t* service);
+	using RealWeight = std::pair<balancer_real_id_t, decltype(balancer_real_state_t::weight)>;
+
+	std::vector<RealWeight> ServiceWeights(const balancer_service_t& service);
 	balancer_real_id_t* rebuild_service_ring_one_wrr(
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,
-	        const balancer_service_t* service);
+	        const balancer_service_t& service);
 	balancer_real_id_t* rebuild_service_ring_one_chash(
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,
-	        const balancer_service_t* service);
+	        const balancer_service_t& service);
 	balancer_real_id_t* update_service_ring_one_chash(
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,
-	        const balancer_service_t* service);
+	        const balancer_service_t& service);
 	balancer_real_id_t* evaluate_service_ring_one(
 	        ServiceRingOp op,
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,
-	        const balancer_service_t* service);
+	        const balancer_service_t& service);
 	void evaluate_service_ring(ServiceRingOp op);
 	inline uint64_t count_real_connections(uint32_t counter_id);
 
