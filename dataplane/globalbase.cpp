@@ -1646,6 +1646,7 @@ balancer_real_id_t* generation::rebuild_service_ring_one_wrr(
 std::vector<generation::RealWeight> generation::ServiceWeights(const balancer_service_t& service)
 {
 	std::vector<RealWeight> weights;
+	weights.reserve(service.real_size);
 	for (uint32_t real_idx = service.real_start;
 	     real_idx < service.real_start + service.real_size;
 	     ++real_idx)
