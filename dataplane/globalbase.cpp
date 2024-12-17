@@ -637,7 +637,8 @@ static bool checkFlow(const common::globalBase::tFlow& flow)
 		}
 	}
 	else if (flow.type == common::globalBase::eFlowType::route ||
-	         flow.type == common::globalBase::eFlowType::route_tunnel)
+	         flow.type == common::globalBase::eFlowType::route_tunnel ||
+	         flow.type == common::globalBase::eFlowType::route_tunnel_ipip)
 	{
 		if (flow.data.routeId >= CONFIG_YADECAP_ROUTES_SIZE)
 		{
@@ -839,6 +840,7 @@ eResult generation::tun64_update(const common::idp::updateGlobalBase::tun64_upda
 
 	if (flow.type != common::globalBase::eFlowType::route &&
 	    flow.type != common::globalBase::eFlowType::route_tunnel &&
+	    flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
 	    flow.type != common::globalBase::eFlowType::controlPlane &&
 	    flow.type != common::globalBase::eFlowType::drop)
 	{
@@ -941,6 +943,7 @@ eResult generation::updateDecap(const common::idp::updateGlobalBase::updateDecap
 	}
 	if (flow.type != common::globalBase::eFlowType::route &&
 	    flow.type != common::globalBase::eFlowType::route_tunnel &&
+	    flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
 	    flow.type != common::globalBase::eFlowType::controlPlane &&
 	    flow.type != common::globalBase::eFlowType::drop)
 	{
@@ -1041,11 +1044,12 @@ eResult generation::update_route(const common::idp::updateGlobalBase::update_rou
 
 	if (tunnel)
 	{
-		const auto& [ipv4AddressSource, ipv6AddressSource, udpDestinationPort] = *tunnel;
+		const auto& [ipv4AddressSource, ipv6AddressSource, udpDestinationPort, randomSource] = *tunnel;
 
 		route.ipv4AddressSource = ipv4_address_t::convert(ipv4AddressSource);
 		route.ipv6AddressSource = ipv6_address_t::convert(ipv6AddressSource);
 		route.udpDestinationPort = rte_cpu_to_be_16(udpDestinationPort);
+		route.randomSource = randomSource;
 	}
 
 	return eResult::success;
@@ -1111,6 +1115,7 @@ eResult generation::nat64stateful_update(const common::idp::updateGlobalBase::na
 	}
 	if (flow.type != common::globalBase::eFlowType::route &&
 	    flow.type != common::globalBase::eFlowType::route_tunnel &&
+	    flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
 	    flow.type != common::globalBase::eFlowType::controlPlane &&
 	    flow.type != common::globalBase::eFlowType::drop)
 	{
@@ -1212,6 +1217,7 @@ eResult generation::updateNat64stateless(const common::idp::updateGlobalBase::up
 	}
 	if (flow.type != common::globalBase::eFlowType::route &&
 	    flow.type != common::globalBase::eFlowType::route_tunnel &&
+	    flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
 	    flow.type != common::globalBase::eFlowType::controlPlane &&
 	    flow.type != common::globalBase::eFlowType::drop)
 	{
@@ -1320,6 +1326,7 @@ eResult generation::nat46clat_update(const common::idp::updateGlobalBase::nat46c
 
 	if (flow.type != common::globalBase::eFlowType::route &&
 	    flow.type != common::globalBase::eFlowType::route_tunnel &&
+	    flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
 	    flow.type != common::globalBase::eFlowType::controlPlane &&
 	    flow.type != common::globalBase::eFlowType::drop)
 	{

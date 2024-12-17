@@ -1,7 +1,7 @@
 steps:
 - ipv6Update: "::/0 -> 3333::2"
 - cli:
-  - rib static insert default 0.0.0.0/0 4444::1 1100 10000 1 1
+  - rib static insert default 1.0.0.0/24 4444::1 1100 10000 1 1
 - rib_insert:
     attribute:
       protocol: autotest
@@ -15,6 +15,8 @@ steps:
         path_information: 55.55.55.1:10001
         labels:
         - 1200
+- cli:
+  - rib prefixes
 - sendPackets:
   - port: kni0
     send: 001-send.pcap
