@@ -1688,8 +1688,8 @@ balancer_real_id_t* generation::rebuild_service_ring_one_chash(
 	}
 	auto updater = chash::WeightUpdater::MakeWeightUpdater(
 	        reals,
-	        20000,
-	        20);
+	        YANET_DEFAULT_BALANCER_REAL_MAPPINGS_LIMIT,
+	        YANET_DEFAULT_BALANCER_CELLS_PER_WEIGHT_UNIT);
 	if (!updater)
 	{
 		YANET_LOG_ERROR("Failed to intialize updater for balancer service reals: %ld\n",
