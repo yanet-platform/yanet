@@ -499,6 +499,9 @@ void config_converter_t::processNat64stateful()
 		{
 			throw error_result_t(eResult::invalidFlow, "invalid flow type for nat64stateful: " + std::string(eFlowType_toString(nat64stateful.flow.type)));
 		}
+
+		nat64stateful.vrf_lan = controlplane_ptr->getVrfIdsStorage().GetOrCreateOrException(nat64stateful.vrf_lan_name, "Can't get id nat64stateful.vrf_lan_name: ");
+		nat64stateful.vrf_wan = controlplane_ptr->getVrfIdsStorage().GetOrCreateOrException(nat64stateful.vrf_wan_name, "Can't get id nat64stateful.vrf_wan_name: ");
 	}
 
 	/// continue in nat64stateful_t::compile()
@@ -610,6 +613,9 @@ void config_converter_t::processNat46clat()
 		{
 			throw error_result_t(eResult::invalidFlow, "invalid flow type for nat46clat: " + std::string(eFlowType_toString(nat46clat.flow.type)));
 		}
+
+		nat46clat.vrf_lan = controlplane_ptr->getVrfIdsStorage().GetOrCreateOrException(nat46clat.vrf_lan_name, "Can't get id nat46clat.vrf_lan_name: ");
+		nat46clat.vrf_wan = controlplane_ptr->getVrfIdsStorage().GetOrCreateOrException(nat46clat.vrf_wan_name, "Can't get id nat46clat.vrf_wan_name: ");
 	}
 
 	/// continue in nat46clat::manager::compile()

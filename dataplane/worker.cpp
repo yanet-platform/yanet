@@ -2984,6 +2984,10 @@ inline void cWorker::nat64stateful_lan_handle()
 		const auto& key = nat64stateful_lan_keys[mbuf_i];
 
 		const auto& nat64stateful = base.globalBase->nat64statefuls[metadata->flow.data.nat64stateful_id];
+		if (nat64stateful.vrf_lan != 0)
+		{
+			metadata->vrfId = nat64stateful.vrf_lan;
+		}
 
 		dataplane::globalBase::nat64stateful_lan_value* value_lookup = nullptr;
 		dataplane::spinlock_nonrecursive_t* locker = nullptr;
@@ -3275,6 +3279,10 @@ inline void cWorker::nat64stateful_wan_handle()
 		const auto& key = nat64stateful_wan_keys[mbuf_i];
 
 		const auto& nat64stateful = base.globalBase->nat64statefuls[metadata->flow.data.nat64stateful_id];
+		if (nat64stateful.vrf_wan != 0)
+		{
+			metadata->vrfId = nat64stateful.vrf_wan;
+		}
 
 		dataplane::globalBase::nat64stateful_wan_value* value_lookup = nullptr;
 		dataplane::spinlock_nonrecursive_t* locker = nullptr;
@@ -3677,6 +3685,10 @@ inline void cWorker::nat46clat_lan_handle()
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
 		const auto& nat46clat = base.globalBase->nat46clats[metadata->flow.data.nat46clat_id];
+		if (nat46clat.vrf_lan != 0)
+		{
+			metadata->vrfId = nat46clat.vrf_lan;
+		}
 
 		nat46clat_lan_translation(mbuf, nat46clat);
 
@@ -3756,6 +3768,10 @@ inline void cWorker::nat46clat_wan_handle()
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
 		const auto& nat46clat = base.globalBase->nat46clats[metadata->flow.data.nat46clat_id];
+		if (nat46clat.vrf_wan != 0)
+		{
+			metadata->vrfId = nat46clat.vrf_wan;
+		}
 
 		nat46clat_wan_translation(mbuf, nat46clat);
 

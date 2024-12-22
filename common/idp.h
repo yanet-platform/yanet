@@ -231,7 +231,9 @@ using request = std::tuple<nat64stateful_id_t,
                            uint32_t, ///< pool_start
                            uint32_t, ///< pool_size
                            state_timeout,
-                           common::globalBase::flow_t>;
+                           common::globalBase::flow_t,
+                           tVrfId, ///< vrf_lan
+                           tVrfId>; ///< vrf_wan
 }
 
 namespace nat64stateful_pool_update
@@ -268,7 +270,9 @@ using request = std::tuple<nat46clat_id_t,
                            eDscpMarkType, ///< dscp_type
                            uint8_t, ///< dscp
                            tCounterId,
-                           common::globalBase::flow_t>;
+                           common::globalBase::flow_t,
+                           tVrfId, ///< vrf_lan
+                           tVrfId>; ///< vrf_wan
 }
 
 namespace update_balancer

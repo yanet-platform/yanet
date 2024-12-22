@@ -585,6 +585,9 @@ void config_parser_t::loadConfig_nat64stateful(controlplane::base_t& baseNext,
 		nat64stateful.state_timeout = moduleJson["state_timeout"];
 	}
 
+	nat64stateful.vrf_lan_name = moduleJson.value("vrfLan", YANET_RIB_VRF_DEFAULT);
+	nat64stateful.vrf_wan_name = moduleJson.value("vrfWan", YANET_RIB_VRF_DEFAULT);
+
 	nat64stateful.next_module = moduleJson.value("nextModule", "");
 	nat64stateful.nat64stateful_id = nat64stateful_id;
 
@@ -1084,6 +1087,9 @@ void config_parser_t::loadConfig_nat46clat(controlplane::base_t& baseNext,
 			throw error_result_t(eResult::invalidConfigurationFile, "invalid dscpMarkType: " + dscpMarkTypeString);
 		}
 	}
+
+	nat46clat.vrf_lan_name = moduleJson.value("vrfLan", YANET_RIB_VRF_DEFAULT);
+	nat46clat.vrf_wan_name = moduleJson.value("vrfWan", YANET_RIB_VRF_DEFAULT);
 
 	nat46clat.next_module = moduleJson.value("nextModule", "");
 	nat46clat.nat46clat_id = nat46clat_id;

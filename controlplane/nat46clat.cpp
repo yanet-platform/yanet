@@ -108,7 +108,9 @@ void manager::compile(common::idp::updateGlobalBase::request& globalbase,
 		                                                                                 nat46clat.dscp_mark_type,
 		                                                                                 nat46clat.dscp,
 		                                                                                 counter_id,
-		                                                                                 nat46clat.flow));
+		                                                                                 nat46clat.flow,
+		                                                                                 nat46clat.vrf_lan,
+		                                                                                 nat46clat.vrf_wan));
 	}
 }
 

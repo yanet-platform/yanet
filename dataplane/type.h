@@ -317,6 +317,8 @@ struct nat64stateful_t
 	uint32_t pool_size{};
 	tCounterId counter_id;
 	uint8_t ipv4_dscp_flags;
+	tVrfId vrf_lan;
+	tVrfId vrf_wan;
 	struct
 	{
 		uint16_t tcp_syn;
@@ -350,6 +352,8 @@ struct nat46clat_t
 	ipv6_address_t ipv6_destination;
 	tCounterId counter_id;
 	uint8_t ipv4_dscp_flags;
+	tVrfId vrf_lan;
+	tVrfId vrf_wan;
 	common::globalBase::tFlow flow;
 };
 
