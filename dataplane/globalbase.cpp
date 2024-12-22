@@ -1110,7 +1110,7 @@ eResult generation::updateInterface(const common::idp::updateGlobalBase::updateI
 
 eResult generation::nat64stateful_update(const common::idp::updateGlobalBase::nat64stateful_update::request& request)
 {
-	const auto& [nat64stateful_id, dscp_mark_type, dscp, counter_id, pool_start, pool_size, state_timeout, flow] = request;
+	const auto& [nat64stateful_id, dscp_mark_type, dscp, counter_id, pool_start, pool_size, state_timeout, flow, vrf_lan, vrf_wan] = request;
 
 	if (nat64stateful_id >= YANET_CONFIG_NAT64STATEFULS_SIZE)
 	{
@@ -1185,6 +1185,9 @@ eResult generation::nat64stateful_update(const common::idp::updateGlobalBase::na
 		nat64stateful.state_timeout.icmp = icmp;
 		nat64stateful.state_timeout.other = other;
 	}
+
+	nat64stateful.vrf_lan = vrf_lan;
+	nat64stateful.vrf_wan = vrf_wan;
 
 	nat64stateful_enabled = 1;
 
@@ -1327,7 +1330,7 @@ eResult generation::updateNat64statelessTranslation(const common::idp::updateGlo
 
 eResult generation::nat46clat_update(const common::idp::updateGlobalBase::nat46clat_update::request& request)
 {
-	const auto& [nat46clat_id, ipv6_source, ipv6_destination, dscp_mark_type, dscp, counter_id, flow] = request;
+	const auto& [nat46clat_id, ipv6_source, ipv6_destination, dscp_mark_type, dscp, counter_id, flow, vrf_lan, vrf_wan] = request;
 
 	if (nat46clat_id >= YANET_CONFIG_NAT46CLATS_SIZE)
 	{
@@ -1386,6 +1389,9 @@ eResult generation::nat46clat_update(const common::idp::updateGlobalBase::nat46c
 		YADECAP_LOG_ERROR("invalid dscp_mark_type\n");
 		return eResult::invalidArguments;
 	}
+
+	nat46clat.vrf_lan = vrf_lan;
+	nat46clat.vrf_wan = vrf_wan;
 
 	nat46clat_enabled = 1;
 

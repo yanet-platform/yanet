@@ -294,7 +294,7 @@ class config_t
 public:
 	config_t() = default;
 
-	SERIALIZABLE(nat64stateful_id, dscp_mark_type, dscp, ipv6_prefixes, ipv4_prefixes, announces, next_module);
+	SERIALIZABLE(nat64stateful_id, dscp_mark_type, dscp, ipv6_prefixes, ipv4_prefixes, announces, next_module, vrf_lan_name, vrf_wan_name, vrf_lan, vrf_wan);
 
 public:
 	nat64stateful_id_t nat64stateful_id;
@@ -303,6 +303,10 @@ public:
 	std::vector<common::ipv6_prefix_t> ipv6_prefixes;
 	std::vector<common::ipv4_prefix_t> ipv4_prefixes;
 	std::set<common::ip_prefix_t> announces;
+	std::string vrf_lan_name;
+	std::string vrf_wan_name;
+	tVrfId vrf_lan;
+	tVrfId vrf_wan;
 	controlplane::state_timeout state_timeout;
 	std::string next_module;
 	common::globalBase::flow_t flow;
