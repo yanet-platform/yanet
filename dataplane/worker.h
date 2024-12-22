@@ -51,6 +51,11 @@ public:
 		mbufsCount = 0;
 	}
 
+	inline void copy_from(tStack& other)
+	{
+		insert(other.mbufs, other.mbufsCount);
+	}
+
 public:
 	unsigned int mbufsCount{};
 	rte_mbuf* mbufs[TSize];
@@ -273,9 +278,13 @@ protected:
 
 	union
 	{
-		uint32_t route_ipv4_keys[CONFIG_YADECAP_MBUFS_BURST_SIZE];
+		struct
+		{
+			uint32_t ipv4[CONFIG_YADECAP_MBUFS_BURST_SIZE];
+			ipv6_address_t ipv6[CONFIG_YADECAP_MBUFS_BURST_SIZE];
+			tVrfId vrfs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
+		} route_keys;
 		dataplane::globalBase::tun64mapping_key_t tun64_keys[CONFIG_YADECAP_MBUFS_BURST_SIZE];
-		ipv6_address_t route_ipv6_keys[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 		dataplane::globalBase::nat64stateful_lan_key nat64stateful_lan_keys[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 		dataplane::globalBase::nat64stateful_wan_key nat64stateful_wan_keys[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 		dataplane::globalBase::balancer_state_key_t balancer_keys[CONFIG_YADECAP_MBUFS_BURST_SIZE];
@@ -322,6 +331,10 @@ protected:
 	worker::tStack<> route_stack6;
 	worker::tStack<> route_tunnel_stack4;
 	worker::tStack<> route_tunnel_stack6;
+	worker::tStack<> vrf_route_stack4;
+	worker::tStack<> vrf_route_stack6;
+	worker::tStack<> vrf_route_tunnel_stack4;
+	worker::tStack<> vrf_route_tunnel_stack6;
 	worker::tStack<> nat64stateful_lan_stack;
 	worker::tStack<> nat64stateful_wan_stack;
 	worker::tStack<> nat64stateless_ingress_stack;
