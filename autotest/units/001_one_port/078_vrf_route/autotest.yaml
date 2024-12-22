@@ -1,0 +1,68 @@
+steps:
+- cli:
+    - rib static insert default 0.0.0.0/0 200.0.10.1
+    - rib static insert default 1.0.0.0/24 200.0.20.1
+    - rib static insert default 2.0.0.0/24 200.0.40.1
+    - rib static insert red 0.0.0.0/0 200.0.30.1
+    - rib static insert red 1.0.0.0/24 200.0.10.1
+    - rib static insert red 2.0.0.0/24 200.0.20.1
+    - rib static insert white 1.0.0.0/24 200.0.40.1
+    - rib static insert white 1.0.0.16/28 200.0.10.1
+    - rib static insert white 1.0.0.16/30 200.0.20.1
+- cli:
+    - rib static insert default ::/0 c0de::10:1
+    - rib static insert default 7e01::/64 c0de::20:1
+    - rib static insert default 7e02::/64 c0de::40:1
+    - rib static insert red ::/0 c0de::30:1
+    - rib static insert red 7e01::/64 c0de::10:1
+    - rib static insert red 7e02::/64 c0de::20:1
+    - rib static insert white 7e01::/64 c0de::40:1
+    - rib static insert white 7e01::/96 c0de::10:1
+    - rib static insert white 7e01::/128 c0de::20:1
+- cli:
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+
+- cli:
+    - rib static remove default 1.0.0.0/24 200.0.20.1
+    - rib static remove red 0.0.0.0/0 200.0.30.1
+    - rib static remove white 1.0.0.16/30 200.0.20.1
+    - rib static remove default 7e01::/64 c0de::20:1
+    - rib static remove red ::/0 c0de::30:1
+    - rib static remove white 7e01::/128 c0de::20:1
+- cli:
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
+
+- cli:
+    - rib static remove default 0.0.0.0/0 200.0.10.1
+    - rib static remove default 2.0.0.0/24 200.0.40.1
+    - rib static remove red 1.0.0.0/24 200.0.10.1
+    - rib static remove red 2.0.0.0/24 200.0.20.1
+    - rib static remove white 1.0.0.0/24 200.0.40.1
+    - rib static remove white 1.0.0.16/28 200.0.10.1
+- cli:
+    - rib static remove default ::/0 c0de::10:1
+    - rib static remove default 7e02::/64 c0de::40:1
+    - rib static remove red 7e01::/64 c0de::10:1
+    - rib static remove red 7e02::/64 c0de::20:1
+    - rib static remove white 7e01::/64 c0de::40:1
+    - rib static remove white 7e01::/96 c0de::10:1
+- cli:
+  - rib prefixes

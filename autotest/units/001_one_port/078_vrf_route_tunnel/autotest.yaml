@@ -1,0 +1,159 @@
+steps:
+- rib_insert:
+    attribute:
+      protocol: autotest
+      vrf: default
+    tables:
+    - table_name: ipv4 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 88.88.88.1
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1100
+      - nexthop: 88.88.88.2
+        prefix: 2.0.0.0/24
+        path_information: 88.88.88.2:10001
+        labels:
+        - 1200
+      - nexthop: 88.88.88.3
+        prefix: 3.0.0.0/24
+        path_information: 88.88.88.3:10001
+        labels:
+        - 1300
+- rib_insert:
+    attribute:
+      protocol: autotest
+      vrf: red
+    tables:
+    - table_name: ipv4 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 88.88.88.2
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.2:10001
+        labels:
+        - 1200
+      - nexthop: 88.88.88.3
+        prefix: 2.0.0.0/24
+        path_information: 88.88.88.3:10001
+        labels:
+        - 1300
+      - nexthop: 88.88.88.1
+        prefix: 3.0.0.0/24
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1100
+- rib_insert:
+    attribute:
+      protocol: autotest
+      vrf: white
+    tables:
+    - table_name: ipv4 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 88.88.88.3
+        prefix: 1.0.0.0/24
+        path_information: 88.88.88.3:10001
+        labels:
+        - 1300
+      - nexthop: 88.88.88.1
+        prefix: 2.0.0.0/24
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1100
+      - nexthop: 88.88.88.2
+        prefix: 3.0.0.0/24
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1200
+- rib_insert:
+    attribute:
+      protocol: autotest
+      vrf: default
+    tables:
+    - table_name: ipv6 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 8888::1
+        prefix: 7e01::/16
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1100
+      - nexthop: 8888::2
+        prefix: 7e02::/16
+        path_information: 88.88.88.2:10001
+        labels:
+        - 1200
+      - nexthop: 8888::3
+        prefix: 7e03::/16
+        path_information: 88.88.88.3:10001
+        labels:
+        - 1300
+- rib_insert:
+    attribute:
+      protocol: autotest
+      vrf: red
+    tables:
+    - table_name: ipv6 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 8888::2
+        prefix: 7e01::/16
+        path_information: 88.88.88.3:10001
+        labels:
+        - 1200
+      - nexthop: 8888::3
+        prefix: 7e02::/16
+        path_information: 88.88.88.3:10001
+        labels:
+        - 1300
+      - nexthop: 8888::1
+        prefix: 7e03::/16
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1100
+- rib_insert:
+    attribute:
+      protocol: autotest
+      vrf: white
+    tables:
+    - table_name: ipv6 mpls-vpn
+      large_communities:
+      - 13238:1:1
+      prefixes:
+      - nexthop: 8888::3
+        prefix: 7e01::/16
+        path_information: 88.88.88.3:10001
+        labels:
+        - 1300
+      - nexthop: 8888::1
+        prefix: 7e02::/16
+        path_information: 88.88.88.1:10001
+        labels:
+        - 1100
+      - nexthop: 8888::2
+        prefix: 7e03::/16
+        path_information: 88.88.88.2:10001
+        labels:
+        - 1200
+- cli:
+  - rib prefixes
+- ipv4Update:
+  - "0.0.0.0/0 -> 100.0.0.1"
+- ipv6Update:
+  - "::/0 -> c0de::100:1"
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
