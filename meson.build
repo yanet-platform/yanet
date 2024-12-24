@@ -47,6 +47,7 @@ if target_option.contains('librib')
     subdir_done()
 endif
 
+
 libdpdk = subproject('dpdk', default_options: [
     'platform=generic',
     'cpu_instruction_set=corei7',
@@ -58,6 +59,19 @@ libdpdk = subproject('dpdk', default_options: [
 
 libjson = subproject('json')
 
+# # Run the fix_dpdk_pc.sh script immediately after configuring DPDK
+# fix_dpdk_pc = run_command(
+#     find_program('sh'),
+#     'fix_dpdk_pc.sh',
+#     meson.current_build_dir(),
+#     check: true
+# )
+
+# # Ensure the script ran successfully
+# if fix_dpdk_pc.returncode() != 0
+#     error('fix_dpdk_pc.sh failed to execute successfully.')
+# endif
+
 cmake = import('cmake')
 
 pcapplusplus_options = cmake.subproject_options()
@@ -65,6 +79,13 @@ pcapplusplus_options.add_cmake_defines({
   'PCAPPP_BUILD_EXAMPLES': 'OFF',
   'PCAPPP_BUILD_TESTS': 'OFF',
   'PCAPPP_INSTALL': 'OFF',
+
+  # 'PCAPPP_USE_DPDK': 'ON',
+  # 'DPDK_ROOT': meson.current_build_dir() / 'meson-private',
+
+  # 'PKG_CONFIG_PATH': meson.current_build_dir() / 'meson-private',
+   # 'DPDK_ROOT': meson.current_source_dir() / 'subprojects' / 'dpdk',
+   # 'DPDK_BUILD_DIR': meson.current_build_dir() / 'subprojects' / 'dpdk',
   'CMAKE_CXX_FLAGS': '-fexceptions',
 })
 

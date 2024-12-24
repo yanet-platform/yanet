@@ -2,6 +2,7 @@ sources = files('autotest.cpp',
                 'main.cpp')
 
 dependencies = []
+dependencies += libdpdk.get_variable('dpdk_dep')
 dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('yaml-cpp', static: true)
@@ -14,6 +15,7 @@ executable('yanet-autotest',
            include_directories: yanet_rootdir,
            dependencies: dependencies,
            link_args : ['-lstdc++fs'],
+           # override_options: 'b_lto=false',
            install: true)
 
 install_data('yanet-autotest-run.py', install_dir: get_option('bindir'))

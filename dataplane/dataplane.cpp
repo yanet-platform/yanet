@@ -1618,7 +1618,7 @@ static std::unordered_map<tSocketId, size_t> calculate_shared_memory_size(const 
 	return shm_size_per_socket;
 }
 
-//FIXME: why is this class not using class SharedMemory from common/shared_memory.h?
+// FIXME: why is this class not using class SharedMemory from common/shared_memory.h?
 eResult cDataPlane::allocateSharedMemory()
 {
 	// shared memory size for each numa

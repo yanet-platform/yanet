@@ -6,7 +6,7 @@
 
 #include "pcap_shm_device.h"
 
-//TODO: replace cerr with YANET_LOG
+// TODO: replace cerr with YANET_LOG
 namespace pcpp
 {
 

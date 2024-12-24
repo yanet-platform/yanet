@@ -1,5 +1,5 @@
 #pragma once
-//TODO: RENAME TO dump_rings.h
+// TODO: RENAME TO dump_rings.h
 
 #include <rte_mbuf.h>
 
@@ -16,7 +16,7 @@ using DumpConfig = tDataPlaneConfig::DumpConfig;
 
 struct DumpRingBase
 {
-	virtual ~DumpRingBase();
+	virtual ~DumpRingBase() = default;
 
 	virtual void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, uint32_t time) = 0;
 };

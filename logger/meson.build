@@ -6,9 +6,7 @@ dependencies += dependency('threads')
 
 sources = files('main.cpp')
 
-cpp_args = []
-cpp_args += '-fno-rtti'
-cpp_args += '-march=corei7'
+cpp_args = ['-fno-rtti', '-march=corei7']
 
 executable('yanet-logger',
            sources,

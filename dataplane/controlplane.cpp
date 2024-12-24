@@ -1038,9 +1038,11 @@ common::idp::get_shm_info::response cControlPlane::get_shm_info()
 	return response;
 }
 
+// I won't need this..
 common::idp::hexdump_ring::response cControlPlane::hexdump_ring(const common::idp::hexdump_ring::request& request)
 {
 	common::idp::hexdump_ring::response response;
+#if 0
 	const std::string& requested_tag = request;
 
 	std::string combined_hexdump;
@@ -1073,6 +1075,7 @@ common::idp::hexdump_ring::response cControlPlane::hexdump_ring(const common::id
 	}
 
 	response.hexdumped_ring = combined_hexdump;
+#endif
 
 #if 0
 	common::idp::get_shm_info::response shm_info = dataPlane->getShmInfo();

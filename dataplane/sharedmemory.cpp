@@ -62,16 +62,28 @@ DumpRingPcap::DumpRingPcap(void* memory, size_t max_pkt_size, size_t pkt_count) 
  * This class allows initialization with an already-created mbuf, making it
  * possible to safely pass the object to a Writer instance as the base class
  * RawPacket. In the original `MBufRawPacket` class, the `setMBuf` method
- * was protected, but it has been incorporated into a new constructor.
+ * was protected, plus is requires to build PcapPlusPlus with DPDK support,
+ * which is unnecessary for such a small change.
  */
-struct MBufRawPacketCopy : public pcpp::MBufRawPacket
+class MBufRawPacketCopy : public pcpp::RawPacket
 {
-	using MBufRawPacket::MBufRawPacket;
-
-	MBufRawPacketCopy(rte_mbuf* mBuf, const timespec& timestamp) :
-	        MBufRawPacket()
+	void SetMBuf(rte_mbuf* mbuf, timespec timestamp)
 	{
-		setMBuf(mBuf, timestamp);
+		if (mbuf == nullptr)
+		{
+			std::cerr << "mbuf to set is nullptr" << std::endl;
+			return;
+		}
+
+		setRawData(rte_pktmbuf_mtod(mbuf, const uint8_t*), rte_pktmbuf_pkt_len(mbuf), timestamp, pcpp::LINKTYPE_ETHERNET);
+	}
+
+public:
+	MBufRawPacketCopy(rte_mbuf* mbuf, const timespec& timestamp) :
+	        RawPacket()
+	{
+		m_DeleteRawDataAtDestructor = false;
+		SetMBuf(mbuf, timestamp);
 	}
 };
 
@@ -80,7 +92,7 @@ void DumpRingPcap::Write(rte_mbuf* mbuf, [[maybe_unused]] common::globalBase::eF
 	timespec ts = {.tv_sec = time, .tv_nsec = 0};
 	MBufRawPacketCopy raw_packet(mbuf, ts);
 
-	// TODO: can I do this, or should I use time obtained from basePermanently.globalBaseAtomic->currentTime?
+	// TODO: can I do this, or should I use time obtained from basePermanently.globalBaseAtomic->currentTime like I do now?
 	/* timespec_get(&ts, TIME_UTC); */
 
 	dev_.WritePacket(raw_packet);
