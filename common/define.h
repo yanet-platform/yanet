@@ -7,6 +7,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <vector>
 
 /**
@@ -104,16 +105,20 @@ extern LogPriority logPriority;
 
 #define CALCULATE_LOGICALPORT_ID(portId, vlanId) ((portId << 13) | ((vlanId & 0xFFF) << 1) | 1)
 
+template<typename... Args>
+void YANET_THROW(Args&&... args)
+{
+	std::ostringstream oss;
+	(oss << ... << std::forward<Args>(args));
+	const std::string message = oss.str();
+
 #if __cpp_exceptions
-#define YANET_THROW(message) throw std::runtime_error(std::string(message))
+	throw std::runtime_error(message);
 #else // __cpp_exceptions
-#define YANET_THROW(message)                                               \
-	do                                                                 \
-	{                                                                  \
-		YANET_LOG_ERROR("%s\n", std::string_view(message).data()); \
-		std::abort();                                              \
-	} while (0)
+	YANET_LOG_ERROR("%s\n", message.c_str());
+	std::abort();
 #endif // __cpp_exceptions
+}
 
 #define YANET_RIB_PRIORITY_DEFAULT ((uint32_t)10000)
 #define YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK ((uint32_t)11000)

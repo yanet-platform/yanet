@@ -107,7 +107,8 @@ protected:
 	        pcaps;
 
 	std::tuple<size_t, void*> rawShmInfo;
-	std::map<std::string, common::bufferring> dumpRings;
+	// TODO: this should be DumpRingBase instead of PacketBufferRing.
+	std::map<std::string, common::PacketBufferRing> dumpRings;
 
 	std::vector<std::thread> threads;
 	volatile bool flagStop;

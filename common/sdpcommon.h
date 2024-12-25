@@ -6,6 +6,7 @@
 
 #include "define.h"
 #include "idp.h"
+#include "utils.h"
 
 // #define YANET_USE_POSIX_SHARED_MEMORY
 
@@ -87,18 +88,14 @@ Block for worker_gc
 namespace common::sdp
 {
 
+using utils::ShiftBuffer;
+
 #ifdef YANET_USE_POSIX_SHARED_MEMORY
 inline std::string FileNameWorkerOnNumaNode(tSocketId socket_id)
 {
 	return YANET_SHARED_MEMORY_PREFIX_WORKERS + std::to_string(socket_id) + ".shm";
 }
 #endif
-
-template<typename TResult, typename TBuffer = void*>
-inline TResult ShiftBuffer(TBuffer buffer, uint64_t size)
-{
-	return reinterpret_cast<TResult>((reinterpret_cast<char*>(buffer) + size));
-}
 
 template<typename Key, typename Value>
 bool MapsEqual(const std::map<Key, Value>& left, const std::map<Key, Value>& right)
@@ -224,9 +221,9 @@ struct DataPlaneInSharedMemory
 	{
 		auto count_errors = static_cast<uint32_t>(common::idp::errorType::size);
 		auto count_requests = static_cast<uint32_t>(common::idp::requestType::size);
-		auto* requests = common::sdp::ShiftBuffer<uint64_t*>(dataplane_data, start_bus_section);
-		auto* errors = common::sdp::ShiftBuffer<uint64_t*>(dataplane_data, start_bus_section + count_requests * sizeof(uint64_t));
-		auto* durations = common::sdp::ShiftBuffer<uint64_t*>(dataplane_data, start_bus_section + (count_requests + count_errors) * sizeof(uint64_t));
+		auto* requests = ShiftBuffer<uint64_t*>(dataplane_data, start_bus_section);
+		auto* errors = ShiftBuffer<uint64_t*>(dataplane_data, start_bus_section + count_requests * sizeof(uint64_t));
+		auto* durations = ShiftBuffer<uint64_t*>(dataplane_data, start_bus_section + (count_requests + count_errors) * sizeof(uint64_t));
 		return {requests, errors, durations};
 	}
 };

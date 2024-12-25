@@ -4,3 +4,6 @@
 [submodule "subprojects/json"]
 	path = subprojects/json
 	url = https://github.com/nlohmann/json.git
+[submodule "subprojects/pcap"]
+	path = subprojects/pcap
+	url = https://github.com/seladb/PcapPlusPlus.git
