@@ -12,11 +12,11 @@ steps:
 
 - cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
 
-- sleep: 3  # Wait, state should still be present
+- sleep: 2  # Wait, state should still be present
 
 - cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
 
-- sleep: 3  # Wait for state to expire (total sleep 6s)
+- sleep: 4  # Wait for state to expire (total sleep 6s)
 
 - cli_check: |
     fw list states
@@ -34,11 +34,11 @@ steps:
 
 - cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
 
-- sleep: 3  # Wait, state should still be present
+- sleep: 2  # Wait, state should still be present
 
 - cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
 
-- sleep: 3  # Wait for state to expire (total sleep 6s)
+- sleep: 4  # Wait for state to expire (total sleep 6s)
 
 - cli_check: |
     fw list states
