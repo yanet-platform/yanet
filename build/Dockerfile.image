@@ -69,4 +69,5 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/yanet/build/controlplane/yanet-controlplane /usr/bin/
 COPY --from=builder /opt/yanet/build/dataplane/yanet-dataplane /usr/bin/
 COPY --from=builder /opt/yanet/build/cli/yanet-cli /usr/bin/
+COPY --from=builder /opt/yanet/build/logger/yanet-logger /usr/bin/
 COPY --from=builder /opt/yanet/yanet-announcer.py /usr/bin/yanet-announcer

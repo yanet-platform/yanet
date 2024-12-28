@@ -21,6 +21,7 @@ override_dh_auto_install:
 	install -pD -m0755 yanet-cli.bash_completion debian/tmp/etc/bash_completion.d/yanet-cli
 	install -pD -m0755 yanet-cli.zsh_completion debian/tmp/usr/share/zsh/vendor-completions/_yanet-cli
 	install -pD -m0755 build/dataplane/yanet-dataplane -t debian/tmp/usr/bin
+	install -pD -m0755 build/logger/yanet-logger -t debian/tmp/usr/bin
 	install -pD -m0755 misc/yanet-dataplane.service -t debian/tmp/lib/systemd/system
 	install -pD -m0755 misc/yanet-controlplane.service -t debian/tmp/lib/systemd/system
 	install -pD -m0775 libprotobuf/meta.proto -t debian/tmp/usr/include/yanet/
