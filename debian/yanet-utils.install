@@ -1,3 +1,4 @@
+usr/bin/yanet-logger
 usr/bin/yanet-announcer.py
 usr/bin/yanet-rebind.sh
 usr/bin/yanet-init.sh
