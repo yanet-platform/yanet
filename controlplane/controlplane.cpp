@@ -936,8 +936,10 @@ eResult cControlPlane::loadConfig(const std::string& rootFilePath,
 		}
 
 		YANET_LOG_INFO("dataplane has been updated (stage 7)\n");
-		for(auto& module : modules) {
-			if (rib_t* rib = dynamic_cast<rib_t*>(module)) {
+		for (auto& module : modules)
+		{
+			if (rib_t* rib = dynamic_cast<rib_t*>(module))
+			{
 				rib->bird_import_get();
 				rib->moduleStart();
 			}
