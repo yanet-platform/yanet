@@ -1487,6 +1487,16 @@ void tAutotest::mainThread()
 
 					result = step_dumpPackets(yamlStep["dumpPackets"], configFilePath);
 				}
+				else if (yamlStep["bird"])
+				{
+					YANET_LOG_DEBUG("step: bird\n");
+
+					result = step_bird(yamlStep["bird"], configFilePath);
+				}
+				else if (yamlStep["birdc"])
+				{
+					YANET_LOG_DEBUG("step: birdc\n");
+				}
 				else
 				{
 					YANET_LOG_ERROR("unknown step\n");
@@ -2003,6 +2013,42 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 		}
 	}
 
+	return true;
+}
+
+bool tAutotest::step_bird(const YAML::Node& yamlStep,
+                          const std::string& path)
+{
+	std::string confPath;
+	for (const auto& yamlIter : yamlStep)
+	{
+		confPath = yamlIter.as<std::string>();
+	}
+
+	if (!confPath.empty())
+	{
+		const std::string execCommand = "bird -c " + path + confPath;
+
+		std::string resExec = exec(execCommand.c_str());
+
+		printf("%s", resExec.data());
+
+		return true;
+	}
+	return false;
+}
+
+bool tAutotest::step_birdc(const YAML::Node& yamlStep)
+{
+	std::string command = "birdc ";
+	for (const auto& yamlIter : yamlStep)
+	{
+		command += yamlIter.as<std::string>() + " ";
+	}
+
+	auto res_birdc = exec(command.c_str());
+
+	printf("birdc:\n %s\n", res_birdc.data());
 	return true;
 }
 
