@@ -61,17 +61,10 @@ void network_table_t::prepare(const uint32_t height, const uint32_t width)
 
 void network_table_t::compile()
 {
-	for (unsigned int filter_id = 0;
-	     filter_id < filters.size();
-	     filter_id++)
+	for (auto [network_ipv4_source_filter_id, network_ipv4_destination_filter_id, network_ipv6_source_filter_id, network_ipv6_destination_filter_id] : filters)
 	{
 		remap_group_ids.clear();
 		remap_group_ids.resize(group_id, 0);
-
-		const auto& [network_ipv4_source_filter_id,
-		             network_ipv4_destination_filter_id,
-		             network_ipv6_source_filter_id,
-		             network_ipv6_destination_filter_id] = filters[filter_id];
 
 		const auto& network_ipv4_source_group_ids = compiler->network_ipv4_source.filter_group_ids[network_ipv4_source_filter_id];
 		const auto& network_ipv4_destination_group_ids = compiler->network_ipv4_destination.filter_group_ids[network_ipv4_destination_filter_id];

@@ -15,101 +15,16 @@
 
 #include "common/idp.h"
 #include "common/result.h"
-#include "common/type.h"
 
-#include "dregress.h"
-#include "fragmentation.h"
+#include "dataplane/dregress.h"
+#include "dataplane/kernel_interface_handler.h"
+#include "kernel_interface_handle.h"
 #include "type.h"
+#include "utils.h"
 
 class cControlPlane ///< @todo: move to cDataPlane
 {
-public:
-	cControlPlane(cDataPlane* dataPlane);
-	virtual ~cControlPlane();
-
-	eResult init(bool use_kernel_interface);
-	void start();
-	void stop();
-	void join();
-
-	common::idp::updateGlobalBase::response updateGlobalBase(const common::idp::updateGlobalBase::request& request);
-	eResult updateGlobalBaseBalancer(const common::idp::updateGlobalBaseBalancer::request& request);
-	common::idp::getGlobalBase::response getGlobalBase(const common::idp::getGlobalBase::request& request);
-	common::idp::getWorkerStats::response getWorkerStats(const common::idp::getWorkerStats::request& request);
-	common::idp::getSlowWorkerStats::response getSlowWorkerStats();
-	common::idp::get_worker_gc_stats::response get_worker_gc_stats();
-	common::idp::get_dregress_counters::response get_dregress_counters();
-	common::idp::get_ports_stats::response get_ports_stats();
-	common::idp::get_ports_stats_extended::response get_ports_stats_extended();
-	common::idp::getControlPlanePortStats::response getControlPlanePortStats(const common::idp::getControlPlanePortStats::request& request);
-	common::idp::getPortStatsEx::response getPortStatsEx();
-	common::idp::getFragmentationStats::response getFragmentationStats();
-	common::idp::getFWState::response getFWState();
-	common::idp::getFWStateStats::response getFWStateStats();
-	eResult clearFWState();
-	common::idp::getAclCounters::response getAclCounters();
-	common::idp::getCounters::response getCounters(const common::idp::getCounters::request& request);
-	common::idp::getOtherStats::response getOtherStats();
-	common::idp::getConfig::response getConfig() const;
-	common::idp::getErrors::response getErrors();
-	common::idp::getReport::response getReport();
-	common::idp::lpm4LookupAddress::response lpm4LookupAddress(const common::idp::lpm4LookupAddress::request& request);
-	common::idp::lpm6LookupAddress::response lpm6LookupAddress(const common::idp::lpm6LookupAddress::request& request);
-	common::idp::limits::response limits();
-	common::idp::samples::response samples();
-	common::idp::balancer_connection::response balancer_connection(const common::idp::balancer_connection::request& request);
-	common::idp::balancer_service_connections::response balancer_service_connections();
-	common::idp::balancer_real_connections::response balancer_real_connections();
-	eResult debug_latch_update(const common::idp::debug_latch_update::request& request);
-	eResult unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request);
-	eResult update_vip_vport_proto(const common::idp::update_vip_vport_proto::request& request);
-	common::idp::version::response version();
-	common::idp::get_counter_by_name::response get_counter_by_name(const common::idp::get_counter_by_name::request& request);
-	common::idp::nat64stateful_state::response nat64stateful_state(const common::idp::nat64stateful_state::request& request);
-	common::idp::get_shm_info::response get_shm_info();
-	common::idp::get_shm_tsc_info::response get_shm_tsc_info();
-	eResult dump_physical_port(const common::idp::dump_physical_port::request& request);
-	eResult balancer_state_clear();
-
-	void switchBase();
-	void switchGlobalBase();
-	virtual void waitAllWorkers();
-
-	void sendPacketToSlowWorker(rte_mbuf* mbuf, const common::globalBase::tFlow& flow); ///< @todo: remove flow
-	void freeWorkerPacket(rte_ring* ring_to_free_mbuf, rte_mbuf* mbuf);
-
 protected:
-	eResult initMempool();
-	eResult init_kernel_interfaces();
-	std::optional<tPortId> add_kernel_interface(const tPortId port_id, const std::string& interface_name);
-	void remove_kernel_interface(const tPortId port_id, const std::string& interface_name);
-	void set_kernel_interface_up(const std::string& interface_name);
-
-	void mainThread();
-	unsigned ring_handle(rte_ring* ring_to_free_mbuf, rte_ring* ring);
-
-	void handlePacketFromForwardingPlane(rte_mbuf* mbuf); ///< @todo: rename
-	void handlePacket_icmp_translate_v6_to_v4(rte_mbuf* mbuf);
-	void handlePacket_icmp_translate_v4_to_v6(rte_mbuf* mbuf);
-	void handlePacket_dregress(rte_mbuf* mbuf);
-	void handlePacket_repeat(rte_mbuf* mbuf);
-	void handlePacket_fragment(rte_mbuf* mbuf);
-	void handlePacket_farm(rte_mbuf* mbuf);
-	void handlePacket_fw_state_sync(rte_mbuf* mbuf);
-	bool handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf);
-	void handlePacket_balancer_icmp_forward(rte_mbuf* mbuf);
-	void handlePacket_dump(rte_mbuf* mbuf);
-
-	void SWRateLimiterTimeTracker();
-
-	rte_mbuf* convertMempool(rte_ring* ring_to_free_mbuf, rte_mbuf* mbuf);
-
-protected:
-	friend class cReport;
-	friend class cDataPlane;
-	friend class dataplane::globalBase::generation;
-	friend class dregress_t;
-
 	struct sKniStats
 	{
 		uint64_t ipackets = 0;
@@ -120,18 +35,104 @@ protected:
 		uint64_t odropped = 0;
 	};
 
-	cDataPlane* dataPlane;
+public:
+	cControlPlane(cDataPlane* dataPlane);
+	virtual ~cControlPlane() = default;
 
-	fragmentation_t fragmentation;
-	dregress_t dregress;
+	eResult init(bool use_kernel_interface);
+	void stop();
+	void join();
+
+	common::idp::updateGlobalBase::response updateGlobalBase(const common::idp::updateGlobalBase::request& request);
+	eResult updateGlobalBaseBalancer(const common::idp::updateGlobalBaseBalancer::request& request);
+	common::idp::getGlobalBase::response getGlobalBase(const common::idp::getGlobalBase::request& request);
+	common::idp::getWorkerStats::response getWorkerStats(const common::idp::getWorkerStats::request& request);
+	[[nodiscard]] common::slowworker::stats_t SlowWorkerStats() const;
+	common::idp::getSlowWorkerStats::response SlowWorkerStatsResponse();
+	common::idp::get_worker_gc_stats::response get_worker_gc_stats();
+	common::idp::get_dregress_counters::response get_dregress_counters();
+	common::idp::get_ports_stats::response get_ports_stats();
+	common::idp::get_ports_stats_extended::response get_ports_stats_extended();
+	common::idp::getControlPlanePortStats::response getControlPlanePortStats(const common::idp::getControlPlanePortStats::request& request);
+	common::idp::getPortStatsEx::response getPortStatsEx();
+	[[nodiscard]] common::idp::getFragmentationStats::response getFragmentationStats() const;
+	[[nodiscard]] common::dregress::stats_t DregressStats() const;
+	[[nodiscard]] std::optional<std::reference_wrapper<const dataplane::sKniStats>> KniStats(tPortId) const;
+	[[nodiscard]] dataplane::hashtable_chain_spinlock_stats_t DregressConnectionsStats() const;
+	[[nodiscard]] dregress::LimitsStats DregressLimitsStats() const;
+	common::idp::getFWState::response getFWState();
+	common::idp::getFWStateStats::response getFWStateStats();
+	eResult clearFWState();
+	[[nodiscard]] common::idp::getConfig::response getConfig() const;
+	common::idp::getErrors::response getErrors();
+	common::idp::getReport::response getReport();
+	common::idp::lpm4LookupAddress::response lpm4LookupAddress(const common::idp::lpm4LookupAddress::request& request);
+	common::idp::lpm6LookupAddress::response lpm6LookupAddress(const common::idp::lpm6LookupAddress::request& request);
+	common::idp::limits::response limits();
+	common::idp::samples::response samples();
+	common::idp::hitcount_dump::response hitcount_dump();
+	common::idp::balancer_connection::response balancer_connection(const common::idp::balancer_connection::request& request);
+	common::idp::balancer_service_connections::response balancer_service_connections();
+	common::idp::balancer_real_connections::response balancer_real_connections();
+	eResult debug_latch_update(const common::idp::debug_latch_update::request& request);
+	eResult unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request);
+	eResult update_vip_vport_proto(const common::idp::update_vip_vport_proto::request& request);
+	common::idp::version::response version();
+	common::idp::nat64stateful_state::response nat64stateful_state(const common::idp::nat64stateful_state::request& request);
+	common::idp::get_shm_info::response get_shm_info();
+	common::idp::get_shm_tsc_info::response get_shm_tsc_info();
+	eResult dump_physical_port(const common::idp::dump_physical_port::request& request);
+	eResult balancer_state_clear();
+
+	void switchBase();
+	void switchGlobalBase();
+	virtual void waitAllWorkers();
+
+private:
+	[[nodiscard]] const std::vector<cWorker*>& workers_vector() const;
+	[[nodiscard]] const std::map<tCoreId, dataplane::SlowWorker*>& slow_workers() const;
+
+	template<typename F>
+	// @brief returns sum of results of applying F to all cWorker*s
+	auto accumulateWorkerStats(F func) const
+	{
+		using R = std::invoke_result_t<F, cWorker*>;
+		return std::accumulate(
+		        workers_vector().begin(),
+		        workers_vector().end(),
+		        R{},
+		        [func](R total, cWorker* worker) {
+			        total += func(worker);
+			        return total;
+		        });
+	}
+
+	template<typename F>
+	// @brief returns sum of results of applying F to all SlowWorker*s
+	auto accumulateSlowWorkerStats(F func) const
+	{
+		using R = std::invoke_result_t<F, dataplane::SlowWorker*>;
+		return std::accumulate(
+		        slow_workers().begin(),
+		        slow_workers().end(),
+		        R{},
+		        [&func](R total, const auto& pair) {
+			        total += func(pair.second);
+			        return total;
+		        });
+	}
+
+protected:
+	friend class cReport;
+	friend class cDataPlane;
+	friend class dataplane::globalBase::generation;
+	friend class dregress_t;
+
+	cDataPlane* dataPlane;
 
 	std::mutex mutex;
 	std::mutex balancer_mutex;
-	std::mutex unrdup_mutex;
-	std::mutex interfaces_ips_mutex;
-	std::mutex vip_vport_proto_mutex;
 
-	rte_mempool* mempool;
 	bool use_kernel_interface;
 
 	struct KniPortData
@@ -154,20 +155,19 @@ protected:
 	common::slowworker::stats_t stats;
 	common::idp::getErrors::response errors; ///< @todo: class errorsManager
 
-	cWorker* slowWorker;
 	std::queue<std::tuple<rte_mbuf*,
 	                      common::globalBase::tFlow>>
 	        slowWorkerMbufs;
-	std::mutex fw_state_multicast_acl_ids_mutex;
-	std::map<common::ipv6_address_t, tAclId> fw_state_multicast_acl_ids;
 
-	// provided by unrdup.cfg, used to clone some icmp packets to neighbor balancers, index is balancer_id
-	std::vector<std::unordered_map<common::ip_address_t, std::unordered_set<common::ip_address_t>>> vip_to_balancers;
+public:
+	using VipToBalancers = std::vector<std::unordered_map<common::ip_address_t, std::unordered_set<common::ip_address_t>>>;
+	utils::Sequential<VipToBalancers> vip_to_balancers;
+	using VipVportProto = std::vector<std::unordered_set<std::tuple<common::ip_address_t, std::optional<uint16_t>, uint8_t>>>;
 	// check presence prior to cloning
-	std::vector<std::unordered_set<std::tuple<common::ip_address_t, std::optional<uint16_t>, uint8_t>>> vip_vport_proto;
+	utils::Sequential<VipVportProto> vip_vport_proto;
+	using FwStateMulticastAclIds = std::map<common::ipv6_address_t, tAclId>;
+	utils::Sequential<FwStateMulticastAclIds> fw_state_multicast_acl_ids;
 
-	std::chrono::high_resolution_clock::time_point prevTimePointForSWRateLimiter;
-
-	uint32_t icmpOutRemainder;
+protected:
 	uint32_t gc_step;
 };

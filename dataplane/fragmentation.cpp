@@ -1,44 +1,55 @@
 #include "fragmentation.h"
 #include "common.h"
-#include "controlplane.h"
-#include "dataplane.h"
+#include "metadata.h"
 
-fragmentation_t::fragmentation_t(cControlPlane* controlPlane,
-                                 cDataPlane* dataPlane) :
-        controlPlane(controlPlane),
-        dataPlane(dataPlane)
+namespace fragmentation
 {
-	memset(&stats, 0, sizeof(stats));
+
+Fragmentation::Fragmentation(OnCollected callback) :
+        callback_{std::move(callback)}
+{}
+
+Fragmentation::Fragmentation(OnCollected callback, const FragmentationConfig& cfg) :
+        callback_{std::move(callback)},
+        config_{cfg}
+{
+	memset(&stats_, 0, sizeof(stats_));
 }
 
-fragmentation_t::~fragmentation_t()
+Fragmentation::Fragmentation(Fragmentation&& other)
 {
-	for (const auto& [key, value] : fragments)
+	*this = std::move(other);
+}
+
+Fragmentation::~Fragmentation()
+{
+	for (const auto& [key, value] : fragments_)
 	{
-		(void)key;
+		YANET_GCC_BUG_UNUSED(key);
 
 		for (const auto& [range_from, range_value] : std::get<0>(value))
 		{
-			(void)range_from;
+			YANET_GCC_BUG_UNUSED(range_from);
 
 			const auto& [range_to, mbuf] = range_value;
-			(void)range_to;
+			YANET_GCC_BUG_UNUSED(range_to);
 
 			rte_pktmbuf_free(mbuf);
 		}
 	}
 }
 
-common::fragmentation::stats_t fragmentation_t::getStats()
+common::fragmentation::stats_t Fragmentation::getStats() const
 {
-	return stats;
+	return stats_;
 }
 
-void fragmentation_t::insert(rte_mbuf* mbuf)
+void Fragmentation::insert(rte_mbuf* mbuf)
 {
-	if (stats.current_count_packets > dataPlane->getConfigValues().fragmentation_size)
+	if (stats_.current_count_packets > config_.size)
 	{
-		stats.total_overflow_packets++;
+		YANET_LOG_DEBUG("Frag limit exceeded\n");
+		stats_.total_overflow_packets++;
 		rte_pktmbuf_free(mbuf);
 		return;
 	}
@@ -48,7 +59,7 @@ void fragmentation_t::insert(rte_mbuf* mbuf)
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 	if (!(metadata->network_flags & YANET_NETWORK_FLAG_FRAGMENT))
 	{
-		stats.not_fragment_packets++;
+		stats_.not_fragment_packets++;
 		rte_pktmbuf_free(mbuf);
 		return;
 	}
@@ -67,7 +78,7 @@ void fragmentation_t::insert(rte_mbuf* mbuf)
 
 		if (range_from == range_to)
 		{
-			stats.empty_packets++;
+			stats_.empty_packets++;
 			rte_pktmbuf_free(mbuf);
 			return;
 		}
@@ -98,7 +109,7 @@ void fragmentation_t::insert(rte_mbuf* mbuf)
 
 		if (range_from == range_to)
 		{
-			stats.empty_packets++;
+			stats_.empty_packets++;
 			rte_pktmbuf_free(mbuf);
 			return;
 		}
@@ -120,33 +131,33 @@ void fragmentation_t::insert(rte_mbuf* mbuf)
 	}
 	else
 	{
-		stats.unknown_network_type_packets++;
+		stats_.unknown_network_type_packets++;
 		rte_pktmbuf_free(mbuf);
 		return;
 	}
 
-	if (!exist(fragments, key))
+	if (!exist(fragments_, key))
 	{
-		fragments[key] = {{{range_from,
-		                    {range_to,
-		                     mbuf}}},
-		                  currentTime,
-		                  currentTime};
+		fragments_[key] = {{{range_from,
+		                     {range_to,
+		                      mbuf}}},
+		                   currentTime,
+		                   currentTime};
 	}
 	else
 	{
-		auto& value = fragments[key];
+		auto& value = fragments_[key];
 
-		if (std::get<0>(value).size() > dataPlane->getConfigValues().fragmentation_packets_per_flow)
+		if (std::get<0>(value).size() > config_.packets_per_flow)
 		{
-			stats.flow_overflow_packets++;
+			stats_.flow_overflow_packets++;
 			rte_pktmbuf_free(mbuf);
 			return;
 		}
 
 		if (isIntersect(value, range_from, range_to))
 		{
-			stats.intersect_packets++;
+			stats_.intersect_packets++;
 			rte_pktmbuf_free(mbuf);
 			return;
 		}
@@ -155,14 +166,14 @@ void fragmentation_t::insert(rte_mbuf* mbuf)
 		std::get<2>(value) = currentTime;
 	}
 
-	stats.current_count_packets++;
+	stats_.current_count_packets++;
 }
 
-void fragmentation_t::handle()
+void Fragmentation::handle()
 {
 	std::vector<fragmentation::key_t> gc_keys;
 
-	for (auto& [key, value] : fragments)
+	for (auto& [key, value] : fragments_)
 	{
 		if (isTimeout(value))
 		{
@@ -206,16 +217,16 @@ void fragmentation_t::handle()
 
 			for (auto& [range_from, range_value] : std::get<0>(value))
 			{
-				(void)range_from;
+				YANET_GCC_BUG_UNUSED(range_from);
 
 				const auto& [range_to, mbuf] = range_value;
-				(void)range_to;
+				YANET_GCC_BUG_UNUSED(range_to);
 
 				dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 				metadata->flow.data = firstPacket_metadata->flow.data;
 
-				controlPlane->sendPacketToSlowWorker(mbuf, metadata->flow);
-				stats.current_count_packets--;
+				callback_(mbuf, metadata->flow);
+				stats_.current_count_packets--;
 			}
 
 			std::get<0>(value).clear();
@@ -225,33 +236,33 @@ void fragmentation_t::handle()
 
 	for (const auto& key : gc_keys)
 	{
-		for (auto& [range_from, range_value] : std::get<0>(fragments[key]))
+		for (auto& [range_from, range_value] : std::get<0>(fragments_[key]))
 		{
-			(void)range_from;
+			YANET_GCC_BUG_UNUSED(range_from);
 
 			const auto& [range_to, mbuf] = range_value;
-			(void)range_to;
+			YANET_GCC_BUG_UNUSED(range_to);
 
-			stats.timeout_packets++;
+			stats_.timeout_packets++;
 			rte_pktmbuf_free(mbuf);
 
-			stats.current_count_packets--;
+			stats_.current_count_packets--;
 		}
 
-		fragments.erase(key);
+		fragments_.erase(key);
 	}
 }
 
-bool fragmentation_t::isTimeout(const fragmentation::value_t& value)
+bool Fragmentation::isTimeout(const fragmentation::value_t& value) const
 {
 	uint16_t currentTime = time(nullptr);
 
-	if ((uint16_t)(currentTime - std::get<1>(value)) >= dataPlane->getConfigValues().fragmentation_timeout_first)
+	if ((uint16_t)(currentTime - std::get<1>(value)) >= config_.timeout_first)
 	{
 		return true;
 	}
 
-	if ((uint16_t)(currentTime - std::get<2>(value)) >= dataPlane->getConfigValues().fragmentation_timeout_last)
+	if ((uint16_t)(currentTime - std::get<2>(value)) >= config_.timeout_last)
 	{
 		return true;
 	}
@@ -259,13 +270,13 @@ bool fragmentation_t::isTimeout(const fragmentation::value_t& value)
 	return false;
 }
 
-bool fragmentation_t::isCollected(const fragmentation::value_t& value)
+bool Fragmentation::isCollected(const fragmentation::value_t& value) const
 {
 	uint32_t next_range_from = 0;
 	for (const auto& [range_from, range_value] : std::get<0>(value))
 	{
 		const auto& [range_to, mbuf] = range_value;
-		(void)mbuf;
+		YANET_GCC_BUG_UNUSED(mbuf);
 
 		if (range_from != next_range_from)
 		{
@@ -283,14 +294,14 @@ bool fragmentation_t::isCollected(const fragmentation::value_t& value)
 	return false;
 }
 
-bool fragmentation_t::isIntersect(const fragmentation::value_t& value,
-                                  const uint32_t& second_range_from,
-                                  const uint32_t& second_range_to)
+bool Fragmentation::isIntersect(const fragmentation::value_t& value,
+                                const uint32_t& second_range_from,
+                                const uint32_t& second_range_to) const
 {
 	for (const auto& [range_from, range_value] : std::get<0>(value))
 	{
 		const auto& [range_to, mbuf] = range_value;
-		(void)mbuf;
+		YANET_GCC_BUG_UNUSED(mbuf);
 
 		if (second_range_to < range_from)
 		{
@@ -306,3 +317,4 @@ bool fragmentation_t::isIntersect(const fragmentation::value_t& value,
 
 	return false;
 }
+} // namespace fragmentation

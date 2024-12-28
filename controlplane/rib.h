@@ -1,27 +1,11 @@
 #pragma once
 
-#include <array>
-#include <atomic>
-#include <functional>
-#include <map>
-#include <mutex>
-#include <set>
-#include <tuple>
-#include <unordered_map>
-#include <unordered_set>
-
-#include "common/icp.h"
-#include "common/idataplane.h"
-#include "common/idp.h"
-
-#include "isystem.h"
 #include "module.h"
-#include "type.h"
+#include <atomic>
+#include <mutex>
 
 namespace rib
 {
-
-using nexthop_t = common::rib::nexthop_t;
 
 using vrf_priority_t = common::rib::vrf_priority_t;
 
@@ -38,8 +22,8 @@ using path_info_to_nexthop_stuff_ptr_t = common::rib::path_info_to_nexthop_stuff
 class rib_t : public cModule
 {
 public:
-	rib_t();
-	~rib_t() override;
+	rib_t() = default;
+	~rib_t() override = default;
 
 	eResult init() override;
 	void reload(const controlplane::base_t& base_prev, const controlplane::base_t& base_next, common::idp::updateGlobalBase::request& globalbase) override;
@@ -95,8 +79,8 @@ protected:
 	                              std::string, ///< protocol
 	                              ip_address_t, ///< peer
 	                              std::string>, ///< table_name
-	                   std::tuple<common::uint64,
-	                              common::uint64,
-	                              common::uint8>>
+	                   std::tuple<common::uint64, ///< prefixes
+	                              common::uint64, ///< paths
+	                              common::uint8>> ///< eor
 	        summary;
 };

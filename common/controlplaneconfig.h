@@ -3,8 +3,8 @@
 #include <nlohmann/json.hpp>
 
 #include "balancer.h"
+#include "define.h"
 #include "scheduler.h"
-#include "stream.h"
 #include "type.h"
 
 namespace controlplane
@@ -13,15 +13,7 @@ namespace controlplane
 class state_timeout
 {
 public:
-	state_timeout() :
-	        tcp_syn(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
-	        tcp_ack(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
-	        tcp_fin(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
-	        udp(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
-	        icmp(YANET_CONFIG_STATE_TIMEOUT_DEFAULT),
-	        other(YANET_CONFIG_STATE_TIMEOUT_DEFAULT)
-	{
-	}
+	state_timeout() = default;
 
 	operator std::tuple<uint16_t, uint16_t, uint16_t, uint16_t, uint16_t, uint16_t>() const
 	{
@@ -29,12 +21,12 @@ public:
 	}
 
 public:
-	uint16_t tcp_syn;
-	uint16_t tcp_ack;
-	uint16_t tcp_fin;
-	uint16_t udp;
-	uint16_t icmp;
-	uint16_t other;
+	uint16_t tcp_syn{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
+	uint16_t tcp_ack{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
+	uint16_t tcp_fin{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
+	uint16_t udp{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
+	uint16_t icmp{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
+	uint16_t other{YANET_CONFIG_STATE_TIMEOUT_DEFAULT};
 };
 
 [[maybe_unused]] static void from_json(const nlohmann::json& json,
@@ -90,42 +82,14 @@ namespace route
 class interface_t
 {
 public:
-	interface_t()
-	{
-	}
+	interface_t() = default;
 
 	/** @todo: tag:CP_MODULES
 	void load(const nlohmann::json& json);
 	nlohmann::json save() const;
 	*/
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(interfaceId);
-		stream.pop(ip_prefixes);
-		stream.pop(neighborIPv4Address);
-		stream.pop(neighborIPv6Address);
-		stream.pop(static_neighbor_mac_address_v4);
-		stream.pop(static_neighbor_mac_address_v6);
-		stream.pop(nextModule);
-		stream.pop(acl);
-		stream.pop(aclId);
-		stream.pop(flow);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(interfaceId);
-		stream.push(ip_prefixes);
-		stream.push(neighborIPv4Address);
-		stream.push(neighborIPv6Address);
-		stream.push(static_neighbor_mac_address_v4);
-		stream.push(static_neighbor_mac_address_v6);
-		stream.push(nextModule);
-		stream.push(acl);
-		stream.push(aclId);
-		stream.push(flow);
-	}
+	SERIALIZABLE(interfaceId, ip_prefixes, neighborIPv4Address, neighborIPv6Address, static_neighbor_mac_address_v4, static_neighbor_mac_address_v6, nextModule, acl, aclId, flow);
 
 public:
 	tInterfaceId interfaceId;
@@ -144,19 +108,7 @@ public:
 class bird_import_t
 {
 public:
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(socket);
-		stream.pop(vrf);
-		stream.pop(flow);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(socket);
-		stream.push(vrf);
-		stream.push(flow);
-	}
+	SERIALIZABLE(socket, vrf);
 
 public:
 	inline static const std::string socketStr = "socket";
@@ -164,60 +116,25 @@ public:
 
 	std::string socket;
 	std::string vrf;
-	common::globalBase::tFlow flow;
 };
 
 class config_t
 {
 public:
-	config_t() :
-	        vrf("default"),
-	        tunnel_enabled(false)
-	{
-	}
+	config_t() = default;
 
 	/** @todo: tag:CP_MODULES
 	void load(const nlohmann::json& json);
 	nlohmann::json save() const;
 	*/
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(routeId);
-		stream.pop(to_kernel_prefixes);
-		stream.pop(vrf);
-		stream.pop(tunnel_enabled);
-		stream.pop(ignore_tables);
-		stream.pop(ipv4_source_address);
-		stream.pop(ipv6_source_address);
-		stream.pop(udp_destination_port);
-		stream.pop(local_prefixes);
-		stream.pop(peers);
-		stream.pop(interfaces);
-		stream.pop(bird_imports);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(routeId);
-		stream.push(to_kernel_prefixes);
-		stream.push(vrf);
-		stream.push(tunnel_enabled);
-		stream.push(ignore_tables);
-		stream.push(ipv4_source_address);
-		stream.push(ipv6_source_address);
-		stream.push(udp_destination_port);
-		stream.push(local_prefixes);
-		stream.push(peers);
-		stream.push(interfaces);
-		stream.push(bird_imports);
-	}
+	SERIALIZABLE(routeId, to_kernel_prefixes, vrf, tunnel_enabled, ignore_tables, ipv4_source_address, ipv6_source_address, udp_destination_port, local_prefixes, peers, interfaces, bird_imports);
 
 public:
 	tRouteId routeId;
 	std::set<common::ip_prefix_t> to_kernel_prefixes;
-	std::string vrf;
-	bool tunnel_enabled;
+	std::string vrf{"default"};
+	bool tunnel_enabled{};
 	std::set<std::string> ignore_tables;
 	common::ipv4_address_t ipv4_source_address;
 	common::ipv6_address_t ipv6_source_address;
@@ -241,37 +158,7 @@ public:
 	nlohmann::json save() const;
 	*/
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(dregressId);
-		stream.pop(ipv6SourcePrefixes);
-		stream.pop(ipv6DestinationPrefix);
-		stream.pop(ipv4SourceAddress);
-		stream.pop(ipv6SourceAddress);
-		stream.pop(udpDestinationPort);
-		stream.pop(onlyLongest);
-		stream.pop(communities);
-		stream.pop(localPrefixes);
-		stream.pop(announces);
-		stream.pop(ourAs);
-		stream.pop(nextModule);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(dregressId);
-		stream.push(ipv6SourcePrefixes);
-		stream.push(ipv6DestinationPrefix);
-		stream.push(ipv4SourceAddress);
-		stream.push(ipv6SourceAddress);
-		stream.push(udpDestinationPort);
-		stream.push(onlyLongest);
-		stream.push(communities);
-		stream.push(localPrefixes);
-		stream.push(announces);
-		stream.push(ourAs);
-		stream.push(nextModule);
-	}
+	SERIALIZABLE(dregressId, ipv6SourcePrefixes, ipv6DestinationPrefix, ipv4SourceAddress, ipv6SourceAddress, udpDestinationPort, onlyLongest, communities, localPrefixes, announces, ourAs, nextModule);
 
 public:
 	dregress_id_t dregressId;
@@ -293,8 +180,7 @@ public:
 namespace balancer
 {
 
-YANET_UNUSED
-static uint8_t to_proto(const std::string& string)
+[[maybe_unused]] static uint8_t to_proto(const std::string& string)
 {
 	if (string == "tcp")
 	{
@@ -308,8 +194,7 @@ static uint8_t to_proto(const std::string& string)
 	return 0;
 }
 
-YANET_UNUSED
-constexpr const char* from_proto(const uint8_t& proto)
+[[maybe_unused]] constexpr const char* from_proto(const uint8_t& proto)
 {
 	switch (proto)
 	{
@@ -346,37 +231,14 @@ using service_t = std::tuple<balancer_service_id_t,
 class config_t
 {
 public:
-	config_t() :
-	        reals_count(0)
-	{
-	}
+	config_t() = default;
 
 	/** @todo: tag:CP_MODULES
 	void load(const nlohmann::json& json);
 	nlohmann::json save() const;
 	*/
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(balancer_id);
-		stream.pop(services);
-		stream.pop(source_ipv6);
-		stream.pop(source_ipv4);
-		stream.pop(vip_to_balancers);
-		stream.pop(default_wlc_power);
-		stream.pop(next_module);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(balancer_id);
-		stream.push(services);
-		stream.push(source_ipv6);
-		stream.push(source_ipv4);
-		stream.push(vip_to_balancers);
-		stream.push(default_wlc_power);
-		stream.push(next_module);
-	}
+	SERIALIZABLE(balancer_id, services, source_ipv6, source_ipv4, vip_to_balancers, default_wlc_power, next_module);
 
 public:
 	balancer_id_t balancer_id;
@@ -393,7 +255,7 @@ public:
 	std::string next_module;
 	common::globalBase::tFlow flow;
 
-	uint64_t reals_count;
+	uint64_t reals_count{};
 };
 
 }
@@ -404,50 +266,23 @@ namespace tun64
 class config_t
 {
 public:
-	config_t() :
-	        dscpMarkType(common::eDscpMarkType::never),
-	        dscp(0),
-	        srcRndEnabled(false)
-	{
-	}
+	config_t() = default;
 
 	/** @todo: tag:CP_MODULES
        void load(const nlohmann::json& json);
        nlohmann::json save() const;
        */
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(tun64Id);
-		stream.pop(dscpMarkType);
-		stream.pop(dscp);
-		stream.pop(ipv6SourceAddress);
-		stream.pop(srcRndEnabled);
-		stream.pop(prefixes);
-		stream.pop(mappings);
-		stream.pop(nextModule);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(tun64Id);
-		stream.push(dscpMarkType);
-		stream.push(dscp);
-		stream.push(ipv6SourceAddress);
-		stream.push(srcRndEnabled);
-		stream.push(prefixes);
-		stream.push(mappings);
-		stream.push(nextModule);
-	}
+	SERIALIZABLE(tun64Id, dscpMarkType, dscp, ipv6SourceAddress, srcRndEnabled, prefixes, mappings, nextModule);
 
 public:
 	tun64_id_t tun64Id;
 
-	common::eDscpMarkType dscpMarkType;
-	uint8_t dscp;
+	common::eDscpMarkType dscpMarkType{common::eDscpMarkType::never};
+	uint8_t dscp{};
 
 	common::ipv6_address_t ipv6SourceAddress;
-	bool srcRndEnabled; /// < IPv6 Source address randomization
+	bool srcRndEnabled{}; /// < IPv6 Source address randomization
 
 	std::set<common::ip_prefix_t> prefixes;
 	std::map<common::ipv4_address_t,
@@ -467,38 +302,14 @@ namespace nat64stateful
 class config_t
 {
 public:
-	config_t() :
-	        dscp_mark_type(common::eDscpMarkType::never),
-	        dscp(0)
-	{
-	}
+	config_t() = default;
 
-	void pop(common::stream_in_t& stream)
-	{
-		stream.pop(nat64stateful_id);
-		stream.pop(dscp_mark_type);
-		stream.pop(dscp);
-		stream.pop(ipv6_prefixes);
-		stream.pop(ipv4_prefixes);
-		stream.pop(announces);
-		stream.pop(next_module);
-	}
-
-	void push(common::stream_out_t& stream) const
-	{
-		stream.push(nat64stateful_id);
-		stream.push(dscp_mark_type);
-		stream.push(dscp);
-		stream.push(ipv6_prefixes);
-		stream.push(ipv4_prefixes);
-		stream.push(announces);
-		stream.push(next_module);
-	}
+	SERIALIZABLE(nat64stateful_id, dscp_mark_type, dscp, ipv6_prefixes, ipv4_prefixes, announces, next_module);
 
 public:
 	nat64stateful_id_t nat64stateful_id;
-	common::eDscpMarkType dscp_mark_type;
-	uint8_t dscp;
+	common::eDscpMarkType dscp_mark_type{common::eDscpMarkType::never};
+	uint8_t dscp{};
 	std::vector<common::ipv6_prefix_t> ipv6_prefixes;
 	std::vector<common::ipv4_prefix_t> ipv4_prefixes;
 	std::set<common::ip_prefix_t> announces;

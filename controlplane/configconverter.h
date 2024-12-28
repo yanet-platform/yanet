@@ -1,22 +1,26 @@
 #pragma once
 
+#include <utility>
+
 #include "base.h"
+#include "common/idp.h"
+#include "common/result.h"
 
 class config_converter_t
 {
 public:
 	config_converter_t(cControlPlane* controlplane,
-	                   const controlplane::base_t& baseNext,
-	                   const common::idp::limits::response& limits) :
+	                   controlplane::base_t baseNext,
+	                   common::idp::limits::response limits) :
 	        controlplane(controlplane),
-	        baseNext(baseNext),
-	        limits(limits)
+	        baseNext(std::move(baseNext)),
+	        limits(std::move(limits))
 	{
 	}
 
 	[[nodiscard]] eResult process(uint32_t serial);
 
-	const controlplane::base_t& getBaseNext() const
+	[[nodiscard]] const controlplane::base_t& getBaseNext() const
 	{
 		return baseNext;
 	}
@@ -45,8 +49,8 @@ protected:
 	std::string checkLimit(size_t count, const std::string& limit, size_t multiplier(size_t));
 
 	void convertToFlow(const std::string& nextModule, common::globalBase::tFlow& flow) const;
-	common::globalBase::tFlow convertToFlow(std::string nextModule) const;
-	common::globalBase::tFlow convertToFlow(std::string nextModule, const std::string& entryName) const;
+	[[nodiscard]] common::globalBase::tFlow convertToFlow(std::string nextModule) const;
+	[[nodiscard]] common::globalBase::tFlow convertToFlow(std::string nextModule, const std::string& entryName) const;
 
 	void acl_rules_route_local(controlplane::base::acl_t& acl, const std::string& next_module) const;
 	void acl_rules_route_forward(controlplane::base::acl_t& acl, const std::string& next_module) const;

@@ -14,10 +14,7 @@ namespace interface
 class dataPlane
 {
 public:
-	dataPlane() :
-	        clientSocket(-1)
-	{
-	}
+	dataPlane() = default;
 
 	~dataPlane()
 	{
@@ -103,24 +100,9 @@ public:
 		return get<common::idp::requestType::clearFWState, eResult>();
 	}
 
-	common::idp::getAclCounters::response getAclCounters() const
-	{
-		return get<common::idp::requestType::getAclCounters, common::idp::getAclCounters::response>();
-	}
-
 	common::idp::getPortStatsEx::response getPortStatsEx() const
 	{
 		return get<common::idp::requestType::getPortStatsEx, common::idp::getPortStatsEx::response>();
-	}
-
-	common::idp::getCounters::response getCounters(const common::idp::getCounters::request& request) const
-	{
-		return get<common::idp::requestType::getCounters, common::idp::getCounters::response>(request);
-	}
-
-	common::idp::getOtherStats::response getOtherStats() const
-	{
-		return get<common::idp::requestType::getOtherStats, common::idp::getOtherStats::response>();
 	}
 
 	common::idp::getConfig::response getConfig() const
@@ -173,6 +155,11 @@ public:
 		return get<common::idp::requestType::samples, common::idp::samples::response>();
 	}
 
+	auto hitcount_dump() const
+	{
+		return get<common::idp::requestType::hitcount_dump, common::idp::hitcount_dump::response>();
+	}
+
 	eResult debug_latch_update(const common::idp::debug_latch_update::request& request) const
 	{
 		return get<common::idp::requestType::debug_latch_update, common::idp::debug_latch_update::response>(request);
@@ -191,11 +178,6 @@ public:
 	auto version() const
 	{
 		return get<common::idp::requestType::version, common::idp::version::response>();
-	}
-
-	auto get_counter_by_name(const common::idp::get_counter_by_name::request& request) const
-	{
-		return get<common::idp::requestType::get_counter_by_name, common::idp::get_counter_by_name::response>(request);
 	}
 
 	auto get_shm_info() const
@@ -287,7 +269,12 @@ protected:
 		int ret = connect(clientSocket, (struct sockaddr*)&address, sizeof(address));
 		if (ret == -1)
 		{
-			throw std::string("connect(): ") + strerror(errno);
+			int error = errno;
+			YANET_LOG_ERROR("Error connect to socket %s, error: %d - %s\n",
+			                common::idp::socketPath,
+			                error,
+			                strerror(error));
+			throw std::string("connect(): ") + strerror(error);
 		}
 	}
 
@@ -298,7 +285,7 @@ protected:
 	}
 
 	template<common::idp::requestType T, class Req>
-	inline common::idp::response call(const Req& request) const
+	common::idp::response call(const Req& request) const
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		connectToDataPlane();
@@ -312,7 +299,7 @@ protected:
 	}
 
 	template<common::idp::requestType T, class Req>
-	inline common::idp::response call(Req&& request) const
+	common::idp::response call(Req&& request) const
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		connectToDataPlane();
@@ -320,7 +307,7 @@ protected:
 	}
 
 protected:
-	mutable int clientSocket;
+	mutable int clientSocket{-1};
 	mutable std::mutex mutex;
 };
 

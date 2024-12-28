@@ -1,14 +1,6 @@
 #include "tun64.h"
 #include "controlplane.h"
 
-tun64_t::tun64_t()
-{
-}
-
-tun64_t::~tun64_t()
-{
-}
-
 eResult tun64_t::init()
 {
 	tunnel_counters.init(&controlPlane->counter_manager);
@@ -50,7 +42,7 @@ void tun64_t::reload(const controlplane::base_t& base_prev,
 
 		for (const auto& [ipv4_address, mapping] : tunnel.mappings)
 		{
-			(void)mapping;
+			YANET_GCC_BUG_UNUSED(mapping);
 			mappings_counters.insert({name, ipv4_address});
 		}
 	}
@@ -61,7 +53,7 @@ void tun64_t::reload(const controlplane::base_t& base_prev,
 
 		for (const auto& [ipv4_address, mapping] : tunnel.mappings)
 		{
-			(void)mapping;
+			YANET_GCC_BUG_UNUSED(mapping);
 			mappings_counters.remove({name, ipv4_address});
 		}
 	}
@@ -123,9 +115,9 @@ void tun64_t::compile(common::idp::updateGlobalBase::request& globalbase,
 {
 	for (auto& [name, tunnel] : generation_config.config_tunnels)
 	{
-		const auto counter_ids = tunnel_counters.get_ids(name);
+		const auto counter_id = tunnel_counters.get_id(name);
 
-		tunnel.flow.counter_id = counter_ids[0];
+		tunnel.flow.counter_id = counter_id;
 		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::tun64_update,
 		                        common::idp::updateGlobalBase::tun64_update::request{tunnel.tun64Id,
 		                                                                             tunnel.dscpMarkType,
@@ -139,13 +131,13 @@ void tun64_t::compile(common::idp::updateGlobalBase::request& globalbase,
 		for (const auto& [ipv4_address, mapping] : tunnel.mappings)
 		{
 			const auto& [ipv6_address, location] = mapping;
-			const auto counter_ids = mappings_counters.get_ids({name, ipv4_address});
+			const auto counter_id = mappings_counters.get_id({name, ipv4_address});
 
-			(void)location;
+			YANET_GCC_BUG_UNUSED(location);
 			tun64mappings_update_request.emplace_back(tunnel.tun64Id,
 			                                          ipv4_address,
 			                                          ipv6_address,
-			                                          counter_ids[0]);
+			                                          counter_id);
 		}
 
 		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::tun64mappings_update,

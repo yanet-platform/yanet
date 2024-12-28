@@ -1,7 +1,6 @@
 #pragma once
 
 #include "base.h"
-#include "counter.h"
 #include "module.h"
 #include "type.h"
 
@@ -18,7 +17,7 @@ public:
 	void update(const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
 	{
-		(void)base_prev;
+		YANET_GCC_BUG_UNUSED(base_prev);
 
 		vrf_fqdns = base_next.vrf_fqdns;
 

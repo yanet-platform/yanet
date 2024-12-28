@@ -1,10 +1,8 @@
 #pragma once
 
-#include <rte_byteorder.h>
 #include <rte_ether.h>
 
 #include "common/balancer.h"
-#include "common/config.h"
 #include "common/scheduler.h"
 #include "common/type.h"
 
@@ -191,7 +189,7 @@ struct ipv6_address_t
 		return !(*this == second);
 	}
 
-	bool empty() const ///< @todo: is_default()
+	[[nodiscard]] bool empty() const ///< @todo: is_default()
 	{
 		for (auto b : bytes)
 		{
@@ -301,8 +299,7 @@ struct tInterface
 
 struct nat64stateful_t
 {
-	nat64stateful_t() :
-	        pool_size(0)
+	nat64stateful_t()
 	{
 		state_timeout.tcp_syn = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
 		state_timeout.tcp_ack = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
@@ -315,7 +312,7 @@ struct nat64stateful_t
 	/// @todo: uint8_t enabled;
 
 	uint32_t pool_start;
-	uint32_t pool_size;
+	uint32_t pool_size{};
 	tCounterId counter_id;
 	uint8_t ipv4_dscp_flags;
 	struct
@@ -383,6 +380,7 @@ struct nexthop ///< @todo
 {
 	tInterfaceId interfaceId : 16;
 	uint16_t flags;
+	tCounterId counter_id;
 	ipv6_address_t neighbor_address;
 	uint32_t labelExpTransport; ///< @todo: rename first
 	uint32_t labelExpService; ///< @todo: rename second
@@ -404,12 +402,9 @@ static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid YANET_CONFIG_COUN
 
 struct route_value_t
 {
-	route_value_t() :
-	        type(common::globalBase::eNexthopType::controlPlane)
-	{
-	}
+	route_value_t() = default;
 
-	common::globalBase::eNexthopType type; ///< @todo: DELETE
+	common::globalBase::eNexthopType type{common::globalBase::eNexthopType::controlPlane}; ///< @todo: DELETE
 
 	union
 	{
@@ -424,12 +419,9 @@ struct route_value_t
 
 struct route_tunnel_value_t
 {
-	route_tunnel_value_t() :
-	        type(common::globalBase::eNexthopType::controlPlane)
-	{
-	}
+	route_tunnel_value_t() = default;
 
-	common::globalBase::eNexthopType type; ///< @todo: DELETE
+	common::globalBase::eNexthopType type{common::globalBase::eNexthopType::controlPlane}; ///< @todo: DELETE
 
 	union
 	{
@@ -589,9 +581,9 @@ struct balancer_service_t
 	uint32_t wlc_power;
 
 	/*
-		outer_source_network_flag:
-		zero byte stores the state for ipv4_router_source_network
-		first byte stores the state for ipv6_router_source_network
+	        outer_source_network_flag:
+	        zero byte stores the state for ipv4_router_source_network
+	        first byte stores the state for ipv6_router_source_network
 	*/
 	uint8_t outer_source_network_flag;
 	ipv4_prefix_t ipv4_outer_source_network;
@@ -650,7 +642,7 @@ struct fw_tcp_state_value_t
 	uint8_t src_flags : 4;
 	uint8_t dst_flags : 4;
 
-	uint8_t pack() const
+	[[nodiscard]] uint8_t pack() const
 	{
 		return src_flags | (dst_flags << 4);
 	}
@@ -738,7 +730,7 @@ struct fw_state_sync_frame_t
 	uint32_t flow_id6;
 	uint32_t extra;
 
-	static inline fw_state_sync_frame_t from_state_key(const fw4_state_key_t& key)
+	static fw_state_sync_frame_t from_state_key(const fw4_state_key_t& key)
 	{
 		fw_state_sync_frame_t sync_frame{};
 		sync_frame.proto = uint8_t(key.proto);
@@ -751,7 +743,7 @@ struct fw_state_sync_frame_t
 		return sync_frame;
 	}
 
-	static inline fw_state_sync_frame_t from_state_key(const fw6_state_key_t& key)
+	static fw_state_sync_frame_t from_state_key(const fw6_state_key_t& key)
 	{
 		fw_state_sync_frame_t sync_frame{};
 		sync_frame.proto = uint8_t(key.proto);

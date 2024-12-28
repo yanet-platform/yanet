@@ -23,6 +23,7 @@ sources = files('unittest.cpp',
                 'acl_tree.cpp',
                 'network.cpp',
                 'parser.cpp',
+                'segment_allocator.cpp',
                 'type.cpp')
 
 arch = 'corei7'

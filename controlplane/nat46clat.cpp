@@ -3,11 +3,9 @@
 
 using namespace nat46clat;
 
-void generation_config::update(const controlplane::base_t& base_prev,
+void generation_config::update([[maybe_unused]] const controlplane::base_t& base_prev,
                                const controlplane::base_t& base_next)
 {
-	(void)base_prev;
-
 	config_nat46clats = base_next.nat46clats;
 
 	for (const auto& [module_name, nat46clat] : base_next.nat46clats)
@@ -55,14 +53,14 @@ void manager::reload(const controlplane::base_t& base_prev,
 
 	for (const auto& [module_name, nat46clat] : base_next.nat46clats)
 	{
-		(void)nat46clat;
+		YANET_GCC_BUG_UNUSED(nat46clat);
 
 		module_counters.insert(module_name);
 	}
 
 	for (const auto& [module_name, nat46clat] : base_prev.nat46clats)
 	{
-		(void)nat46clat;
+		YANET_GCC_BUG_UNUSED(nat46clat);
 
 		module_counters.remove(module_name);
 	}

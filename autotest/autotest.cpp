@@ -1,6 +1,6 @@
 #include <arpa/inet.h>
+#include <cstring>
 #include <pcap.h>
-#include <string.h>
 #include <sys/shm.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -11,13 +11,16 @@
 
 #include <experimental/filesystem>
 #include <fstream>
-#include <iostream>
 #include <thread>
+#include <utility>
 
 #include <gmock/gmock.h>
 
 #include "autotest.h"
 #include "common.h"
+
+#include "common/sdpclient.h"
+#include "common/utils.h"
 
 #define MAX_PACK_LEN 16384
 #define SOCK_DEV_PREFIX "sock_dev:"
@@ -56,15 +59,11 @@ tAutotest::tAutotest() :
 	::testing::GTEST_FLAG(throw_on_failure) = true;
 }
 
-tAutotest::~tAutotest()
-{
-}
-
 eResult tAutotest::init(const std::string& binaryPath,
                         bool dumpPackets,
                         const std::vector<std::string>& configFilePaths)
 {
-	(void)binaryPath;
+	YANET_GCC_BUG_UNUSED(binaryPath);
 	this->dumpPackets = dumpPackets;
 	this->configFilePaths = configFilePaths;
 
@@ -74,6 +73,11 @@ eResult tAutotest::init(const std::string& binaryPath,
 	}
 
 	if (auto ret = initSharedMemory(); ret != eResult::success)
+	{
+		return ret;
+	}
+
+	if (auto ret = common::sdp::SdpClient::ReadSharedMemoryData(sdp_data, true); ret != eResult::success)
 	{
 		return ret;
 	}
@@ -121,9 +125,9 @@ eResult tAutotest::initSharedMemory()
 	dataPlaneSharedMemory = dataPlane.get_shm_info();
 
 	std::map<key_t, void*> shm_by_key;
-	key_t ipcKey;
-	int shmid;
-	void* shmaddr;
+	key_t ipcKey = 0;
+	int shmid = 0;
+	void* shmaddr = nullptr;
 
 	for (const auto& shmInfo : dataPlaneSharedMemory)
 	{
@@ -136,10 +140,10 @@ eResult tAutotest::initSharedMemory()
 			return eResult::errorInitSharedMemory;
 		}
 
-		shmaddr = shmat(shmid, NULL, 0);
+		shmaddr = shmat(shmid, nullptr, 0);
 		if (shmaddr == (void*)-1)
 		{
-			YANET_LOG_ERROR("shmat(%d, NULL, 0) = %d\n", shmid, errno);
+			YANET_LOG_ERROR("shmat(%d, nullptr, 0) = %d\n", shmid, errno);
 			return eResult::errorInitSharedMemory;
 		}
 
@@ -163,7 +167,7 @@ eResult tAutotest::initSharedMemory()
 
 	for (const auto& shmInfo : dataPlaneSharedMemory)
 	{
-		std::string tag = std::get<1>(shmInfo);
+		std::string name = std::get<0>(shmInfo);
 		unsigned int unitSize = std::get<2>(shmInfo);
 		unsigned int unitsNumber = std::get<3>(shmInfo);
 		key_t ipcKey = std::get<6>(shmInfo);
@@ -171,7 +175,7 @@ eResult tAutotest::initSharedMemory()
 
 		void* shm = shm_by_key[ipcKey];
 		auto memaddr = (void*)((intptr_t)shm + offset);
-		dumpRings[tag] = common::bufferring(memaddr, unitSize, unitsNumber);
+		dumpRings[name] = common::bufferring(memaddr, unitSize, unitsNumber);
 	}
 
 	return eResult::success;
@@ -235,8 +239,8 @@ void tAutotest::sendThread(std::string interfaceName,
 		throw "";
 	}
 
-	pcap_pkthdr* header;
-	const u_char* data;
+	pcap_pkthdr* header = nullptr;
+	const u_char* data = nullptr;
 	static u_char zeros[MAX_PACK_LEN];
 
 	auto iface = pcaps[interfaceName];
@@ -406,10 +410,10 @@ private:
 class PcapDumper
 {
 public:
-	PcapDumper(const std::string& path, int capsize = MAX_PACK_LEN) :
-	        tmpFilePath(path)
+	PcapDumper(std::string path, int capsize = MAX_PACK_LEN) :
+	        tmpFilePath(std::move(path)), pcap(pcap_open_dead(DLT_EN10MB, capsize))
 	{
-		pcap = pcap_open_dead(DLT_EN10MB, capsize);
+
 		if (!pcap)
 		{
 			YANET_LOG_ERROR("error: pcap_open_dead()\n");
@@ -436,7 +440,7 @@ public:
 		pcap_dump((u_char*)dumper, header, data);
 	}
 
-	std::string path() const
+	[[nodiscard]] std::string path() const
 	{
 		return tmpFilePath;
 	}
@@ -474,7 +478,7 @@ class pcap_expectation
 {
 public:
 	pcap_expectation(std::string filename) :
-	        filename(filename), has_packet(true), packetsCount(0), buffer(MAX_PACK_LEN, 0)
+	        filename(filename), buffer(MAX_PACK_LEN, 0)
 	{
 		char pcap_errbuf[PCAP_ERRBUF_SIZE];
 		pcap = pcap_open_offline(filename.c_str(), pcap_errbuf);
@@ -504,8 +508,8 @@ public:
 		{
 			return;
 		}
-		pcap_pkthdr* h = 0;
-		const u_char* data = 0;
+		pcap_pkthdr* h = nullptr;
+		const u_char* data = nullptr;
 		if (pcap_next_ex(pcap, &h, &data) >= 0)
 		{
 			memcpy(&header, h, sizeof(struct pcap_pkthdr));
@@ -524,7 +528,7 @@ public:
 		}
 	}
 
-	bool has_unmatched_packets() const
+	[[nodiscard]] bool has_unmatched_packets() const
 	{
 		return has_packet;
 	}
@@ -536,22 +540,22 @@ public:
 		       !memcmp(buffer.data(), packet, packetSize);
 	}
 
-	std::string location() const
+	[[nodiscard]] std::string location() const
 	{
 		return filename + ":" + std::to_string(packetsCount);
 	}
 
-	int expected_len() const
+	[[nodiscard]] int expected_len() const
 	{
 		return header.len;
 	}
 
-	const u_char* begin() const
+	[[nodiscard]] const u_char* begin() const
 	{
 		return buffer.data();
 	}
 
-	const u_char* end() const
+	[[nodiscard]] const u_char* end() const
 	{
 		return buffer.data() + header.len;
 	}
@@ -566,9 +570,9 @@ public:
 
 private:
 	std::string filename;
-	bool has_packet;
+	bool has_packet{true};
 	struct pcap_pkthdr header;
-	uint64_t packetsCount;
+	uint64_t packetsCount{};
 	pcap_t* pcap;
 	std::vector<u_char> buffer;
 };
@@ -715,7 +719,7 @@ void tAutotest::recvThread(std::string interfaceName,
 
 			auto packetSize = tmp_pcap_packetHeader.len;
 			YANET_LOG_DEBUG("unexpected %u\n", packetSize);
-			dumper.dump(NULL, NULL, buffer, buffer + packetSize);
+			dumper.dump(nullptr, nullptr, buffer, buffer + packetSize);
 		}
 
 		success = false;
@@ -736,21 +740,6 @@ void tAutotest::recvThread(std::string interfaceName,
 	}
 
 	unlink(pcapDumper.path().data());
-}
-
-std::vector<std::string> split(const std::string& string,
-                               char delimiter = ' ')
-{
-	std::vector<std::string> result;
-
-	std::stringstream stream(string);
-	std::string item;
-	while (std::getline(stream, item, delimiter))
-	{
-		result.emplace_back(item);
-	}
-
-	return result;
 }
 
 bool tAutotest::step_ipv4Update(const YAML::Node& yamlStep)
@@ -868,10 +857,10 @@ bool tAutotest::step_checkCounters(const YAML::Node& yamlStep)
 	auto fwList = controlPlane.getFwList(common::icp::getFwList::requestType::static_rules_original);
 	for (auto& [ruleno, rules] : fwList)
 	{
-		(void)ruleno;
+		YANET_GCC_BUG_UNUSED(ruleno);
 		for (auto& [id, counter, text] : rules)
 		{
-			(void)text;
+			YANET_GCC_BUG_UNUSED(text);
 			counters[id] = counter;
 		}
 	}
@@ -890,7 +879,7 @@ bool tAutotest::step_sendPackets(const YAML::Node& yamlStep,
 
 	for (const auto& yamlPort : yamlStep)
 	{
-		std::string interfaceName = yamlPort["port"].as<std::string>();
+		auto interfaceName = yamlPort["port"].as<std::string>();
 
 		if (yamlPort["send"])
 		{
@@ -1193,9 +1182,9 @@ bool tAutotest::step_rib_clear(const YAML::Node& yaml)
 
 		if (yaml_attribute["peer"].IsDefined() && yaml_attribute["vrf"].IsDefined() && yaml_attribute["priority"].IsDefined())
 		{
-			std::string peer = yaml_attribute["peer"].as<std::string>();
-			std::string vrf = yaml_attribute["vrf"].as<std::string>();
-			uint32_t priority = yaml_attribute["priority"].as<uint32_t>();
+			auto peer = yaml_attribute["peer"].as<std::string>();
+			auto vrf = yaml_attribute["vrf"].as<std::string>();
+			auto priority = yaml_attribute["priority"].as<uint32_t>();
 
 			std::tuple<std::string, uint32_t> vrf_priority_tup(std::move(vrf), std::move(priority));
 			std::tuple<ip_address_t, std::tuple<std::string, uint32_t>> peer_vrf_priority_tup(std::move(peer), std::move(vrf_priority_tup));
@@ -1354,7 +1343,12 @@ void tAutotest::mainThread()
 			{
 				bool result = true;
 
-				if (yamlStep["ipv4Update"])
+				if (yamlStep["subtest"])
+				{
+					auto test_name = yamlStep["subtest"].as<std::string>();
+					YANET_LOG_PRINT(ANSI_COLOR_BLUE "Running subtest: '%s'\n" ANSI_COLOR_RESET, test_name.c_str());
+				}
+				else if (yamlStep["ipv4Update"])
 				{
 					YANET_LOG_DEBUG("step: ipv4Update\n");
 
@@ -1527,7 +1521,7 @@ void tAutotest::convert_ipv4Update(const std::string& string)
 
 	convert_ipv4Remove(prefix);
 
-	for (const auto& nexthop : split(nexthops))
+	for (const auto& nexthop : utils::split(nexthops, ' '))
 	{
 		common::icp::rib_update::insert request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
 		std::get<3>(request)[attribute_default]["ipv4"][nexthop].emplace_back(prefix,
@@ -1564,7 +1558,7 @@ void tAutotest::convert_ipv4LabelledUpdate(const std::string& string)
 
 	convert_ipv4LabelledRemove(prefix);
 
-	for (const auto& nexthop_label : split(nexthops))
+	for (const auto& nexthop_label : utils::split(nexthops, ' '))
 	{
 		std::string nexthop = nexthop_label.substr(0, nexthop_label.find(":"));
 		std::string label = nexthop_label.substr(nexthop_label.find(":") + 1);
@@ -1608,7 +1602,7 @@ void tAutotest::convert_ipv6Update(const std::string& string)
 	std::string prefix = string.substr(0, string.find(" -> "));
 	std::string nexthops = string.substr(string.find(" -> ") + 4);
 
-	for (const auto& nexthop : split(nexthops))
+	for (const auto& nexthop : utils::split(nexthops, ' '))
 	{
 		common::icp::rib_update::insert request = {"autotest", "default", YANET_RIB_PRIORITY_DEFAULT, {}};
 		std::get<3>(request)[attribute_default]["ipv6"][nexthop].emplace_back(prefix,
@@ -1625,7 +1619,7 @@ void tAutotest::convert_ipv6LabelledUpdate(const std::string& string)
 	std::string prefix = string.substr(0, string.find(" -> "));
 	std::string nexthops = string.substr(string.find(" -> ") + 4);
 
-	for (const auto& nexthop_label : split(nexthops))
+	for (const auto& nexthop_label : utils::split(nexthops, ' '))
 	{
 		std::string nexthop = nexthop_label.substr(0, nexthop_label.find("|"));
 		std::string label = nexthop_label.substr(nexthop_label.find("|") + 1);
@@ -1741,7 +1735,7 @@ bool tAutotest::step_memorize_counter_value(const YAML::Node& yamlStep)
 
 	uint32_t coreId = std::stoi(yamlStep.as<std::string>().substr(delim_pos + 1));
 
-	const auto response = dataPlane.get_counter_by_name({counter_name, coreId});
+	const auto response = common::sdp::SdpClient::GetCounterByName(sdp_data, counter_name, coreId);
 
 	if (response.empty())
 	{
@@ -1800,7 +1794,7 @@ bool tAutotest::step_diff_with_kept_counter_value(const YAML::Node& yamlStep)
 		return false;
 	}
 
-	const auto response = dataPlane.get_counter_by_name({counter_name, coreId});
+	const auto response = common::sdp::SdpClient::GetCounterByName(sdp_data, counter_name, coreId);
 
 	if (response.empty())
 	{
@@ -1854,7 +1848,7 @@ std::string exec(const char* cmd)
 
 	try
 	{
-		while (fgets(buffer, sizeof buffer, pipe) != NULL)
+		while (fgets(buffer, sizeof buffer, pipe) != nullptr)
 		{
 			result += buffer;
 		}
@@ -1906,7 +1900,7 @@ common::bufferring::item_t* read_shm_packet(common::bufferring* buffer, uint64_t
 	{
 		return nullptr;
 	}
-	common::bufferring::item_t* item = (common::bufferring::item_t*)((uintptr_t)buffer->ring->memory + (position * buffer->unit_size));
+	auto* item = (common::bufferring::item_t*)((uintptr_t)buffer->ring->memory + (position * buffer->unit_size));
 	return item;
 }
 
@@ -1916,11 +1910,11 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 	TextDumper dumper;
 	for (const auto& yamlDump : yamlStep)
 	{
-		std::string tag = yamlDump["ringTag"].as<std::string>();
+		auto tag = yamlDump["ringTag"].as<std::string>();
 		std::string expectFilePath = path + "/" + yamlDump["expect"].as<std::string>();
 		bool success = true;
 
-		common::bufferring* ring;
+		common::bufferring* ring = nullptr;
 		{ /// searching memory ring by tag
 			auto it = dumpRings.find(tag);
 			if (it == dumpRings.end())
@@ -1931,7 +1925,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 			ring = &it->second;
 		}
 
-		pcap_t* pcap;
+		pcap_t* pcap = nullptr;
 		{ /// open pcap file with expected data
 			char pcap_errbuf[PCAP_ERRBUF_SIZE];
 			pcap = pcap_open_offline(expectFilePath.data(), pcap_errbuf);
@@ -1943,8 +1937,8 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 		}
 
 		struct pcap_pkthdr header;
-		const u_char* pcap_packet;
-		common::bufferring::item_t* shm_packet;
+		const u_char* pcap_packet = nullptr;
+		common::bufferring::item_t* shm_packet = nullptr;
 		uint64_t position = 0;
 
 		/// read packets from pcap and compare them with packets from memory ring
@@ -1988,7 +1982,7 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 			if (dumpPackets)
 			{
 				YANET_LOG_DEBUG("dump [%s]: unexpected %u\n", tag.data(), shm_packet->header.size);
-				dumper.dump(NULL, NULL, shm_packet->memory, shm_packet->memory + header.len);
+				dumper.dump(nullptr, nullptr, shm_packet->memory, shm_packet->memory + header.len);
 			}
 		}
 

@@ -6,24 +6,10 @@
 #include "dataplane.h"
 #include "report.h"
 #include "worker.h"
+#include "worker_gc.h"
 
 namespace
 {
-
-template<typename hashtable_chain_T>
-nlohmann::json convertHashtable(const hashtable_chain_T& hashtable)
-{
-	nlohmann::json json;
-
-	const auto& stats = hashtable.getStats();
-
-	json["extendedChunksCount"] = stats.extendedChunksCount;
-	json["longestChain"] = stats.longestChain;
-	json["pairs"] = stats.pairs;
-	json["insertFailed"] = stats.insertFailed;
-
-	return json;
-}
 
 template<typename hashtable_mod_T,
          typename stats_T>
@@ -49,6 +35,28 @@ nlohmann::json convertHashtable(const hashtable_mod_T& hashtable, const stats_T&
 
 } // namespace
 
+namespace common::dregress
+{
+void to_json(nlohmann::json& j, const stats_t& stats)
+{
+	j = nlohmann::json{
+	        {"bad_decap_transport", stats.bad_decap_transport},
+	        {"fragment", stats.fragment},
+	        {"bad_transport", stats.bad_transport},
+	        {"lookup_miss", stats.lookup_miss},
+	        {"local", stats.local},
+	        {"tcp_syn", stats.tcp_syn},
+	        {"tcp_unknown_option", stats.tcp_unknown_option},
+	        {"tcp_no_option", stats.tcp_no_option},
+	        {"tcp_insert_sessions", stats.tcp_insert_sessions},
+	        {"tcp_close_sessions", stats.tcp_close_sessions},
+	        {"tcp_retransmission", stats.tcp_retransmission},
+	        {"tcp_ok", stats.tcp_ok},
+	        {"tcp_timeout_sessions", stats.tcp_timeout_sessions},
+	        {"tcp_unknown_sessions", stats.tcp_unknown_sessions}};
+}
+} // namespace common::dregress
+
 cReport::cReport(cDataPlane* dataPlane) :
         dataPlane(dataPlane)
 {
@@ -58,15 +66,14 @@ nlohmann::json cReport::getReport()
 {
 	nlohmann::json jsonReport;
 
-	for (const auto& iter : dataPlane->workers)
+	for (const cWorker* worker : dataPlane->workers_vector)
 	{
-		const cWorker* worker = iter.second;
 		jsonReport["workers"].emplace_back(convertWorker(worker));
 	}
 
 	for (const auto& [core_id, worker] : dataPlane->worker_gcs)
 	{
-		(void)core_id;
+		YANET_GCC_BUG_UNUSED(core_id);
 		jsonReport["worker_gcs"].emplace_back(convertWorkerGC(worker));
 	}
 
@@ -129,37 +136,37 @@ nlohmann::json cReport::convertWorker(const cWorker* worker)
 	json["mempool"] = convertMempool(worker->mempool);
 	json["iteration"] = worker->iteration;
 
-	json["stats"]["brokenPackets"] = worker->stats.brokenPackets;
-	json["stats"]["dropPackets"] = worker->stats.dropPackets;
-	json["stats"]["ring_highPriority_drops"] = worker->stats.ring_highPriority_drops;
-	json["stats"]["ring_normalPriority_drops"] = worker->stats.ring_normalPriority_drops;
-	json["stats"]["ring_lowPriority_drops"] = worker->stats.ring_lowPriority_drops;
-	json["stats"]["decap_packets"] = worker->stats.decap_packets;
-	json["stats"]["decap_fragments"] = worker->stats.decap_fragments;
-	json["stats"]["decap_unknownExtensions"] = worker->stats.decap_unknownExtensions;
-	json["stats"]["interface_lookupMisses"] = worker->stats.interface_lookupMisses;
-	json["stats"]["interface_hopLimits"] = worker->stats.interface_hopLimits;
-	json["stats"]["interface_neighbor_invalid"] = worker->stats.interface_neighbor_invalid;
-	json["stats"]["nat64stateless_ingressPackets"] = worker->stats.nat64stateless_ingressPackets;
-	json["stats"]["nat64stateless_ingressFragments"] = worker->stats.nat64stateless_ingressFragments;
-	json["stats"]["nat64stateless_ingressUnknownICMP"] = worker->stats.nat64stateless_ingressUnknownICMP;
-	json["stats"]["nat64stateless_egressPackets"] = worker->stats.nat64stateless_egressPackets;
-	json["stats"]["nat64stateless_egressFragments"] = worker->stats.nat64stateless_egressFragments;
-	json["stats"]["nat64stateless_egressUnknownICMP"] = worker->stats.nat64stateless_egressUnknownICMP;
-	json["stats"]["balancer_invalid_reals_count"] = worker->stats.balancer_invalid_reals_count;
-	json["stats"]["fwsync_multicast_egress_drops"] = worker->stats.fwsync_multicast_egress_drops;
-	json["stats"]["fwsync_multicast_egress_packets"] = worker->stats.fwsync_multicast_egress_packets;
-	json["stats"]["fwsync_unicast_egress_drops"] = worker->stats.fwsync_unicast_egress_drops;
-	json["stats"]["fwsync_unicast_egress_packets"] = worker->stats.fwsync_unicast_egress_packets;
-	json["stats"]["fwsync_multicast_egress_imm_packets"] = worker->stats.fwsync_multicast_egress_imm_packets;
-	json["stats"]["fwsync_no_config_drops"] = worker->stats.fwsync_no_config_drops;
-	json["stats"]["acl_ingress_dropPackets"] = worker->stats.acl_ingress_dropPackets;
-	json["stats"]["acl_egress_dropPackets"] = worker->stats.acl_egress_dropPackets;
-	json["stats"]["repeat_ttl"] = worker->stats.repeat_ttl;
-	json["stats"]["leakedMbufs"] = worker->stats.leakedMbufs;
+	json["stats"]["brokenPackets"] = worker->stats->brokenPackets;
+	json["stats"]["dropPackets"] = worker->stats->dropPackets;
+	json["stats"]["ring_highPriority_drops"] = worker->stats->ring_highPriority_drops;
+	json["stats"]["ring_normalPriority_drops"] = worker->stats->ring_normalPriority_drops;
+	json["stats"]["ring_lowPriority_drops"] = worker->stats->ring_lowPriority_drops;
+	json["stats"]["decap_packets"] = worker->stats->decap_packets;
+	json["stats"]["decap_fragments"] = worker->stats->decap_fragments;
+	json["stats"]["decap_unknownExtensions"] = worker->stats->decap_unknownExtensions;
+	json["stats"]["interface_lookupMisses"] = worker->stats->interface_lookupMisses;
+	json["stats"]["interface_hopLimits"] = worker->stats->interface_hopLimits;
+	json["stats"]["interface_neighbor_invalid"] = worker->stats->interface_neighbor_invalid;
+	json["stats"]["nat64stateless_ingressPackets"] = worker->stats->nat64stateless_ingressPackets;
+	json["stats"]["nat64stateless_ingressFragments"] = worker->stats->nat64stateless_ingressFragments;
+	json["stats"]["nat64stateless_ingressUnknownICMP"] = worker->stats->nat64stateless_ingressUnknownICMP;
+	json["stats"]["nat64stateless_egressPackets"] = worker->stats->nat64stateless_egressPackets;
+	json["stats"]["nat64stateless_egressFragments"] = worker->stats->nat64stateless_egressFragments;
+	json["stats"]["nat64stateless_egressUnknownICMP"] = worker->stats->nat64stateless_egressUnknownICMP;
+	json["stats"]["balancer_invalid_reals_count"] = worker->stats->balancer_invalid_reals_count;
+	json["stats"]["fwsync_multicast_egress_drops"] = worker->stats->fwsync_multicast_egress_drops;
+	json["stats"]["fwsync_multicast_egress_packets"] = worker->stats->fwsync_multicast_egress_packets;
+	json["stats"]["fwsync_unicast_egress_drops"] = worker->stats->fwsync_unicast_egress_drops;
+	json["stats"]["fwsync_unicast_egress_packets"] = worker->stats->fwsync_unicast_egress_packets;
+	json["stats"]["fwsync_multicast_egress_imm_packets"] = worker->stats->fwsync_multicast_egress_imm_packets;
+	json["stats"]["fwsync_no_config_drops"] = worker->stats->fwsync_no_config_drops;
+	json["stats"]["acl_ingress_dropPackets"] = worker->stats->acl_ingress_dropPackets;
+	json["stats"]["acl_egress_dropPackets"] = worker->stats->acl_egress_dropPackets;
+	json["stats"]["repeat_ttl"] = worker->stats->repeat_ttl;
+	json["stats"]["leakedMbufs"] = worker->stats->leakedMbufs;
 	json["stats"]["samples_drops"] = worker->sampler.get_drops();
-	json["stats"]["logs_packets"] = worker->stats.logs_packets;
-	json["stats"]["logs_drops"] = worker->stats.logs_drops;
+	json["stats"]["logs_packets"] = worker->stats->logs_packets;
+	json["stats"]["logs_drops"] = worker->stats->logs_drops;
 
 	for (tPortId portId = 0;
 	     portId < dataPlane->ports.size();
@@ -169,7 +176,7 @@ nlohmann::json cReport::convertWorker(const cWorker* worker)
 
 		jsonPort["portId"] = portId;
 		jsonPort["physicalPort_egress_drops"] = worker->statsPorts[portId].physicalPort_egress_drops;
-		jsonPort["controlPlane_drops"] = worker->statsPorts[portId].controlPlane_drops;
+		jsonPort["controlPlane_drops"] = 0; // @todo: DELETE
 
 		json["statsPorts"].emplace_back(jsonPort);
 	}
@@ -192,16 +199,15 @@ nlohmann::json cReport::convertWorker(const cWorker* worker)
 
 	/// permanently base
 	json["permanentlyBase"]["globalBaseAtomic"]["pointer"] = pointerToHex(worker->basePermanently.globalBaseAtomic);
-	json["permanentlyBase"]["workerPortsCount"] = worker->basePermanently.workerPortsCount;
-	for (unsigned int worker_port_i = 0;
-	     worker_port_i < worker->basePermanently.workerPortsCount;
-	     worker_port_i++)
+	json["permanentlyBase"]["workerPortsCount"] = worker->basePermanently.rx_points.size();
+	std::size_t idx{};
+	for (const auto& [port, queue] : worker->basePermanently.rx_points)
 	{
 		nlohmann::json jsonPort;
 
-		jsonPort["worker_port_i"] = worker_port_i;
-		jsonPort["inPortId"] = worker->basePermanently.workerPorts[worker_port_i].inPortId;
-		jsonPort["inQueueId"] = worker->basePermanently.workerPorts[worker_port_i].inQueueId;
+		jsonPort["worker_port_i"] = idx++;
+		jsonPort["inPortId"] = port;
+		jsonPort["inQueueId"] = queue;
 
 		json["permanentlyBase"]["workerPorts"].emplace_back(jsonPort);
 	}
@@ -258,28 +264,27 @@ nlohmann::json cReport::convertWorkerGC(const worker_gc_t* worker)
 	json["iteration"] = worker->iteration;
 	json["samples"] = worker->samples.size();
 
-	json["stats"]["broken_packets"] = worker->stats.broken_packets;
-	json["stats"]["drop_packets"] = worker->stats.drop_packets;
-	json["stats"]["drop_samples"] = worker->stats.drop_samples;
-	json["stats"]["fwsync_multicast_egress_packets"] = worker->stats.fwsync_multicast_egress_packets;
-	json["stats"]["fwsync_multicast_egress_drops"] = worker->stats.fwsync_multicast_egress_drops;
-	json["stats"]["fwsync_unicast_egress_packets"] = worker->stats.fwsync_unicast_egress_packets;
-	json["stats"]["fwsync_unicast_egress_drops"] = worker->stats.fwsync_unicast_egress_drops;
-	json["stats"]["balancer_state_insert_failed"] = worker->stats.balancer_state_insert_failed;
-	json["stats"]["balancer_state_insert_done"] = worker->stats.balancer_state_insert_done;
+	json["stats"]["broken_packets"] = worker->stats->broken_packets;
+	json["stats"]["drop_packets"] = worker->stats->drop_packets;
+	json["stats"]["drop_samples"] = worker->stats->drop_samples;
+	json["stats"]["fwsync_multicast_egress_packets"] = worker->stats->fwsync_multicast_egress_packets;
+	json["stats"]["fwsync_multicast_egress_drops"] = worker->stats->fwsync_multicast_egress_drops;
+	json["stats"]["fwsync_unicast_egress_packets"] = worker->stats->fwsync_unicast_egress_packets;
+	json["stats"]["fwsync_unicast_egress_drops"] = worker->stats->fwsync_unicast_egress_drops;
+	json["stats"]["balancer_state_insert_failed"] = worker->stats->balancer_state_insert_failed;
+	json["stats"]["balancer_state_insert_done"] = worker->stats->balancer_state_insert_done;
 
 	/// permanently base
 	json["permanentlyBase"]["globalBaseAtomic"]["pointer"] = pointerToHex(worker->base_permanently.globalBaseAtomic);
-	json["permanentlyBase"]["workerPortsCount"] = worker->base_permanently.workerPortsCount;
-	for (unsigned int worker_port_i = 0;
-	     worker_port_i < worker->base_permanently.workerPortsCount;
-	     worker_port_i++)
+	json["permanentlyBase"]["workerPortsCount"] = worker->base_permanently.rx_points.size();
+	std::size_t idx{};
+	for (const auto& [port, queue] : worker->base_permanently.rx_points)
 	{
 		nlohmann::json jsonPort;
 
-		jsonPort["worker_port_i"] = worker_port_i;
-		jsonPort["inPortId"] = worker->base_permanently.workerPorts[worker_port_i].inPortId;
-		jsonPort["inQueueId"] = worker->base_permanently.workerPorts[worker_port_i].inQueueId;
+		jsonPort["worker_port_i"] = idx++;
+		jsonPort["inPortId"] = port;
+		jsonPort["inQueueId"] = queue;
 
 		json["permanentlyBase"]["workerPorts"].emplace_back(jsonPort);
 	}
@@ -352,55 +357,62 @@ nlohmann::json cReport::convertPort(const tPortId& portId)
 	return json;
 }
 
+namespace dataplane
+{
+void to_json(nlohmann::json& j, const hashtable_chain_spinlock_stats_t& stats)
+{
+	j = nlohmann::json{
+	        {"extendedChunksCount", stats.extendedChunksCount},
+	        {"longestChain", stats.longestChain},
+	        {"pairs", stats.pairs},
+	        {"insertFailed", stats.insertFailed}};
+}
+} // namespace dataplane
+
 nlohmann::json cReport::convertControlPlane(const cControlPlane* controlPlane)
 {
 	nlohmann::json json;
 
-	json["mempool"] = convertMempool(controlPlane->mempool);
-
-	auto& portmapper = controlPlane->slowWorker->basePermanently.ports;
-	for (int i = 0; i < portmapper.size(); ++i)
+	json["mempool"] = convertMempool(dataPlane->slow_workers.begin()->second->Mempool());
+	for (const auto& it : dataPlane->slow_workers)
 	{
-		nlohmann::json jsonKni;
-
-		const auto& port = controlPlane->kernel_interfaces[i];
-		const auto& stats = controlPlane->kernel_stats[i];
-
-		jsonKni["portId"] = portmapper.ToDpdk(i);
-		jsonKni["interfaceName"] = port.interface_name;
-		jsonKni["stats"]["ipackets"] = stats.ipackets;
-		jsonKni["stats"]["ibytes"] = stats.ibytes;
-		jsonKni["stats"]["idropped"] = stats.idropped;
-		jsonKni["stats"]["opackets"] = stats.opackets;
-		jsonKni["stats"]["obytes"] = stats.obytes;
-		jsonKni["stats"]["odropped"] = stats.odropped;
-
-		json["knis"].emplace_back(jsonKni);
+		json["mempools"].emplace_back(convertMempool(it.second->Mempool()));
 	}
 
-	json["repeat_packets"] = controlPlane->stats.repeat_packets;
-	json["tofarm_packets"] = controlPlane->stats.tofarm_packets;
-	json["farm_packets"] = controlPlane->stats.farm_packets;
-	json["fwsync_multicast_ingress_packets"] = controlPlane->stats.fwsync_multicast_ingress_packets;
-	json["slowworker_drops"] = controlPlane->stats.slowworker_drops;
-	json["slowworker_packets"] = controlPlane->stats.slowworker_packets;
-	json["mempool_is_empty"] = controlPlane->stats.mempool_is_empty;
+	for (const auto it : dataPlane->slow_workers)
+	{
+		const dataplane::KernelInterfaceWorker& worker = it.second->KniWorker();
 
-	json["dregress"]["bad_decap_transport"] = controlPlane->dregress.stats.bad_decap_transport;
-	json["dregress"]["fragment"] = controlPlane->dregress.stats.fragment;
-	json["dregress"]["bad_transport"] = controlPlane->dregress.stats.bad_transport;
-	json["dregress"]["lookup_miss"] = controlPlane->dregress.stats.lookup_miss;
-	json["dregress"]["local"] = controlPlane->dregress.stats.local;
-	json["dregress"]["tcp_syn"] = controlPlane->dregress.stats.tcp_syn;
-	json["dregress"]["tcp_unknown_option"] = controlPlane->dregress.stats.tcp_unknown_option;
-	json["dregress"]["tcp_no_option"] = controlPlane->dregress.stats.tcp_no_option;
-	json["dregress"]["tcp_insert_sessions"] = controlPlane->dregress.stats.tcp_insert_sessions;
-	json["dregress"]["tcp_close_sessions"] = controlPlane->dregress.stats.tcp_close_sessions;
-	json["dregress"]["tcp_retransmission"] = controlPlane->dregress.stats.tcp_retransmission;
-	json["dregress"]["tcp_ok"] = controlPlane->dregress.stats.tcp_ok;
-	json["dregress"]["tcp_timeout_sessions"] = controlPlane->dregress.stats.tcp_timeout_sessions;
-	json["dregress"]["tcp_unknown_sessions"] = controlPlane->dregress.stats.tcp_unknown_sessions;
-	json["dregress"]["connections"] = convertHashtable(*controlPlane->dregress.connections);
+		auto stats_it = worker.PortsStats().first;
+
+		for (auto [current, end] = worker.PortsIds(); current != end; ++current, ++stats_it)
+		{
+			nlohmann::json jsonKni;
+			jsonKni["portId"] = *current;
+			jsonKni["interfaceName"] = dataPlane->InterfaceNameFromPort(*current);
+			jsonKni["stats"]["ipackets"] = stats_it->ipackets;
+			jsonKni["stats"]["ibytes"] = stats_it->ibytes;
+			jsonKni["stats"]["idropped"] = stats_it->idropped;
+			jsonKni["stats"]["opackets"] = stats_it->opackets;
+			jsonKni["stats"]["obytes"] = stats_it->obytes;
+			jsonKni["stats"]["odropped"] = stats_it->odropped;
+
+			json["knis"].emplace_back(std::move(jsonKni));
+		}
+	}
+
+	const auto& slow_stats = controlPlane->SlowWorkerStats();
+
+	json["repeat_packets"] = slow_stats.repeat_packets;
+	json["tofarm_packets"] = slow_stats.tofarm_packets;
+	json["farm_packets"] = slow_stats.farm_packets;
+	json["fwsync_multicast_ingress_packets"] = slow_stats.fwsync_multicast_ingress_packets;
+	json["slowworker_drops"] = slow_stats.slowworker_drops;
+	json["slowworker_packets"] = slow_stats.slowworker_packets;
+	json["mempool_is_empty"] = slow_stats.mempool_is_empty;
+
+	json["dregress"] = controlPlane->DregressStats();
+	json["dregress"]["connections"] = controlPlane->DregressConnectionsStats();
 
 	return json;
 }

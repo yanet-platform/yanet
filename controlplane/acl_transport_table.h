@@ -2,11 +2,9 @@
 
 #include <thread>
 
-#include "acl/bitset.h"
 #include "acl_base.h"
 #include "acl_table.h"
 
-#include "common/acl.h"
 #include "common/idp.h"
 
 namespace acl::compiler
@@ -68,6 +66,9 @@ public:
 	std::vector<std::vector<tAclGroupId>> filter_id_group_ids;
 	std::map<tAclGroupId, std::set<unsigned int>> group_id_filter_ids;
 	std::vector<std::vector<tAclGroupId>> transport_table_filter_id_group_ids;
+	// FIXME: I have a strong feeling that a containter with all groups should be already presented somewhere.
+	// Even if it does not, maybe all I need is a vector, since we don't have to order groups.
+	std::set<tAclGroupId> all_groups;
 
 	common::idp::updateGlobalBase::acl_transport_table::request acl_transport_table;
 

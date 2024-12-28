@@ -1,8 +1,6 @@
 #pragma once
 
-#include <cinttypes>
-
-#include "common/config.h"
+#include "common/config.release.h"
 #include "common/define.h"
 #include "common/result.h"
 
@@ -35,10 +33,7 @@ public:
 	}
 
 public:
-	dynamic_table() :
-	        width_bits(0)
-	{
-	}
+	dynamic_table() = default;
 
 	template<unsigned int burst_size = YANET_CONFIG_BURST_SIZE>
 	inline void lookup(const uint32_t (&k1s)[burst_size],
@@ -97,7 +92,7 @@ public:
 	}
 
 protected:
-	uint32_t width_bits;
+	uint32_t width_bits{};
 	value_t values[];
 };
 

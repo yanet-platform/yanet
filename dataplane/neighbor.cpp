@@ -51,7 +51,7 @@ static void netlink_parse(const std::function<void(const std::string&, const com
 	unsigned int offset = 0;
 	while (offset + sizeof(nlmsghdr) <= buffer_length)
 	{
-		nlmsghdr* nl_message_header = (nlmsghdr*)(buffer + offset);
+		auto* nl_message_header = (nlmsghdr*)(buffer + offset);
 		uint32_t length = nl_message_header->nlmsg_len;
 
 		if (nl_message_header->nlmsg_type == NLMSG_DONE ||
@@ -63,7 +63,7 @@ static void netlink_parse(const std::function<void(const std::string&, const com
 		if (nl_message_header->nlmsg_type == RTM_NEWNEIGH ||
 		    nl_message_header->nlmsg_type == RTM_GETNEIGH)
 		{
-			ndmsg* nl_message = (ndmsg*)NLMSG_DATA(nl_message_header);
+			auto* nl_message = (ndmsg*)NLMSG_DATA(nl_message_header);
 			parse_rt_attributes(rt_attributes,
 			                    NDA_MAX,
 			                    (rtattr*)(((char*)(nl_message)) + NLMSG_ALIGN(sizeof(ndmsg))),
@@ -193,8 +193,7 @@ static void netlink_neighbor_dump(const std::function<void(const std::string&, c
 	close(nl_socket);
 }
 
-module::module() :
-        dataplane(nullptr)
+module::module() :dataplane(nullptr)
 {
 	memset(&stats, 0, sizeof(stats));
 }
@@ -286,7 +285,7 @@ common::idp::neighbor_show::response module::neighbor_show() const
 eResult module::neighbor_insert(const common::idp::neighbor_insert::request& request)
 {
 	const auto& [route_name, interface_name, ip_address, mac_address] = request;
-	(void)route_name; ///< @todo
+	YANET_GCC_BUG_UNUSED(route_name); ///< @todo
 
 	tInterfaceId interface_id = 0;
 	{
@@ -327,7 +326,7 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 		eResult result = eResult::success;
 		for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
 		{
-			(void)socket_id;
+			YANET_GCC_BUG_UNUSED(socket_id);
 			if (!hashtable_updater.get_pointer()->insert_or_update(key, value))
 			{
 				result = eResult::isFull;
@@ -347,7 +346,7 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 eResult module::neighbor_remove(const common::idp::neighbor_remove::request& request)
 {
 	const auto& [route_name, interface_name, ip_address] = request;
-	(void)route_name; ///< @todo
+	YANET_GCC_BUG_UNUSED(route_name); ///< @todo
 
 	tInterfaceId interface_id = 0;
 	{
@@ -382,7 +381,7 @@ eResult module::neighbor_remove(const common::idp::neighbor_remove::request& req
 		eResult result = eResult::success;
 		for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
 		{
-			(void)socket_id;
+			YANET_GCC_BUG_UNUSED(socket_id);
 			if (!hashtable_updater.get_pointer()->remove(key))
 			{
 				result = eResult::invalidArguments;
@@ -404,7 +403,7 @@ eResult module::neighbor_clear()
 	auto response = generation_hashtable.update([](neighbor::generation_hashtable& hashtable) {
 		for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
 		{
-			(void)socket_id;
+			YANET_GCC_BUG_UNUSED(socket_id);
 			hashtable_updater.get_pointer()->clear();
 		}
 		return eResult::success;
@@ -483,7 +482,7 @@ eResult module::neighbor_update_interfaces(const common::idp::neighbor_update_in
 		generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 			for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
 			{
-				(void)socket_id;
+				YANET_GCC_BUG_UNUSED(socket_id);
 				if (!hashtable_updater.get_pointer()->insert_or_update(key, value))
 				{
 					stats.hashtable_insert_error++;
@@ -614,7 +613,7 @@ void module::netlink_thread()
 			generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 				for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
 				{
-					(void)socket_id;
+					YANET_GCC_BUG_UNUSED(socket_id);
 					if (!hashtable_updater.get_pointer()->insert_or_update(key, value))
 					{
 						stats.hashtable_insert_error++;
@@ -652,7 +651,7 @@ void module::resolve(const dataplane::neighbor::key& key)
 		}
 
 		const auto& [it_route_name, it_interface_name] = it->second;
-		(void)it_route_name;
+		YANET_GCC_BUG_UNUSED(it_route_name);
 
 		interface_name = it_interface_name;
 	}
@@ -677,7 +676,7 @@ void module::resolve(const dataplane::neighbor::key& key)
 	generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 		for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
 		{
-			(void)socket_id;
+			YANET_GCC_BUG_UNUSED(socket_id);
 			if (!hashtable_updater.get_pointer()->insert_or_update(key, value))
 			{
 				stats.hashtable_insert_error++;

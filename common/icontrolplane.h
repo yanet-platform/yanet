@@ -13,10 +13,7 @@ namespace interface
 class controlPlane
 {
 public:
-	controlPlane() :
-	        clientSocket(-1)
-	{
-	}
+	controlPlane() = default;
 
 	~controlPlane()
 	{
@@ -175,6 +172,16 @@ public:
 	auto route_get(const common::icp::route_get::request& request) const
 	{
 		return get<common::icp::requestType::route_get, common::icp::route_get::response>(request);
+	}
+
+	auto route_counters() const
+	{
+		return get<common::icp::requestType::route_counters, common::icp::route_counters::response>();
+	}
+
+	auto route_tunnel_counters() const
+	{
+		return get<common::icp::requestType::route_tunnel_counters, common::icp::route_tunnel_counters::response>();
 	}
 
 	auto route_tunnel_lookup(const common::icp::route_tunnel_lookup::request& request) const
@@ -337,6 +344,11 @@ public:
 		return get<common::icp::requestType::convert, common::icp::convert::response>(request);
 	}
 
+	auto counters_stat() const
+	{
+		return get<common::icp::requestType::counters_stat, common::icp::counters_stat::response>();
+	}
+
 protected:
 	void connectToControlPlane() const
 	{
@@ -372,7 +384,7 @@ protected:
 	}
 
 	template<common::icp::requestType T, class Req = std::tuple<>>
-	inline common::icp::response call(const Req& request = Req()) const
+	common::icp::response call(const Req& request = Req()) const
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		connectToControlPlane();
@@ -380,7 +392,7 @@ protected:
 	}
 
 protected:
-	mutable int clientSocket;
+	mutable int clientSocket{-1};
 	mutable std::mutex mutex;
 };
 

@@ -18,6 +18,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: version
+        run: |
+          export YANET_VERSION=${{github.ref_name}}
+          export YANET_VERSION=${YANET_VERSION}
+          export YANET_VERSION_MAJOR=${YANET_VERSION%.*}
+          export YANET_VERSION_MINOR=${YANET_VERSION#*.}
+          export YANET_VERSION_REVISION=${{github.run_number}}
+          export YANET_VERSION_HASH=${{github.sha}}
+          export YANET_VERSION_CUSTOM=stable
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5

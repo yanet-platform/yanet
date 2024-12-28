@@ -23,7 +23,7 @@ void cSharedMemory::write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_typ
 
 	uint64_t wpos = (buffer.ring->header.before) % buffer.units_number;
 	buffer.ring->header.before++;
-	item_t* item = (item_t*)((uintptr_t)buffer.ring->memory + (wpos * buffer.unit_size));
+	auto* item = (item_t*)((uintptr_t)buffer.ring->memory + (wpos * buffer.unit_size));
 
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 

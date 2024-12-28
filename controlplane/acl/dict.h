@@ -1,7 +1,5 @@
 #pragma once
 
-#include "../acl.h"
-
 #include "bitset.h"
 #include "network.h"
 #include "rule.h"
@@ -44,7 +42,7 @@ bool is_mask_simple(uint128_t mask)
 	bool end_found = false;
 	for (unsigned int i = 1; i <= 16; ++i)
 	{
-		const uint8_t byte = uint8_t((mask >> (128 - i * 8)) & 0xff);
+		const auto byte = uint8_t((mask >> (128 - i * 8)) & 0xff);
 		if (end_found)
 		{
 			if (byte > 0)
@@ -268,7 +266,7 @@ struct rdict_t
 		vec.reserve(map.size());
 		for (auto& v : map)
 		{
-			vec.push_back(v);
+			vec.emplace_back(v);
 		}
 
 		return vec;
@@ -477,7 +475,7 @@ struct id_dict_t
 	{
 	}
 
-	inline void insert(unsigned int id, unsigned int idx)
+	void insert(unsigned int id, unsigned int idx)
 	{
 		if (id >= table.size())
 		{

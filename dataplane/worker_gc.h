@@ -5,16 +5,23 @@
 
 #include "base.h"
 #include "common.h"
+#include "common/sdpcommon.h"
+#include "config_values.h"
 #include "hashtable.h"
+#include "samples.h"
+#include "utils.h"
 
 #include "common/generation.h"
 #include "common/idp.h"
+#include "common/static_vector.h"
 #include "hashtable.h"
 
 class worker_gc_t
 {
 public:
-	worker_gc_t(cDataPlane* dataplane);
+	using PortToSocketArray = std::array<tSocketId, CONFIG_YADECAP_PORTS_SIZE>;
+	using SamplersVector = utils::StaticVector<samples::Sampler*, YANET_CONFIG_MAX_SAMPLED_WORKERS_PER_GC>;
+	worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, SamplersVector&& samplers);
 	~worker_gc_t();
 
 	eResult init(const tCoreId& core_id, const tSocketId& socket_id, const dataplane::base::permanently& base_permanently, const dataplane::base::generation& base);
@@ -26,7 +33,8 @@ public:
 
 	void limits(common::idp::limits::response& response) const;
 
-	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
+	static void FillMetadataWorkerCounters(common::sdp::MetadataWorkerGc& metadata);
+	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorkerGc& metadata);
 
 protected:
 	YANET_INLINE_NEVER void thread();
@@ -44,14 +52,15 @@ protected:
 
 	void nat64stateful_remove_state(const dataplane::globalBase::nat64stateful_lan_key& lan_key, const dataplane::globalBase::nat64stateful_wan_key& wan_key);
 
-	void send_to_slowworker(rte_mbuf* mbuf, const common::globalBase::eFlowType& flow_type);
-	void send_to_slowworker(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
+	void SendToSlowWorker(rte_mbuf* mbuf);
 
 	void handle_samples();
 
 public:
-	cDataPlane* dataplane;
-	cControlPlane* controlplane;
+	[[nodiscard]] std::optional<dpdk::RingConn<rte_mbuf*>> RegisterSlowWorker(const std::string& name,
+	                                                                          unsigned int capacity,
+	                                                                          unsigned int capacity_to_free);
+
 	rte_mempool* mempool;
 	tCoreId core_id;
 	tSocketId socket_id;
@@ -59,18 +68,20 @@ public:
 	uint32_t current_base_id;
 	uint32_t local_base_id;
 	dataplane::base::permanently base_permanently;
-	common::worker_gc::stats_t stats;
+	common::worker_gc::stats_t* stats;
 	dataplane::base::generation bases[2];
 
 	YADECAP_CACHE_ALIGNED(align1);
 
-	rte_ring* ring_to_slowworker;
-	rte_ring* ring_to_free_mbuf;
+	utils::StaticVector<dpdk::Ring<rte_mbuf*>, YANET_CONFIG_MAX_SLOW_WORKERS_PER_GC> toSlowWorkers_;
+	utils::StaticVector<dpdk::Ring<rte_mbuf*>, YANET_CONFIG_MAX_SLOW_WORKERS_PER_GC> toFree_;
+	utils::RoundRobinIterator<decltype(toSlowWorkers_)::iterator> toSlowWorker_;
 
-	tSocketId port_id_to_socket_id[CONFIG_YADECAP_PORTS_SIZE];
+	PortToSocketArray port_id_to_socket_id;
 
 	YADECAP_CACHE_ALIGNED(align2);
 
+	SamplersVector samplers_;
 	std::set<common::idp::samples::sample_t> samples;
 	uint32_t samples_current_base_id;
 	std::mutex samples_mutex;
@@ -94,7 +105,7 @@ public:
 	generation_manager<common::idp::balancer_real_connections::connections> balancer_real_connections;
 	generation_manager<dataplane::hashtable_mod_spinlock_stats> balancer_state_stats;
 
-	uint64_t counters[YANET_CONFIG_COUNTERS_SIZE];
+	uint64_t* counters; // YANET_CONFIG_COUNTERS_SIZE
 
 	uint32_t current_time;
 	dataplane::hashtable_gc_t nat64stateful_lan_state_gc;

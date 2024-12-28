@@ -16,14 +16,12 @@ namespace common::proto
 class UnixProtobufRpcChannel : public google::protobuf::RpcChannel
 {
 public:
-	UnixProtobufRpcChannel(const std::string& socketPath) :
-	        clientSocket(-1)
+	UnixProtobufRpcChannel(const std::string& socketPath)
 	{
-
 		connectChannel(socketPath);
 	}
 
-	~UnixProtobufRpcChannel()
+	~UnixProtobufRpcChannel() override
 	{
 		if (clientSocket != -1)
 		{
@@ -60,11 +58,11 @@ public:
 		}
 	}
 
-	virtual void CallMethod(const ::google::protobuf::MethodDescriptor* method,
-	                        ::google::protobuf::RpcController* controller,
-	                        const ::google::protobuf::Message* request,
-	                        ::google::protobuf::Message* response,
-	                        ::google::protobuf::Closure*)
+	void CallMethod(const ::google::protobuf::MethodDescriptor* method,
+	                ::google::protobuf::RpcController* controller,
+	                const ::google::protobuf::Message* request,
+	                ::google::protobuf::Message* response,
+	                ::google::protobuf::Closure*) override
 	{
 		std::lock_guard<std::mutex> guard(mutex);
 		// Get the service name method name and fill it into rpc_meta
@@ -86,7 +84,7 @@ public:
 
 		// single response
 
-		uint64_t messageSize;
+		uint64_t messageSize = 0;
 		if (auto err = common::recvAll(clientSocket, (char*)&messageSize, sizeof(messageSize)); err != 0)
 		{
 			controller->SetFailed(std::string("recv response: ") + strerror(err));
@@ -103,7 +101,7 @@ public:
 	}
 
 private:
-	mutable int clientSocket;
+	mutable int clientSocket{-1};
 	mutable std::mutex mutex{};
 	std::vector<uint8_t> buffer;
 };

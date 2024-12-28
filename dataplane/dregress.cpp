@@ -1,22 +1,46 @@
 #include <rte_tcp.h>
 #include <rte_udp.h>
 
-#include "common/fallback.h"
-
 #include "checksum.h"
-#include "controlplane.h"
 #include "dataplane.h"
 #include "dregress.h"
 #include "metadata.h"
-#include "worker.h"
+#include "slow_worker.h"
 
-dregress_t::dregress_t(cControlPlane* controlplane,
-                       cDataPlane* dataplane) :
-        controlplane(controlplane),
-        dataplane(dataplane)
+dregress_t::dregress_t(dataplane::SlowWorker* slow, cDataPlane* dataplane, uint32_t gc_step) :
+        slow_worker_{slow},
+        dataplane{dataplane},
+        stats{},
+        connections{new dregress::ConnTable},
+        gc_step{gc_step}
+{}
+dregress_t::dregress_t(dregress_t&& other) :
+        connections{nullptr}
 {
-	memset(&stats, 0, sizeof(stats));
-	connections = new dataplane::hashtable_chain_spinlock_t<dregress::connection_key_t, dregress::connection_value_t, YANET_CONFIG_DREGRESS_HT_SIZE, YANET_CONFIG_DREGRESS_HT_EXTENDED_SIZE, 4, 4>();
+	*this = std::move(other);
+
+	other.connections = nullptr;
+}
+
+dregress_t& dregress_t::operator=(dregress_t&& other)
+{
+	slow_worker_ = other.slow_worker_;
+	dataplane = other.dataplane;
+	stats = other.stats;
+	std::swap(connections, other.connections);
+
+	auto pre_guard = std::lock_guard(other.prefixes_mutex);
+	std::swap(local_prefixes_v4, other.local_prefixes_v4);
+	std::swap(local_prefixes_v6, other.local_prefixes_v6);
+	std::swap(prefixes, other.prefixes);
+	std::swap(values, other.values);
+
+	auto count_guard = std::lock_guard(other.counters_mutex);
+	std::swap(counters_v4, other.counters_v4);
+	std::swap(counters_v6, other.counters_v6);
+
+	gc_step = other.gc_step;
+	return *this;
 }
 
 dregress_t::~dregress_t()
@@ -28,14 +52,14 @@ void dregress_t::insert(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-	const auto& base = controlplane->slowWorker->bases[controlplane->slowWorker->localBaseId & 1];
+	const auto& base = slow_worker_->current_base();
 	const auto& dregress = base.globalBase->dregresses[metadata->flow.data.dregressId];
 
 	if (metadata->network_flags & YANET_NETWORK_FLAG_FRAGMENT)
 	{
 		stats.fragment++;
 
-		controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
+		slow_worker_->SendToSlowWorker(mbuf, dregress.flow);
 		return;
 	}
 
@@ -43,7 +67,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 	{
 		stats.bad_transport++;
 
-		controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
+		slow_worker_->SendToSlowWorker(mbuf, dregress.flow);
 		return;
 	}
 
@@ -84,16 +108,16 @@ void dregress_t::insert(rte_mbuf* mbuf)
 		{
 			stats.lookup_miss++;
 
-			controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
+			slow_worker_->SendToSlowWorker(mbuf, dregress.flow);
 			return;
 		}
 
 		const auto& [prefix, nexthop, is_best, label, community, peer_as, origin_as] = *direction;
-		(void)prefix;
-		(void)is_best;
-		(void)community;
-		(void)peer_as;
-		(void)origin_as;
+		YANET_GCC_BUG_UNUSED(prefix);
+		YANET_GCC_BUG_UNUSED(is_best);
+		YANET_GCC_BUG_UNUSED(community);
+		YANET_GCC_BUG_UNUSED(peer_as);
+		YANET_GCC_BUG_UNUSED(origin_as);
 
 		labelled_nexthop = ipv6_address_t::convert(nexthop);
 		labelled_label = label;
@@ -102,13 +126,13 @@ void dregress_t::insert(rte_mbuf* mbuf)
 	}
 	else
 	{
-		dregress::connection_value_t* value;
-		dataplane::spinlock_t* locker;
+		dregress::connection_value_t* value = nullptr;
+		dataplane::spinlock_t* locker = nullptr;
 
 		connections->lookup(key, value, locker);
 
-		uint32_t loss_count;
-		uint32_t ack_count;
+		uint32_t loss_count = 0;
+		uint32_t ack_count = 0;
 
 		int32_t ack_diff = 0;
 		int32_t loss_diff = 0;
@@ -122,7 +146,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 			{
 				stats.lookup_miss++;
 
-				controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
+				slow_worker_->SendToSlowWorker(mbuf, dregress.flow);
 				return;
 			}
 
@@ -132,7 +156,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 			labelled_label = label;
 
 			ipv6_address_t prefix_address;
-			uint8_t prefix_mask;
+			uint8_t prefix_mask = 0;
 			if (prefix.is_ipv4())
 			{
 				prefix_address = ipv6_address_t::convert(prefix.get_ipv4().address());
@@ -308,7 +332,7 @@ void dregress_t::insert(rte_mbuf* mbuf)
 		}
 	}
 
-	uint16_t payload_length;
+	uint16_t payload_length = 0;
 	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
 	{
 		rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
@@ -388,8 +412,8 @@ void dregress_t::insert(rte_mbuf* mbuf)
 	}
 
 	/// @todo: opt
-	controlplane->slowWorker->preparePacket(mbuf);
-	controlplane->sendPacketToSlowWorker(mbuf, dregress.flow);
+	slow_worker_->PreparePacket(mbuf);
+	slow_worker_->SendToSlowWorker(mbuf, dregress.flow);
 }
 
 void dregress_t::handle()
@@ -430,7 +454,7 @@ void dregress_t::handle()
 std::optional<dregress::direction_t> dregress_t::lookup(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-	const auto& base = controlplane->slowWorker->bases[controlplane->slowWorker->localBaseId & 1];
+	const auto& base = slow_worker_->current_base();
 	const auto& dregress = base.globalBase->dregresses[metadata->flow.data.dregressId];
 
 	std::map<std::tuple<common::ip_address_t, ///< nexthop
@@ -519,11 +543,11 @@ std::optional<dregress::direction_t> dregress_t::lookup(rte_mbuf* mbuf)
 	auto direction = (*std::next(directions.begin(), rand() % directions.size())).second;
 	{
 		auto& [prefix, nexthop, is_best, label, community, peer_as, origin_as] = direction;
-		(void)nexthop;
-		(void)label;
-		(void)community;
-		(void)peer_as;
-		(void)origin_as;
+		YANET_GCC_BUG_UNUSED(nexthop);
+		YANET_GCC_BUG_UNUSED(label);
+		YANET_GCC_BUG_UNUSED(community);
+		YANET_GCC_BUG_UNUSED(peer_as);
+		YANET_GCC_BUG_UNUSED(origin_as);
 
 		if (prefix.mask() != mask_max)
 		{
@@ -622,34 +646,11 @@ bool dregress_t::tcp_parse(rte_mbuf* mbuf,
 	return false;
 }
 
-common::idp::get_dregress_counters::response dregress_t::get_dregress_counters()
+dregress::LimitsStats dregress_t::limits() const
 {
-	common::idp::get_dregress_counters::response response;
-
-	{
-		std::lock_guard<std::mutex> guard(counters_mutex); ///< @todo: free lock
-		common::stream_out_t stream;
-		counters_v4.push(stream);
-		counters_v6.push(stream);
-		response = stream.getBuffer();
-
-		YANET_MEMORY_BARRIER_COMPILE;
-
-		counters_v4.clear(); ///< @todo: swap
-		counters_v6.clear(); ///< @todo: swap
-	}
-
-	return response;
-}
-
-void dregress_t::limits(common::idp::limits::response& response)
-{
-	limit_insert(response,
-	             "dregress.ht.keys",
-	             connections->getStats().pairs,
-	             connections->keysSize);
-	limit_insert(response,
-	             "dregress.ht.extended_chunks",
-	             connections->getStats().extendedChunksCount,
-	             YANET_CONFIG_DREGRESS_HT_EXTENDED_SIZE);
+	return {
+	        connections->stats().pairs,
+	        connections->keysSize,
+	        connections->stats().extendedChunksCount,
+	};
 }

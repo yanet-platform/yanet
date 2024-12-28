@@ -1,13 +1,12 @@
-#include <errno.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <ifaddrs.h>
 #include <linux/sockios.h>
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -41,11 +40,11 @@ bool system::getEtherAddress(const uint32_t& ipAddress,
 {
 	/// @todo: try to connect
 
-	int arpSocket;
+	int arpSocket = 0;
 	struct arpreq request;
-	struct sockaddr_in* sin;
-	struct ifaddrs* interfaces;
-	struct ifaddrs* interfaceNext;
+	struct sockaddr_in* sin = nullptr;
+	struct ifaddrs* interfaces = nullptr;
+	struct ifaddrs* interfaceNext = nullptr;
 
 	arpSocket = socket(AF_INET, SOCK_DGRAM, 0);
 	if (arpSocket == -1)
@@ -179,8 +178,7 @@ void system::updateRoute(const uint32_t& network,
 		snprintf(buffer + strlen(buffer), sizeof(buffer) - strlen(buffer), " nexthop via %s", ipv4_address_t(nexthop).toString().data());
 	}
 
-	int ret = ::system(buffer);
-	(void)ret;
+	[[maybe_unused]] int ret = ::system(buffer);
 }
 
 void system::updateRoute(const ip_prefix_t& prefix,
@@ -221,8 +219,7 @@ void system::removeRoute(const uint32_t& network,
 	char buffer[512];
 	snprintf(buffer, sizeof(buffer), "ip route del %s", prefix.toString().data());
 
-	int ret = ::system(buffer);
-	(void)ret;
+	[[maybe_unused]] int ret = ::system(buffer);
 }
 
 void system::removeRoute(const ip_prefix_t& prefix)
@@ -242,9 +239,9 @@ std::set<uint32_t> system::getLocalIpAddresses()
 {
 	std::set<uint32_t> result;
 
-	struct ifaddrs* ifaddr;
-	struct ifaddrs* ifa;
-	int n;
+	struct ifaddrs* ifaddr = nullptr;
+	struct ifaddrs* ifa = nullptr;
+	int n = 0;
 
 	if (getifaddrs(&ifaddr) == -1)
 	{
@@ -276,9 +273,9 @@ std::set<std::array<uint8_t, 16>> system::getLocalIPv6Addresses()
 {
 	std::set<std::array<uint8_t, 16>> result;
 
-	struct ifaddrs* ifaddr;
-	struct ifaddrs* ifa;
-	int n;
+	struct ifaddrs* ifaddr = nullptr;
+	struct ifaddrs* ifa = nullptr;
+	int n = 0;
 
 	if (getifaddrs(&ifaddr) == -1)
 	{
@@ -308,11 +305,9 @@ std::set<std::array<uint8_t, 16>> system::getLocalIPv6Addresses()
 	return result;
 }
 
-std::optional<mac_address_t> system::get_mac_address(const std::string& vrf,
+std::optional<mac_address_t> system::get_mac_address([[maybe_unused]] const std::string& vrf,
                                                      const ip_address_t& address)
 {
-	(void)vrf; ///< @todo: VRF
-
 	if (address.is_ipv4())
 	{
 		std::array<uint8_t, 6> neighborMacAddress;

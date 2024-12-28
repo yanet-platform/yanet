@@ -10,7 +10,7 @@ TEST(HashtableTest, Basic)
 {
 	dataplane::hashtable_chain_t<int, int, 128, 128, 4, 4> t;
 
-	int* v;
+	int* v = nullptr;
 	int k = 1;
 	t.lookup(&k, &v, 1);
 	EXPECT_EQ(nullptr, v);
@@ -42,8 +42,8 @@ TEST(HashtableTest, Extended)
 
 	for (int k = 0; k < 512; ++k)
 	{
-		int* v;
-		dataplane::spinlock_t* locker;
+		int* v = nullptr;
+		dataplane::spinlock_t* locker = nullptr;
 
 		t.lookup(k, v, locker);
 		if ((k % 7) && (k % 11))
@@ -70,7 +70,7 @@ TEST(HashtableTest, Extended)
 	}
 
 	EXPECT_TRUE(ok);
-	EXPECT_NE(t.getStats().extendedChunksCount, 0);
+	EXPECT_NE(t.stats().extendedChunksCount, 0);
 
 	uint32_t from = 0;
 	for (auto iter : t.range(from, 8192))
@@ -100,8 +100,8 @@ TEST(HashtableTest, Extended)
 		iter.unlock();
 	}
 
-	EXPECT_EQ(t.getStats().extendedChunksCount, 0);
-	EXPECT_EQ(t.getStats().pairs, 0);
+	EXPECT_EQ(t.stats().extendedChunksCount, 0);
+	EXPECT_EQ(t.stats().pairs, 0);
 
 	for (int k = 0; k < 512; ++k)
 	{
@@ -127,21 +127,21 @@ TEST(HashtableTest, Extended)
 		iter.unlock();
 	}
 
-	EXPECT_EQ(t.getStats().extendedChunksCount, 0);
-	EXPECT_EQ(t.getStats().pairs, 0);
+	EXPECT_EQ(t.stats().extendedChunksCount, 0);
+	EXPECT_EQ(t.stats().pairs, 0);
 
 	for (int k = 0; k < 100500; ++k)
 	{
 		t.insert(k, k);
 	}
 
-	EXPECT_EQ(t.getStats().extendedChunksCount, 128);
-	EXPECT_EQ(t.getStats().pairs, 128 * 2 + 128 * 4);
+	EXPECT_EQ(t.stats().extendedChunksCount, 128);
+	EXPECT_EQ(t.stats().pairs, 128 * 2 + 128 * 4);
 
 	t.clear();
 
-	EXPECT_EQ(t.getStats().extendedChunksCount, 0);
-	EXPECT_EQ(t.getStats().pairs, 0);
+	EXPECT_EQ(t.stats().extendedChunksCount, 0);
+	EXPECT_EQ(t.stats().pairs, 0);
 }
 
 TEST(hashtable_mod_id32, basic)
@@ -220,47 +220,37 @@ TEST(hashtable_mod_id32, burst)
 	{
 		const auto mask = ht.lookup(hashes, keys, values, YANET_CONFIG_BURST_SIZE);
 		EXPECT_EQ(0, mask);
-		for (unsigned int i = 0;
-		     i < YANET_CONFIG_BURST_SIZE;
-		     i++)
+		for (unsigned int value : values)
 		{
-			EXPECT_EQ(0x80000000, values[i] & (1u << 31));
+			EXPECT_EQ(0x80000000, value & (1u << 31));
 		}
 	}
 
-	for (unsigned int i = 0;
-	     i < YANET_CONFIG_BURST_SIZE;
-	     i++)
+	for (auto key : keys)
 	{
-		EXPECT_EQ(eResult::success, ht.insert(updater, keys[i], value1));
+		EXPECT_EQ(eResult::success, ht.insert(updater, key, value1));
 	}
 
 	{
 		const auto mask = ht.lookup(hashes, keys, values, YANET_CONFIG_BURST_SIZE);
 		EXPECT_EQ(0xFFFFFFFF, mask);
-		for (unsigned int i = 0;
-		     i < YANET_CONFIG_BURST_SIZE;
-		     i++)
+		for (unsigned int value : values)
 		{
-			EXPECT_EQ(value1, values[i]);
+			EXPECT_EQ(value1, value);
 		}
 	}
 
-	for (unsigned int i = 0;
-	     i < YANET_CONFIG_BURST_SIZE;
-	     i++)
+	for (auto key : keys)
 	{
-		EXPECT_EQ(eResult::success, ht.insert(updater, keys[i], value2));
+		EXPECT_EQ(eResult::success, ht.insert(updater, key, value2));
 	}
 
 	{
 		const auto mask = ht.lookup(hashes, keys, values, YANET_CONFIG_BURST_SIZE);
 		EXPECT_EQ(0xFFFFFFFF, mask);
-		for (unsigned int i = 0;
-		     i < YANET_CONFIG_BURST_SIZE;
-		     i++)
+		for (unsigned int value : values)
 		{
-			EXPECT_EQ(value2, values[i]);
+			EXPECT_EQ(value2, value);
 		}
 	}
 
@@ -269,11 +259,9 @@ TEST(hashtable_mod_id32, burst)
 	{
 		const auto mask = ht.lookup(hashes, keys, values, YANET_CONFIG_BURST_SIZE);
 		EXPECT_EQ(0, mask);
-		for (unsigned int i = 0;
-		     i < YANET_CONFIG_BURST_SIZE;
-		     i++)
+		for (unsigned int value : values)
 		{
-			EXPECT_EQ(0x80000000, values[i] & (1u << 31));
+			EXPECT_EQ(0x80000000, value & (1u << 31));
 		}
 	}
 }
@@ -338,8 +326,8 @@ TEST(hashtable_mod_spinlock, basic)
 	const uint32_t value1 = 12345u;
 	const uint32_t value2 = 12345678u;
 
-	uint32_t* value;
-	dataplane::spinlock_nonrecursive_t* locker;
+	uint32_t* value = nullptr;
+	dataplane::spinlock_nonrecursive_t* locker = nullptr;
 
 	{
 		const uint32_t hash = ht.lookup(key, value, locker);
@@ -415,8 +403,8 @@ TEST(hashtable_mod_spinlock, collision)
 	                                  32>
 	        ht;
 
-	uint32_t* value;
-	dataplane::spinlock_nonrecursive_t* locker;
+	uint32_t* value = nullptr;
+	dataplane::spinlock_nonrecursive_t* locker = nullptr;
 
 	for (unsigned int i = 0;
 	     i < 64;

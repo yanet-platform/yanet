@@ -21,10 +21,8 @@ void fqdn_t::reload_before()
 
 void fqdn_t::reload(const controlplane::base_t& base_prev,
                     const controlplane::base_t& base_next,
-                    common::idp::updateGlobalBase::request& globalbase)
+                    [[maybe_unused]] common::idp::updateGlobalBase::request& globalbase)
 {
-	(void)globalbase;
-
 	generations.next().update(base_prev, base_next);
 }
 

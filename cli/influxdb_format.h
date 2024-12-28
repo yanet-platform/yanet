@@ -88,11 +88,9 @@ std::string to_string(const char* key,
 class base_t
 {
 public:
-	virtual ~base_t()
-	{
-	}
+	virtual ~base_t() = default;
 
-	const std::string& to_string() const
+	[[nodiscard]] const std::string& to_string() const
 	{
 		return string;
 	}
@@ -183,7 +181,7 @@ void print_histogram(const char* name,
                      const index_T start,
                      const index_T end)
 {
-	for (unsigned int i = (unsigned int)start;
+	for (auto i = (unsigned int)start;
 	     i <= (unsigned int)end;
 	     i++)
 	{

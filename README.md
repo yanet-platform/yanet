@@ -33,6 +33,7 @@ docker pull yanetplatform/builder
 Add alias for run commands on docker:
 ```
 alias yanet-builder="docker run --rm -it -v /run/yanet:/run/yanet -v \$PWD:/project yanetplatform/builder"
+(for Mac: alias yanet-builder="docker run --platform linux/amd64 --rm -it -v /run/yanet:/run/yanet -v \$PWD:/project yanetplatform/builder")
 ```
 
 Once setup `build_autotest` directory:
@@ -58,6 +59,31 @@ yanet-builder ./autotest/yanet-autotest-run.py --prefix=build_autotest autotest/
 For more information about the autotests run:
 ```
 yanet-builder ./autotest/yanet-autotest-run.py -h
+```
+
+## Running Unit Tests
+
+To run the unit tests for the project, follow these steps:
+
+Setup the build directory for unittest targeting:
+```sh
+meson setup -Dtarget=unittest build_unittest
+```
+Next, compile the project within the setup build directory:
+
+```sh
+meson compile -C build_unittest
+```
+
+After compilation, run all the unit tests with:
+
+```sh
+meson test -C build_unittest
+```
+- To view more detailed output, you can run the tests with -v flag:
+
+```sh
+meson test -C build_unittest -v
 ```
 ## Dependencies
 - [DPDK](https://github.com/DPDK/dpdk)

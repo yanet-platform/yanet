@@ -6,7 +6,7 @@
 #include <rte_ether.h>
 #include <rte_hash_crc.h>
 
-#include "common/config.h"
+#include "common/config.release.h"
 #include "common/define.h"
 
 #define YADECAP_UNUSED [[maybe_unused]]
@@ -98,5 +98,11 @@ namespace dataplane
 
 class memory_pointer;
 class memory_manager;
+
+enum class FlowDirection
+{
+	Ingress,
+	Egress
+};
 
 }
