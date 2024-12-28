@@ -1,5 +1,5 @@
+#include <csignal>
 #include <fstream>
-#include <signal.h>
 #include <systemd/sd-daemon.h>
 #include <thread>
 
@@ -9,9 +9,9 @@
 #include <rte_ring.h>
 #include <rte_version.h>
 
+#include "common/define.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
-#include "common/result.h"
 #include "common/type.h"
 
 #include "dataplane/samples.h"
@@ -42,13 +42,13 @@ int initLogger()
 	auto response = dataplane.getConfig();
 	auto& workers = std::get<1>(response);
 
-	for (auto it : workers)
+	for (auto& [core, workers_vector] : workers)
 	{
-		auto coreId = it.first;
-		auto ring = rte_ring_lookup(("r_log_" + std::to_string(coreId)).c_str());
-		if (ring != NULL)
+		YANET_GCC_BUG_UNUSED(workers_vector);
+		auto ring = rte_ring_lookup(("r_log_" + std::to_string(core)).c_str());
+		if (ring != nullptr)
 		{
-			YANET_LOG_DEBUG("found log ring on #%u core\n", coreId);
+			YANET_LOG_DEBUG("found log ring on #%u core\n", core);
 
 			rings.push_back(ring);
 		}
@@ -90,8 +90,8 @@ int runLogger()
 
 	interface::controlPlane controlplane;
 
-	uint32_t size = 1024;
-	samples::sample_t* samples[size];
+	constexpr uint32_t size = 1024;
+	std::array<samples::sample_t*, size> samples;
 
 	std::map<uint32_t, common::icp::getAclConfig::response> configs;
 
@@ -151,7 +151,7 @@ int runLogger()
 				if (aclConfig != nullptr)
 				{
 					auto& [serial, ifaces, rules] = *aclConfig;
-					(void)serial;
+					YANET_GCC_BUG_UNUSED(serial);
 
 					auto it = ifaces.find(sample->acl_id);
 					if (it != ifaces.end())
@@ -169,14 +169,14 @@ int runLogger()
 				}
 
 				std::cout << "{"
-				          << "\"action\":\"" << common::globalBase::eFlowType_toString(sample->action) << "\","
+				          << R"("action":")" << common::globalBase::eFlowType_toString(sample->action) << "\","
 				          << "\"rule_ids\":[" << rule_ids << "],"
 				          << "\"direction\":" << (direction ? "\"in\"" : "\"out\"") << ","
-				          << "\"iface\":\"" << iface << "\","
+				          << R"("iface":")" << iface << "\","
 				          << "\"proto\":" << (int)sample->proto << ","
-				          << "\"src_addr\":\"" << src_addr.toString() << "\","
+				          << R"("src_addr":")" << src_addr.toString() << "\","
 				          << "\"src_port\":" << sample->src_port << ","
-				          << "\"dst_addr\":\"" << dst_addr.toString() << "\","
+				          << R"("dst_addr":")" << dst_addr.toString() << "\","
 				          << "\"dst_port\":" << sample->dst_port << "}\n";
 
 				rte_mempool_put(mempool, sample);
@@ -232,82 +232,84 @@ int loadConfig(const std::string& path)
 	return 0;
 }
 
-int main(int argc,
-         char** argv)
+int main(int argc, char** argv)
 {
 	int config = argc;
 	for (int i = 1; i < argc; i++)
 	{
-		if (strcmp(argv[i], "-d") == 0)
+		std::string_view arg{argv[i]};
+		if (arg == "-d")
 		{
 			common::log::logPriority = common::log::TLOG_DEBUG;
 		}
-		else if (strcmp(argv[i], "-c") == 0)
+		else if (arg == "-c")
 		{
 			config = i + 1;
 		}
 	}
+
 	if (config >= argc)
 	{
 		std::cout << "usage: " << argv[0] << " [-d] -c <logger.conf>" << std::endl;
 		return 1;
 	}
+
 	int ret = loadConfig(argv[config]);
 	if (ret != 0)
 	{
 		return ret;
 	}
 
-	std::vector<const char*> args;
+	std::vector<std::string> args;
 	args.push_back(argv[0]);
-	args.push_back("--proc-type=secondary");
+	args.emplace_back("--proc-type=secondary");
 
 	std::string filePrefix = "--file-prefix=";
+	if (const char* pointer = std::getenv("YANET_FILEPREFIX"))
 	{
-		char* pointer = getenv("YANET_FILEPREFIX");
-		if (pointer)
-		{
-			filePrefix += pointer;
-		}
-		else
-		{
-			char* pointer = getenv("YANET_PREFIX");
-			if (pointer)
-			{
-				filePrefix += pointer;
-			}
-		}
+		filePrefix += pointer;
 	}
+	else if (const char* pointer = std::getenv("YANET_PREFIX"))
+	{
+		filePrefix += pointer;
+	}
+
 	if (filePrefix.size() > std::string("--file-prefix=").size())
 	{
-		args.push_back(filePrefix.data());
+		args.push_back(filePrefix);
 	}
 
 #if (RTE_VER_YEAR < 20) || (RTE_VER_YEAR == 20 && RTE_VER_MONT < 11)
-	const char masterLcore[] = "--master-lcore";
+	const std::string masterLcore = "--master-lcore";
 #else
-	const char masterLcore[] = "--main-lcore";
+	const std::string masterLcore = "--main-lcore";
 #endif
 
 	std::string masterLcoreId = std::to_string(loggerCoreId);
-
 	args.push_back(masterLcore);
-	args.push_back(masterLcoreId.data());
+	args.push_back(masterLcoreId);
 
 	YANET_LOG_DEBUG("eal args:\n");
-	for (uint32_t i = 0; i < args.size(); ++i)
+	for (const auto& arg : args)
 	{
-		YANET_LOG_DEBUG("%s\n", args[i]);
+		YANET_LOG_DEBUG("%s\n", arg.c_str());
 	}
 
-	ret = rte_eal_init(args.size(), (char**)args.data());
+	// Use std::vector<char*> and copy the data into it for passing to rte_eal_init
+	std::vector<char*> c_args;
+	for (auto& arg : args)
+	{
+		c_args.push_back(const_cast<char*>(arg.c_str()));
+	}
+
+	ret = rte_eal_init(static_cast<int>(c_args.size()), c_args.data());
 	if (ret < 0)
 	{
 		YANET_LOG_ERROR("rte_eal_init() = %d\n", ret);
 		return 2;
 	}
 
-	if (signal(SIGPIPE, handleSignal) == SIG_ERR)
+	if (std::signal(SIGPIPE, handleSignal) == SIG_ERR)
 	{
 		return 3;
 	}

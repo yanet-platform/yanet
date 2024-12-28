@@ -156,33 +156,33 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 	try
 	{
 		const auto& [dataplane_physicalports, dataplane_workers, dataplane_values] = dataPlaneConfig;
-		(void)dataplane_workers;
-		(void)dataplane_values;
+		YANET_GCC_BUG_UNUSED(dataplane_workers);
+		YANET_GCC_BUG_UNUSED(dataplane_values);
 
 		for (const auto& [core_id, worker] : dataplane_workers)
 		{
-			(void)core_id;
+			YANET_GCC_BUG_UNUSED(core_id);
 			const auto& [ports, socket_id] = worker;
-			(void)ports;
+			YANET_GCC_BUG_UNUSED(ports);
 			// add entry for sockets with workers, including slow worker
 			baseNext.socket_interfaces[socket_id] = {};
 		}
 		for (const auto& [route_name, route] : baseNext.routes)
 		{
-			(void)route_name;
+			YANET_GCC_BUG_UNUSED(route_name);
 
 			for (const auto& [interface_name, interface] : route.interfaces)
 			{
-				(void)interface_name;
+				YANET_GCC_BUG_UNUSED(interface_name);
 
 				if (exist(baseNext.logicalPorts, interface.nextModule))
 				{
 					const auto& logicalport = baseNext.logicalPorts[interface.nextModule];
 
 					const auto& [physicalport_name, socket_id, mac_address, pci] = dataplane_physicalports.find(logicalport.physicalPortId)->second;
-					(void)physicalport_name;
-					(void)mac_address;
-					(void)pci;
+					YANET_GCC_BUG_UNUSED(physicalport_name);
+					YANET_GCC_BUG_UNUSED(mac_address);
+					YANET_GCC_BUG_UNUSED(pci);
 
 					baseNext.socket_interfaces[socket_id].emplace(interface.interfaceId);
 				}
@@ -501,12 +501,9 @@ void config_parser_t::loadConfig_decap(controlplane::base_t& baseNext,
 void config_parser_t::loadConfig_nat64stateful(controlplane::base_t& baseNext,
                                                const std::string& moduleId,
                                                const nlohmann::json& moduleJson,
-                                               const std::string& rootFilePath,
-                                               const std::map<std::string, nlohmann::json>& jsons)
+                                               [[maybe_unused]] const std::string& rootFilePath,
+                                               [[maybe_unused]] const std::map<std::string, nlohmann::json>& jsons)
 {
-	(void)rootFilePath;
-	(void)jsons;
-
 	auto& nat64stateful = baseNext.nat64statefuls[moduleId];
 	nat64stateful_id_t nat64stateful_id = baseNext.nat64statefuls.size();
 
@@ -634,7 +631,7 @@ void config_parser_t::loadConfig_tun64(controlplane::base_t& baseNext,
 	}
 	else
 	{
-		tunnel.prefixes.emplace(common::ip_prefix_t(tunnel.ipv6SourceAddress, 128));
+		tunnel.prefixes.emplace(tunnel.ipv6SourceAddress, 128);
 	}
 
 	if (exist(moduleJson, "mappings"))
@@ -1013,12 +1010,9 @@ void config_parser_t::loadConfig_nat64stateless_translations(controlplane::base_
 void config_parser_t::loadConfig_nat46clat(controlplane::base_t& baseNext,
                                            const std::string& moduleId,
                                            const nlohmann::json& moduleJson,
-                                           const std::string& rootFilePath,
-                                           const std::map<std::string, nlohmann::json>& jsons)
+                                           [[maybe_unused]] const std::string& rootFilePath,
+                                           [[maybe_unused]] const std::map<std::string, nlohmann::json>& jsons)
 {
-	(void)rootFilePath;
-	(void)jsons;
-
 	auto& nat46clat = baseNext.nat46clats[moduleId];
 	nat46clat_id_t nat46clat_id = baseNext.nat46clats.size();
 
@@ -1136,7 +1130,7 @@ void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,
 
 	if (exist(moduleJson, "macros"))
 	{
-		std::string includePath = moduleJson["macros"].get<std::string>();
+		auto includePath = moduleJson["macros"].get<std::string>();
 		if (includePath.find("/") != 0) ///< relative path
 		{
 			includePath = dirname(rootFilePath) + "/" + includePath;
@@ -1149,7 +1143,7 @@ void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,
 
 	if (exist(moduleJson, "dnscache"))
 	{
-		std::string includePath = moduleJson["dnscache"].get<std::string>();
+		auto includePath = moduleJson["dnscache"].get<std::string>();
 		if (includePath.find("/") != 0) ///< relative path
 		{
 			includePath = dirname(rootFilePath) + "/" + includePath;
@@ -1213,7 +1207,7 @@ void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,
 
 			for (const auto& ipJson : srcPrefixes)
 			{
-				std::string prefix_str = ipJson.get<std::string>();
+				auto prefix_str = ipJson.get<std::string>();
 				ip_prefix_t prefix(prefix_str);
 
 				if (prefix.is_ipv4())
@@ -1231,7 +1225,7 @@ void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,
 		{
 			for (const auto& ipJson : earlyDecapJson["dstAddresses"])
 			{
-				std::string addr_str = ipJson.get<std::string>();
+				auto addr_str = ipJson.get<std::string>();
 				ip_prefix_t addr(addr_str);
 
 				if (addr.is_ipv4())
@@ -1655,7 +1649,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 
 		std::string scheduler_string = service_json["scheduler"];
 
-		balancer::scheduler scheduler;
+		balancer::scheduler scheduler{};
 		balancer::scheduler_params scheduler_params{};
 		if (scheduler_string == "rr")
 		{
@@ -1678,7 +1672,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			throw error_result_t(eResult::invalidConfigurationFile, "unknown scheduler: " + scheduler_string);
 		}
 
-		balancer::forwarding_method forwarding_method;
+		balancer::forwarding_method forwarding_method{};
 
 		if (!exist(service_json, "lvs_method"))
 		{
@@ -1919,7 +1913,7 @@ void config_parser_t::loadConfig_memory_group(common::memory_manager::memory_gro
 	{
 		auto memory_group_next = std::make_shared<common::memory_manager::memory_group>();
 
-		std::string name = json_iter["name"].get<std::string>();
+		auto name = json_iter["name"].get<std::string>();
 		std::string limit = "0";
 		if (exist(json_iter, "limit"))
 		{

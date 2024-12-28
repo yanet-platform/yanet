@@ -1,9 +1,16 @@
 #pragma once
 
+#include "common/config.release.h"
 #include <cstdint>
 #include <nlohmann/json.hpp>
 
-#include "common/config.h"
+struct FragmentationConfig
+{
+	uint64_t size = 1024;
+	uint64_t timeout_first = 32;
+	uint64_t timeout_last = 16;
+	uint64_t packets_per_flow = 64;
+};
 
 struct ConfigValues
 {
@@ -14,10 +21,7 @@ struct ConfigValues
 	uint64_t ring_lowPriority_size = 64;
 	uint64_t ring_toFreePackets_size = 64;
 	uint64_t ring_log_size = 1024;
-	uint64_t fragmentation_size = 1024;
-	uint64_t fragmentation_timeout_first = 32;
-	uint64_t fragmentation_timeout_last = 16;
-	uint64_t fragmentation_packets_per_flow = 64;
+	FragmentationConfig fragmentation;
 	uint64_t stateful_firewall_tcp_timeout = 120;
 	uint64_t stateful_firewall_tcp_syn_timeout = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
 	uint64_t stateful_firewall_tcp_syn_ack_timeout = YANET_CONFIG_STATE_TIMEOUT_DEFAULT;
@@ -51,10 +55,10 @@ inline void from_json(const nlohmann::json& j, ConfigValues& cfg)
 	cfg.ring_lowPriority_size = j.value("ring_lowPriority_size", cfg.ring_lowPriority_size);
 	cfg.ring_toFreePackets_size = j.value("ring_toFreePackets_size", cfg.ring_toFreePackets_size);
 	cfg.ring_log_size = j.value("ring_log_size", cfg.ring_log_size);
-	cfg.fragmentation_size = j.value("fragmentation_size", cfg.fragmentation_size);
-	cfg.fragmentation_timeout_first = j.value("fragmentation_timeout_first", cfg.fragmentation_timeout_first);
-	cfg.fragmentation_timeout_last = j.value("fragmentation_timeout_last", cfg.fragmentation_timeout_last);
-	cfg.fragmentation_packets_per_flow = j.value("fragmentation_packets_per_flow", cfg.fragmentation_packets_per_flow);
+	cfg.fragmentation.size = j.value("fragmentation_size", cfg.fragmentation.size);
+	cfg.fragmentation.timeout_first = j.value("fragmentation_timeout_first", cfg.fragmentation.timeout_first);
+	cfg.fragmentation.timeout_last = j.value("fragmentation_timeout_last", cfg.fragmentation.timeout_last);
+	cfg.fragmentation.packets_per_flow = j.value("fragmentation_packets_per_flow", cfg.fragmentation.packets_per_flow);
 
 	{
 		/*

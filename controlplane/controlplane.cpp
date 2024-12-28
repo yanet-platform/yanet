@@ -21,10 +21,6 @@ cControlPlane::cControlPlane() :
 {
 }
 
-cControlPlane::~cControlPlane()
-{
-}
-
 eResult cControlPlane::init(const std::string& jsonFilePath)
 {
 	eResult result = eResult::success;
@@ -41,6 +37,13 @@ eResult cControlPlane::init(const std::string& jsonFilePath)
 	{
 		sockets.emplace(std::get<1>(iter.second)); ///< @todo
 	}
+
+	result = common::sdp::SdpClient::ReadSharedMemoryData(sdp_data, true);
+	if (result != eResult::success)
+	{
+		return result;
+	}
+	counter_manager.init(&sdp_data);
 
 	modules.emplace_back(new telegraf_t); ///< @todo
 	modules.emplace_back(new rib_t); ///< @todo
@@ -147,6 +150,10 @@ eResult cControlPlane::init(const std::string& jsonFilePath)
 
 	register_command(common::icp::requestType::convert, [this](const common::icp::request& request) {
 		return command_convert(std::get<common::icp::convert::request>(std::get<1>(request)));
+	});
+
+	register_command(common::icp::requestType::counters_stat, [this]() {
+		return command_counters_stat();
 	});
 
 	if (!jsonFilePath.empty())
@@ -258,6 +265,11 @@ eResult cControlPlane::getPhysicalPortName(const tPortId& portId,
 	}
 
 	return eResult::invalidPortId;
+}
+
+const common::sdp::DataPlaneInSharedMemory* cControlPlane::getSdpData() const
+{
+	return &sdp_data;
 }
 
 common::icp::getPhysicalPorts::response cControlPlane::getPhysicalPorts() const
@@ -411,7 +423,7 @@ common::icp::limit_summary::response cControlPlane::limit_summary() const
 
 common::icp::acl_unwind::response cControlPlane::acl_unwind(const common::icp::acl_unwind::request& request) const
 {
-	const auto& [module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, keepstate] = request;
+	const auto& [module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, recordstate] = request;
 
 	generations.current_lock();
 	std::map<std::string, controlplane::base::acl_t> acls = generations.current().acls;
@@ -430,7 +442,7 @@ common::icp::acl_unwind::response cControlPlane::acl_unwind(const common::icp::a
 		acls.swap(acls_next);
 	}
 
-	return acl::unwind(acls, iface_map, module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, keepstate);
+	return acl::unwind(acls, iface_map, module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, recordstate);
 }
 
 common::icp::acl_lookup::response cControlPlane::acl_lookup(const common::icp::acl_lookup::request& request) const
@@ -469,7 +481,7 @@ common::icp::acl_lookup::response cControlPlane::acl_lookup(const common::icp::a
 	std::map<uint32_t, std::string> labels;
 	for (const auto& [module, acl] : acls)
 	{
-		(void)module;
+		YANET_GCC_BUG_UNUSED(module);
 
 		for (const auto& [label, info] : acl.firewall->labels())
 		{
@@ -491,7 +503,7 @@ common::icp::acl_lookup::response cControlPlane::acl_lookup(const common::icp::a
 
 		for (const auto& [id, gen_text, orig_text] : rules)
 		{
-			(void)gen_text;
+			YANET_GCC_BUG_UNUSED(gen_text);
 
 			if (ids.count(id))
 			{
@@ -591,7 +603,7 @@ common::icp::getFwLabels::response cControlPlane::command_getFwLabels()
 	for (const auto& [module, acl] : current.acls)
 	{
 		const auto& fw = acl.firewall;
-		(void)module;
+		YANET_GCC_BUG_UNUSED(module);
 		for (const auto& [label, info] : fw->labels())
 		{
 			auto ruleno = std::get<unsigned int>(info);
@@ -609,7 +621,7 @@ common::icp::getFwList::response cControlPlane::command_getFwList(const common::
 	if (rules_type == common::icp::getFwList::requestType::static_rules_original ||
 	    rules_type == common::icp::getFwList::requestType::static_rules_generated)
 	{
-		auto counters = dataPlane.getAclCounters();
+		auto counters = getAclCounters();
 		auto current_guard = generations.current_lock_guard();
 		const auto& current = generations.current();
 		const auto need_orig = (rules_type == common::icp::getFwList::requestType::static_rules_original);
@@ -641,7 +653,7 @@ common::icp::getFwList::response cControlPlane::command_getFwList(const common::
 
 		for (const auto& [id, gen_text, unused_text] : current.dispatcher)
 		{
-			(void)unused_text;
+			YANET_GCC_BUG_UNUSED(unused_text);
 			// XXX: if we need accounting for dispatcher rules
 			//      we can prepare id mappings for them.
 			response_rules.emplace_back(id, 0, gen_text);
@@ -818,6 +830,11 @@ common::icp::convert::response cControlPlane::command_convert(const common::icp:
 	return response;
 }
 
+common::icp::counters_stat::response cControlPlane::command_counters_stat()
+{
+	return counter_manager.full_stat();
+}
+
 common::icp::convert::response cControlPlane::convert_logical_module()
 {
 	common::icp::convert::response response;
@@ -828,7 +845,7 @@ common::icp::convert::response cControlPlane::convert_logical_module()
 
 	for (auto [id, name] : logicalport_id_to_name)
 	{
-		response.push_back({id, name});
+		response.emplace_back(id, name);
 	}
 
 	return response;
@@ -868,7 +885,7 @@ eResult cControlPlane::loadConfig(const std::string& rootFilePath,
 		{
 			{
 				std::unique_lock aclCountersDelta_lock(aclCountersDelta_mutex);
-				aclCountersDelta = dataPlane.getAclCounters();
+				aclCountersDelta = getAclCounters();
 			}
 
 			generations.next_lock();
@@ -978,4 +995,21 @@ void cControlPlane::main_thread()
 void cControlPlane::register_service(google::protobuf::Service* service)
 {
 	services[service->GetDescriptor()->name()] = service;
+}
+
+std::vector<uint64_t> cControlPlane::getAclCounters()
+{
+	std::vector<uint64_t> response(YANET_CONFIG_ACL_COUNTERS_SIZE);
+
+	uint64_t start_acl_counters = sdp_data.metadata_worker.start_acl_counters;
+	for (const auto& iter : sdp_data.workers)
+	{
+		auto* aclCounters = common::sdp::ShiftBuffer<uint64_t*>(iter.second.buffer, start_acl_counters);
+		for (size_t i = 0; i < YANET_CONFIG_ACL_COUNTERS_SIZE; i++)
+		{
+			response[i] += aclCounters[i];
+		}
+	}
+
+	return response;
 }

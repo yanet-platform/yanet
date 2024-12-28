@@ -15,9 +15,7 @@
 #include "result.h"
 #include "type.h"
 
-namespace common
-{
-namespace icp
+namespace common::icp
 {
 
 constexpr inline char socketPath[] = "/run/yanet/controlplane.sock";
@@ -87,6 +85,9 @@ enum class requestType : uint32_t
 	nat46clat_announce,
 	nat46clat_stats,
 	convert,
+	counters_stat,
+	route_counters,
+	route_tunnel_counters,
 	size // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -220,6 +221,12 @@ inline const char* requestType_toString(requestType t)
 			return "nat46clat_stats";
 		case requestType::convert:
 			return "convert";
+		case requestType::counters_stat:
+			return "counters_stat";
+		case requestType::route_counters:
+			return "route_counters";
+		case requestType::route_tunnel_counters:
+			return "route_tunnel_counters";
 		case requestType::size:
 			return "unknown";
 	}
@@ -726,7 +733,7 @@ using request = std::tuple<std::optional<std::string>, ///< module
                            std::optional<std::string>, ///< transport_source
                            std::optional<std::string>, ///< transport_destination
                            std::optional<std::string>, ///< transport_flags
-                           std::optional<std::string>>; ///< keepstate
+                           std::optional<std::string>>; ///< recordstate
 
 using response = std::vector<std::tuple<std::optional<std::string>,
                                         std::optional<std::string>,
@@ -777,6 +784,23 @@ using request = std::tuple<std::string, ///< module_name
                            ip_prefix_t>;
 
 using response = route_lookup::response;
+}
+
+namespace route_counters
+{
+using response = std::vector<std::tuple<uint32, ///< peer
+                                        ip_address_t, ///< nexthop
+                                        ip_prefix_t, ///< prefix
+                                        uint64_t, ///< count
+                                        uint64_t>>; ///< size
+}
+
+namespace route_tunnel_counters
+{
+using response = std::vector<std::tuple<uint32, ///< peer
+                                        ip_address_t, ///< nexthop
+                                        uint64_t, ///< count
+                                        uint64_t>>; ///< size
 }
 
 namespace route_tunnel_lookup
@@ -909,6 +933,22 @@ using response = std::vector<std::tuple<unsigned int, ///< id
                                         std::string>>; ///< name
 }
 
+namespace counters_stat
+{
+using one_size_info = std::tuple<uint16_t, ///< size of segments
+                                 uint32_t, ///< used_blocks
+                                 uint32_t, ///< busy_blocks
+                                 uint32_t>; ///< used_segments
+
+using common_info = std::tuple<uint32_t, ///< free_blocks
+                               uint32_t, ///< free_cells_
+                               uint64_t, ///< errors_external_
+                               uint64_t>; ///< errors_internal_
+
+using response = std::tuple<common_info,
+                            std::vector<one_size_info>>;
+}
+
 using request = std::tuple<requestType,
                            std::variant<std::tuple<>,
                                         acl_unwind::request,
@@ -956,6 +996,8 @@ using response = std::variant<std::tuple<>,
                               acl_unwind::response,
                               acl_lookup::response,
                               route_lookup::response, ///< + route_get::response
+                              route_counters::response,
+                              route_tunnel_counters::response,
                               route_tunnel_lookup::response, ///< + route_tunnel_get::response
                               getRibStats::response,
                               getDefenders::response,
@@ -976,7 +1018,6 @@ using response = std::variant<std::tuple<>,
                               nat46clat_config::response,
                               nat46clat_announce::response,
                               nat46clat_stats::response,
-                              convert::response>;
-}
-
+                              convert::response,
+                              counters_stat::response>;
 }

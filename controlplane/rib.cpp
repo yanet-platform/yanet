@@ -6,14 +6,6 @@
 
 using namespace controlplane::module;
 
-rib_t::rib_t()
-{
-}
-
-rib_t::~rib_t()
-{
-}
-
 eResult rib_t::init()
 {
 	controlPlane->register_command(common::icp::requestType::rib_update, [this](const common::icp::request& request) {
@@ -79,13 +71,10 @@ eResult rib_t::init()
 	return eResult::success;
 }
 
-void rib_t::reload(const controlplane::base_t& base_prev,
+void rib_t::reload([[maybe_unused]] const controlplane::base_t& base_prev,
                    const controlplane::base_t& base_next,
-                   common::idp::updateGlobalBase::request& globalbase)
+                   [[maybe_unused]] common::idp::updateGlobalBase::request& globalbase)
 {
-	(void)base_prev;
-	(void)globalbase;
-
 	common::icp::rib_update::request request;
 
 	{
@@ -191,7 +180,7 @@ void rib_t::rib_insert(const common::icp::rib_update::insert& request)
 			for (const auto& [nexthop, nlris] : nexthops)
 			{
 				auto& [summary_prefixes, summary_paths, summary_eor] = this->summary[{vrf, priority, protocol, peer, table_name}];
-				(void)summary_eor;
+				YANET_GCC_BUG_UNUSED(summary_eor);
 
 				for (const auto& [prefix, path_information, labels] : nlris)
 				{
@@ -291,13 +280,13 @@ void rib_t::rib_remove(const common::icp::rib_update::remove& request)
 			}
 
 			auto& [summary_prefixes, summary_paths, summary_eor] = this->summary[{vrf, priority, protocol, peer, table_name}];
-			(void)summary_eor;
+			YANET_GCC_BUG_UNUSED(summary_eor);
 
 			rib::pptn_t current_pptn = {protocol, peer, table_name};
 
 			for (const auto& [prefix, path_information, labels] : nlris)
 			{
-				(void)labels;
+				YANET_GCC_BUG_UNUSED(labels);
 
 				unsigned int prefixes_diff = 0;
 				unsigned int paths_diff = 0;
@@ -386,9 +375,9 @@ void rib_t::rib_clear(const common::icp::rib_update::clear& request)
 		{
 			const auto& [vrf, priority, protocol, peer, table_name] = summary_key;
 			auto& [summary_prefixes, summary_paths, summary_eor] = summary_value;
-			(void)table_name;
-			(void)summary_prefixes;
-			(void)summary_paths;
+			YANET_GCC_BUG_UNUSED(table_name);
+			YANET_GCC_BUG_UNUSED(summary_prefixes);
+			YANET_GCC_BUG_UNUSED(summary_paths);
 
 			if (protocol != request_protocol)
 			{
@@ -423,7 +412,7 @@ void rib_t::rib_clear(const common::icp::rib_update::clear& request)
 			if (request_attribute)
 			{
 				const auto& [request_peer, request_vrf_priority] = *request_attribute;
-				(void)request_peer;
+				YANET_GCC_BUG_UNUSED(request_peer);
 
 				if (request_vrf_priority != vrf_priority)
 				{
@@ -438,7 +427,7 @@ void rib_t::rib_clear(const common::icp::rib_update::clear& request)
 				for (auto& [pptn_index, path_info_to_nh_ptr] : pptn_to_path_info_to_nh_ptr)
 				{
 					const auto& [protocol, peer, table_name] = proto_peer_table_name[pptn_index];
-					(void)table_name;
+					YANET_GCC_BUG_UNUSED(table_name);
 
 					if (request_protocol != protocol)
 					{
@@ -448,7 +437,7 @@ void rib_t::rib_clear(const common::icp::rib_update::clear& request)
 					if (request_attribute)
 					{
 						const auto& [request_peer, request_vrf_priority] = request_attribute.value();
-						(void)request_vrf_priority;
+						YANET_GCC_BUG_UNUSED(request_vrf_priority);
 
 						if (request_peer != peer)
 						{
@@ -458,7 +447,7 @@ void rib_t::rib_clear(const common::icp::rib_update::clear& request)
 
 					for (auto& [path_info, nh_ptr] : path_info_to_nh_ptr)
 					{
-						(void)path_info;
+						YANET_GCC_BUG_UNUSED(path_info);
 						--nh_to_ref_count[*nh_ptr];
 
 						// nexthop stuff is not referenced by any prefix anymore - remove it entirely
@@ -520,8 +509,8 @@ void rib_t::rib_clear(const common::icp::rib_update::clear& request)
 		for (auto& [summary_key, summary_value] : this->summary)
 		{
 			const auto& [vrf, priority, protocol, peer, table_name] = summary_key;
-			(void)summary_value;
-			(void)table_name;
+			YANET_GCC_BUG_UNUSED(summary_value);
+			YANET_GCC_BUG_UNUSED(table_name);
 
 			if (protocol != request_protocol)
 			{
@@ -560,15 +549,15 @@ void rib_t::rib_eor(const common::icp::rib_update::eor& request)
 	const auto& [protocol, vrf, priority, peer, table_name] = request;
 
 	auto& [summary_prefixes, summary_paths, summary_eor] = this->summary[{vrf, priority, protocol, peer, table_name}];
-	(void)summary_prefixes;
-	(void)summary_paths;
+	YANET_GCC_BUG_UNUSED(summary_prefixes);
+	YANET_GCC_BUG_UNUSED(summary_paths);
 
 	summary_eor = true;
 }
 
 void rib_t::rib_flush(bool force_flush)
 {
-	bool flush;
+	bool flush = false;
 	{
 		std::lock_guard<std::mutex> rib_update_guard(rib_update_mutex);
 		std::lock_guard<std::mutex> prefixes_guard(prefixes_mutex);
@@ -586,14 +575,14 @@ void rib_t::rib_flush(bool force_flush)
 
 					controlPlane->route.prefix_update(vrf_priority, updated_prefix, proto_peer_table_name, destination);
 					controlPlane->route.tunnel_prefix_update(vrf_priority, updated_prefix, destination);
-					//controlPlane->route.linux_prefix_update(vrf_priority, updated_prefix, destination);
+					// controlPlane->route.linux_prefix_update(vrf_priority, updated_prefix, destination);
 					controlPlane->dregress.prefix_insert(vrf_priority, updated_prefix, destination);
 				}
 				else
 				{
 					controlPlane->route.prefix_update(vrf_priority, updated_prefix, {}, std::monostate()); // TODO: get rid of third parameter
 					controlPlane->route.tunnel_prefix_update(vrf_priority, updated_prefix, std::monostate());
-					//controlPlane->route.linux_prefix_update(vrf_priority, updated_prefix, std::monostate());
+					// controlPlane->route.linux_prefix_update(vrf_priority, updated_prefix, std::monostate());
 					controlPlane->dregress.prefix_remove(vrf_priority, updated_prefix);
 				}
 			}
@@ -666,7 +655,7 @@ common::icp::rib_lookup::response rib_t::rib_lookup(const common::icp::rib_looku
 		for (const auto& [vrf_priority, prefixes_to_pptn_to_path_info_to_nh_ptr] : prefixes_to_path_info_to_nh_ptr)
 		{
 			const auto& [vrf, priority] = vrf_priority;
-			(void)priority;
+			YANET_GCC_BUG_UNUSED(priority);
 
 			if (request_vrf != vrf)
 			{
@@ -709,7 +698,7 @@ common::icp::rib_get::response rib_t::rib_get(const common::icp::rib_get::reques
 	for (const auto& [vrf_priority, prefixes_to_pptn_to_path_info_to_nh_ptr] : prefixes_to_path_info_to_nh_ptr)
 	{
 		const auto& [vrf, priority] = vrf_priority;
-		(void)priority;
+		YANET_GCC_BUG_UNUSED(priority);
 
 		if (request_vrf != vrf)
 		{
@@ -826,7 +815,7 @@ void rib_t::rib_load(const common::icp::rib_load::request& request)
 		{
 			for (const auto& [prefix, pptn_to_path_info_to_nh_ptr] : prefixes_to_pptn_to_path_info_to_nh_ptr)
 			{
-				(void)pptn_to_path_info_to_nh_ptr;
+				YANET_GCC_BUG_UNUSED(pptn_to_path_info_to_nh_ptr);
 				this->prefixes_reb[vrf_priority].insert(prefix);
 			}
 		}
@@ -841,7 +830,7 @@ void rib_t::rib_load(const common::icp::rib_load::request& request)
 		{
 			const auto& [index, ref_count] = index_ref_count_pair;
 			auto [nh_to_ref_count_it, insert_result] = this->nh_to_ref_count.insert({nh, ref_count});
-			(void)insert_result;
+			YANET_GCC_BUG_UNUSED(insert_result);
 
 			const rib::nexthop_stuff_t* nh_ptr = &(nh_to_ref_count_it->first);
 

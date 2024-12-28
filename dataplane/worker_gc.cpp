@@ -1,29 +1,26 @@
-#include <thread>
-
 #include <rte_errno.h>
 #include <rte_ethdev.h>
 
 #include "common/counters.h"
 #include "common/fallback.h"
+#include "dataplane/globalbase.h"
+#include "dataplane/sdpserver.h"
+#include "dataplane/worker_gc.h"
 
-#include "dataplane.h"
-#include "worker.h"
-#include "worker_gc.h"
-
-worker_gc_t::worker_gc_t(cDataPlane* dataplane) :
-        dataplane(dataplane),
-        controlplane(nullptr),
+worker_gc_t::worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, SamplersVector&& samplers) :
         mempool(nullptr),
         core_id(-1),
         socket_id(-1),
         iteration(0),
         current_base_id(0),
         local_base_id(0),
-        ring_to_slowworker(nullptr),
-        ring_to_free_mbuf(nullptr),
-        callback_id(0)
+        toSlowWorker_(toSlowWorkers_.begin(), toSlowWorkers_.end()),
+        port_id_to_socket_id{pts},
+        samplers_{samplers},
+        callback_id(0),
+        gc_step{static_cast<uint32_t>(cfg.gc_step)},
+        sample_gc_step{static_cast<uint32_t>(cfg.sample_gc_step)}
 {
-	memset(counters, 0, sizeof(counters));
 }
 
 worker_gc_t::~worker_gc_t()
@@ -33,14 +30,14 @@ worker_gc_t::~worker_gc_t()
 		rte_mempool_free(mempool);
 	}
 
-	if (ring_to_slowworker)
+	for (auto& ring : toSlowWorkers_)
 	{
-		rte_ring_free(ring_to_slowworker);
+		ring.Destroy();
 	}
 
-	if (ring_to_free_mbuf)
+	for (auto& ring : toFree_)
 	{
-		rte_ring_free(ring_to_free_mbuf);
+		ring.Destroy();
 	}
 }
 
@@ -54,17 +51,6 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 	this->base_permanently = base_permanently;
 	this->bases[local_base_id] = base;
 	this->bases[local_base_id ^ 1] = base;
-
-	this->controlplane = dataplane->controlPlane.get();
-
-	for (const auto& [port_id, port] : dataplane->ports)
-	{
-		(void)port;
-		port_id_to_socket_id[port_id] = rte_eth_dev_socket_id(port_id);
-	}
-
-	gc_step = dataplane->getConfigValues().gc_step;
-	sample_gc_step = dataplane->getConfigValues().sample_gc_step;
 
 	mempool = rte_mempool_create(("wgc" + std::to_string(core_id)).data(),
 	                             CONFIG_YADECAP_MBUFS_COUNT + 3 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE,
@@ -83,44 +69,49 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 		return eResult::errorInitMempool;
 	}
 
-	ring_to_slowworker = rte_ring_create(("r_tsw_" + std::to_string(core_id)).c_str(),
-	                                     dataplane->getConfigValues().ring_normalPriority_size,
-	                                     socket_id,
-	                                     RING_F_SP_ENQ | RING_F_SC_DEQ);
-	if (!ring_to_slowworker)
-	{
-		return eResult::errorInitRing;
-	}
-
-	ring_to_free_mbuf = rte_ring_create(("r_tfmb_" + std::to_string(core_id)).c_str(),
-	                                    dataplane->getConfigValues().ring_toFreePackets_size,
-	                                    socket_id,
-	                                    RING_F_SP_ENQ | RING_F_SC_DEQ);
-	if (!ring_to_free_mbuf)
-	{
-		return eResult::errorInitRing;
-	}
-
 	return eResult::success;
+}
+
+[[nodiscard]] std::optional<dpdk::RingConn<rte_mbuf*>> worker_gc_t::RegisterSlowWorker(const std::string& name,
+                                                                                       unsigned int capacity,
+                                                                                       unsigned int capacity_to_free)
+{
+	if (toSlowWorkers_.Full() || toFree_.Full())
+	{
+		YANET_LOG_ERROR("Trying to assign to many workers to garbage collector on core %d\n", core_id);
+		return std::nullopt;
+	}
+	auto rs = dpdk::Ring<rte_mbuf*>::Make(
+	        "r_gc" + std::to_string(socket_id) + "_to_" + name,
+	        capacity,
+	        socket_id,
+	        RING_F_SP_ENQ | RING_F_SC_DEQ);
+	if (!rs)
+	{
+		return std::nullopt;
+	}
+
+	auto rf = dpdk::Ring<rte_mbuf*>::Make(
+	        "r_tfmb_gc" + std::to_string(socket_id) + "_from_" + name,
+	        capacity_to_free,
+	        socket_id,
+	        RING_F_SP_ENQ | RING_F_SC_DEQ);
+
+	if (!rf)
+	{
+		rs.value().Destroy();
+		return std::nullopt;
+	}
+
+	toSlowWorkers_.push_back(rs.value());
+	toFree_.push_back(rf.value());
+
+	toSlowWorker_ = {toSlowWorkers_.begin(), toSlowWorkers_.end()};
+	return dpdk::RingConn<rte_mbuf*>{std::move(rs.value()), std::move(rf.value())};
 }
 
 void worker_gc_t::start()
 {
-	/// @todo: prepare
-
-	int rc;
-
-	rc = pthread_barrier_wait(&dataplane->runBarrier);
-	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
-	{
-		pthread_barrier_destroy(&dataplane->runBarrier);
-	}
-	else if (rc != 0)
-	{
-		YADECAP_LOG_ERROR("pthread_barrier_wait() = %d\n", rc);
-		abort();
-	}
-
 	thread();
 }
 
@@ -159,19 +150,37 @@ void worker_gc_t::limits(common::idp::limits::response& response) const
 	globalbase_atomic->updater.fw6_state.limits(response, "acl.state.v6.ht");
 }
 
-void worker_gc_t::fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table)
+void worker_gc_t::FillMetadataWorkerCounters(common::sdp::MetadataWorkerGc& metadata)
 {
-	table["broken_packets"] = &stats.broken_packets;
-	table["drop_packets"] = &stats.drop_packets;
-	table["ring_to_slowworker_packets"] = &stats.ring_to_slowworker_packets;
-	table["ring_to_slowworker_drops"] = &stats.ring_to_slowworker_drops;
-	table["fwsync_multicast_egress_packets"] = &stats.fwsync_multicast_egress_packets;
-	table["fwsync_multicast_egress_drops"] = &stats.fwsync_multicast_egress_drops;
-	table["fwsync_unicast_egress_packets"] = &stats.fwsync_unicast_egress_packets;
-	table["fwsync_unicast_egress_drops"] = &stats.fwsync_unicast_egress_drops;
-	table["drop_samples"] = &stats.drop_samples;
-	table["balancer_state_insert_failed"] = &stats.balancer_state_insert_failed;
-	table["balancer_state_insert_done"] = &stats.balancer_state_insert_done;
+	metadata.size = 0;
+	metadata.start_counters = common::sdp::SdrSever::GetStartData(YANET_CONFIG_COUNTERS_SIZE * sizeof(uint64_t), metadata.size);
+	metadata.start_stats = common::sdp::SdrSever::GetStartData(sizeof(common::worker_gc::stats_t), metadata.size);
+
+	// stats
+	static_assert(std::is_trivially_destructible<common::worker_gc::stats_t>::value, "invalid struct destructible");
+	std::map<std::string, uint64_t> counters_stats;
+	counters_stats["broken_packets"] = offsetof(common::worker_gc::stats_t, broken_packets);
+	counters_stats["drop_packets"] = offsetof(common::worker_gc::stats_t, drop_packets);
+	counters_stats["ring_to_slowworker_packets"] = offsetof(common::worker_gc::stats_t, ring_to_slowworker_packets);
+	counters_stats["ring_to_slowworker_drops"] = offsetof(common::worker_gc::stats_t, ring_to_slowworker_drops);
+	counters_stats["fwsync_multicast_egress_packets"] = offsetof(common::worker_gc::stats_t, fwsync_multicast_egress_packets);
+	counters_stats["fwsync_multicast_egress_drops"] = offsetof(common::worker_gc::stats_t, fwsync_multicast_egress_drops);
+	counters_stats["fwsync_unicast_egress_packets"] = offsetof(common::worker_gc::stats_t, fwsync_unicast_egress_packets);
+	counters_stats["fwsync_unicast_egress_drops"] = offsetof(common::worker_gc::stats_t, fwsync_unicast_egress_drops);
+	counters_stats["drop_samples"] = offsetof(common::worker_gc::stats_t, drop_samples);
+	counters_stats["balancer_state_insert_failed"] = offsetof(common::worker_gc::stats_t, balancer_state_insert_failed);
+	counters_stats["balancer_state_insert_done"] = offsetof(common::worker_gc::stats_t, balancer_state_insert_done);
+
+	for (const auto& iter : counters_stats)
+	{
+		metadata.counter_positions[iter.first] = (metadata.start_stats + iter.second) / sizeof(uint64_t);
+	}
+}
+
+void worker_gc_t::SetBufferForCounters(void* buffer, const common::sdp::MetadataWorkerGc& metadata)
+{
+	counters = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
+	stats = common::sdp::ShiftBuffer<common::worker_gc::stats_t*>(buffer, metadata.start_stats);
 }
 
 YANET_INLINE_NEVER void worker_gc_t::thread()
@@ -234,11 +243,8 @@ void worker_gc_t::handle_nat64stateful_gc()
 		const auto& nat64stateful = base.globalBase->nat64statefuls[wan_key.nat64stateful_id];
 
 		/// check other wan tables
-		for (unsigned int numa_i = 0;
-		     numa_i < YANET_CONFIG_NUMA_SIZE;
-		     numa_i++)
+		for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 		{
-			auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 			if (globalbase_atomic == base_permanently.globalBaseAtomic)
 			{
 				continue;
@@ -248,8 +254,8 @@ void worker_gc_t::handle_nat64stateful_gc()
 				break;
 			}
 
-			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
-			dataplane::spinlock_nonrecursive_t* wan_locker;
+			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup = nullptr;
+			dataplane::spinlock_nonrecursive_t* wan_locker = nullptr;
 			globalbase_atomic->nat64stateful_wan_state->lookup(wan_key, wan_value_lookup, wan_locker);
 			if (wan_value_lookup)
 			{
@@ -270,18 +276,15 @@ void worker_gc_t::handle_nat64stateful_gc()
 		lan_key.port_destination = wan_key.port_source;
 
 		/// check lan tables
-		for (unsigned int numa_i = 0;
-		     numa_i < YANET_CONFIG_NUMA_SIZE;
-		     numa_i++)
+		for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 		{
-			auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 			if (globalbase_atomic == nullptr)
 			{
 				break;
 			}
 
-			dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup;
-			dataplane::spinlock_nonrecursive_t* lan_locker;
+			dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup = nullptr;
+			dataplane::spinlock_nonrecursive_t* lan_locker = nullptr;
 			globalbase_atomic->nat64stateful_lan_state->lookup(lan_key, lan_value_lookup, lan_locker);
 			if (lan_value_lookup)
 			{
@@ -419,11 +422,8 @@ void worker_gc_t::handle_balancer_gc()
 				auto value = *iter.value();
 				iter.unlock();
 
-				for (unsigned int numa_i = 0;
-				     numa_i < YANET_CONFIG_NUMA_SIZE;
-				     numa_i++)
+				for (auto globalbase_atomic_other : base_permanently.globalBaseAtomics)
 				{
-					dataplane::globalBase::atomic* globalbase_atomic_other = base_permanently.globalBaseAtomics[numa_i];
 					if (globalbase_atomic_other == nullptr)
 					{
 						break;
@@ -437,9 +437,9 @@ void worker_gc_t::handle_balancer_gc()
 					bool saved = true;
 					bool updated = false;
 
-					dataplane::globalBase::balancer_state_value_t* ht_value;
-					dataplane::spinlock_nonrecursive_t* locker;
-					uint32_t old_real_id;
+					dataplane::globalBase::balancer_state_value_t* ht_value = nullptr;
+					dataplane::spinlock_nonrecursive_t* locker = nullptr;
+					uint32_t old_real_id = 0;
 
 					uint32_t hash = globalbase_atomic_other->balancer_state->lookup(*iter.key(), ht_value, locker);
 					if (ht_value)
@@ -457,7 +457,7 @@ void worker_gc_t::handle_balancer_gc()
 
 					if (saved)
 					{
-						stats.balancer_state_insert_done++;
+						stats->balancer_state_insert_done++;
 						const auto& real_from_base = base.globalBase->balancer_reals[value.real_unordered_id];
 						if (updated)
 						{
@@ -475,7 +475,7 @@ void worker_gc_t::handle_balancer_gc()
 					}
 					else
 					{
-						stats.balancer_state_insert_failed++;
+						stats->balancer_state_insert_failed++;
 					}
 				}
 
@@ -609,6 +609,22 @@ void worker_gc_t::handle_acl_gc()
 
 			iter.unlock();
 		}
+		else
+		{
+			// The entry is invalid, likely due to a call to clearFWState().
+			iter.lock();
+			auto key = *iter.key();
+			iter.unlock();
+
+			common::idp::getFWState::key_t fw_key(
+			        std::uint8_t(key.proto),
+			        {rte_be_to_cpu_32(key.src_addr.address)},
+			        {rte_be_to_cpu_32(key.dst_addr.address)},
+			        key.src_port,
+			        key.dst_port);
+
+			fw_state_remove_stack.emplace_back(fw_key);
+		}
 	}
 
 	if (fw4_state_gc.offset == 0)
@@ -717,6 +733,22 @@ void worker_gc_t::handle_acl_gc()
 
 			iter.unlock();
 		}
+		else
+		{
+			// The entry is invalid, likely due to a call to clearFWState().
+			iter.lock();
+			auto key = *iter.key();
+			iter.unlock();
+
+			common::idp::getFWState::key_t fw_key(
+			        std::uint8_t(key.proto),
+			        {key.src_addr.bytes},
+			        {key.dst_addr.bytes},
+			        key.src_port,
+			        key.dst_port);
+
+			fw_state_remove_stack.emplace_back(fw_key);
+		}
 	}
 
 	if (fw6_state_gc.offset == 0)
@@ -817,7 +849,7 @@ void worker_gc_t::handle_acl_sync()
 				rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
 				if (mbuf_clone == nullptr)
 				{
-					stats.fwsync_multicast_egress_drops++;
+					stats->fwsync_multicast_egress_drops++;
 					continue;
 				}
 
@@ -829,8 +861,9 @@ void worker_gc_t::handle_acl_sync()
 				mbuf_clone->data_len = mbuf->data_len;
 				mbuf_clone->pkt_len = mbuf->pkt_len;
 
-				stats.fwsync_multicast_egress_packets++;
-				send_to_slowworker(mbuf_clone, flow);
+				stats->fwsync_multicast_egress_packets++;
+				utils::SetFlow(mbuf_clone, flow);
+				SendToSlowWorker(mbuf_clone);
 			}
 
 			if (!fw_state_config.ipv6_address_unicast.empty())
@@ -845,7 +878,7 @@ void worker_gc_t::handle_acl_sync()
 				rte_mbuf* mbuf_clone = rte_pktmbuf_alloc(mempool);
 				if (mbuf_clone == nullptr)
 				{
-					stats.fwsync_unicast_egress_drops++;
+					stats->fwsync_unicast_egress_drops++;
 				}
 				else
 				{
@@ -857,8 +890,9 @@ void worker_gc_t::handle_acl_sync()
 					mbuf_clone->data_len = mbuf->data_len;
 					mbuf_clone->pkt_len = mbuf->pkt_len;
 
-					stats.fwsync_unicast_egress_packets++;
-					send_to_slowworker(mbuf_clone, fw_state_config.ingress_flow);
+					stats->fwsync_unicast_egress_packets++;
+					utils::SetFlow(mbuf_clone, fw_state_config.ingress_flow);
+					SendToSlowWorker(mbuf_clone);
 				}
 			}
 		}
@@ -908,18 +942,12 @@ void worker_gc_t::handle_callbacks()
 void worker_gc_t::handle_free_mbuf()
 {
 	rte_mbuf* mbufs[CONFIG_YADECAP_MBUFS_BURST_SIZE];
-	unsigned int mbufs_count;
+	unsigned int mbufs_count = 0;
 
-	mbufs_count = rte_ring_sc_dequeue_burst(ring_to_free_mbuf,
-	                                        (void**)mbufs,
-	                                        CONFIG_YADECAP_MBUFS_BURST_SIZE,
-	                                        nullptr);
-	for (unsigned int mbuf_i = 0;
-	     mbuf_i < mbufs_count;
-	     mbuf_i++)
+	for (auto& ring : toFree_)
 	{
-		rte_mbuf* mbuf = mbufs[mbuf_i];
-		rte_pktmbuf_free(mbuf);
+		mbufs_count = ring.DequeueBurstSC(mbufs);
+		rte_pktmbuf_free_bulk(mbufs, mbufs_count);
 	}
 }
 
@@ -932,7 +960,7 @@ inline bool worker_gc_t::is_timeout(const uint32_t timestamp,
 inline void worker_gc_t::correct_timestamp(uint16_t& timestamp,
                                            const uint16_t last_seen_max)
 {
-	uint16_t last_seen = (uint16_t)(current_time - timestamp);
+	auto last_seen = (uint16_t)(current_time - timestamp);
 	if (last_seen > last_seen_max)
 	{
 		timestamp = (uint16_t)(current_time - last_seen_max);
@@ -948,11 +976,8 @@ void worker_gc_t::nat64stateful_remove_state(const dataplane::globalBase::nat64s
                                              const dataplane::globalBase::nat64stateful_wan_key& wan_key)
 {
 	/// remove on other numas
-	for (unsigned int numa_i = 0;
-	     numa_i < YANET_CONFIG_NUMA_SIZE;
-	     numa_i++)
+	for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 	{
-		auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 		if (globalbase_atomic == base_permanently.globalBaseAtomic)
 		{
 			continue;
@@ -974,37 +999,16 @@ void worker_gc_t::nat64stateful_remove_state(const dataplane::globalBase::nat64s
 	}
 }
 
-void worker_gc_t::send_to_slowworker(rte_mbuf* mbuf,
-                                     const common::globalBase::eFlowType& flow_type)
+void worker_gc_t::SendToSlowWorker(rte_mbuf* mbuf)
 {
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-	metadata->flow.type = flow_type;
-
-	if (rte_ring_sp_enqueue(ring_to_slowworker, (void*)mbuf))
+	if (toSlowWorker_->EnqueueSP(mbuf))
 	{
-		stats.ring_to_slowworker_drops++;
+		stats->ring_to_slowworker_drops++;
 		rte_pktmbuf_free(mbuf);
 	}
 	else
 	{
-		stats.ring_to_slowworker_packets++;
-	}
-}
-
-void worker_gc_t::send_to_slowworker(rte_mbuf* mbuf,
-                                     const common::globalBase::tFlow& flow)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-	metadata->flow = flow;
-
-	if (rte_ring_sp_enqueue(ring_to_slowworker, (void*)mbuf))
-	{
-		stats.ring_to_slowworker_drops++;
-		rte_pktmbuf_free(mbuf);
-	}
-	else
-	{
-		stats.ring_to_slowworker_packets++;
+		stats->ring_to_slowworker_packets++;
 	}
 }
 
@@ -1017,40 +1021,35 @@ void worker_gc_t::handle_samples()
 
 	std::lock_guard<std::mutex> guard(samples_mutex);
 
-	for (const auto& iter : dataplane->workers)
+	for (auto sampler : samplers_)
 	{
-		if (iter.second->socketId != socket_id)
-			continue;
-
-		auto& sampler = iter.second->sampler;
-
-		sampler.visit6([this](auto& sample) {
+		sampler->visit6([this](auto& sample) {
 			if (samples.size() < YANET_CONFIG_SAMPLES_SIZE * 8)
 			{
 				samples.emplace(sample.proto, sample.in_logicalport_id, sample.out_logicalport_id, sample.src_port, sample.dst_port, sample.src_addr.bytes, sample.dst_addr.bytes);
 			}
 			else
 			{
-				stats.drop_samples++;
+				stats->drop_samples++;
 			}
 		});
-		sampler.visit4([this](auto& sample) {
+		sampler->visit4([this](auto& sample) {
 			if (samples.size() < YANET_CONFIG_SAMPLES_SIZE * 8)
 			{
 				samples.emplace(sample.proto, sample.in_logicalport_id, sample.out_logicalport_id, sample.src_port, sample.dst_port, rte_be_to_cpu_32(sample.src_addr.address), rte_be_to_cpu_32(sample.dst_addr.address));
 			}
 			else
 			{
-				stats.drop_samples++;
+				stats->drop_samples++;
 			}
 		});
-		sampler.clear();
+		sampler->clear();
 	}
 
 	if (samples_current_base_id != current_base_id)
 	{
 		// config changed, aclId may be invalid now
-		stats.drop_samples += samples.size();
+		stats->drop_samples += samples.size();
 		samples.clear();
 		samples_current_base_id = current_base_id;
 	}
@@ -1096,11 +1095,8 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 			uint16_t wan_last_seen = calc_last_seen(wan_value.timestamp_last_packet);
 
 			/// check other wan tables
-			for (unsigned int numa_i = 0;
-			     numa_i < YANET_CONFIG_NUMA_SIZE;
-			     numa_i++)
+			for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 			{
-				auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 				if (globalbase_atomic == base_permanently.globalBaseAtomic)
 				{
 					continue;
@@ -1110,8 +1106,8 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 					break;
 				}
 
-				dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
-				dataplane::spinlock_nonrecursive_t* wan_locker;
+				dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup = nullptr;
+				dataplane::spinlock_nonrecursive_t* wan_locker = nullptr;
 				globalbase_atomic->nat64stateful_wan_state->lookup(wan_key, wan_value_lookup, wan_locker);
 				if (wan_value_lookup)
 				{
@@ -1131,18 +1127,15 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 			lan_key.port_destination = wan_key.port_source;
 
 			/// check lan tables
-			for (unsigned int numa_i = 0;
-			     numa_i < YANET_CONFIG_NUMA_SIZE;
-			     numa_i++)
+			for (auto globalbase_atomic : base_permanently.globalBaseAtomics)
 			{
-				auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
 				if (globalbase_atomic == nullptr)
 				{
 					break;
 				}
 
-				dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup;
-				dataplane::spinlock_nonrecursive_t* lan_locker;
+				dataplane::globalBase::nat64stateful_lan_value* lan_value_lookup = nullptr;
+				dataplane::spinlock_nonrecursive_t* lan_locker = nullptr;
 				globalbase_atomic->nat64stateful_lan_state->lookup(lan_key, lan_value_lookup, lan_locker);
 				if (lan_value_lookup)
 				{

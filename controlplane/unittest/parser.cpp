@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include "common/type.h"
 #include "libfwparser/fw_parser.h"
 
 namespace
@@ -8,7 +7,7 @@ namespace
 
 auto parse_rules(const std::string& rules, bool validation = false)
 {
-	bool ret;
+	bool ret = false;
 
 	ipfw::fw_config_t firewall;
 	firewall.schedule_string(rules);
@@ -172,10 +171,10 @@ add allow udp from { _CNETS_ or _DNETS_ } dst-port 3784,4784 to { _CNETS_ or _DN
 	EXPECT_FALSE(parse_rules(rules));
 }
 
-TEST(Parser, 017_KeepStateOption)
+TEST(Parser, 017_RecordStateOption)
 {
 	const auto rules = R"IPFW(
-add allow icmp from me to any icmptypes 8 out keep-state
+add allow icmp from me to any icmptypes 8 out record-state
 )IPFW";
 	EXPECT_TRUE(parse_rules(rules));
 }
@@ -219,12 +218,10 @@ TEST(Parser, 020_IgnoredOptions)
 {
 	const auto rules = R"IPFW(
 # just ignore antispoof, diverted, logamount, tag, tagged,
-# check-state
 add allow tcp from 10.0.0.0/8 to 10.0.0.0/8 80 in antispoof
-add 65534 allow ip from any to any diverted keep-state
+add 65534 allow ip from any to any diverted record-state
 add deny log logamount 500 all from any to any
 add allow tag 653 ip4 from { 10.0.0.0/8 } to me
-add check-state
 add allow ip from any to any tagged 31000
 add skipto :HELP ip from any to any not tagged 63
 )IPFW";

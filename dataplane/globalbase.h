@@ -70,7 +70,7 @@ using network_table = dataplane::updater_dynamic_table<uint32_t>;
 using transport_layers = dataplane::updater_array<transport_layer_t>;
 using transport_table = dataplane::updater_hashtable_mod_id32<common::acl::transport_key_t, 16>;
 using total_table = dataplane::updater_hashtable_mod_id32<common::acl::total_key_t, 16>;
-using values = dataplane::updater_array<common::acl::value_t>;
+using values = dataplane::updater_array<common::Actions>;
 }
 
 namespace nat64stateful
@@ -88,7 +88,7 @@ class atomic
 {
 public:
 	atomic(cDataPlane* dataPlane, const tSocketId& socketId);
-	~atomic();
+	~atomic() = default;
 
 public: ///< @todo
 	cDataPlane* dataPlane;
@@ -134,7 +134,7 @@ class generation
 {
 public:
 	generation(cDataPlane* dataPlane, const tSocketId& socketId);
-	~generation();
+	~generation() = default;
 
 public:
 	eResult init();

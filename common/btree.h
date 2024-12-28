@@ -457,7 +457,7 @@ public:
 		}
 	}
 
-	std::vector<ip_prefix_t> get_all_top() const
+	[[nodiscard]] std::vector<ip_prefix_t> get_all_top() const
 	{
 		std::vector<ip_prefix_t> result;
 

@@ -163,13 +163,13 @@ private:
   uint64_t      totalLength;
 
   /// rotate bits, should compile to a single CPU instruction (ROL)
-  static inline uint32_t rotateLeft(uint32_t x, unsigned char bits)
+  static uint32_t rotateLeft(uint32_t x, unsigned char bits)
   {
     return (x << bits) | (x >> (32 - bits));
   }
 
   /// process a block of 4x4 bytes, this is the main part of the XXHash32 algorithm
-  static inline void process(const void* data, uint32_t& state0, uint32_t& state1, uint32_t& state2, uint32_t& state3)
+  static void process(const void* data, uint32_t& state0, uint32_t& state1, uint32_t& state2, uint32_t& state3)
   {
     const uint32_t* block = (const uint32_t*) data;
     state0 = rotateLeft(state0 + block[0] * Prime2, 13) * Prime1;

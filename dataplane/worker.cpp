@@ -1,6 +1,7 @@
 #include <netinet/icmp6.h>
 #include <netinet/ip_icmp.h>
 
+#include <optional>
 #include <string>
 
 #include <rte_cycles.h>
@@ -20,6 +21,9 @@
 #include "common/fallback.h"
 #include "common/nat46clat.h"
 
+#include "dataplane/sdpserver.h"
+
+#include "action_dispatcher.h"
 #include "checksum.h"
 #include "common.h"
 #include "dataplane.h"
@@ -45,8 +49,6 @@ cWorker::cWorker(cDataPlane* dataPlane) :
         ring_log(nullptr),
         packetsToSWNPRemainder(dataPlane->config.SWNormalPriorityRateLimitPerWorker)
 {
-	memset(bursts, 0, sizeof(bursts));
-	memset(counters, 0, sizeof(counters));
 }
 
 cWorker::~cWorker()
@@ -81,6 +83,17 @@ cWorker::~cWorker()
 	}
 }
 
+unsigned int cWorker::MempoolSize() const
+{
+	const auto& config = dataPlane->getConfigValues();
+	unsigned int rx_points_factor = 2 * basePermanently.rx_points.size();
+	return rx_points_factor * config.port_rx_queue_size +
+	       rx_points_factor * config.port_tx_queue_size +
+	       2 * config.ring_highPriority_size +
+	       2 * config.ring_normalPriority_size +
+	       2 * config.ring_lowPriority_size;
+}
+
 eResult cWorker::init(const tCoreId& coreId,
                       const dataplane::base::permanently& basePermanently,
                       const dataplane::base::generation& base)
@@ -95,11 +108,7 @@ eResult cWorker::init(const tCoreId& coreId,
 	this->bases[currentBaseId] = base;
 	this->bases[currentBaseId ^ 1] = base;
 
-	unsigned int elements_count = 2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_rx_queue_size +
-	                              2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_tx_queue_size +
-	                              2 * dataPlane->getConfigValues().ring_highPriority_size +
-	                              2 * dataPlane->getConfigValues().ring_normalPriority_size +
-	                              2 * dataPlane->getConfigValues().ring_lowPriority_size;
+	unsigned int elements_count = MempoolSize();
 
 	YADECAP_LOG_DEBUG("elements_count: %u\n", elements_count);
 
@@ -199,20 +208,7 @@ void cWorker::start()
 
 	/// @todo: prepare()
 
-	unsigned int mbufs_count_expect = 2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_rx_queue_size +
-	                                  2 * basePermanently.workerPortsCount * dataPlane->getConfigValues().port_tx_queue_size +
-	                                  2 * dataPlane->getConfigValues().ring_highPriority_size +
-	                                  2 * dataPlane->getConfigValues().ring_normalPriority_size +
-	                                  2 * dataPlane->getConfigValues().ring_lowPriority_size;
-
 	unsigned int mbufs_count = rte_mempool_avail_count(mempool);
-	if (mbufs_count != mbufs_count_expect)
-	{
-		YADECAP_LOG_ERROR("mbufs_count: %u != %u\n",
-		                  mbufs_count,
-		                  mbufs_count_expect);
-		abort();
-	}
 
 	std::vector<rte_mbuf*> mbufs;
 	mbufs.resize(mbufs_count);
@@ -231,51 +227,9 @@ void cWorker::start()
 		abort();
 	}
 
-	for (unsigned int worker_port_i = 0;
-	     worker_port_i < basePermanently.workerPortsCount;
-	     worker_port_i++)
-	{
-		const auto& portId = basePermanently.workerPorts[worker_port_i].inPortId;
-		const auto& queueId = basePermanently.workerPorts[worker_port_i].inQueueId;
-
-		rc = rte_eth_rx_queue_setup(portId,
-		                            queueId,
-		                            dataPlane->getConfigValues().port_rx_queue_size,
-		                            rte_eth_dev_socket_id(portId),
-		                            nullptr, ///< @todo
-		                            mempool);
-		if (rc < 0)
-		{
-			YADECAP_LOG_ERROR("rte_eth_rx_queue_setup() = %d\n", rc);
-			abort();
-		}
-	}
-
 	if (rte_mempool_default_cache(mempool, coreId))
 	{
 		YADECAP_LOG_ERROR("mempool cache not empty\n");
-		abort();
-	}
-
-	rc = pthread_barrier_wait(&dataPlane->initPortBarrier);
-	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
-	{
-		pthread_barrier_destroy(&dataPlane->initPortBarrier);
-	}
-	else if (rc != 0)
-	{
-		YADECAP_LOG_ERROR("pthread_barrier_wait() = %d\n", rc);
-		abort();
-	}
-
-	rc = pthread_barrier_wait(&dataPlane->runBarrier);
-	if (rc == PTHREAD_BARRIER_SERIAL_THREAD)
-	{
-		pthread_barrier_destroy(&dataPlane->runBarrier);
-	}
-	else if (rc != 0)
-	{
-		YADECAP_LOG_ERROR("pthread_barrier_wait() = %d\n", rc);
 		abort();
 	}
 
@@ -300,71 +254,101 @@ void cWorker::start()
 	mainThread();
 }
 
-void cWorker::fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table)
+void cWorker::FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata)
 {
-	table["brokenPackets"] = &stats.brokenPackets;
-	table["dropPackets"] = &stats.dropPackets;
-	table["ring_highPriority_drops"] = &stats.ring_highPriority_drops;
-	table["ring_normalPriority_drops"] = &stats.ring_normalPriority_drops;
-	table["ring_lowPriority_drops"] = &stats.ring_lowPriority_drops;
-	table["ring_highPriority_packets"] = &stats.ring_highPriority_packets;
-	table["ring_normalPriority_packets"] = &stats.ring_normalPriority_packets;
-	table["ring_lowPriority_packets"] = &stats.ring_lowPriority_packets;
-	table["decap_packets"] = &stats.decap_packets;
-	table["decap_fragments"] = &stats.decap_fragments;
-	table["decap_unknownExtensions"] = &stats.decap_unknownExtensions;
-	table["interface_lookupMisses"] = &stats.interface_lookupMisses;
-	table["interface_hopLimits"] = &stats.interface_hopLimits;
-	table["interface_neighbor_invalid"] = &stats.interface_neighbor_invalid;
-	table["nat64stateless_ingressPackets"] = &stats.nat64stateless_ingressPackets;
-	table["nat64stateless_ingressFragments"] = &stats.nat64stateless_ingressFragments;
-	table["nat64stateless_ingressUnknownICMP"] = &stats.nat64stateless_ingressUnknownICMP;
-	table["nat64stateless_egressPackets"] = &stats.nat64stateless_egressPackets;
-	table["nat64stateless_egressFragments"] = &stats.nat64stateless_egressFragments;
-	table["nat64stateless_egressUnknownICMP"] = &stats.nat64stateless_egressUnknownICMP;
-	table["balancer_invalid_reals_count"] = &stats.balancer_invalid_reals_count;
-	table["fwsync_multicast_egress_drops"] = &stats.fwsync_multicast_egress_drops;
-	table["fwsync_multicast_egress_packets"] = &stats.fwsync_multicast_egress_packets;
-	table["fwsync_multicast_egress_imm_packets"] = &stats.fwsync_multicast_egress_imm_packets;
-	table["fwsync_no_config_drops"] = &stats.fwsync_no_config_drops;
-	table["fwsync_unicast_egress_drops"] = &stats.fwsync_unicast_egress_drops;
-	table["fwsync_unicast_egress_packets"] = &stats.fwsync_unicast_egress_packets;
-	table["acl_ingress_dropPackets"] = &stats.acl_ingress_dropPackets;
-	table["acl_egress_dropPackets"] = &stats.acl_egress_dropPackets;
-	table["repeat_ttl"] = &stats.repeat_ttl;
-	table["leakedMbufs"] = &stats.leakedMbufs;
-	table["logs_packets"] = &stats.logs_packets;
-	table["logs_drops"] = &stats.logs_drops;
+	metadata.size = 0;
+	metadata.start_counters = common::sdp::SdrSever::GetStartData(YANET_CONFIG_COUNTERS_SIZE * sizeof(uint64_t), metadata.size);
+	metadata.start_acl_counters = common::sdp::SdrSever::GetStartData(YANET_CONFIG_ACL_COUNTERS_SIZE * sizeof(uint64_t), metadata.size);
+	metadata.start_bursts = common::sdp::SdrSever::GetStartData((CONFIG_YADECAP_MBUFS_BURST_SIZE + 1) * sizeof(uint64_t), metadata.size);
+	metadata.start_stats = common::sdp::SdrSever::GetStartData(sizeof(common::worker::stats::common), metadata.size);
+	metadata.start_stats_ports = common::sdp::SdrSever::GetStartData(sizeof(common::worker::stats::port[CONFIG_YADECAP_PORTS_SIZE]), metadata.size);
 
-	table["balancer_state_insert_failed"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_state_insert_failed];
-	table["balancer_state_insert_done"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_state_insert_done];
-	table["balancer_icmp_generated_echo_reply_ipv4"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_generated_echo_reply_ipv4];
-	table["balancer_icmp_generated_echo_reply_ipv6"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_generated_echo_reply_ipv6];
-	table["balancer_icmp_drop_icmpv4_payload_too_short_ip"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_icmpv4_payload_too_short_ip];
-	table["balancer_icmp_drop_icmpv4_payload_too_short_port"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_icmpv4_payload_too_short_port];
-	table["balancer_icmp_drop_icmpv6_payload_too_short_ip"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_icmpv6_payload_too_short_ip];
-	table["balancer_icmp_drop_icmpv6_payload_too_short_port"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_icmpv6_payload_too_short_port];
-	table["balancer_icmp_unmatching_src_from_original_ipv4"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_unmatching_src_from_original_ipv4];
-	table["balancer_icmp_unmatching_src_from_original_ipv6"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_unmatching_src_from_original_ipv6];
-	table["balancer_icmp_drop_real_disabled"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_real_disabled];
-	table["balancer_icmp_no_balancer_src_ipv4"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_no_balancer_src_ipv4];
-	table["balancer_icmp_no_balancer_src_ipv6"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_no_balancer_src_ipv6];
-	table["balancer_icmp_drop_already_cloned"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_already_cloned];
-	table["balancer_icmp_drop_no_unrdup_table_for_balancer_id"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_no_unrdup_table_for_balancer_id];
-	table["balancer_icmp_drop_unrdup_vip_not_found"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_unrdup_vip_not_found];
-	table["balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id];
-	table["balancer_icmp_drop_unexpected_transport_protocol"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_unexpected_transport_protocol];
-	table["balancer_icmp_drop_unknown_service"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_drop_unknown_service];
-	table["balancer_icmp_failed_to_clone"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_failed_to_clone];
-	table["balancer_icmp_clone_forwarded"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_clone_forwarded];
-	table["balancer_icmp_sent_to_real"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_sent_to_real];
-	table["balancer_icmp_out_rate_limit_reached"] = &counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_out_rate_limit_reached];
-	table["slow_worker_normal_priority_rate_limit_exceeded"] = &counters[(uint32_t)common::globalBase::static_counter_type::slow_worker_normal_priority_rate_limit_exceeded];
+	// stats
+	std::map<std::string, uint64_t> counters_stats;
+	counters_stats["brokenPackets"] = offsetof(common::worker::stats::common, brokenPackets);
+	counters_stats["dropPackets"] = offsetof(common::worker::stats::common, dropPackets);
+	counters_stats["ring_highPriority_drops"] = offsetof(common::worker::stats::common, ring_highPriority_drops);
+	counters_stats["ring_normalPriority_drops"] = offsetof(common::worker::stats::common, ring_normalPriority_drops);
+	counters_stats["ring_lowPriority_drops"] = offsetof(common::worker::stats::common, ring_lowPriority_drops);
+	counters_stats["ring_highPriority_packets"] = offsetof(common::worker::stats::common, ring_highPriority_packets);
+	counters_stats["ring_normalPriority_packets"] = offsetof(common::worker::stats::common, ring_normalPriority_packets);
+	counters_stats["ring_lowPriority_packets"] = offsetof(common::worker::stats::common, ring_lowPriority_packets);
+	counters_stats["decap_packets"] = offsetof(common::worker::stats::common, decap_packets);
+	counters_stats["decap_fragments"] = offsetof(common::worker::stats::common, decap_fragments);
+	counters_stats["decap_unknownExtensions"] = offsetof(common::worker::stats::common, decap_unknownExtensions);
+	counters_stats["interface_lookupMisses"] = offsetof(common::worker::stats::common, interface_lookupMisses);
+	counters_stats["interface_hopLimits"] = offsetof(common::worker::stats::common, interface_hopLimits);
+	counters_stats["interface_neighbor_invalid"] = offsetof(common::worker::stats::common, interface_neighbor_invalid);
+	counters_stats["nat64stateless_ingressPackets"] = offsetof(common::worker::stats::common, nat64stateless_ingressPackets);
+	counters_stats["nat64stateless_ingressFragments"] = offsetof(common::worker::stats::common, nat64stateless_ingressFragments);
+	counters_stats["nat64stateless_ingressUnknownICMP"] = offsetof(common::worker::stats::common, nat64stateless_ingressUnknownICMP);
+	counters_stats["nat64stateless_egressPackets"] = offsetof(common::worker::stats::common, nat64stateless_egressPackets);
+	counters_stats["nat64stateless_egressFragments"] = offsetof(common::worker::stats::common, nat64stateless_egressFragments);
+	counters_stats["nat64stateless_egressUnknownICMP"] = offsetof(common::worker::stats::common, nat64stateless_egressUnknownICMP);
+	counters_stats["balancer_invalid_reals_count"] = offsetof(common::worker::stats::common, balancer_invalid_reals_count);
+	counters_stats["fwsync_multicast_egress_drops"] = offsetof(common::worker::stats::common, fwsync_multicast_egress_drops);
+	counters_stats["fwsync_multicast_egress_packets"] = offsetof(common::worker::stats::common, fwsync_multicast_egress_packets);
+	counters_stats["fwsync_multicast_egress_imm_packets"] = offsetof(common::worker::stats::common, fwsync_multicast_egress_imm_packets);
+	counters_stats["fwsync_no_config_drops"] = offsetof(common::worker::stats::common, fwsync_no_config_drops);
+	counters_stats["fwsync_unicast_egress_drops"] = offsetof(common::worker::stats::common, fwsync_unicast_egress_drops);
+	counters_stats["fwsync_unicast_egress_packets"] = offsetof(common::worker::stats::common, fwsync_unicast_egress_packets);
+	counters_stats["acl_ingress_dropPackets"] = offsetof(common::worker::stats::common, acl_ingress_dropPackets);
+	counters_stats["acl_egress_dropPackets"] = offsetof(common::worker::stats::common, acl_egress_dropPackets);
+	counters_stats["repeat_ttl"] = offsetof(common::worker::stats::common, repeat_ttl);
+	counters_stats["leakedMbufs"] = offsetof(common::worker::stats::common, leakedMbufs);
+	counters_stats["logs_packets"] = offsetof(common::worker::stats::common, logs_packets);
+	counters_stats["logs_drops"] = offsetof(common::worker::stats::common, logs_drops);
+	for (const auto& iter : counters_stats)
+	{
+		metadata.counter_positions[iter.first] = (metadata.start_stats + iter.second) / sizeof(uint64_t);
+	}
 
-	table["acl_ingress_v4_broken_packet"] = &counters[(uint32_t)common::globalBase::static_counter_type::acl_ingress_v4_broken_packet];
-	table["acl_ingress_v6_broken_packet"] = &counters[(uint32_t)common::globalBase::static_counter_type::acl_ingress_v6_broken_packet];
-	table["acl_egress_v4_broken_packet"] = &counters[(uint32_t)common::globalBase::static_counter_type::acl_egress_v4_broken_packet];
-	table["acl_egress_v6_broken_packet"] = &counters[(uint32_t)common::globalBase::static_counter_type::acl_egress_v6_broken_packet];
+	// counters
+	std::map<std::string, common::globalBase::static_counter_type> counters_named;
+	counters_named["balancer_state_insert_failed"] = common::globalBase::static_counter_type::balancer_state_insert_failed;
+	counters_named["balancer_state_insert_done"] = common::globalBase::static_counter_type::balancer_state_insert_done;
+	counters_named["balancer_icmp_generated_echo_reply_ipv4"] = common::globalBase::static_counter_type::balancer_icmp_generated_echo_reply_ipv4;
+	counters_named["balancer_icmp_generated_echo_reply_ipv6"] = common::globalBase::static_counter_type::balancer_icmp_generated_echo_reply_ipv6;
+	counters_named["balancer_icmp_drop_icmpv4_payload_too_short_ip"] = common::globalBase::static_counter_type::balancer_icmp_drop_icmpv4_payload_too_short_ip;
+	counters_named["balancer_icmp_drop_icmpv4_payload_too_short_port"] = common::globalBase::static_counter_type::balancer_icmp_drop_icmpv4_payload_too_short_port;
+	counters_named["balancer_icmp_drop_icmpv6_payload_too_short_ip"] = common::globalBase::static_counter_type::balancer_icmp_drop_icmpv6_payload_too_short_ip;
+	counters_named["balancer_icmp_drop_icmpv6_payload_too_short_port"] = common::globalBase::static_counter_type::balancer_icmp_drop_icmpv6_payload_too_short_port;
+	counters_named["balancer_icmp_unmatching_src_from_original_ipv4"] = common::globalBase::static_counter_type::balancer_icmp_unmatching_src_from_original_ipv4;
+	counters_named["balancer_icmp_unmatching_src_from_original_ipv6"] = common::globalBase::static_counter_type::balancer_icmp_unmatching_src_from_original_ipv6;
+	counters_named["balancer_icmp_drop_real_disabled"] = common::globalBase::static_counter_type::balancer_icmp_drop_real_disabled;
+	counters_named["balancer_icmp_no_balancer_src_ipv4"] = common::globalBase::static_counter_type::balancer_icmp_no_balancer_src_ipv4;
+	counters_named["balancer_icmp_no_balancer_src_ipv6"] = common::globalBase::static_counter_type::balancer_icmp_no_balancer_src_ipv6;
+	counters_named["balancer_icmp_drop_already_cloned"] = common::globalBase::static_counter_type::balancer_icmp_drop_already_cloned;
+	counters_named["balancer_icmp_drop_no_unrdup_table_for_balancer_id"] = common::globalBase::static_counter_type::balancer_icmp_drop_no_unrdup_table_for_balancer_id;
+	counters_named["balancer_icmp_drop_unrdup_vip_not_found"] = common::globalBase::static_counter_type::balancer_icmp_drop_unrdup_vip_not_found;
+	counters_named["balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id"] = common::globalBase::static_counter_type::balancer_icmp_drop_no_vip_vport_proto_table_for_balancer_id;
+	counters_named["balancer_icmp_drop_unexpected_transport_protocol"] = common::globalBase::static_counter_type::balancer_icmp_drop_unexpected_transport_protocol;
+	counters_named["balancer_icmp_drop_unknown_service"] = common::globalBase::static_counter_type::balancer_icmp_drop_unknown_service;
+	counters_named["balancer_icmp_failed_to_clone"] = common::globalBase::static_counter_type::balancer_icmp_failed_to_clone;
+	counters_named["balancer_icmp_clone_forwarded"] = common::globalBase::static_counter_type::balancer_icmp_clone_forwarded;
+	counters_named["balancer_icmp_sent_to_real"] = common::globalBase::static_counter_type::balancer_icmp_sent_to_real;
+	counters_named["balancer_icmp_out_rate_limit_reached"] = common::globalBase::static_counter_type::balancer_icmp_out_rate_limit_reached;
+	counters_named["slow_worker_normal_priority_rate_limit_exceeded"] = common::globalBase::static_counter_type::slow_worker_normal_priority_rate_limit_exceeded;
+
+	counters_named["acl_ingress_v4_broken_packet"] = common::globalBase::static_counter_type::acl_ingress_v4_broken_packet;
+	counters_named["acl_ingress_v6_broken_packet"] = common::globalBase::static_counter_type::acl_ingress_v6_broken_packet;
+	counters_named["acl_egress_v4_broken_packet"] = common::globalBase::static_counter_type::acl_egress_v4_broken_packet;
+	counters_named["acl_egress_v6_broken_packet"] = common::globalBase::static_counter_type::acl_egress_v6_broken_packet;
+	counters_named["balancer_fragment_drops"] = common::globalBase::static_counter_type::balancer_fragment_drops;
+
+	for (const auto& iter : counters_named)
+	{
+		metadata.counter_positions[iter.first] = metadata.start_counters / sizeof(uint64_t) + static_cast<uint64_t>(iter.second);
+	}
+}
+
+void cWorker::SetBufferForCounters(void* buffer, const common::sdp::MetadataWorker& metadata)
+{
+	counters = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_counters);
+	aclCounters = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_acl_counters);
+	bursts = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_bursts);
+	stats = common::sdp::ShiftBuffer<common::worker::stats::common*>(buffer, metadata.start_stats);
+	statsPorts = common::sdp::ShiftBuffer<common::worker::stats::port*>(buffer, metadata.start_stats_ports);
 }
 
 eResult cWorker::sanityCheck()
@@ -391,12 +375,10 @@ YANET_NEVER_INLINE void cWorker::mainThread()
 		localBaseId = currentBaseId;
 
 		/// @todo: opt
-		for (unsigned int worker_port_i = 0;
-		     worker_port_i < basePermanently.workerPortsCount;
-		     worker_port_i++)
+		for (const auto& rx_point : basePermanently.rx_points)
 		{
 			toFreePackets_handle();
-			physicalPort_ingress_handle(worker_port_i);
+			physicalPort_ingress_handle(rx_point);
 
 			if (unlikely(logicalPort_ingress_stack.mbufsCount == 0))
 			{
@@ -495,7 +477,7 @@ void cWorker::preparePacket(rte_mbuf* mbuf)
 	// will traverse through ipv4 options/ipv6 extensions and try to determine transport header type and offset
 	if (!prepareL3(mbuf, metadata))
 	{
-		stats.brokenPackets++;
+		stats->brokenPackets++;
 		return;
 	}
 
@@ -517,7 +499,7 @@ void cWorker::preparePacket(rte_mbuf* mbuf)
 	if ((!(metadata->network_flags & YANET_NETWORK_FLAG_NOT_FIRST_FRAGMENT)) &&
 	    network_payload_length < basePermanently.transportSizes[metadata->transport_headerType])
 	{
-		stats.brokenPackets++;
+		stats->brokenPackets++;
 		metadata->transport_headerType = YANET_TRANSPORT_TYPE_UNKNOWN;
 		return;
 	}
@@ -1022,11 +1004,11 @@ inline void cWorker::handlePackets()
 static_assert(CONFIG_YADECAP_PORTS_SIZE == 8, "(vlanId << 3) | metadata->fromPortId");
 static_assert(CONFIG_YADECAP_LOGICALPORTS_SIZE == CONFIG_YADECAP_PORTS_SIZE * 8192, "base.globalBase->logicalPorts[CALCULATE_LOGICALPORT_ID(metadata->fromPortId, vlanId)]");
 
-inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port_i)
+inline void cWorker::physicalPort_ingress_handle(const dpdk::Endpoint& rx_point)
 {
 	/// read packets from ports
-	uint16_t rxSize = rte_eth_rx_burst(basePermanently.workerPorts[worker_port_i].inPortId,
-	                                   basePermanently.workerPorts[worker_port_i].inQueueId,
+	uint16_t rxSize = rte_eth_rx_burst(rx_point.port,
+	                                   rx_point.queue,
 	                                   logicalPort_ingress_stack.mbufs,
 	                                   CONFIG_YADECAP_MBUFS_BURST_SIZE);
 
@@ -1038,7 +1020,7 @@ inline void cWorker::physicalPort_ingress_handle(const unsigned int& worker_port
 		rte_mbuf* mbuf = logicalPort_ingress_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		metadata->fromPortId = basePermanently.workerPorts[worker_port_i].inPortId;
+		metadata->fromPortId = rx_point.port;
 		metadata->repeat_ttl = YANET_CONFIG_REPEAT_TTL;
 		metadata->flowLabel = 0;
 		metadata->already_early_decapped = 0;
@@ -1351,7 +1333,7 @@ inline void cWorker::logicalPort_egress_handle()
 		}
 		if (rte_mbuf_refcnt_read(mbuf) < 1)
 		{
-			stats.leakedMbufs++;
+			stats->leakedMbufs++;
 
 #ifdef CONFIG_YADECAP_AUTOTEST
 			YADECAP_LOG_ERROR("mbuf[%p] is broken\n", mbuf);
@@ -1401,6 +1383,9 @@ inline void cWorker::acl_ingress_entry(rte_mbuf* mbuf)
 		controlPlane(mbuf);
 	}
 }
+
+using ActionsIngress = dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>;
+using ActionsEgress = dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>;
 
 inline void cWorker::acl_ingress_handle4()
 {
@@ -1543,44 +1528,7 @@ inline void cWorker::acl_ingress_handle4()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->flow.data.aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->flow.data.aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_ingress_flow(mbuf, value.flow);
+		ActionsIngress::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_ingress_stack4.clear();
@@ -1734,44 +1682,7 @@ inline void cWorker::acl_ingress_handle6()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->flow.data.aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->flow.data.aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_ingress_flow(mbuf, value.flow);
+		ActionsIngress::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_ingress_stack6.clear();
@@ -1882,7 +1793,7 @@ inline void cWorker::acl_ingress_flow(rte_mbuf* mbuf,
 	}
 	else
 	{
-		stats.acl_ingress_dropPackets++; ///< @todo
+		stats->acl_ingress_dropPackets++; ///< @todo
 		drop(mbuf);
 	}
 }
@@ -2093,7 +2004,7 @@ inline void cWorker::decap_handle()
 			mark_ipv4_dscp(mbuf, decap.ipv4DSCPFlags);
 		}
 
-		stats.decap_packets++;
+		stats->decap_packets++;
 		decap_flow(mbuf, decap.flow);
 	}
 
@@ -2135,7 +2046,7 @@ inline bool cWorker::decap_cut(rte_mbuf* mbuf)
 		const rte_gre_hdr* greHeader = rte_pktmbuf_mtod_offset(mbuf, rte_gre_hdr*, metadata->transport_headerOffset);
 		if (((*(uint32_t*)greHeader) & 0xFFFFFF4F) != 0x00080000) ///< |X|0|X|X|0|0|0x0800|. @todo: ACL_GRE
 		{
-			stats.decap_unknownExtensions++;
+			stats->decap_unknownExtensions++;
 			return false;
 		}
 
@@ -2177,7 +2088,7 @@ inline bool cWorker::decap_cut(rte_mbuf* mbuf)
 		return true;
 	}
 
-	stats.decap_unknownExtensions++;
+	stats->decap_unknownExtensions++;
 	return false;
 }
 
@@ -2236,7 +2147,7 @@ inline void cWorker::route_handle4()
 
 		if (route_ipv4_values[mbuf_i] == dataplane::lpmValueIdInvalid)
 		{
-			stats.interface_lookupMisses++;
+			stats->interface_lookupMisses++;
 			rte_pktmbuf_free(mbuf);
 			continue;
 		}
@@ -2250,7 +2161,7 @@ inline void cWorker::route_handle4()
 			rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 			if (ipv4Header->time_to_live <= 1)
 			{
-				stats.interface_hopLimits++;
+				stats->interface_hopLimits++;
 				drop(mbuf);
 				continue;
 			}
@@ -2274,7 +2185,7 @@ inline void cWorker::route_handle4()
 				key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
 			}
 
-			dataplane::neighbor::value const* value;
+			dataplane::neighbor::value const* value = nullptr;
 			base.neighbor_hashtable->lookup(key, value);
 			if (value)
 			{
@@ -2283,13 +2194,16 @@ inline void cWorker::route_handle4()
 			}
 			else
 			{
-				stats.interface_neighbor_invalid++;
+				stats->interface_neighbor_invalid++;
 				drop(mbuf);
 
 				neighbor_resolve.insert_or_update(key, 0);
 
 				continue;
 			}
+
+			counters[nexthop.counter_id]++;
+			counters[nexthop.counter_id + 1] += mbuf->pkt_len;
 
 			route_nexthop(mbuf, nexthop);
 
@@ -2310,7 +2224,7 @@ inline void cWorker::route_handle4()
 			metadata->repeat_ttl--;
 			if (metadata->repeat_ttl == 0)
 			{
-				stats.repeat_ttl++;
+				stats->repeat_ttl++;
 				rte_pktmbuf_free(mbuf);
 			}
 			else
@@ -2361,7 +2275,7 @@ inline void cWorker::route_handle6()
 
 		if (route_ipv6_values[mbuf_i] == dataplane::lpmValueIdInvalid)
 		{
-			stats.interface_lookupMisses++;
+			stats->interface_lookupMisses++;
 			rte_pktmbuf_free(mbuf);
 			continue;
 		}
@@ -2375,7 +2289,7 @@ inline void cWorker::route_handle6()
 			rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
 			if (ipv6Header->hop_limits <= 1)
 			{
-				stats.interface_hopLimits++;
+				stats->interface_hopLimits++;
 				drop(mbuf);
 				continue;
 			}
@@ -2395,7 +2309,7 @@ inline void cWorker::route_handle6()
 				memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
 			}
 
-			dataplane::neighbor::value const* value;
+			dataplane::neighbor::value const* value = nullptr;
 			base.neighbor_hashtable->lookup(key, value);
 			if (value)
 			{
@@ -2404,13 +2318,16 @@ inline void cWorker::route_handle6()
 			}
 			else
 			{
-				stats.interface_neighbor_invalid++;
+				stats->interface_neighbor_invalid++;
 				drop(mbuf);
 
 				neighbor_resolve.insert_or_update(key, 0);
 
 				continue;
 			}
+
+			counters[nexthop.counter_id]++;
+			counters[nexthop.counter_id + 1] += mbuf->pkt_len;
 
 			route_nexthop(mbuf, nexthop);
 
@@ -2429,7 +2346,7 @@ inline void cWorker::route_handle6()
 			metadata->repeat_ttl--;
 			if (metadata->repeat_ttl == 0)
 			{
-				stats.repeat_ttl++;
+				stats->repeat_ttl++;
 				rte_pktmbuf_free(mbuf);
 			}
 			else
@@ -2567,7 +2484,7 @@ inline void cWorker::route_tunnel_handle4()
 
 		if (route_ipv4_values[mbuf_i] == dataplane::lpmValueIdInvalid)
 		{
-			stats.interface_lookupMisses++;
+			stats->interface_lookupMisses++;
 			rte_pktmbuf_free(mbuf);
 			continue;
 		}
@@ -2583,7 +2500,7 @@ inline void cWorker::route_tunnel_handle4()
 			rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 			if (ipv4Header->time_to_live <= 1)
 			{
-				stats.interface_hopLimits++;
+				stats->interface_hopLimits++;
 				drop(mbuf);
 				continue;
 			}
@@ -2607,7 +2524,7 @@ inline void cWorker::route_tunnel_handle4()
 				key.address.mapped_ipv4_address.address = nexthop.neighbor_address.mapped_ipv4_address.address;
 			}
 
-			dataplane::neighbor::value const* value;
+			dataplane::neighbor::value const* value = nullptr;
 			base.neighbor_hashtable->lookup(key, value);
 			if (value)
 			{
@@ -2616,7 +2533,7 @@ inline void cWorker::route_tunnel_handle4()
 			}
 			else
 			{
-				stats.interface_neighbor_invalid++;
+				stats->interface_neighbor_invalid++;
 				drop(mbuf);
 
 				neighbor_resolve.insert_or_update(key, 0);
@@ -2646,7 +2563,7 @@ inline void cWorker::route_tunnel_handle4()
 			metadata->repeat_ttl--;
 			if (metadata->repeat_ttl == 0)
 			{
-				stats.repeat_ttl++;
+				stats->repeat_ttl++;
 				rte_pktmbuf_free(mbuf);
 			}
 			else
@@ -2698,7 +2615,7 @@ inline void cWorker::route_tunnel_handle6()
 
 		if (route_ipv6_values[mbuf_i] == dataplane::lpmValueIdInvalid)
 		{
-			stats.interface_lookupMisses++;
+			stats->interface_lookupMisses++;
 			rte_pktmbuf_free(mbuf);
 			continue;
 		}
@@ -2714,7 +2631,7 @@ inline void cWorker::route_tunnel_handle6()
 			rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
 			if (ipv6Header->hop_limits <= 1)
 			{
-				stats.interface_hopLimits++;
+				stats->interface_hopLimits++;
 				drop(mbuf);
 				continue;
 			}
@@ -2734,7 +2651,7 @@ inline void cWorker::route_tunnel_handle6()
 				memcpy(key.address.bytes, nexthop.neighbor_address.bytes, 16);
 			}
 
-			dataplane::neighbor::value const* value;
+			dataplane::neighbor::value const* value = nullptr;
 			base.neighbor_hashtable->lookup(key, value);
 			if (value)
 			{
@@ -2743,7 +2660,7 @@ inline void cWorker::route_tunnel_handle6()
 			}
 			else
 			{
-				stats.interface_neighbor_invalid++;
+				stats->interface_neighbor_invalid++;
 				drop(mbuf);
 
 				neighbor_resolve.insert_or_update(key, 0);
@@ -2771,7 +2688,7 @@ inline void cWorker::route_tunnel_handle6()
 			metadata->repeat_ttl--;
 			if (metadata->repeat_ttl == 0)
 			{
-				stats.repeat_ttl++;
+				stats->repeat_ttl++;
 				rte_pktmbuf_free(mbuf);
 			}
 			else
@@ -2803,7 +2720,7 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		return;
 	}
 
-	uint16_t payload_length;
+	uint16_t payload_length = 0;
 	bool is_ipv4 = metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
 	if (is_ipv4 && !nexthop.is_ipv6)
 	{
@@ -2840,8 +2757,8 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 	}
 	else
 	{
-		uint32_t vtc_flow;
-		uint16_t payload_len;
+		uint32_t vtc_flow = 0;
+		uint16_t payload_len = 0;
 		if (is_ipv4)
 		{
 			rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
@@ -3054,8 +2971,8 @@ inline void cWorker::nat64stateful_lan_handle()
 
 		const auto& nat64stateful = base.globalBase->nat64statefuls[metadata->flow.data.nat64stateful_id];
 
-		dataplane::globalBase::nat64stateful_lan_value* value_lookup;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::nat64stateful_lan_value* value_lookup = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		const uint32_t hash = nat64stateful_lan_state->lookup(key, value_lookup, locker);
 		if (value_lookup)
 		{
@@ -3103,9 +3020,9 @@ inline void cWorker::nat64stateful_lan_handle()
 			wan_key.port_source = key.port_destination;
 			wan_key.port_destination = key.port_source;
 
-			uint32_t wan_hash;
-			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup;
-			dataplane::spinlock_nonrecursive_t* wan_locker;
+			uint32_t wan_hash = 0;
+			dataplane::globalBase::nat64stateful_wan_value* wan_value_lookup = nullptr;
+			dataplane::spinlock_nonrecursive_t* wan_locker = nullptr;
 			for (unsigned int try_i = 0;
 			     try_i < YANET_CONFIG_NAT64STATEFUL_INSERT_TRIES;
 			     try_i++)
@@ -3159,11 +3076,8 @@ inline void cWorker::nat64stateful_lan_handle()
 				}
 
 				/// @todo: create cross-numa state over slowworker?
-				for (unsigned int numa_i = 0;
-				     numa_i < YANET_CONFIG_NUMA_SIZE;
-				     numa_i++)
+				for (auto globalbase_atomic : basePermanently.globalBaseAtomics)
 				{
-					auto* globalbase_atomic = basePermanently.globalBaseAtomics[numa_i];
 					if (globalbase_atomic == basePermanently.globalBaseAtomic)
 					{
 						continue;
@@ -3199,11 +3113,8 @@ inline void cWorker::nat64stateful_lan_handle()
 
 				/// @todo: create cross-numa state over slowworker?
 				value.timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime - YANET_CONFIG_STATE_TIMEOUT_MAX;
-				for (unsigned int numa_i = 0;
-				     numa_i < YANET_CONFIG_NUMA_SIZE;
-				     numa_i++)
+				for (auto globalbase_atomic : basePermanently.globalBaseAtomics)
 				{
-					auto* globalbase_atomic = basePermanently.globalBaseAtomics[numa_i];
 					if (globalbase_atomic == basePermanently.globalBaseAtomic)
 					{
 						continue;
@@ -3351,8 +3262,8 @@ inline void cWorker::nat64stateful_wan_handle()
 
 		const auto& nat64stateful = base.globalBase->nat64statefuls[metadata->flow.data.nat64stateful_id];
 
-		dataplane::globalBase::nat64stateful_wan_value* value_lookup;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::nat64stateful_wan_value* value_lookup = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		nat64stateful_wan_state->lookup(key, value_lookup, locker);
 		if (!value_lookup)
 		{
@@ -3487,7 +3398,7 @@ inline void cWorker::nat64stateless_ingress_handle()
 
 		nat64stateless_ingress_translation(mbuf, nat64stateless, translation);
 
-		stats.nat64stateless_ingressPackets++;
+		stats->nat64stateless_ingressPackets++;
 		nat64stateless_ingress_flow(mbuf, nat64stateless.flow);
 	}
 
@@ -3606,7 +3517,7 @@ inline void cWorker::nat64stateless_egress_handle()
 
 		nat64stateless_egress_translation(mbuf, translation);
 
-		stats.nat64stateless_egressPackets++;
+		stats->nat64stateless_egressPackets++;
 		nat64stateless_egress_flow(mbuf, nat64stateless.flow);
 	}
 
@@ -4144,8 +4055,8 @@ inline void cWorker::balancer_handle()
 
 		/// @todo: BALANCER TCP SYN
 
-		dataplane::globalBase::balancer_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::balancer_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		const uint32_t hash = basePermanently.globalBaseAtomic->balancer_state->lookup(key, value, locker);
 		bool rescheduleReal = false;
 		if (value)
@@ -4201,7 +4112,7 @@ inline void cWorker::balancer_handle()
 			{
 				locker->unlock();
 
-				stats.balancer_invalid_reals_count++;
+				stats->balancer_invalid_reals_count++;
 				drop(mbuf);
 				continue;
 			}
@@ -4413,7 +4324,7 @@ inline void cWorker::balancer_ipv6_source(rte_ipv6_hdr* header,
                                           const rte_ipv4_hdr* ipv4HeaderInner,
                                           const rte_ipv6_hdr* ipv6HeaderInner)
 {
-	uint32_t random_src;
+	uint32_t random_src = 0;
 	if (ipv4HeaderInner)
 	{
 		random_src = ipv4HeaderInner->src_addr;
@@ -4757,8 +4668,8 @@ inline void cWorker::balancer_icmp_forward_handle()
 		const balancer_service_id_t service_id = metadata->flow.data.atomic >> 8;
 		const auto& service = base.globalBase->balancer_services[service_id];
 
-		dataplane::globalBase::balancer_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::balancer_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		basePermanently.globalBaseAtomic->balancer_state->lookup(key, value, locker);
 
 		if (value)
@@ -4810,7 +4721,7 @@ inline void cWorker::balancer_icmp_forward_handle()
 	balancer_icmp_forward_stack.clear();
 }
 
-inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf)
+inline cWorker::FlowFromState cWorker::acl_checkstate(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -4844,11 +4755,11 @@ inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf)
 			key.dst_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::fw_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		basePermanently.globalBaseAtomic->fw4_state->lookup(key, value, locker);
 
-		return acl_try_keepstate(mbuf, value, locker);
+		return acl_checkstate(mbuf, value, locker);
 	}
 	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
 	{
@@ -4880,26 +4791,26 @@ inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf)
 			key.dst_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::fw_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		basePermanently.globalBaseAtomic->fw6_state->lookup(key, value, locker);
 
-		return acl_try_keepstate(mbuf, value, locker);
+		return acl_checkstate(mbuf, value, locker);
 	}
 
-	return false;
+	return std::nullopt;
 }
 
-inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf,
-                                       dataplane::globalBase::fw_state_value_t* value,
-                                       dataplane::spinlock_nonrecursive_t* locker)
+inline cWorker::FlowFromState cWorker::acl_checkstate(rte_mbuf* mbuf,
+                                                      dataplane::globalBase::fw_state_value_t* value,
+                                                      dataplane::spinlock_nonrecursive_t* locker)
 {
 	// Checking both value and locker for non-being-nullptr seems redundant.
 	if (value == nullptr)
 	{
 		// No record found, the caller should continue as usual.
 		locker->unlock();
-		return false;
+		return std::nullopt;
 	}
 
 	uint8_t flags = 0;
@@ -4918,12 +4829,10 @@ inline bool cWorker::acl_try_keepstate(rte_mbuf* mbuf,
 	value->tcp.dst_flags |= flags;
 	locker->unlock();
 
-	// Handle the packet according its flow.
-	acl_ingress_flow(mbuf, flow);
-	return true;
+	return {flow};
 }
 
-inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow)
+inline void cWorker::acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow, std::optional<uint32_t> timeout)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -4966,10 +4875,11 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 			key.src_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t value;
+		dataplane::globalBase::fw_state_value_t value{};
 		value.type = static_cast<dataplane::globalBase::fw_state_type>(metadata->transport_headerType);
 		value.owner = dataplane::globalBase::fw_state_owner_e::internal;
 		acl_touch_state(mbuf, metadata, &value);
+		acl_fill_state_timeout(mbuf, metadata, &value, timeout);
 		value.flow = flow;
 		value.acl_id = aclId;
 		value.last_sync = basePermanently.globalBaseAtomic->currentTime;
@@ -4980,16 +4890,15 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 		value.tcp.dst_flags = 0;
 
 		bool emit = false;
-		for (unsigned int idx = 0; idx < YANET_CONFIG_NUMA_SIZE; ++idx)
+		for (auto atomic : basePermanently.globalBaseAtomics)
 		{
-			dataplane::globalBase::atomic* atomic = basePermanently.globalBaseAtomics[idx];
 			if (atomic == nullptr)
 			{
 				break;
 			}
 
-			dataplane::globalBase::fw_state_value_t* lookup_value;
-			dataplane::spinlock_nonrecursive_t* locker;
+			dataplane::globalBase::fw_state_value_t* lookup_value = nullptr;
+			dataplane::spinlock_nonrecursive_t* locker = nullptr;
 			const uint32_t hash = atomic->fw4_state->lookup(key, lookup_value, locker);
 			if (lookup_value)
 			{
@@ -5013,7 +4922,7 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 		if (base.globalBase->fw_state_sync_configs[aclId].flows_size == 0)
 		{
 			// No fw state synchronization configured.
-			stats.fwsync_no_config_drops++;
+			stats->fwsync_no_config_drops++;
 			return;
 		}
 
@@ -5063,10 +4972,11 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 			key.src_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t value;
+		dataplane::globalBase::fw_state_value_t value{};
 		value.type = static_cast<dataplane::globalBase::fw_state_type>(metadata->transport_headerType);
 		value.owner = dataplane::globalBase::fw_state_owner_e::internal;
 		acl_touch_state(mbuf, metadata, &value);
+		acl_fill_state_timeout(mbuf, metadata, &value, timeout);
 		value.flow = flow;
 		value.acl_id = aclId;
 		value.last_sync = basePermanently.globalBaseAtomic->currentTime;
@@ -5077,16 +4987,15 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 		value.tcp.dst_flags = 0;
 
 		bool emit = false;
-		for (unsigned int idx = 0; idx < YANET_CONFIG_NUMA_SIZE; ++idx)
+		for (auto atomic : basePermanently.globalBaseAtomics)
 		{
-			dataplane::globalBase::atomic* atomic = basePermanently.globalBaseAtomics[idx];
 			if (atomic == nullptr)
 			{
 				break;
 			}
 
-			dataplane::globalBase::fw_state_value_t* lookup_value;
-			dataplane::spinlock_nonrecursive_t* locker;
+			dataplane::globalBase::fw_state_value_t* lookup_value = nullptr;
+			dataplane::spinlock_nonrecursive_t* locker = nullptr;
 			const uint32_t hash = atomic->fw6_state->lookup(key, lookup_value, locker);
 			if (lookup_value)
 			{
@@ -5110,7 +5019,7 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 		if (base.globalBase->fw_state_sync_configs[aclId].flows_size == 0)
 		{
 			// No fw state synchronization configured.
-			stats.fwsync_no_config_drops++;
+			stats->fwsync_no_config_drops++;
 			return;
 		}
 
@@ -5128,7 +5037,7 @@ inline void cWorker::acl_state_emit(tAclId aclId, const dataplane::globalBase::f
 	rte_mbuf* mbuf = rte_pktmbuf_alloc(mempool);
 	if (mbuf == nullptr)
 	{
-		stats.fwsync_multicast_egress_drops++;
+		stats->fwsync_multicast_egress_drops++;
 		return;
 	}
 
@@ -5148,7 +5057,7 @@ inline void cWorker::acl_state_emit(tAclId aclId, const dataplane::globalBase::f
 	// Push packet to the ring through stack.
 	metadata->flow.type = common::globalBase::eFlowType::slowWorker_fw_sync;
 	controlPlane_stack.insert(mbuf);
-	stats.fwsync_multicast_egress_imm_packets++;
+	stats->fwsync_multicast_egress_imm_packets++;
 }
 
 inline void cWorker::acl_egress_entry(rte_mbuf* mbuf, tAclId aclId)
@@ -5311,44 +5220,7 @@ inline void cWorker::acl_egress_handle4()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_egress_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_egress_flow(mbuf, value.flow);
+		ActionsEgress::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_egress_stack4.clear();
@@ -5495,44 +5367,7 @@ inline void cWorker::acl_egress_handle6()
 
 		const auto& value = acl.values[total_value];
 
-		if (value.flow.type == common::globalBase::eFlowType::drop)
-		{
-			// Try to match against stateful dynamic rules. If so - a packet will be handled.
-			if (acl_egress_try_keepstate(mbuf))
-			{
-				continue;
-			}
-		}
-
-		aclCounters[value.flow.counter_id]++;
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::log)
-		{
-			acl_log(mbuf, value.flow, metadata->aclId);
-		}
-
-		if (value.flow.flags & (uint8_t)common::globalBase::eFlowFlags::keepstate)
-		{
-			acl_create_keepstate(mbuf, metadata->aclId, value.flow);
-		}
-
-		for (auto dump_id : value.dump_ids)
-		{
-			if (dump_id == 0)
-			{
-				break;
-			}
-
-			auto ring_id = base.globalBase->dump_id_to_tag[dump_id];
-			if (ring_id == -1)
-			{
-				continue;
-			}
-			auto& ring = dumpRings[ring_id];
-			ring.write(mbuf, value.flow.type);
-		}
-
-		acl_egress_flow(mbuf, value.flow);
+		ActionsEgress::execute(value, {this, mbuf, metadata, &base});
 	}
 
 	acl_egress_stack6.clear();
@@ -5542,17 +5377,17 @@ void cWorker::acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAc
 {
 	if (rte_ring_full(ring_log))
 	{
-		stats.logs_drops++;
+		stats->logs_drops++;
 		return;
 	}
 
 	const auto& base = bases[localBaseId & 1];
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-	samples::sample_t* sample;
+	samples::sample_t* sample = nullptr;
 	if (rte_mempool_get(dataPlane->mempool_log, (void**)&sample) != 0)
 	{
-		stats.logs_drops++;
+		stats->logs_drops++;
 		return;
 	}
 
@@ -5572,7 +5407,7 @@ void cWorker::acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAc
 	}
 	else
 	{
-		stats.logs_drops++;
+		stats->logs_drops++;
 		rte_mempool_put(dataPlane->mempool_log, sample);
 		return;
 	}
@@ -5606,14 +5441,14 @@ void cWorker::acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAc
 
 	if (rte_ring_enqueue(ring_log, sample) != 0)
 	{
-		stats.logs_drops++;
+		stats->logs_drops++;
 		rte_mempool_put(dataPlane->mempool_log, sample);
 		return;
 	}
-	stats.logs_packets++;
+	stats->logs_packets++;
 }
 
-inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
+inline cWorker::FlowFromState cWorker::acl_egress_checkstate(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
@@ -5647,11 +5482,11 @@ inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
 			key.dst_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::fw_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		basePermanently.globalBaseAtomic->fw4_state->lookup(key, value, locker);
 
-		return acl_egress_try_keepstate(mbuf, value, locker);
+		return acl_egress_checkstate(mbuf, value, locker);
 	}
 	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
 	{
@@ -5683,26 +5518,26 @@ inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf)
 			key.dst_port = 0;
 		}
 
-		dataplane::globalBase::fw_state_value_t* value;
-		dataplane::spinlock_nonrecursive_t* locker;
+		dataplane::globalBase::fw_state_value_t* value = nullptr;
+		dataplane::spinlock_nonrecursive_t* locker = nullptr;
 		basePermanently.globalBaseAtomic->fw6_state->lookup(key, value, locker);
 
-		return acl_egress_try_keepstate(mbuf, value, locker);
+		return acl_egress_checkstate(mbuf, value, locker);
 	}
 
-	return false;
+	return std::nullopt;
 }
 
-inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf,
-                                              dataplane::globalBase::fw_state_value_t* value,
-                                              dataplane::spinlock_nonrecursive_t* locker)
+inline cWorker::FlowFromState cWorker::acl_egress_checkstate(rte_mbuf* mbuf,
+                                                             dataplane::globalBase::fw_state_value_t* value,
+                                                             dataplane::spinlock_nonrecursive_t* locker)
 {
 	// Checking both value and locker for non-being-nullptr seems redundant.
 	if (value == nullptr)
 	{
 		// No record found, the caller should continue as usual.
 		locker->unlock();
-		return false;
+		return std::nullopt;
 	}
 
 	uint8_t flags = 0;
@@ -5721,9 +5556,7 @@ inline bool cWorker::acl_egress_try_keepstate(rte_mbuf* mbuf,
 	value->tcp.dst_flags |= flags;
 	locker->unlock();
 
-	// Handle the packet according its flow.
-	acl_egress_flow(mbuf, flow);
-	return true;
+	return {flow};
 }
 
 inline void cWorker::acl_egress_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow)
@@ -5732,12 +5565,12 @@ inline void cWorker::acl_egress_flow(rte_mbuf* mbuf, const common::globalBase::t
 
 	if (flow.type == common::globalBase::eFlowType::controlPlane)
 	{
-		stats.acl_egress_dropPackets++;
+		stats->acl_egress_dropPackets++;
 		controlPlane(mbuf);
 	}
 	else if (flow.type == common::globalBase::eFlowType::drop)
 	{
-		stats.acl_egress_dropPackets++;
+		stats->acl_egress_dropPackets++;
 		drop(mbuf);
 	}
 	else if (metadata->flow.type == common::globalBase::eFlowType::logicalPort_egress || metadata->flow.type == common::globalBase::eFlowType::acl_egress)
@@ -5809,18 +5642,18 @@ inline void cWorker::controlPlane_handle()
 	     mbuf_i++)
 	{
 		rte_mbuf* mbuf = controlPlane_stack.mbufs[mbuf_i];
-		stats.ring_normalPriority_drops++;
+		stats->ring_normalPriority_drops++;
 		rte_pktmbuf_free(mbuf);
 	}
 
-	stats.ring_normalPriority_packets += count;
+	stats->ring_normalPriority_packets += count;
 
 	controlPlane_stack.clear();
 }
 
 inline void cWorker::drop(rte_mbuf* mbuf)
 {
-	stats.dropPackets++;
+	stats->dropPackets++;
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
 	if (basePermanently.globalBaseAtomic->physicalPort_flags[metadata->fromPortId] & YANET_PHYSICALPORT_FLAG_DROP_DUMP)
@@ -5875,12 +5708,12 @@ inline void cWorker::slowWorker_entry_highPriority(rte_mbuf* mbuf,
 
 	if (rte_ring_sp_enqueue(ring_highPriority, (void*)mbuf))
 	{
-		stats.ring_highPriority_drops++;
+		stats->ring_highPriority_drops++;
 		rte_pktmbuf_free(mbuf);
 	}
 	else
 	{
-		stats.ring_highPriority_packets++;
+		stats->ring_highPriority_packets++;
 	}
 }
 
@@ -5902,12 +5735,12 @@ inline void cWorker::slowWorker_entry_normalPriority(rte_mbuf* mbuf,
 
 	if (rte_ring_sp_enqueue(ring_normalPriority, (void*)mbuf))
 	{
-		stats.ring_normalPriority_drops++;
+		stats->ring_normalPriority_drops++;
 		rte_pktmbuf_free(mbuf);
 	}
 	else
 	{
-		stats.ring_normalPriority_packets++;
+		stats->ring_normalPriority_packets++;
 	}
 }
 
@@ -5917,12 +5750,12 @@ inline void cWorker::slowWorker_entry_lowPriority(rte_mbuf* mbuf)
 
 	if (rte_ring_sp_enqueue(ring_lowPriority, (void*)mbuf))
 	{
-		stats.ring_lowPriority_drops++;
+		stats->ring_lowPriority_drops++;
 		rte_pktmbuf_free(mbuf);
 	}
 	else
 	{
-		stats.ring_lowPriority_packets++;
+		stats->ring_lowPriority_packets++;
 	}
 }
 
@@ -6060,7 +5893,7 @@ YANET_NEVER_INLINE void cWorker::slowWorkerFarmHandleFragment(rte_mbuf* mbuf)
 	metadata->repeat_ttl--;
 	if (metadata->repeat_ttl == 0)
 	{
-		stats.repeat_ttl++;
+		stats->repeat_ttl++;
 		rte_pktmbuf_free(mbuf);
 		return;
 	}
@@ -6074,7 +5907,11 @@ YANET_NEVER_INLINE void cWorker::slowWorkerFarmHandleFragment(rte_mbuf* mbuf)
 inline void cWorker::acl_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value)
 {
 	value->last_seen = basePermanently.globalBaseAtomic->currentTime;
-	value->state_timeout = get_state_timeout(mbuf, metadata, acl_state_config);
+}
+
+inline void cWorker::acl_fill_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value, std::optional<uint32_t> timeout)
+{
+	value->state_timeout = timeout.has_value() ? timeout.value() : get_state_timeout(mbuf, metadata, acl_state_config);
 }
 
 inline void cWorker::balancer_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::balancer_state_value_t* value)
@@ -6112,4 +5949,12 @@ inline uint32_t cWorker::get_state_timeout(rte_mbuf* mbuf, dataplane::metadata* 
 		return state_timeout_config.udp_timeout;
 	}
 	return state_timeout_config.default_timeout;
+}
+
+inline void cWorker::populate_hitcount_map(const std::string& id, rte_mbuf* mbuf)
+{
+	common::idp::hitcount_dump::Data& entry = dataPlane->hitcount_map_[id];
+
+	entry.count++;
+	entry.bytes += mbuf->pkt_len;
 }

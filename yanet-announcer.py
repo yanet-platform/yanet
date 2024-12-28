@@ -7,6 +7,7 @@ import json
 import logging
 import signal
 import subprocess
+import ipaddress
 import textwrap
 import time
 import typing
@@ -67,7 +68,7 @@ class Executer:
         # don't use generator output, because LRU cache return wrong response
         parsed_output: typing.List[typing.Dict[str, str]] = []
 
-        out = subprocess.check_output(command, shell=True).decode("ascii").splitlines()
+        out = subprocess.check_output(command, shell=True, stderr=subprocess.DEVNULL).decode("ascii").splitlines()
         if len(out) <= 1:
             return parsed_output
 
@@ -146,18 +147,36 @@ def bgp_remove_ipv6(prefix):
             Executer.run(command)
 
 
-def bgp_update(prefix):
-    if ":" in prefix:
-        bgp_update_ipv6(prefix)
-    else:
-        bgp_update_ipv4(prefix)
+def bgp_update(prefix_list):
+    for prefix in prefix_list:
+        try:
+            parsed = ipaddress.ip_network(prefix)
+            if parsed.version == 6:
+                bgp_update_ipv6(prefix)
+            else:
+                bgp_update_ipv4(prefix)
+        except Exception as error:
+            if "firewall" in prefix:
+                bgp_update_ipv6(prefix)
+                LOGGER.info("Update bgp with custom prefix: %s", prefix)
+            else:
+                LOGGER.error("Can not update bgp prefix: %s with error: %s", prefix, error)
 
 
-def bgp_remove(prefix):
-    if ":" in prefix:
-        bgp_remove_ipv6(prefix)
-    else:
-        bgp_remove_ipv4(prefix)
+def bgp_remove(prefix_list):
+    for prefix in prefix_list:
+        try:
+            parsed = ipaddress.ip_network(prefix)
+            if parsed.version == 6:
+                bgp_remove_ipv6(prefix)
+            else:
+                bgp_remove_ipv4(prefix)
+        except Exception as error:
+            if "firewall" in prefix:
+                bgp_remove_ipv6(prefix)
+                LOGGER.info("Remove bgp with custom prefix: %s", prefix)
+            else:
+                LOGGER.error("Can not remove bgp prefix: %s with error: %s", prefix, error)
 
 
 def get_announces(types):
@@ -458,7 +477,8 @@ def main():
         signal.signal(signal.SIGTERM, signal_handler)
 
     current_prefixes = []
-    report_counter: int = 0
+    report_config_counter: int = 0
+    report_getannounces_counter: int = 0
     is_firewall_machine: bool = False
 
     try:
@@ -475,10 +495,11 @@ def main():
 
         try:
             update_config()
+            report_config_counter = 0
         except Exception as error:
-            if report_counter % 25 == 0:
+            if report_config_counter == 0:
                 LOGGER.error("Fail: %s", error)
-            report_counter += 1
+            report_config_counter = 1
             time.sleep(1)
             continue
 
@@ -489,34 +510,33 @@ def main():
 
                 if check_module(module):
                     prefixes.extend(module["announces"])
-        except:
-            pass
+            report_getannounces_counter = 0
+        except Exception as error:
+            if report_getannounces_counter == 0:
+                LOGGER.error("Can not get announces with error: %s", error)
+                report_getannounces_counter = 1
+            if len(current_prefixes) > 0:
+                LOGGER.warning(
+                    "Problem with get_announce(dp/cp in down state?), remove current announces: %s", current_prefixes
+                )
+                bgp_remove(current_prefixes)
+                current_prefixes = []
+            continue
 
         if is_firewall_machine and check_firewall_module():
             prefixes.extend(["firewall::/128"])
 
-        for prefix in list(set(prefixes) - set(current_prefixes)):
-            try:
-                bgp_update(prefix)
-            except:
-                pass
+        bgp_update(list(set(prefixes) - set(current_prefixes)))
 
-        for prefix in list(set(current_prefixes) - set(prefixes)):
-            try:
-                bgp_remove(prefix)
-            except:
-                pass
+        bgp_remove(list(set(current_prefixes) - set(prefixes)))
 
         if not OPTIONS.daemon:
             return
 
         current_prefixes = prefixes
         if SIGNAL_RECV:
-            for prefix in current_prefixes:
-                try:
-                    bgp_remove(prefix)
-                except:
-                    pass
+            LOGGER.warning("Detect SIGNAL_RECV, remove announces and exit...")
+            bgp_remove(current_prefixes)
             return
 
         time.sleep(1)

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <inttypes.h>
-
 #include <map>
 #include <memory>
 #include <optional>
@@ -13,9 +11,17 @@
 #include <variant>
 #include <vector>
 
+#include "common/traits.h"
+
 namespace common
 {
 
+// TODO: This class offers serialization/deserialization of objects, but it is too restrictive.
+// Due to the pop method interface, which returns objects by reference in an argument,
+// we cannot use this with non DefaultConstructible objects.
+// This means that even though we serialize an object and want to deserialize it by
+// creating an object directly, without needing to first create a default one,
+// we are unable to do so.
 class stream_in_t
 {
 public:
@@ -81,8 +87,8 @@ protected:
 
 protected:
 	const std::vector<uint8_t>& inBuffer;
-	uint64_t inPosition;
-	bool failed;
+	uint64_t inPosition{};
+	bool failed{};
 };
 
 //
@@ -93,7 +99,7 @@ public:
 	using integer_t = uint64_t;
 
 public:
-	stream_out_t();
+	stream_out_t() = default;
 
 	template<typename TType>
 	inline void push(const TType& value);
@@ -278,12 +284,46 @@ private:
 	std::vector<uint8_t> outBuffer;
 };
 
+// Check if T has a pop method with signature void pop(stream_in_t&)
+template<typename T, typename = void>
+struct has_pop : std::false_type
+{};
+
+template<typename T>
+struct has_pop<T, std::void_t<decltype(std::declval<T>().pop(std::declval<common::stream_in_t&>()))>> : std::true_type
+{};
+
+template<typename T>
+constexpr bool has_pop_v = has_pop<T>::value;
+
+// Check if T has a push method with signature void push(stream_out_t&) const
+template<typename T, typename = void>
+struct has_push : std::false_type
+{};
+
+template<typename T>
+struct has_push<T, std::void_t<decltype(std::declval<const T>().push(std::declval<common::stream_out_t&>()))>> : std::true_type
+{};
+
+template<typename T>
+constexpr bool has_push_v = has_push<T>::value;
+
+// Check if T has an as_tuple() method
+template<typename T, typename = void>
+struct has_as_tuple : std::false_type
+{};
+
+template<typename T>
+struct has_as_tuple<T, std::void_t<decltype(std::declval<T>().as_tuple())>> : std::true_type
+{};
+
+template<typename T>
+constexpr bool has_as_tuple_v = has_as_tuple<T>::value;
+
 //
 
 inline stream_in_t::stream_in_t(const std::vector<uint8_t>& buffer) :
-        inBuffer(buffer),
-        inPosition(0),
-        failed(false)
+        inBuffer(buffer)
 {
 }
 
@@ -304,9 +344,21 @@ inline void stream_in_t::pop(TType& value)
 
 		inPosition += sizeof(TType);
 	}
-	else
+	// Use as_tuple method to deserialize members
+	else if constexpr (has_as_tuple_v<TType>)
+	{
+		auto tuple = value.as_tuple();
+		std::apply([this](auto&... args) { (this->pop(args), ...); }, tuple);
+	}
+	// Use the class's own pop method if it has one with the correct signature
+	else if constexpr (has_pop_v<TType>)
 	{
 		value.pop(*this);
+	}
+	else
+	{
+		static_assert(traits::always_false_v<TType>, "Type TType cannot be deserialized: "
+		                                             "no as_tuple or pop(stream_in_t&) method");
 	}
 }
 
@@ -332,7 +384,7 @@ inline void stream_in_t::pop(char* buffer, uint64_t bufferSize)
 
 inline void stream_in_t::pop(std::string& value)
 {
-	std::string::size_type size;
+	std::string::size_type size = 0;
 	pop(size);
 
 	if (this->inBuffer.size() - inPosition < size)
@@ -554,10 +606,6 @@ inline void stream_in_t::popVariant(std::variant<TArgs...>& variant,
 
 //
 
-inline stream_out_t::stream_out_t()
-{
-}
-
 template<typename TType>
 inline void stream_out_t::push(const TType& value)
 {
@@ -567,9 +615,21 @@ inline void stream_out_t::push(const TType& value)
 		auto& data = reinterpret_cast<ByteArray>(value);
 		outBuffer.insert(outBuffer.end(), std::begin(data), std::end(data));
 	}
-	else
+	// Use as_tuple method to serialize members
+	else if constexpr (has_as_tuple_v<TType>)
+	{
+		auto tuple = value.as_tuple();
+		std::apply([this](const auto&... args) { (this->push(args), ...); }, tuple);
+	}
+	// Use the class's own push method if it has one with the correct signature
+	else if constexpr (has_push_v<TType>)
 	{
 		value.push(*this);
+	}
+	else
+	{
+		static_assert(traits::always_false_v<TType>, "Type TType cannot be serialized: "
+		                                             "no as_tuple or push(stream_out_t&) method");
 	}
 }
 

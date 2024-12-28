@@ -9,7 +9,6 @@
 #include "common/generation.h"
 #include "common/icp.h"
 #include "common/idataplane.h"
-#include "common/refarray.h"
 
 namespace tun64
 {
@@ -17,11 +16,9 @@ namespace tun64
 class generation_config_t
 {
 public:
-	void update(const controlplane::base_t& base_prev,
+	void update([[maybe_unused]] const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
 	{
-		(void)base_prev;
-
 		config_tunnels = base_next.tunnels;
 	}
 
@@ -38,8 +35,8 @@ public:
 class tun64_t : public module_t
 {
 public:
-	tun64_t();
-	~tun64_t();
+	tun64_t() = default;
+	~tun64_t() override = default;
 
 	eResult init() override;
 	void reload_before() override;

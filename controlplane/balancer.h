@@ -10,7 +10,6 @@
 #include "common/generation.h"
 #include "common/icp.h"
 #include "common/idataplane.h"
-#include "common/refarray.h"
 #include "libprotobuf/controlplane.pb.h"
 
 namespace balancer
@@ -37,17 +36,11 @@ using real_counter_key_t = real_key_global_t;
 class generation_config_t
 {
 public:
-	generation_config_t() :
-	        services_count(0),
-	        reals_count(0)
-	{
-	}
+	generation_config_t() = default;
 
-	void update(const controlplane::base_t& base_prev,
+	void update([[maybe_unused]] const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
 	{
-		(void)base_prev;
-
 		for (const auto& [name, balancer] : base_next.balancers)
 		{
 			name_id[name] = balancer.balancer_id;
@@ -61,20 +54,17 @@ public:
 public:
 	std::map<std::string, balancer_id_t> name_id;
 	std::map<std::string, controlplane::balancer::config_t> config_balancers;
-	uint64_t services_count;
-	uint64_t reals_count;
+	uint64_t services_count{};
+	uint64_t reals_count{};
 };
 
 class generation_services_t
 {
 public:
-	generation_services_t() :
-	        reals_enabled_count(0)
-	{
-	}
+	generation_services_t() = default;
 
 public:
-	uint64_t reals_enabled_count;
+	uint64_t reals_enabled_count{};
 	common::icp::balancer_summary::response summary;
 	common::icp::balancer_service::response services;
 	common::icp::balancer_real_find::response reals;

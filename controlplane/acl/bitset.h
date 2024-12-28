@@ -18,19 +18,19 @@ namespace acl
 struct bitset_t
 {
 public:
-	inline void insert(size_t i)
+	void insert(size_t i)
 	{
 		vals[i / 64] |= ((uint64_t)(1) << (i % 64));
 		first_one = std::min(first_one, i / 64);
 	}
 
-	inline bool operator[](size_t i) const
+	bool operator[](size_t i) const
 	{
 
 		return (vals[i / 64] & ((uint64_t)(1) << (i % 64))) != 0;
 	}
 
-	inline bool empty() const
+	[[nodiscard]] bool empty() const
 	{
 		return first_one == size;
 	}
@@ -41,7 +41,7 @@ public:
 		printf("%s", to_string().c_str());
 	}
 
-	std::string to_string() const
+	[[nodiscard]] std::string to_string() const
 	{
 		std::string out;
 		for (size_t i = 0; i < size; ++i)
@@ -59,7 +59,7 @@ public:
 	}
 #endif
 
-	inline bitset_t& operator|=(bitset_t const& other)
+	bitset_t& operator|=(bitset_t const& other)
 	{
 		if (other.empty())
 		{
@@ -74,7 +74,7 @@ public:
 		return *this;
 	}
 
-	inline bitset_t& operator&=(bitset_t const& other)
+	bitset_t& operator&=(bitset_t const& other)
 	{
 		if (empty())
 		{
@@ -95,14 +95,14 @@ public:
 		return *this;
 	}
 
-	friend inline bitset_t operator&(const bitset_t& rs1, const bitset_t& rs2)
+	friend bitset_t operator&(const bitset_t& rs1, const bitset_t& rs2)
 	{
 		bitset_t r = rs1;
 
 		return r &= rs2;
 	}
 
-	friend inline bool operator==(const bitset_t& p1, const bitset_t& p2)
+	friend bool operator==(const bitset_t& p1, const bitset_t& p2)
 	{
 		for (size_t i = p1.start(p2); i < p1.size; ++i)
 		{
@@ -115,12 +115,12 @@ public:
 		return true;
 	}
 
-	friend inline bool operator!=(const bitset_t& p1, const bitset_t& p2)
+	friend bool operator!=(const bitset_t& p1, const bitset_t& p2)
 	{
 		return !(p1 == p2);
 	}
 
-	inline std::tuple<size_t, bool> minAnd(const bitset_t& p) const
+	[[nodiscard]] std::tuple<size_t, bool> minAnd(const bitset_t& p) const
 	{
 		for (size_t i = std::max(first_one, p.first_one); i < size; ++i)
 		{
@@ -134,8 +134,8 @@ public:
 		return {0, false};
 	}
 
-	inline std::tuple<size_t, bool> minAnd(const bitset_t& p1,
-	                                       const bitset_t& p2) const
+	[[nodiscard]] std::tuple<size_t, bool> minAnd(const bitset_t& p1,
+	                                              const bitset_t& p2) const
 	{
 		for (size_t i = std::max(std::max(first_one, p1.first_one), p2.first_one); i < size; ++i)
 		{
@@ -149,7 +149,7 @@ public:
 		return {0, false};
 	}
 
-	inline bool emptyAnd(const bitset_t& p1) const
+	[[nodiscard]] bool emptyAnd(const bitset_t& p1) const
 	{
 		for (size_t i = std::max(first_one, p1.first_one); i < size; ++i)
 		{
@@ -163,7 +163,7 @@ public:
 	}
 
 private:
-	size_t start(const bitset_t& p1) const
+	[[nodiscard]] size_t start(const bitset_t& p1) const
 	{
 		return std::min(first_one, p1.first_one);
 	}
@@ -207,7 +207,7 @@ public:
 	}
 };
 
-} //namespace acl
+} // namespace acl
 
 namespace std
 {

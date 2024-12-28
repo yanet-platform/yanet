@@ -1,12 +1,8 @@
 #pragma once
 
-#include "common/icp.h"
-
 #include "module.h"
 
-namespace controlplane
-{
-namespace module
+namespace controlplane::module
 {
 
 class protoBus : public cModule
@@ -26,5 +22,4 @@ protected:
 	int serverSocket;
 };
 
-}
 }

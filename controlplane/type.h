@@ -1,7 +1,5 @@
 #pragma once
 
-#include <array>
-
 #include "common/type.h"
 
 class cControlPlane;

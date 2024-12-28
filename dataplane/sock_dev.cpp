@@ -98,12 +98,15 @@ sock_dev_stop(struct rte_eth_dev* dev)
 static int
 sock_dev_close(struct rte_eth_dev* dev)
 {
-	struct sock_internals* internals =
+	auto* internals =
 	        (struct sock_internals*)dev->data->dev_private;
 
 	close(internals->fd);
 	unlink(internals->sockaddr.sun_path);
-	rte_free(internals);
+	if (internals)
+	{
+		rte_free(internals);
+	}
 	return 0;
 }
 #else
@@ -140,7 +143,7 @@ sock_dev_rx_queue_setup(struct rte_eth_dev* dev,
                         const struct rte_eth_rxconf* rx_conf __rte_unused,
                         struct rte_mempool* mb_pool)
 {
-	struct sock_internals* si = (struct sock_internals*)dev->data->dev_private;
+	auto* si = (struct sock_internals*)dev->data->dev_private;
 	dev->data->rx_queues[rx_queue_id] = si->rx_queues + rx_queue_id;
 	si->rx_queues[rx_queue_id].internals = si;
 	si->rx_queues[rx_queue_id].mb_pool = mb_pool;
@@ -254,11 +257,11 @@ sock_dev_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		return 0;
 	}
 
-	struct sock_queue* sq = (struct sock_queue*)q;
+	auto* sq = (struct sock_queue*)q;
 
 	if (sq->internals->conFd < 0)
 	{
-		sq->internals->conFd = accept4(sq->internals->fd, NULL, NULL, SOCK_NONBLOCK);
+		sq->internals->conFd = accept4(sq->internals->fd, nullptr, nullptr, SOCK_NONBLOCK);
 	}
 
 	if (sq->internals->conFd < 0)
@@ -294,9 +297,9 @@ sock_dev_rx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		}
 	} while (rc == 0); /// Repeat if there is no data yet
 
-	struct rte_mbuf* mbuf;
+	struct rte_mbuf* mbuf = nullptr;
 	mbuf = rte_pktmbuf_alloc(sq->mb_pool);
-	if (unlikely(mbuf == NULL))
+	if (unlikely(mbuf == nullptr))
 	{
 		sq->internals->eth_stats.ierrors++;
 		return 0;
@@ -362,7 +365,7 @@ sock_dev_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		return 0;
 	}
 
-	struct sock_internals* si = (struct sock_internals*)q;
+	auto* si = (struct sock_internals*)q;
 	if (si->conFd < 0)
 	{
 		si->eth_stats.oerrors++;
@@ -383,7 +386,7 @@ sock_dev_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 		iov[0].iov_base = &hdr;
 		iov[0].iov_len = sizeof(hdr);
 
-		iov[1].iov_base = (void*)rte_pktmbuf_read(mbuf, 0, len, writeBuf);
+		iov[1].iov_base = const_cast<void*>(rte_pktmbuf_read(mbuf, 0, len, writeBuf));
 		iov[1].iov_len = len;
 
 		if (writeIovCount(si->conFd, iov, 2) < 0)
@@ -403,18 +406,16 @@ sock_dev_tx(void* q, struct rte_mbuf** bufs, uint16_t nb_bufs)
 int sock_dev_stats_get(struct rte_eth_dev* dev,
                        struct rte_eth_stats* igb_stats)
 {
-	sock_internals* private_data = (struct sock_internals*)dev->data->dev_private;
+	auto* private_data = (struct sock_internals*)dev->data->dev_private;
 	memcpy(igb_stats, &private_data->eth_stats, sizeof(rte_eth_stats));
 	return 0;
 }
 
-int sock_dev_create(const char* name, uint8_t numa_node)
+int sock_dev_create(const char* path, const char* name, uint8_t numa_node)
 {
-	const char* path = name + strlen(SOCK_DEV_PREFIX);
-
-	struct sock_internals* internals = (struct sock_internals*)
+	auto* internals = (struct sock_internals*)
 	        rte_zmalloc_socket(path, sizeof(struct sock_internals), 0, numa_node);
-	if (internals == NULL)
+	if (internals == nullptr)
 		return ENOSPC;
 
 	internals->pci_id.device_id = 0xBEEF;
@@ -451,9 +452,9 @@ int sock_dev_create(const char* name, uint8_t numa_node)
 	listen(internals->fd, 1);
 	internals->conFd = -1;
 
-	struct rte_eth_dev* eth_dev = NULL;
-	eth_dev = rte_eth_dev_allocate(path);
-	if (eth_dev == NULL)
+	struct rte_eth_dev* eth_dev = nullptr;
+	eth_dev = rte_eth_dev_allocate(name);
+	if (eth_dev == nullptr)
 	{
 		close(internals->fd);
 		unlink(internals->sockaddr.sun_path);

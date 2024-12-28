@@ -2,6 +2,7 @@
 
 #include "base.h"
 #include "counter.h"
+#include "isystem.h"
 #include "module.h"
 #include "rib.h"
 #include "type.h"
@@ -18,8 +19,14 @@ namespace route
 using directly_connected_destination_t = std::tuple<tInterfaceId, ///< interface_id
                                                     std::string>; ///< interface_name
 
-using destination_t = std::variant<std::set<std::tuple<ip_address_t,
-                                                       std::vector<uint32_t>>>,
+using destination_interface_t = std::set<
+        std::tuple<
+                ip_address_t, ///< nexthop
+                uint32_t, ///< peer_id
+                ip_prefix_t, ///< prefix
+                std::vector<uint32_t>>>; ///< labels
+
+using destination_t = std::variant<destination_interface_t,
                                    directly_connected_destination_t, ///< via interface
                                    uint32_t>; ///< virtual_port_id
 
@@ -32,11 +39,16 @@ using value_interface_t = std::tuple<ip_address_t,
                                      tInterfaceId,
                                      std::string,
                                      std::vector<uint32_t>,
-                                     ip_address_t>; ///< neighbor_address
+                                     ip_address_t, ///< neighbor_address
+                                     uint32_t, ///< peer_id
+                                     ip_prefix_t>; ///< prefix
 
 using lookup_t = std::tuple<ip_address_t, ///< nexthop
                             std::string,
                             std::vector<uint32_t>>; ///< labels
+using route_counter_key_t = std::tuple<uint32_t, ///< peer_id
+                                       ip_address_t, ///< nexthop
+                                       ip_prefix_t>; ///< prefix
 
 using tunnel_destination_interface_t = std::set<
         std::tuple<
@@ -86,20 +98,16 @@ using tunnel_counter_key_t = std::tuple<bool, ///< is_ipv4
 class generation_t
 {
 public:
-	generation_t()
-	{
-	}
+	generation_t() = default;
 
-	void update(const controlplane::base_t& base_prev,
+	void update([[maybe_unused]] const controlplane::base_t& base_prev,
 	            const controlplane::base_t& base_next)
 	{
-		(void)base_prev;
-
 		routes = base_next.routes;
 
 		for (const auto& [module_name, route] : base_next.routes)
 		{
-			(void)module_name;
+			YANET_GCC_BUG_UNUSED(module_name);
 
 			for (const auto& [interface_name, interface] : route.interfaces)
 			{
@@ -132,7 +140,7 @@ public:
 		socket_interfaces = base_next.socket_interfaces;
 	}
 
-	std::optional<const std::tuple<tInterfaceId, std::string>*> get_interface_by_neighbor(const ip_address_t& address) const
+	[[nodiscard]] std::optional<const std::tuple<tInterfaceId, std::string>*> get_interface_by_neighbor(const ip_address_t& address) const
 	{
 		for (const auto& [prefix, interface] : interface_by_neighbors)
 		{
@@ -145,7 +153,7 @@ public:
 		return std::nullopt;
 	}
 
-	std::optional<const std::string*> get_vrf(const std::string& route_name) const
+	[[nodiscard]] std::optional<const std::string*> get_vrf(const std::string& route_name) const
 	{
 		auto it = routes.find(route_name);
 		if (it == routes.end())
@@ -156,7 +164,7 @@ public:
 		return &it->second.vrf; ///< read only after update
 	}
 
-	const std::map<uint32_t, std::string>* get_peers() const
+	[[nodiscard]] const std::map<uint32_t, std::string>* get_peers() const
 	{
 		return &peers;
 	}
@@ -179,7 +187,7 @@ public:
 class generation_neighbors_t
 {
 public:
-	std::optional<const common::mac_address_t*> get_mac_address(const std::string& route_name, const std::string& interface_name, const common::ip_address_t& neighbor) const
+	[[nodiscard]] std::optional<const common::mac_address_t*> get_mac_address(const std::string& route_name, const std::string& interface_name, const common::ip_address_t& neighbor) const
 	{
 		auto it = mac_addresses.find({route_name, interface_name, neighbor});
 		if (it == mac_addresses.end())
@@ -218,6 +226,8 @@ public:
 	common::icp::route_summary::response route_summary() const;
 	common::icp::route_lookup::response route_lookup(const common::icp::route_lookup::request& request);
 	common::icp::route_get::response route_get(const common::icp::route_get::request& request);
+	common::icp::route_counters::response route_counters();
+	common::icp::route_tunnel_counters::response route_tunnel_counters();
 	common::icp::route_interface::response route_interface() const;
 	common::icp::route_tunnel_lookup::response route_tunnel_lookup(const common::icp::route_tunnel_lookup::request& request);
 	common::icp::route_tunnel_get::response route_tunnel_get(const common::icp::route_tunnel_get::request& request);
@@ -297,4 +307,5 @@ protected:
 
 	friend class telegraf_t;
 	counter_t<route::tunnel_counter_key_t, 2> tunnel_counter;
+	counter_t<route::route_counter_key_t, 2> route_counter;
 };

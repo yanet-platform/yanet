@@ -3,6 +3,7 @@
 #include "common/counters.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
+#include "common/sdpclient.h"
 
 #include "helper.h"
 #include "influxdb_format.h"
@@ -26,8 +27,8 @@ void ports_stats()
 {
 	interface::dataPlane dataplane;
 	const auto [ports_cfg, cores_cfg, values] = dataplane.getConfig();
-	(void)cores_cfg;
-	(void)values;
+	YANET_GCC_BUG_UNUSED(cores_cfg);
+	YANET_GCC_BUG_UNUSED(values);
 
 	const std::vector<std::tuple<const char*, common::idp::port_stats_t>> ports_stats_per_type{
 	        {"port", dataplane.get_ports_stats()},
@@ -39,9 +40,9 @@ void ports_stats()
 		for (const auto& [port_id, stats] : ports_stats)
 		{
 			const auto& [interface_name, socket_id, eth_addr, pci] = ports_cfg.at(port_id);
-			(void)socket_id;
-			(void)eth_addr;
-			(void)pci;
+			YANET_GCC_BUG_UNUSED(socket_id);
+			YANET_GCC_BUG_UNUSED(eth_addr);
+			YANET_GCC_BUG_UNUSED(pci);
 			const auto& [rx_packets, rx_bytes, rx_errors, rx_drops, tx_packets, tx_bytes, tx_errors, tx_drops] = stats;
 
 			printf("%s,physicalPortName=%s "
@@ -100,7 +101,7 @@ void unsafe()
 	const auto [responseWorkers, responseWorkerGCs, responseSlowWorkerHashtableGC, responseFragmentation, responseFWState, responseTun64, response_nat64stateful, responseControlplane] = controlplane.telegraf_unsafe();
 	const auto& [responseSlowWorker, hashtable_gc] = responseSlowWorkerHashtableGC;
 
-	const auto static_counters = dataplane.getCounters(vector_range(0, (tCounterId)common::globalBase::static_counter_type::size));
+	const auto static_counters = common::sdp::SdpClient::GetCounters(vector_range(0, (tCounterId)common::globalBase::static_counter_type::size));
 	const auto neighbor_stats = dataplane.neighbor_stats();
 	const auto memory_stats = dataplane.memory_manager_stats();
 	const auto& [memory_groups, memory_objects] = memory_stats;
@@ -187,11 +188,10 @@ void unsafe()
 		{
 			printf("worker,coreId=%u,physicalPortName=%s "
 			       "physicalPort_egress_drops=%luu,"
-			       "controlPlane_drops=%luu\n",
+			       "controlPlane_drops=0\n", // @todo: DELETE
 			       coreId,
 			       physicalPortName.data(),
-			       stats.physicalPort_egress_drops,
-			       stats.controlPlane_drops);
+			       stats.physicalPort_egress_drops);
 		}
 	}
 
@@ -453,7 +453,7 @@ void dregress()
 	std::map<common::community_t, std::string> communities;
 	for (const auto& [community, peer_link_orig] : communities_orig)
 	{
-		(void)peer_link_orig;
+		YANET_GCC_BUG_UNUSED(peer_link_orig);
 
 		uint32_t link_id = 0;
 
@@ -588,7 +588,7 @@ void other()
 	const auto& [flagFirst, workers, ports] = controlPlane.telegraf_other();
 	const auto rib_summary = controlPlane.rib_summary();
 	const auto limit_summary = controlPlane.limit_summary();
-	(void)flagFirst;
+	YANET_GCC_BUG_UNUSED(flagFirst);
 
 	for (const auto& workerIter : workers)
 	{
@@ -667,7 +667,7 @@ void service()
 
 		for (const auto& [virtual_ip, proto, virtual_port, nap_connections, packets, bytes, real_disabled_packets, real_disabled_bytes] : services)
 		{
-			(void)nap_connections;
+			YANET_GCC_BUG_UNUSED(nap_connections);
 
 			common::idp::balancer_service_connections::service_key_t key = {module_id,
 			                                                                virtual_ip,
@@ -677,7 +677,7 @@ void service()
 			uint32_t connections = 0;
 			for (auto& [socket_id, service_connections] : balancer_service_connections)
 			{
-				(void)socket_id;
+				YANET_GCC_BUG_UNUSED(socket_id);
 
 				const auto& socket_connections = service_connections[key].value;
 				if (socket_connections > connections)
@@ -702,4 +702,55 @@ void service()
 
 }
 
+void main_counters()
+{
+	common::sdp::DataPlaneInSharedMemory sdp_data;
+	OpenSharedMemoryDataplaneBuffers(sdp_data, true);
+
+	for (const auto& [coreId, worker_info] : sdp_data.workers)
+	{
+		std::vector<influxdb_format::value_t> values;
+		auto* buffer = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
+		                                                   sdp_data.metadata_worker.start_counters);
+		for (const auto& [name, index] : sdp_data.metadata_worker.counter_positions)
+		{
+			values.emplace_back(name.data(), buffer[index]);
+		}
+		influxdb_format::print("worker", {{"coreId", coreId}}, values);
+	}
+
+	for (const auto& [coreId, worker_info] : sdp_data.workers_gc)
+	{
+		std::vector<influxdb_format::value_t> values;
+		auto* buffer = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
+		                                                   sdp_data.metadata_worker.start_counters);
+		for (const auto& [name, index] : sdp_data.metadata_worker_gc.counter_positions)
+		{
+			values.emplace_back(name.data(), buffer[index]);
+		}
+		influxdb_format::print("worker_gc", {{"coreId", coreId}}, values);
+	}
+}
+
+void route()
+{
+	interface::controlPlane controlplane;
+	auto response = controlplane.route_counters();
+
+	for (const auto& [link, nexthop, prefix, counts, size] : response)
+	{
+		influxdb_format::print("route_counters", {{"link", link}, {"nexthop", nexthop}, {"prefix", prefix}}, {{"counts", counts}, {"size", size}});
+	}
+}
+
+void route_tunnel()
+{
+	interface::controlPlane controlplane;
+	auto response = controlplane.route_tunnel_counters();
+
+	for (const auto& [link, nexthop, counts, size] : response)
+	{
+		influxdb_format::print("route_tunnel_counters", {{"link", link}, {"nexthop", nexthop}}, {{"counts", counts}, {"size", size}});
+	}
+}
 }

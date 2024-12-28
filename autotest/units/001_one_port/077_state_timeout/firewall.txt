@@ -1,0 +1,9 @@
+:BEGIN
+add state-timeout 1 ip from any to any
+add state-timeout 2 ip from any to any
+add state-timeout 3 ip from any to any
+add state-timeout 4 ip from any to any
+add state-timeout 5 ip from any to any
+# only the last occurence matters
+add allow ip from any to any keep-state
+

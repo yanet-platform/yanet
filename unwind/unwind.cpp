@@ -1,7 +1,6 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -12,8 +11,8 @@
 #include <unistd.h>
 
 #include "common/type.h"
-#include "controlplane/src/acl.h"
-#include "controlplane/src/acl/rule.h"
+#include "controlplane/acl.h"
+#include "controlplane/acl/rule.h"
 
 auto make_default_acl(tAclId aclId = 1)
 {
@@ -90,7 +89,7 @@ int main(int argc, char* argv[])
 	common::acl::iface_map_t ifmap;
 	std::set<std::string> oif, iif;
 	std::string fname;
-	char ch;
+	char ch = 0;
 
 	while ((ch = getopt(argc, argv, "f:o:i:hI")) != -1)
 	{

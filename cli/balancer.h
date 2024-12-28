@@ -1,12 +1,12 @@
 #pragma once
 
+#include "cli/helper.h"
 #include "common/icontrolplane.h"
-#include "common/icp_proto.h"
 #include "common/idataplane.h"
 #include "common/iproto_controlplane.h"
 #include "common/type.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace balancer
 {
@@ -16,25 +16,13 @@ void summary()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.balancer_summary();
 
-	table_t table;
-	table.insert("module",
-	             "services",
-	             "reals_enabled",
-	             "reals",
-	             "connections",
-	             "next_module");
-
-	for (const auto& [module, services, reals_enabled, reals, connections, next_module] : response)
-	{
-		table.insert(module,
-		             services,
-		             reals_enabled,
-		             reals,
-		             connections,
-		             next_module);
-	}
-
-	table.print();
+	FillAndPrintTable({"module",
+	                   "services",
+	                   "reals_enabled",
+	                   "reals",
+	                   "connections",
+	                   "next_module"},
+	                  response);
 }
 
 void service(std::string module_string,
@@ -67,16 +55,16 @@ void service(std::string module_string,
 	interface::dataPlane dataplane;
 	auto balancer_service_connections = dataplane.balancer_service_connections();
 
-	table_t table;
-	table.insert("module",
-	             "virtual_ip",
-	             "proto",
-	             "virtual_port",
-	             "scheduler",
-	             "connections",
-	             "packets",
-	             "bytes",
-	             "version");
+	TablePrinter table;
+	table.insert_row("module",
+	                 "virtual_ip",
+	                 "proto",
+	                 "virtual_port",
+	                 "scheduler",
+	                 "connections",
+	                 "packets",
+	                 "bytes",
+	                 "version");
 
 	for (const auto& [module, services] : response)
 	{
@@ -86,7 +74,7 @@ void service(std::string module_string,
 		{
 			const auto& [virtual_ip, proto, virtual_port] = service_key;
 			const auto& [scheduler, version, nap_connections, packets, bytes] = service_value;
-			(void)nap_connections; ///< @todo: DELETE
+			YANET_GCC_BUG_UNUSED(nap_connections); ///< @todo: DELETE
 
 			auto proto_string = controlplane::balancer::from_proto(proto);
 
@@ -98,7 +86,7 @@ void service(std::string module_string,
 			uint32_t connections = 0;
 			for (auto& [socket_id, service_connections] : balancer_service_connections)
 			{
-				(void)socket_id;
+				YANET_GCC_BUG_UNUSED(socket_id);
 
 				const auto& socket_connections = service_connections[key].value;
 				if (socket_connections > connections)
@@ -107,19 +95,19 @@ void service(std::string module_string,
 				}
 			}
 
-			table.insert(module_name,
-			             virtual_ip,
-			             proto_string,
-			             virtual_port,
-			             scheduler,
-			             connections,
-			             packets,
-			             bytes,
-			             version);
+			table.insert_row(module_name,
+			                 virtual_ip,
+			                 proto_string,
+			                 virtual_port,
+			                 scheduler,
+			                 connections,
+			                 packets,
+			                 bytes,
+			                 version);
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 inline void setip(common::icp_proto::IPAddr* pAddr, const common::ip_address_t& value)
@@ -202,20 +190,20 @@ void real_find(std::string module_string,
 	interface::dataPlane dataplane;
 	auto balancer_real_connections = dataplane.balancer_real_connections();
 
-	table_t table;
-	table.insert("module",
-	             "virtual_ip",
-	             "proto",
-	             "virtual_port",
-	             "scheduler",
-	             "real_ip",
-	             "real_port",
-	             "enabled",
-	             "weight",
-	             "connections",
-	             "packets",
-	             "bytes",
-	             "version");
+	TablePrinter table;
+	table.insert_row("module",
+	                 "virtual_ip",
+	                 "proto",
+	                 "virtual_port",
+	                 "scheduler",
+	                 "real_ip",
+	                 "real_port",
+	                 "enabled",
+	                 "weight",
+	                 "connections",
+	                 "packets",
+	                 "bytes",
+	                 "version");
 
 	for (const auto& balancer : response.balancers())
 	{
@@ -239,7 +227,7 @@ void real_find(std::string module_string,
 				uint32_t connections = 0;
 				for (auto& [socket_id, real_connections] : balancer_real_connections)
 				{
-					(void)socket_id;
+					YANET_GCC_BUG_UNUSED(socket_id);
 
 					const auto& socket_connections = real_connections[key].value;
 					if (socket_connections > connections)
@@ -248,24 +236,24 @@ void real_find(std::string module_string,
 					}
 				}
 
-				table.insert(balancer.module(),
-				             virtual_ip,
-				             proto_string,
-				             service.key().port_opt_case() == common::icp_proto::BalancerRealFindResponse_ServiceKey::PortOptCase::kPort ? std::make_optional(service.key().port()) : std::nullopt,
-				             service.scheduler(),
-				             real_ip,
-				             real.port_opt_case() == common::icp_proto::BalancerRealFindResponse_Real::PortOptCase::kPort ? std::make_optional(real.port()) : std::nullopt,
-				             real.enabled(),
-				             real.weight(),
-				             connections,
-				             real.packets(),
-				             real.bytes(),
-				             service.version_opt_case() == common::icp_proto::BalancerRealFindResponse_Service::VersionOptCase::kVersion ? std::make_optional(service.version()) : std::nullopt);
+				table.insert_row(balancer.module(),
+				                 virtual_ip,
+				                 proto_string,
+				                 service.key().port_opt_case() == common::icp_proto::BalancerRealFindResponse_ServiceKey::PortOptCase::kPort ? std::make_optional(service.key().port()) : std::nullopt,
+				                 service.scheduler(),
+				                 real_ip,
+				                 real.port_opt_case() == common::icp_proto::BalancerRealFindResponse_Real::PortOptCase::kPort ? std::make_optional(real.port()) : std::nullopt,
+				                 real.enabled(),
+				                 real.weight(),
+				                 connections,
+				                 real.packets(),
+				                 real.bytes(),
+				                 service.version_opt_case() == common::icp_proto::BalancerRealFindResponse_Service::VersionOptCase::kVersion ? std::make_optional(service.version()) : std::nullopt);
 			}
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 void state(std::string module,
@@ -321,7 +309,7 @@ void state(std::string module,
 	/// @todo: OPT
 	for (const auto& [socket_id, services_real_connections] : response)
 	{
-		(void)socket_id;
+		YANET_GCC_BUG_UNUSED(socket_id);
 
 		for (const auto& [services_real, connections] : services_real_connections)
 		{
@@ -331,7 +319,7 @@ void state(std::string module,
 
 			for (const auto& [client_ip, client_port, timestamp_create, timestamp_last_packet, timestamp_gc] : connections)
 			{
-				(void)timestamp_gc;
+				YANET_GCC_BUG_UNUSED(timestamp_gc);
 
 				auto it = map.find({client_ip, client_port});
 				if (it != map.end())
@@ -351,17 +339,17 @@ void state(std::string module,
 		}
 	}
 
-	table_t table;
-	table.insert("module",
-	             "virtual_ip",
-	             "proto",
-	             "virtual_port",
-	             "real_ip",
-	             "real_port",
-	             "client_ip",
-	             "client_port",
-	             "created",
-	             "last_seen");
+	TablePrinter table;
+	table.insert_row("module",
+	                 "virtual_ip",
+	                 "proto",
+	                 "virtual_port",
+	                 "real_ip",
+	                 "real_port",
+	                 "client_ip",
+	                 "client_port",
+	                 "created",
+	                 "last_seen");
 
 	uint32_t current_time = time(nullptr);
 
@@ -388,22 +376,22 @@ void state(std::string module,
 					const auto& [client_ip, client_port] = key;
 					const auto& [timestamp_create, timestamp_last_packet] = value;
 
-					table.insert(module,
-					             virtual_ip,
-					             proto_string,
-					             virtual_port,
-					             real_ip,
-					             real_port,
-					             client_ip,
-					             client_port,
-					             (uint32_t)current_time - timestamp_create,
-					             (uint16_t)current_time - timestamp_last_packet);
+					table.insert_row(module,
+					                 virtual_ip,
+					                 proto_string,
+					                 virtual_port,
+					                 real_ip,
+					                 real_port,
+					                 client_ip,
+					                 client_port,
+					                 (uint32_t)current_time - timestamp_create,
+					                 (uint16_t)current_time - timestamp_last_packet);
 				}
 			}
 		}
 	}
 
-	table.print();
+	table.Print();
 }
 
 namespace real
@@ -490,17 +478,7 @@ void announce()
 	interface::controlPlane controlPlane;
 	const auto response = controlPlane.balancer_announce();
 
-	table_t table;
-	table.insert("module",
-	             "announces");
-
-	for (const auto& [module, announces] : response)
-	{
-		table.insert(module,
-		             announces);
-	}
-
-	table.print();
+	FillAndPrintTable({"module", "announces"}, response);
 }
 
 }

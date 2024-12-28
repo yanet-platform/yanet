@@ -139,16 +139,16 @@ bool allowPrefix(nlohmann::json& prefixes,
 			}
 
 			// check whether current announces includes announceRaw
-			for (auto announceIt = announces->begin(); announceIt != announces->end(); ++announceIt)
+			for (auto& announceIt : *announces)
 			{
 				// sanity check that announce has string type
-				if (!announceIt->is_string())
+				if (!announceIt.is_string())
 				{
 					throw std::string{"invalid type of prefix item announce. Should be string"};
 				}
 
 				// announce already presented within the prefix
-				if (announceIt->get_ref<const std::string&>() == announceRaw)
+				if (announceIt.get_ref<const std::string&>() == announceRaw)
 				{
 					return false;
 				}
@@ -366,7 +366,7 @@ void allow(const std::string& module,
 	checkModuleType(decap, "decap");
 
 	const auto& [prefixes, inserted] = decap.emplace("ipv6DestinationPrefixes", nlohmann::json::array_t{});
-	(void)inserted;
+	YANET_GCC_BUG_UNUSED(inserted);
 
 	if (allowPrefix(*prefixes, prefixRaw, announceRaw))
 	{
@@ -436,7 +436,7 @@ static void allowAny(const std::string& module,
 	checkModuleType(nat64, "nat64stateless");
 
 	const auto& [prefixes, inserted] = nat64.emplace("nat64_prefixes", nlohmann::json::array_t{});
-	(void)inserted;
+	YANET_GCC_BUG_UNUSED(inserted);
 
 	if (allowPrefix(*prefixes, prefixRaw, announceRaw))
 	{

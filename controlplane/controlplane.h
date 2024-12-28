@@ -1,8 +1,5 @@
 #pragma once
 
-#include <atomic>
-#include <functional>
-#include <map>
 #include <mutex>
 #include <shared_mutex>
 #include <thread>
@@ -11,16 +8,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "balancer.h"
 #include "common/generation.h"
 #include "common/icp.h"
 #include "common/idataplane.h"
 #include "common/idp.h"
 #include "common/result.h"
-#include "libprotobuf/controlplane.pb.h"
-
-#include "balancer.h"
-#include "base.h"
-#include "counter.h"
 #include "dregress.h"
 #include "durations.h"
 #include "fqdn.h"
@@ -37,7 +30,7 @@ class cControlPlane
 {
 public:
 	cControlPlane();
-	~cControlPlane();
+	~cControlPlane() = default;
 
 	eResult init(const std::string& jsonFilePath);
 	void start();
@@ -67,14 +60,14 @@ public:
 		else if constexpr (std::is_invocable_r_v<common::icp::response, decltype(function)>)
 		{
 			commands[type] = [function](const common::icp::request& request) {
-				(void)request;
+				YANET_GCC_BUG_UNUSED(request);
 				return function();
 			};
 		}
 		else if constexpr (std::is_invocable_r_v<void, decltype(function)>)
 		{
 			commands[type] = [function](const common::icp::request& request) {
-				(void)request;
+				YANET_GCC_BUG_UNUSED(request);
 				function();
 				return std::tuple<>{};
 			};
@@ -100,6 +93,8 @@ public:
 		}
 	}
 
+	const common::sdp::DataPlaneInSharedMemory* getSdpData() const;
+
 protected: /** commands */
 	common::icp::getPhysicalPorts::response getPhysicalPorts() const;
 	common::icp::getLogicalPorts::response getLogicalPorts() const;
@@ -123,6 +118,7 @@ protected: /** commands */
 	common::icp::loadConfig::response command_loadConfig(const common::icp::loadConfig::request& request);
 	common::icp::version::response command_version();
 	common::icp::convert::response command_convert(const common::icp::convert::request& request);
+	common::icp::counters_stat::response command_counters_stat();
 
 	common::icp::convert::response convert_logical_module();
 
@@ -196,6 +192,8 @@ protected:
 private:
 	/// used only in loadConfig()
 	controlplane::base_t base;
+	common::sdp::DataPlaneInSharedMemory sdp_data;
 
 	void register_service(google::protobuf::Service* service);
+	std::vector<uint64_t> getAclCounters();
 };

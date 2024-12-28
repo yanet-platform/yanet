@@ -1,7 +1,6 @@
 #pragma once
 
-#include <inttypes.h>
-
+#include <cstdint>
 namespace balancer
 {
 

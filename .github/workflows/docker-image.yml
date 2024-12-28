@@ -14,24 +14,11 @@ jobs:
       - name: Run clang-format style check
         uses: jidicula/clang-format-action@v4.11.0
         with:
-          clang-format-version: '10'
+          clang-format-version: '18'
           exclude-regex: .*\.proto
 
-
-  build-image-builder:
-    needs: formatting-check
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v3
-      - name: Build the yanetplatform/builder
-        run: |
-          cd image
-          # todo
-
-
   build-unittest:
-    needs: build-image-builder
+    needs: formatting-check
     runs-on: ubuntu-latest
     container:
       image: yanetplatform/builder-lite
@@ -51,8 +38,8 @@ jobs:
           retention-days: 1
 
   build-autotest:
-    needs: build-image-builder
-    runs-on: builder
+    needs: formatting-check
+    runs-on: ubuntu-latest
     container:
       image: yanetplatform/builder-lite
     steps:
@@ -72,7 +59,7 @@ jobs:
           retention-days: 1
 
   build:
-    needs: build-image-builder
+    needs: formatting-check
     runs-on: ubuntu-latest
     container:
       image: yanetplatform/builder-lite
@@ -87,7 +74,7 @@ jobs:
 
   build-ubuntu1804:
     name: build (Ubuntu 18.04)
-    needs: build-image-builder
+    needs: formatting-check
     runs-on: ubuntu-latest
     container:
       image: yanetplatform/builder_ubuntu18.04-lite
@@ -117,7 +104,7 @@ jobs:
   autotest-001_one_port:
     name: 001_one_port
     needs: build-autotest
-    runs-on: autotest
+    runs-on: ubuntu-latest
     container:
       image: yanetplatform/builder-lite
     steps:

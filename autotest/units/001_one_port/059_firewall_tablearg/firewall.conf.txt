@@ -35,5 +35,5 @@ add deny log logamount 500 all from any to any
 :TUN64_SKP5
 add deny tcp from any to any setup
 add allow udp from any src-port 53 to any dst-port 1025-65535
-add allow ip from any to any keep-state in
+add allow ip from any to any record-state in
 add deny log logamount 500 all from any to any

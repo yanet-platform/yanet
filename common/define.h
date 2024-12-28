@@ -1,15 +1,30 @@
 #pragma once
 
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 #include <map>
 #include <optional>
 #include <set>
 #include <vector>
 
-#include <inttypes.h>
-
-#define YANET_UNUSED [[maybe_unused]]
+/**
+ *  GCC 7.5 version which we have to support for now due to Ubuntu 18 have a bug
+ *  (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81767) where unused variables
+ *  in structured bindings are incorrectly flagged as warnings, even though
+ *  they "can't" be used, cause they are not a real variables.
+ *
+ *  Previously, code used `(void)var;` to suppress these warnings, but this
+ *  approach was ugly and harder to grep.
+ *
+ *  One should use this macro in structured bindings to mark unused bunding.
+ *
+ *  Once we move to a newer GCC version where this bug is fixed,
+ *  we can easily remove this macro as it is much easier to grep and remove
+ *  than those void(var) statements.
+ */
+#define YANET_GCC_BUG_UNUSED(arg) (void)(arg)
 
 #define YANET_LOG_PRINT(msg, args...) fprintf(stdout, msg, ##args)
 
@@ -90,13 +105,13 @@ extern LogPriority logPriority;
 #define CALCULATE_LOGICALPORT_ID(portId, vlanId) ((portId << 13) | ((vlanId & 0xFFF) << 1) | 1)
 
 #if __cpp_exceptions
-#define YANET_THROW(string) throw string
+#define YANET_THROW(message) throw std::runtime_error(std::string(message))
 #else // __cpp_exceptions
-#define YANET_THROW(string)                             \
-	do                                              \
-	{                                               \
-		YANET_LOG_ERROR("%s\n", string.data()); \
-		std::abort();                           \
+#define YANET_THROW(message)                                               \
+	do                                                                 \
+	{                                                                  \
+		YANET_LOG_ERROR("%s\n", std::string_view(message).data()); \
+		std::abort();                                              \
 	} while (0)
 #endif // __cpp_exceptions
 
@@ -109,6 +124,31 @@ extern LogPriority logPriority;
 #define YANET_NETWORK_FLAG_HAS_EXTENSION ((uint8_t)(1u << 2))
 
 #define YANET_NEXTHOP_FLAG_DIRECTLY ((uint16_t)(1u << 0))
+
+/*
+ * @brief Macro to define serialization-friendly tuple accessors.
+ *
+ * Example usage:
+ * \code
+ * class MyClass {
+ * public:
+ *     int a;
+ *     std::string b;
+ *
+ *     // Automatically defines as_tuple() methods
+ *     SERIALIZABLE(a, b);
+ * };
+ * \endcode
+ *
+ * In cases where serialization/deserialization logic for a class is not
+ * straightforward or requires custom handling, you should define explicit
+ * `pop` and `push` methods as before, instead of using this macro.
+ *
+ * @param __VA_ARGS__ List of member variables to include in the tuple.
+ */
+#define SERIALIZABLE(...)                                 \
+	auto as_tuple() { return std::tie(__VA_ARGS__); } \
+	auto as_tuple() const { return std::tie(__VA_ARGS__); }
 
 /// @todo: move
 template<typename map_T,

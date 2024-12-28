@@ -1,0 +1,3 @@
+:BEGIN
+add hitcount c1 ip from 10.0.0.2 to 10.0.0.1
+add allow ip from any to any keep-state

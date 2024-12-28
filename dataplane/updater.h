@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mutex>
 #include <nlohmann/json.hpp>
 #include <rte_malloc.h>
 
@@ -38,98 +37,80 @@ namespace dataplane
 }
 
 //
-
-class updater_lpm4_24bit_8bit
+template<typename Address, typename ObjectType>
+class updater_lpm
 {
-public:
-	using object_type = lpm4_24bit_8bit_atomic;
-
-	updater_lpm4_24bit_8bit(const char* name,
-	                        dataplane::memory_manager* memory_manager,
-	                        const tSocketId socket_id) :
-	        name(name),
-	        memory_manager(memory_manager),
-	        socket_id(socket_id),
-	        pointer(nullptr)
+	[[nodiscard]] memory_manager::unique_ptr<ObjectType> Allocate(std::size_t size)
 	{
-		stats.extended_chunks_count = 0;
-		stats.extended_chunks_size = 0;
-		stats.max_used_chunk_id = 0;
-		stats.free_chunk_cache.flags = 0;
+		return memory_manager_->create_unique<ObjectType>(name_.c_str(),
+		                                                  socket_id_,
+		                                                  ObjectType::calculate_sizeof(size));
+	}
+
+public:
+	using stats_t = typename ObjectType::stats_t;
+	updater_lpm(const char* name,
+	            dataplane::memory_manager* memory_manager,
+	            tSocketId socket_id) :
+	        name_(name),
+	        memory_manager_(memory_manager),
+	        socket_id_(socket_id),
+	        pointer_{nullptr, memory_manager_->deleter()}
+	{
+		stats_.extended_chunks_count = 0;
+		stats_.max_used_chunk_id = 0;
+		stats_.free_chunk_cache.flags = 0;
 	}
 
 	eResult init()
 	{
-		return create(2 * object_type::extended_chunks_size_min);
-	}
-
-	eResult create(const uint64_t extended_chunks_size)
-	{
-		auto* next_pointer = memory_manager->create<object_type>(name.data(),
-		                                                         socket_id,
-		                                                         object_type::calculate_sizeof(extended_chunks_size));
-		if (next_pointer == nullptr)
+		auto default_chunks_size = 2 * ObjectType::extended_chunks_size_min;
+		pointer_ = Allocate(default_chunks_size);
+		if (!pointer_)
 		{
 			return eResult::errorAllocatingMemory;
 		}
-
-		object_type::stats_t next_stats;
-		next_stats.extended_chunks_count = 0;
-		next_stats.extended_chunks_size = extended_chunks_size;
-		next_stats.max_used_chunk_id = 0;
-		next_stats.free_chunk_cache.flags = 0;
-
-		if (pointer)
-		{
-			next_pointer->copy(next_stats, stats, *pointer);
-			memory_manager->destroy(pointer);
-		}
-
-		stats = next_stats;
-		pointer = next_pointer;
-
+		stats_.extended_chunks_size = default_chunks_size;
 		return eResult::success;
 	}
 
-	eResult insert(const uint32_t& ip_address,
+	eResult insert(const Address& ip_address,
 	               const uint8_t& mask,
 	               const uint32_t& value_id)
 	{
-		if (stats.extended_chunks_size - stats.extended_chunks_count < object_type::extended_chunks_size_min)
+		if (NeedToGrow())
 		{
-			eResult result = create(stats.extended_chunks_size * 2);
+			eResult result = Resize(GrowSize());
 			if (result != eResult::success)
 			{
 				return result;
 			}
 		}
 
-		return pointer->insert(stats, ip_address, mask, value_id);
+		return pointer_->insert(stats_, ip_address, mask, value_id);
 	}
 
-	eResult remove(const uint32_t& ip_address,
+	eResult remove(const Address& ip_address,
 	               const uint8_t& mask)
 	{
-		eResult result = eResult::success;
-		if (stats.extended_chunks_size - stats.extended_chunks_count < object_type::extended_chunks_size_min)
+		if (NeedToGrow())
 		{
-			result = create(stats.extended_chunks_size * 2);
+			eResult result = Resize(GrowSize());
 			if (result != eResult::success)
 			{
 				return result;
 			}
 		}
 
-		result = pointer->remove(stats, ip_address, mask);
+		eResult result = pointer_->remove(stats_, ip_address, mask);
 		if (result != eResult::success)
 		{
 			return result;
 		}
 
-		if (stats.extended_chunks_size > 2 * object_type::extended_chunks_size_min &&
-		    stats.extended_chunks_count < stats.extended_chunks_size / 4)
+		if (NeedToShrink())
 		{
-			result = create(stats.extended_chunks_size / 2);
+			eResult result = Resize(ShrinkSize());
 			if (result != eResult::success)
 			{
 				return result;
@@ -139,182 +120,89 @@ public:
 		return result;
 	}
 
-	eResult clear()
+	void clear()
 	{
-		if (pointer)
+		if (pointer_)
 		{
-			memory_manager->destroy(pointer);
-			pointer = nullptr;
+			pointer_->clear();
+			stats_.clear();
+			if (NeedToShrink())
+			{
+				Resize(2 * ObjectType::extended_chunks_size_min);
+			}
 		}
-
-		return create(2 * object_type::extended_chunks_size_min);
 	}
 
 	void limits(common::idp::limits::response& limits) const
 	{
-		limits.emplace_back(name + ".extended_chunks",
-		                    socket_id,
-		                    stats.extended_chunks_count,
-		                    stats.extended_chunks_size);
+		limits.emplace_back(name_ + ".extended_chunks",
+		                    socket_id_,
+		                    stats_.extended_chunks_count,
+		                    stats_.extended_chunks_size);
 	}
 
 	void report(nlohmann::json& report) const
 	{
-		report["pointer"] = to_hex(pointer);
-		report["extended_chunks_count"] = stats.extended_chunks_count;
-		report["extended_chunks_size"] = stats.extended_chunks_size;
+		report["pointer"] = to_hex(pointer_.get());
+		report["extended_chunks_count"] = stats_.extended_chunks_count;
+		report["extended_chunks_size"] = stats_.extended_chunks_size;
 	}
 
-protected:
-	std::string name;
-	dataplane::memory_manager* memory_manager;
-	tSocketId socket_id;
-
-	object_type::stats_t stats;
-
-public:
-	object_type* pointer;
-};
-
-//
-
-class updater_lpm6_8x16bit
-{
-public:
-	using object_type = lpm6_8x16bit_atomic;
-
-	updater_lpm6_8x16bit(const char* name,
-	                     dataplane::memory_manager* memory_manager,
-	                     const tSocketId socket_id) :
-	        name(name),
-	        memory_manager(memory_manager),
-	        socket_id(socket_id),
-	        pointer(nullptr)
+	ObjectType* pointer()
 	{
-		stats.extended_chunks_count = 0;
-		stats.extended_chunks_size = 0;
-		stats.max_used_chunk_id = 0;
-		stats.free_chunk_cache.flags = 0;
+		return pointer_.get();
 	}
 
-	eResult init()
-	{
-		return create(2 * object_type::extended_chunks_size_min);
-	}
+private:
+	std::string name_;
+	dataplane::memory_manager* memory_manager_;
+	tSocketId socket_id_;
+	stats_t stats_;
+	dataplane::memory_manager::unique_ptr<ObjectType> pointer_;
 
-	eResult create(const uint64_t extended_chunks_size)
+	eResult Resize(const std::size_t size)
 	{
-		auto* next_pointer = memory_manager->create<object_type>(name.data(),
-		                                                         socket_id,
-		                                                         object_type::calculate_sizeof(extended_chunks_size));
-		if (next_pointer == nullptr)
+		memory_manager::unique_ptr<ObjectType> next = Allocate(size);
+		if (!next)
 		{
 			return eResult::errorAllocatingMemory;
 		}
 
-		object_type::stats_t next_stats;
+		stats_t next_stats;
 		next_stats.extended_chunks_count = 0;
-		next_stats.extended_chunks_size = extended_chunks_size;
+		next_stats.extended_chunks_size = size;
 		next_stats.max_used_chunk_id = 0;
 		next_stats.free_chunk_cache.flags = 0;
 
-		if (pointer)
-		{
-			next_pointer->copy(next_stats, stats, *pointer);
-			memory_manager->destroy(pointer);
-		}
-
-		stats = next_stats;
-		pointer = next_pointer;
-
+		next->copy(next_stats, stats_, *pointer_);
+		stats_ = next_stats;
+		std::swap(pointer_, next);
 		return eResult::success;
 	}
 
-	eResult insert(const std::array<uint8_t, 16>& ip_address,
-	               const uint8_t& mask,
-	               const uint32_t& value_id)
+	[[nodiscard]] bool NeedToGrow() const
 	{
-		if (stats.extended_chunks_size - stats.extended_chunks_count < object_type::extended_chunks_size_min)
-		{
-			eResult result = create(stats.extended_chunks_size * 2);
-			if (result != eResult::success)
-			{
-				return result;
-			}
-		}
-
-		return pointer->insert(stats, ip_address, mask, value_id);
+		return stats_.extended_chunks_size - stats_.extended_chunks_count < ObjectType::extended_chunks_size_min;
 	}
 
-	eResult remove(const std::array<uint8_t, 16>& ip_address,
-	               const uint8_t& mask)
+	[[nodiscard]] std::size_t GrowSize() const
 	{
-		eResult result = eResult::success;
-		if (stats.extended_chunks_size - stats.extended_chunks_count < object_type::extended_chunks_size_min)
-		{
-			result = create(stats.extended_chunks_size * 2);
-			if (result != eResult::success)
-			{
-				return result;
-			}
-		}
-
-		result = pointer->remove(stats, ip_address, mask);
-		if (result != eResult::success)
-		{
-			return result;
-		}
-
-		if (stats.extended_chunks_size > 2 * object_type::extended_chunks_size_min &&
-		    stats.extended_chunks_count < stats.extended_chunks_size / 4)
-		{
-			result = create(stats.extended_chunks_size / 2);
-			if (result != eResult::success)
-			{
-				return result;
-			}
-		}
-
-		return result;
+		return stats_.extended_chunks_size * 2;
 	}
 
-	eResult clear()
+	[[nodiscard]] std::size_t ShrinkSize() const
 	{
-		if (pointer)
-		{
-			memory_manager->destroy(pointer);
-			pointer = nullptr;
-		}
-
-		return create(2 * object_type::extended_chunks_size_min);
+		return stats_.extended_chunks_size / 2;
 	}
 
-	void limits(common::idp::limits::response& limits) const
+	[[nodiscard]] bool NeedToShrink() const
 	{
-		limits.emplace_back(name + ".extended_chunks",
-		                    socket_id,
-		                    stats.extended_chunks_count,
-		                    stats.extended_chunks_size);
+		return ShrinkSize() > std::max(ObjectType::extended_chunks_size_min, GrowSize());
 	}
-
-	void report(nlohmann::json& report) const
-	{
-		report["pointer"] = to_hex(pointer);
-		report["extended_chunks_count"] = stats.extended_chunks_count;
-		report["extended_chunks_size"] = stats.extended_chunks_size;
-	}
-
-protected:
-	std::string name;
-	dataplane::memory_manager* memory_manager;
-	tSocketId socket_id;
-
-	object_type::stats_t stats;
-
-public:
-	object_type* pointer;
 };
 
+using updater_lpm4_24bit_8bit = updater_lpm<uint32_t, lpm4_24bit_8bit_atomic>;
+using updater_lpm6_8x16bit = updater_lpm<std::array<uint8_t, 16>, lpm6_8x16bit_atomic>;
 //
 
 class updater_lpm4_24bit_8bit_id32
@@ -327,8 +215,7 @@ public:
 	                             const tSocketId socket_id) :
 	        name(name),
 	        memory_manager(memory_manager),
-	        socket_id(socket_id),
-	        pointer(nullptr)
+	        socket_id(socket_id)
 	{
 	}
 
@@ -402,7 +289,7 @@ protected:
 	object_type::stats_t stats;
 
 public:
-	object_type* pointer;
+	object_type* pointer{};
 };
 
 //
@@ -417,8 +304,7 @@ public:
 	                          const tSocketId socket_id) :
 	        name(name),
 	        memory_manager(memory_manager),
-	        socket_id(socket_id),
-	        pointer(nullptr)
+	        socket_id(socket_id)
 	{
 	}
 
@@ -492,7 +378,7 @@ protected:
 	object_type::stats_t stats;
 
 public:
-	object_type* pointer;
+	object_type* pointer{};
 };
 
 //

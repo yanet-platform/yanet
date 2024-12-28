@@ -108,7 +108,7 @@
 		REASS CONFIG BW WEIGHT BUCKETS MASK SCHEDMASK NOERROR PLR
 		DROPTAIL FLOWID PDELAY SCHED FLOWMASK LINK PRIORITY TYPE
 		VALTYPE ALGO FIB PROFILE BURST CHECKSTATE FWD LOG LOGAMOUNT
-		LOGDST SETUP ESTABLISHED FRAG MF RF DF OFFSET KEEPSTATE
+		LOGDST SETUP ESTABLISHED FRAG MF RF DF OFFSET RECORDSTATE KEEPSTATE
 		ICMPTYPES ICMP6TYPES FROM TO ME ME6 ANY IN OUT VIA XMIT
 		RECV OR NOT LIMIT TABLE TCPFLAGS TCPOPTIONS T_IP T_IP4 T_IP6
 		IPLEN IPID IPOPTIONS IPTOS IPTTL TCPDATALEN TCPSEQ TCPWIN
@@ -131,6 +131,7 @@
 		SRCPRJID DSTPRJID RED ALL LMAX DSTIP6 SRCIP6 TCPSETMSS
 		NAT64CLAT NAT64LSN NAT64STL NPTV6 SRCADDR QM DSTADDR
 		SRCPORT DSTPORT SRCIP DSTIP EQUAL COMMA MINUS EOL M4LQ M4RQ DUMP
+		STATETIMEOUT HITCOUNT
 
 // QUEUE could be an argument to *MASK
 %precedence	QUEUE
@@ -503,6 +504,18 @@ action:
 	DUMP dump_tag
 	{
 		cfg.set_rule_action(rule_action_t::DUMP);
+	}
+	|
+	STATETIMEOUT NUMBER
+	{
+		cfg.set_rule_action(rule_action_t::STATETIMEOUT);
+		cfg.set_rule_action_arg($2);
+	}
+	|
+	HITCOUNT TOKEN
+	{
+		cfg.set_rule_action(rule_action_t::HITCOUNT);
+		cfg.set_rule_action_arg($2);
 	}
 	|
 	T_REJECT
@@ -1260,6 +1273,12 @@ optiontoken:
 	}
 	icmptypes
 	|
+	recordstate
+	{
+		cfg.set_rule_opcode(rule_t::opcode_t::RECORDSTATE);
+		cfg.add_rule_opcode(1);
+	}
+	|
 	keepstate
 	{
 		cfg.set_rule_opcode(rule_t::opcode_t::KEEPSTATE);
@@ -1450,6 +1469,11 @@ fragtoken:
 	{
 		cfg.clear_rule_flag(rule_t::ipoff_flags_t::OFFSET);
 	}
+	;
+recordstate:
+	RECORDSTATE
+	|
+	RECORDSTATE LABEL
 	;
 keepstate:
 	KEEPSTATE

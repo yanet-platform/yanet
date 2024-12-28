@@ -1,5 +1,6 @@
 #include "acl_compiler.h"
 #include "acl_filter.h"
+#include "acl_value.h"
 
 using namespace acl;
 
@@ -101,7 +102,7 @@ void compiler_t::compile(const std::vector<rule_t>& unwind_rules,
 		result.acl_total_table.emplace_back(key, value);
 	}
 
-	result.acl_values.swap(value.vector);
+	result.acl_values = std::move(value.vector);
 
 	YANET_LOG_INFO("acl::compile: done\n");
 }
@@ -171,8 +172,8 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 			}
 			else
 			{
-				network_ipv4_source_filter.emplace(network_t(4, 0, 0));
-				network_ipv6_source_filter.emplace(network_t(6, 0, 0));
+				network_ipv4_source_filter.emplace(4, 0, 0);
+				network_ipv6_source_filter.emplace(6, 0, 0);
 
 				src_family[4] = true;
 				src_family[6] = true;
@@ -197,8 +198,8 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 			}
 			else
 			{
-				network_ipv4_destination_filter.emplace(network_t(4, 0, 0));
-				network_ipv6_destination_filter.emplace(network_t(6, 0, 0));
+				network_ipv4_destination_filter.emplace(4, 0, 0);
+				network_ipv6_destination_filter.emplace(6, 0, 0);
 
 				dst_family[4] = true;
 				dst_family[6] = true;
@@ -266,27 +267,39 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 		}
 
 		/// total_table
-		{
-			rule.total_table_filter_id = total_table.collect(rule_id,
-			                                                 std::tie(rule.via_filter_id,
-			                                                          rule.transport_table_filter_id));
-		}
+		total_table.collect(rule_id,
+		                    std::tie(rule.via_filter_id,
+		                             rule.transport_table_filter_id));
 
-		/// value
 		{
+			// FIXME: unwind_rule being const makes that we cannot use move semantics, even though at this point
+			// we don't need unwinded rules anymore. It will be nice to use moves, but this requires a little bit API
+			// tweaking. Move here does nothing, as this is a const pointer, so just passing by value
 			if (auto flow = std::get_if<common::globalBase::tFlow>(&unwind_rule.action))
 			{
-				rule.value_filter_id = value.collect({*flow});
+				rule.value_filter_id = value.collect_initial_rule(*flow);
 			}
-			else if (auto action = std::get_if<common::acl::action_t>(&unwind_rule.action))
+			else if (auto dump = std::get_if<common::acl::dump_t>(&unwind_rule.action))
 			{
-				rule.value_filter_id = value.collect({*action});
+				rule.value_filter_id = value.collect_initial_rule(*dump);
+			}
+			else if (auto check_state = std::get_if<common::acl::check_state_t>(&unwind_rule.action))
+			{
+				rule.value_filter_id = value.collect_initial_rule(*check_state);
+			}
+			else if (auto state_timeout = std::get_if<common::acl::state_timeout_t>(&unwind_rule.action))
+			{
+				rule.value_filter_id = value.collect_initial_rule(*state_timeout);
+			}
+			else if (auto hit_count = std::get_if<common::acl::hit_count_t>(&unwind_rule.action))
+			{
+				rule.value_filter_id = value.collect_initial_rule(*hit_count);
 			}
 		}
 
 		/// terminating
 		{
-			rule.terminating = std::holds_alternative<common::globalBase::tFlow>(unwind_rule.action);
+			rule.terminating = unwind_rule.is_term();
 		}
 
 		YANET_LOG_DEBUG("acl::compile: rule: %s\n", unwind_rule.to_string().data());
@@ -301,7 +314,6 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 		YANET_LOG_DEBUG("acl::compile: transport_filter_id: %u\n", rule.transport_filter_id);
 		YANET_LOG_DEBUG("acl::compile: transport_table_filter_id: %u\n", rule.transport_table_filter_id);
 		YANET_LOG_DEBUG("acl::compile: via_filter_id: %u\n", rule.via_filter_id);
-		YANET_LOG_DEBUG("acl::compile: total_table_filter_id: %u\n", rule.total_table_filter_id);
 		YANET_LOG_DEBUG("acl::compile: value_filter_id: %u\n", rule.value_filter_id);
 	}
 
@@ -323,11 +335,8 @@ void compiler_t::collect(const std::vector<rule_t>& unwind_rules)
 	YANET_LOG_INFO("acl::compile: transport_table.filters: %lu\n",
 	               transport_table.filters.size());
 
-	YANET_LOG_INFO("acl::compile: total_table.filters: %lu\n",
-	               total_table.filters.size());
-
-	YANET_LOG_INFO("acl::compile: value.filters: %lu\n",
-	               value.filters.size());
+	YANET_LOG_INFO("acl::compile: value.vector: %lu\n",
+	               value.vector.size());
 }
 
 void compiler_t::network_compile()

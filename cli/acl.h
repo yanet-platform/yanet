@@ -1,8 +1,9 @@
 #pragma once
 
+#include "cli/helper.h"
 #include "common/icontrolplane.h"
 
-#include "helper.h"
+#include "table_printer.h"
 
 namespace acl
 {
@@ -25,7 +26,7 @@ void unwind(const std::string& in_module,
             std::optional<std::string> transport_source,
             std::optional<std::string> transport_destination,
             std::optional<std::string> transport_flags,
-            std::optional<std::string> keepstate)
+            std::optional<std::string> recordstate)
 {
 	std::optional<std::string> module = in_module;
 
@@ -38,7 +39,7 @@ void unwind(const std::string& in_module,
 	optional_helper(transport_source);
 	optional_helper(transport_destination);
 	optional_helper(transport_flags);
-	optional_helper(keepstate);
+	optional_helper(recordstate);
 
 	interface::controlPlane controlplane;
 	auto response = controlplane.acl_unwind({module,
@@ -50,41 +51,23 @@ void unwind(const std::string& in_module,
 	                                         transport_source,
 	                                         transport_destination,
 	                                         transport_flags,
-	                                         keepstate});
+	                                         recordstate});
 
-	table_t table({.optional_null = "any"});
-	table.insert("module",
-	             "direction",
-	             "network_source",
-	             "network_destination",
-	             "fragment",
-	             "protocol",
-	             "transport_source",
-	             "transport_destination",
-	             "transport_flags",
-	             "keepstate",
-	             "next_module",
-	             "ids",
-	             "log");
-
-	for (const auto& [module, direction, network_source, network_destination, fragment, protocol, transport_source, transport_destination, transport_flags, keepstate, next_module, ids, log] : response)
-	{
-		table.insert(module,
-		             direction,
-		             network_source,
-		             network_destination,
-		             fragment,
-		             protocol,
-		             transport_source,
-		             transport_destination,
-		             transport_flags,
-		             keepstate,
-		             next_module,
-		             ids,
-		             log);
-	}
-
-	table.print();
+	FillAndPrintTable({"module",
+	                   "direction",
+	                   "network_source",
+	                   "network_destination",
+	                   "fragment",
+	                   "protocol",
+	                   "transport_source",
+	                   "transport_destination",
+	                   "transport_flags",
+	                   "recordstate",
+	                   "next_module",
+	                   "ids",
+	                   "log"},
+	                  response,
+	                  {.optional_null = "any"});
 }
 
 void lookup(std::optional<std::string> module,
@@ -113,19 +96,7 @@ void lookup(std::optional<std::string> module,
 	                                         transport_source,
 	                                         transport_destination});
 
-	table_t table;
-	table.insert("ruleno",
-	             "label",
-	             "rule");
-
-	for (const auto& [ruleno, label, rule] : response)
-	{
-		table.insert(ruleno,
-		             label,
-		             rule);
-	}
-
-	table.print();
+	FillAndPrintTable({"ruleno", "label", "rule"}, response);
 }
 
 }

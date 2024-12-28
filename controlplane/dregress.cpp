@@ -48,12 +48,12 @@ void dregress_t::prefix_insert(const std::tuple<std::string, uint32_t>& vrf_prio
 
 	for (const auto& [pptn_index, path_info_to_nh_ptr] : nexthops)
 	{
-		(void)pptn_index;
+		YANET_GCC_BUG_UNUSED(pptn_index);
 
 		for (const auto& [path_info, nexthop_stuff_ptr] : path_info_to_nh_ptr)
 		{
 			const auto& [nexthop, labels, origin, med, aspath, nexthop_communities, large_communities, local_preference] = *nexthop_stuff_ptr;
-			(void)large_communities;
+			YANET_GCC_BUG_UNUSED(large_communities);
 
 			if ((prefix.is_ipv4() && nexthop.is_ipv4()) ||
 			    (prefix.is_ipv6() && nexthop.is_ipv6()))
@@ -232,7 +232,7 @@ void dregress_t::compile(common::idp::updateGlobalBase::request& globalbase,
 
 	for (const auto& [config_module_name, config_module] : generation.dregresses)
 	{
-		(void)config_module_name;
+		YANET_GCC_BUG_UNUSED(config_module_name);
 
 		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::dregress_local_prefix_update,
 		                        config_module.localPrefixes);
@@ -297,11 +297,11 @@ void dregress_t::value_compile(common::idp::updateGlobalBase::request& globalbas
 	bool is_best = true;
 	for (const auto& [attribute, destinations] : attribute_destinations)
 	{
-		(void)attribute;
+		YANET_GCC_BUG_UNUSED(attribute);
 
 		for (const auto& [nexthop, label, communities, peer_as, origin_as] : destinations)
 		{
-			(void)vrf_priority; ///< @todo
+			YANET_GCC_BUG_UNUSED(vrf_priority); ///< @todo
 			auto community = generation.get_peer_link_community(communities);
 			if (community)
 			{

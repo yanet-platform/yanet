@@ -9,6 +9,7 @@
 #include <rte_ring.h>
 
 #include "common/result.h"
+#include "common/sdpcommon.h"
 #include "common/tsc_deltas.h"
 #include "common/type.h"
 
@@ -18,8 +19,11 @@
 #include "samples.h"
 #include "sharedmemory.h"
 
-class cDataPlane;
-class mControlPlane;
+namespace dataplane
+{
+template<dataplane::FlowDirection Direction>
+struct ActionDispatcher;
+}
 
 namespace worker
 {
@@ -28,10 +32,7 @@ template<unsigned int TSize = CONFIG_YADECAP_MBUFS_BURST_SIZE>
 class tStack
 {
 public:
-	tStack() :
-	        mbufsCount(0)
-	{
-	}
+	tStack() = default;
 
 	inline void insert(rte_mbuf** mbufs, unsigned int mbufsCount)
 	{
@@ -51,7 +52,7 @@ public:
 	}
 
 public:
-	unsigned int mbufsCount;
+	unsigned int mbufsCount{};
 	rte_mbuf* mbufs[TSize];
 };
 
@@ -59,15 +60,19 @@ public:
 
 class cWorker
 {
+	unsigned int MempoolSize() const;
+
 public:
 	cWorker(cDataPlane* dataPlane);
 	~cWorker();
 
 	eResult init(const tCoreId& coreId, const dataplane::base::permanently& basePermanently, const dataplane::base::generation& base);
-
 	void start();
 
-	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
+	static void FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata);
+	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorker& metadata);
+
+	[[nodiscard]] const dataplane::base::generation& current_base() const { return bases[localBaseId & 1]; }
 
 protected:
 	eResult sanityCheck();
@@ -75,8 +80,11 @@ protected:
 	YANET_NEVER_INLINE void mainThread();
 
 	inline void calcHash(rte_mbuf* mbuf, uint8_t without_ports = 0);
+
+public:
 	void preparePacket(rte_mbuf* mbuf); ///< @todo: inline
 
+protected:
 	constexpr static uint32_t translation_ignore = 0xFFFFFFFFu;
 	inline void translation_ipv4_to_ipv6(rte_mbuf* mbuf, const ipv6_address_t& ipv6_source, const ipv6_address_t& ipv6_destination, const uint32_t port_source, const uint32_t port_destination, const uint32_t identifier);
 	inline void translation_ipv6_to_ipv4(rte_mbuf* mbuf, const ipv4_address_t& ipv4_source, const ipv4_address_t& ipv4_destination, const uint32_t port_source, const uint32_t port_destination, const uint32_t identifier);
@@ -85,7 +93,7 @@ protected:
 
 	inline void handlePackets();
 
-	inline void physicalPort_ingress_handle(const unsigned int& worker_port_i);
+	inline void physicalPort_ingress_handle(const dpdk::Endpoint& rx_point);
 
 	inline void physicalPort_egress_handle();
 
@@ -180,11 +188,12 @@ protected:
 	inline void balancer_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::balancer_state_value_t* value);
 
 	/// fw state
-	inline bool acl_try_keepstate(rte_mbuf* mbuf);
-	inline bool acl_try_keepstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
-	inline bool acl_egress_try_keepstate(rte_mbuf* mbuf);
-	inline bool acl_egress_try_keepstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
-	inline void acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow);
+	using FlowFromState = std::optional<common::globalBase::tFlow>;
+	inline FlowFromState acl_checkstate(rte_mbuf* mbuf);
+	inline FlowFromState acl_checkstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
+	inline FlowFromState acl_egress_checkstate(rte_mbuf* mbuf);
+	inline FlowFromState acl_egress_checkstate(rte_mbuf* mbuf, dataplane::globalBase::fw_state_value_t* value, dataplane::spinlock_nonrecursive_t* locker);
+	inline void acl_create_state(rte_mbuf* mbuf, tAclId aclId, const common::globalBase::tFlow& flow, std::optional<uint32_t> timeout);
 	inline void acl_state_emit(tAclId aclId, const dataplane::globalBase::fw_state_sync_frame_t& frame);
 
 	inline void acl_egress_entry(rte_mbuf* mbuf, tAclId aclId);
@@ -193,6 +202,7 @@ protected:
 	inline void acl_egress_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 	inline void acl_log(rte_mbuf* mbuf, const common::globalBase::tFlow& flow, tAclId aclId);
 	inline void acl_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value);
+	inline void acl_fill_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::fw_state_value_t* value, std::optional<uint32_t> timeout);
 
 	inline void dregress_entry(rte_mbuf* mbuf);
 
@@ -210,24 +220,33 @@ protected:
 	inline uint32_t get_tcp_state_timeout(uint8_t flags, const dataplane::globalBase::state_timeout_config_t& state_timeout_config);
 	inline uint32_t get_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, const dataplane::globalBase::state_timeout_config_t& state_timeout_config);
 
+	inline void populate_hitcount_map(const std::string& id, rte_mbuf* mbuf);
+
 protected:
 	/// @todo: move to slow_worker_t
+public:
 	YANET_NEVER_INLINE void slowWorkerBeforeHandlePackets();
 	YANET_NEVER_INLINE void slowWorkerHandlePackets();
+
 	YANET_NEVER_INLINE void slowWorkerHandleFragment(rte_mbuf* mbuf);
 	YANET_NEVER_INLINE void slowWorkerFarmHandleFragment(rte_mbuf* mbuf);
+
 	YANET_NEVER_INLINE void slowWorkerAfterHandlePackets();
+
 	YANET_NEVER_INLINE void slowWorkerFlow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 	YANET_NEVER_INLINE void slowWorkerTranslation(rte_mbuf* mbuf, const dataplane::globalBase::tNat64stateless& nat64stateless, const dataplane::globalBase::nat64stateless_translation_t& translation, bool direction); /** true: ingress, false: egress */
+	const dataplane::base::generation& CurrentBase() { return bases[localBaseId & 1]; }
+	void IncrementCounter(common::globalBase::static_counter_type type) { counters[(uint32_t)type]++; }
+	[[nodiscard]] uint32_t CurrentTime() const { return basePermanently.globalBaseAtomic->currentTime; }
 
-public:
 	friend class cDataPlane;
 	friend class cReport;
 	friend class cControlPlane;
-	friend class mControlPlane;
 	friend class dregress_t;
 	friend class worker_gc_t;
 	friend class dataplane::globalBase::generation;
+	friend struct dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>;
+	friend struct dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>;
 
 	cDataPlane* dataPlane;
 	tCoreId coreId;
@@ -319,19 +338,22 @@ protected:
 	worker::tStack<> after_early_decap_stack4;
 	worker::tStack<> after_early_decap_stack6;
 
+public:
 	rte_ring* ring_highPriority;
 	rte_ring* ring_normalPriority;
 	rte_ring* ring_lowPriority;
 	dataplane::perf::tsc_deltas* tsc_deltas;
 	rte_ring* ring_toFreePackets;
+	common::worker::stats::common& Stats() { return *stats; }
 
+protected:
 	rte_ring* ring_log;
 
-	common::worker::stats::common stats;
-	common::worker::stats::port statsPorts[CONFIG_YADECAP_PORTS_SIZE];
-	uint64_t bursts[CONFIG_YADECAP_MBUFS_BURST_SIZE + 1];
-	uint64_t counters[YANET_CONFIG_COUNTERS_SIZE];
-	uint64_t aclCounters[YANET_CONFIG_ACL_COUNTERS_SIZE];
+	common::worker::stats::common* stats;
+	common::worker::stats::port* statsPorts; // CONFIG_YADECAP_PORTS_SIZE
+	uint64_t* bursts; // CONFIG_YADECAP_MBUFS_BURST_SIZE + 1
+	uint64_t* counters; // YANET_CONFIG_COUNTERS_SIZE
+	uint64_t* aclCounters; // YANET_CONFIG_ACL_COUNTERS_SIZE
 
 	// will decrease with each new packet sent to slow worker, replenishes each N mseconds
 	int32_t packetsToSWNPRemainder;

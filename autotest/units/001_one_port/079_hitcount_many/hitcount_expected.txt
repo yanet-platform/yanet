@@ -1,0 +1,6 @@
+[
+  allow_tcp_from_11_0_0_0_24_to_any_53: 1, 108
+  check_state_ip_from_any_to_any: 3, 322
+  allow_tcp_from_any_to_2111_aaa_ff1c_2030_60_53: 1, 138
+  deny_ip_from_any_to_any: 1, 116
+]
