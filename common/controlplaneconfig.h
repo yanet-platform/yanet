@@ -141,6 +141,32 @@ public:
 	common::globalBase::tFlow flow;
 };
 
+class bird_import_t
+{
+public:
+	void pop(common::stream_in_t& stream)
+	{
+		stream.pop(socket);
+		stream.pop(vrf);
+		stream.pop(flow);
+	}
+
+	void push(common::stream_out_t& stream) const
+	{
+		stream.push(socket);
+		stream.push(vrf);
+		stream.push(flow);
+	}
+
+public:
+	inline static const std::string socketStr = "socket";
+	inline static const std::string vrfStr = "vrf";
+
+	std::string socket;
+	std::string vrf;
+	common::globalBase::tFlow flow;
+};
+
 class config_t
 {
 public:
@@ -168,6 +194,7 @@ public:
 		stream.pop(local_prefixes);
 		stream.pop(peers);
 		stream.pop(interfaces);
+		stream.pop(bird_imports);
 	}
 
 	void push(common::stream_out_t& stream) const
@@ -183,6 +210,7 @@ public:
 		stream.push(local_prefixes);
 		stream.push(peers);
 		stream.push(interfaces);
+		stream.push(bird_imports);
 	}
 
 public:
@@ -197,6 +225,7 @@ public:
 	std::set<common::ip_prefix_t> local_prefixes; ///< for fallback to default
 	std::map<uint32_t, std::string> peers;
 	std::map<std::string, interface_t> interfaces;
+	std::vector<bird_import_t> bird_imports;
 };
 
 }

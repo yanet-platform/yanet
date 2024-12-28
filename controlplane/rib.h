@@ -50,6 +50,8 @@ public:
 	common::icp::rib_summary::response rib_summary();
 	common::icp::rib_prefixes::response rib_prefixes();
 
+	void bird_import_get();
+
 	common::icp::rib_lookup::response rib_lookup(const common::icp::rib_lookup::request& request);
 	common::icp::rib_get::response rib_get(const common::icp::rib_get::request& request);
 	common::icp::rib_save::response rib_save();
@@ -62,7 +64,7 @@ private:
 	void rib_eor(const common::icp::rib_update::eor& request);
 
 	void rib_thread();
-	void bird_thread();
+	void bird_thread(const std::string& socket, const std::string& vrf);
 
 protected:
 	mutable std::mutex rib_update_mutex;

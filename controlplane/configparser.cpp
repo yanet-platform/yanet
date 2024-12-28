@@ -197,6 +197,32 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 	return baseNext;
 }
 
+void config_parser_t::loadConfig_route_bird(controlplane::base_t& baseNext,
+                                            std::vector<controlplane::route::bird_import_t>& birdsImport,
+                                            const nlohmann::json& birdJson)
+{
+	using BirdImport = controlplane::route::bird_import_t;
+	for (const auto& elemJson : birdJson)
+	{
+		BirdImport import;
+
+		if (exist(elemJson, BirdImport::socketStr))
+		{
+			import.socket = elemJson[BirdImport::socketStr];
+		}
+
+		if (exist(elemJson, BirdImport::vrfStr))
+		{
+			import.vrf = elemJson[BirdImport::vrfStr];
+		}
+
+		birdsImport.push_back(import);
+		YANET_LOG_INFO("loadConfig_route_bird: socket(%s), vrf(%s)\n",
+		               import.socket.data(),
+		               import.vrf.data());
+	}
+}
+
 void config_parser_t::loadConfig_logicalPort(controlplane::base_t& baseNext,
                                              const std::string& moduleId,
                                              const nlohmann::json& moduleJson)
@@ -365,6 +391,13 @@ void config_parser_t::loadConfig_route(controlplane::base_t& baseNext,
 	else
 	{
 		route.tunnel_enabled = false;
+	}
+
+	if (exist(moduleJson, "birdImport"))
+	{
+		loadConfig_route_bird(baseNext,
+		                      route.bird_imports,
+		                      moduleJson["birdImport"]);
 	}
 
 	//
