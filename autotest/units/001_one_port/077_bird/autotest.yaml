@@ -1,0 +1,8 @@
+steps:
+- bird: 
+  - bird/bird.conf
+- birdc:
+  - show route
+- sleep: 20
+- cli:
+  - rib prefixes

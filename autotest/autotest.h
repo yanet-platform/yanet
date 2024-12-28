@@ -70,6 +70,8 @@ protected:
 	bool step_reload_async(const YAML::Node& yamlStep);
 	bool step_echo(const YAML::Node& yamlStep);
 	bool step_dumpPackets(const YAML::Node& yamlStep, const std::string& path);
+	bool step_bird(const YAML::Node& yamlStep, const std::string& path);
+	bool step_birdc(const YAML::Node& yamlStep);
 
 	eResult initSockets();
 	eResult initSharedMemory();
