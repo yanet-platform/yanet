@@ -753,4 +753,19 @@ void route_tunnel()
 		influxdb_format::print("route_tunnel_counters", {{"link", link}, {"nexthop", nexthop}}, {{"counts", counts}, {"size", size}});
 	}
 }
+
+inline void acl()
+{
+	interface::dataPlane dataplane;
+	const auto& response = dataplane.hitcount_dump();
+
+	for (const auto& [id, data] : response)
+	{
+		influxdb_format::print("acl",
+		                       {{"name", "counters"},
+		                        {"rule", id}},
+		                       {{"packets", data.count, "u"},
+		                        {"bytes", data.bytes, "u"}});
+	}
+}
 }
