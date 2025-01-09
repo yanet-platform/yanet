@@ -1,0 +1,4 @@
+acl,name=counters,rule=allow_tcp_from_11_0_0_0_24_to_any_53 packets=1u,bytes=108u
+acl,name=counters,rule=check_state_ip_from_any_to_any packets=3u,bytes=322u
+acl,name=counters,rule=allow_tcp_from_any_to_2111_aaa_ff1c_2030_60_53 packets=1u,bytes=138u
+acl,name=counters,rule=deny_ip_from_any_to_any packets=1u,bytes=116u
