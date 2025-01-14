@@ -1850,6 +1850,8 @@ void config_converter_t::buildAcl()
 	YANET_LOG_INFO("ACL compilation finished in %.3f ms\n",
 	               std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - now).count());
 
+	std::abort();
+
 	baseNext.iface_map = iface_map;
 	for (const auto& [name, aclId] : result.in_iface_map)
 	{
