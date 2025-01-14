@@ -1,9 +1,9 @@
-ARG RELEASE=22.04
-FROM --platform=linux/amd64 ubuntu:${RELEASE}
+ARG BUILD_PLATFORM=linux/amd64
+ARG RELEASE=24.04
+FROM --platform=${BUILD_PLATFORM} ubuntu:${RELEASE} AS environment
 
-ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends \
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     build-essential \
     ninja-build \
     pkg-config \
@@ -27,7 +27,9 @@ RUN apt-get install -y --no-install-recommends \
     bison \
     debhelper-compat
 
-RUN python3 -m pip install meson==0.61.2
+# PEP 668 strict recommends to use virtualenv
+RUN python3 -m pip install meson==0.61.2 --break-system-packages \
+    || python3 -m pip install meson==0.61.2
 
 COPY . /opt/yanet
 WORKDIR /opt/yanet
