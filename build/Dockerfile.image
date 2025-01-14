@@ -1,5 +1,6 @@
-ARG RELEASE=22.04
-FROM --platform=linux/amd64 ubuntu:${RELEASE} AS environment
+ARG BUILD_PLATFORM=linux/amd64
+ARG RELEASE=24.04
+FROM --platform=${BUILD_PLATFORM} ubuntu:${RELEASE} AS environment
 
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -26,7 +27,9 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         bison \
         debhelper-compat
 
-RUN python3 -m pip install meson==0.61.2
+# PEP 668 strict recommends to use virtualenv
+RUN python3 -m pip install meson==0.61.2 --break-system-packages \
+        || python3 -m pip install meson==0.61.2
 
 
 FROM environment AS builder
@@ -52,7 +55,7 @@ RUN meson setup --prefix=/target \
 RUN meson compile -C build
 
 
-FROM --platform=linux/amd64 ubuntu:${RELEASE}
+FROM --platform=${BUILD_PLATFORM} ubuntu:${RELEASE}
 
 RUN apt-get update
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
