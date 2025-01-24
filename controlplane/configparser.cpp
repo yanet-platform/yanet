@@ -197,7 +197,7 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 	return baseNext;
 }
 
-void config_parser_t::loadConfig_route_bird(controlplane::base_t& baseNext,
+void config_parser_t::loadConfig_route_bird([[maybe_unused]]controlplane::base_t& baseNext,
                                             std::vector<controlplane::route::bird_import_t>& birdsImport,
                                             const nlohmann::json& birdJson)
 {
@@ -216,10 +216,10 @@ void config_parser_t::loadConfig_route_bird(controlplane::base_t& baseNext,
 			import.vrf = elemJson[BirdImport::vrfStr];
 		}
 
-		birdsImport.push_back(import);
 		YANET_LOG_INFO("loadConfig_route_bird: socket(%s), vrf(%s)\n",
 		               import.socket.data(),
 		               import.vrf.data());
+		birdsImport.push_back(std::move(import));
 	}
 }
 

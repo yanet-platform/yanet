@@ -872,7 +872,7 @@ void rib_t::bird_import_get()
 	auto route = controlPlane->getRoute();
 	for (auto& [vrf, response] : route)
 	{
-		(void)vrf;
+		YANET_GCC_BUG_UNUSED(vrf);
 		auto imports = response.bird_imports;
 
 		for (auto& import : imports)
