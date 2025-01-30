@@ -4118,7 +4118,6 @@ inline void cWorker::balancer_handle()
 				continue;
 			}
 
-
 			const auto& reals_shift = service.flags & YANET_BALANCER_PURE_ROUND_ROBIN ? ++roundRobinCounter : metadata->hash;
 			const auto& real_id = ring->reals[range->start + (reals_shift % range->size)];
 			const auto& real_unordered = base.globalBase->balancer_reals[real_id];
