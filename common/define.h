@@ -101,6 +101,7 @@ extern LogPriority logPriority;
 
 #define YANET_BALANCER_OPS_FLAG ((uint8_t)(1u << 1))
 #define YANET_BALANCER_PURE_L3 ((uint8_t)(1u << 2))
+#define YANET_BALANCER_PURE_ROUND_ROBIN ((uint8_t)(1u << 3))
 
 #define CALCULATE_LOGICALPORT_ID(portId, vlanId) ((portId << 13) | ((vlanId & 0xFFF) << 1) | 1)
 

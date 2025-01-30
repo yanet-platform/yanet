@@ -1743,6 +1743,11 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			flags |= YANET_BALANCER_OPS_FLAG;
 		}
 
+		if (service_json.value("pure_round_robin", false))
+		{
+			flags |= YANET_BALANCER_PURE_ROUND_ROBIN;
+		}
+
 		balancer.services.emplace_back(baseNext.services_count + 1, ///< 0 is invalid id
 		                               service_json["vip"].get<std::string>(),
 		                               proto,
