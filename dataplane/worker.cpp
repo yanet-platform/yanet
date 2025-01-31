@@ -963,19 +963,19 @@ inline void cWorker::handlePackets()
 		tsc_deltas->write(tsc_start, stack_size, tsc_deltas->balancer_icmp_forward_handle, base_values.balancer_icmp_forward_handle);
 	}
 
-	stack_size = route_stack4.mbufsCount;
+	stack_size = route_stack4.mbufsCount + vrf_route_stack4.mbufsCount;
 	route_handle4();
 	tsc_deltas->write(tsc_start, stack_size, tsc_deltas->route_handle4, base_values.route_handle4);
 
-	stack_size = route_stack6.mbufsCount;
+	stack_size = route_stack6.mbufsCount + vrf_route_stack6.mbufsCount;
 	route_handle6();
 	tsc_deltas->write(tsc_start, stack_size, tsc_deltas->route_handle6, base_values.route_handle6);
 
-	stack_size = route_tunnel_stack4.mbufsCount;
+	stack_size = route_tunnel_stack4.mbufsCount + vrf_route_tunnel_stack4.mbufsCount;
 	route_tunnel_handle4();
 	tsc_deltas->write(tsc_start, stack_size, tsc_deltas->route_tunnel_handle4, base_values.route_tunnel_handle4);
 
-	stack_size = route_tunnel_stack6.mbufsCount;
+	stack_size = route_tunnel_stack6.mbufsCount + vrf_route_tunnel_stack6.mbufsCount;
 	route_tunnel_handle6();
 	tsc_deltas->write(tsc_start, stack_size, tsc_deltas->route_tunnel_handle6, base_values.route_tunnel_handle6);
 
@@ -1120,6 +1120,7 @@ inline void cWorker::logicalPort_ingress_handle()
 		rte_mbuf* mbuf = logicalPort_ingress_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 		const auto& logicalPort = base.globalBase->logicalPorts[metadata->flow.data.logicalPortId];
+		metadata->vrfId = logicalPort.vrfId;
 
 		generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
 
@@ -2098,11 +2099,25 @@ inline void cWorker::route_entry(rte_mbuf* mbuf)
 
 	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
 	{
-		route_stack4.insert(mbuf);
+		if (metadata->vrfId == 0)
+		{
+			route_stack4.insert(mbuf);
+		}
+		else
+		{
+			vrf_route_stack4.insert(mbuf);
+		}
 	}
 	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
 	{
-		route_stack6.insert(mbuf);
+		if (metadata->vrfId == 0)
+		{
+			route_stack6.insert(mbuf);
+		}
+		else
+		{
+			vrf_route_stack6.insert(mbuf);
+		}
 	}
 	else
 	{
@@ -2119,10 +2134,14 @@ inline void cWorker::route_handle4()
 {
 	const auto& base = bases[localBaseId & 1];
 
-	if (unlikely(route_stack4.mbufsCount == 0))
+	unsigned int countVrf0 = route_stack4.mbufsCount;
+	unsigned int countVrfOther = vrf_route_stack4.mbufsCount;
+	if (unlikely(countVrf0 + countVrfOther == 0))
 	{
 		return;
 	}
+	route_stack4.copy_from(vrf_route_stack4);
+	vrf_route_stack4.clear();
 
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_stack4.mbufsCount;
@@ -2132,12 +2151,21 @@ inline void cWorker::route_handle4()
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 
-		route_ipv4_keys[mbuf_i] = ipv4Header->dst_addr;
+		route_keys.ipv4[mbuf_i] = ipv4Header->dst_addr;
+		route_keys.vrfs[mbuf_i] = metadata->vrfId;
 
 		calcHash(mbuf);
 	}
 
-	base.globalBase->route_lpm4->lookup(route_ipv4_keys, route_ipv4_values, route_stack4.mbufsCount);
+	if (countVrf0 != 0)
+	{
+		base.globalBase->route_lpm4->lookup(route_keys.ipv4, route_ipv4_values, countVrf0);
+	}
+	if (countVrfOther != 0)
+	{
+		base.globalBase->vrf_route_lpm4.Lookup(route_keys.ipv4 + countVrf0, route_keys.vrfs + countVrf0, route_ipv4_values + countVrf0, countVrfOther);
+	}
+
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_stack4.mbufsCount;
 	     mbuf_i++)
@@ -2247,10 +2275,14 @@ inline void cWorker::route_handle6()
 {
 	const auto& base = bases[localBaseId & 1];
 
-	if (unlikely(route_stack6.mbufsCount == 0))
+	unsigned int countVrf0 = route_stack6.mbufsCount;
+	unsigned int countVrfOther = vrf_route_stack6.mbufsCount;
+	if (unlikely(countVrf0 + countVrfOther == 0))
 	{
 		return;
 	}
+	route_stack6.copy_from(vrf_route_stack6);
+	vrf_route_stack6.clear();
 
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_stack6.mbufsCount;
@@ -2260,12 +2292,21 @@ inline void cWorker::route_handle6()
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 		rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
 
-		rte_memcpy(route_ipv6_keys[mbuf_i].bytes, ipv6Header->dst_addr, 16);
+		rte_memcpy(route_keys.ipv6[mbuf_i].bytes, ipv6Header->dst_addr, 16);
+		route_keys.vrfs[mbuf_i] = metadata->vrfId;
 
 		calcHash(mbuf);
 	}
 
-	base.globalBase->route_lpm6->lookup(route_ipv6_keys, route_ipv6_values, route_stack6.mbufsCount);
+	if (countVrf0 != 0)
+	{
+		base.globalBase->route_lpm6->lookup(route_keys.ipv6, route_ipv6_values, countVrf0);
+	}
+	if (countVrfOther != 0)
+	{
+		base.globalBase->vrf_route_lpm6.Lookup(route_keys.ipv6 + countVrf0, route_keys.vrfs + countVrf0, route_ipv6_values + countVrf0, countVrfOther);
+	}
+
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_stack6.mbufsCount;
 	     mbuf_i++)
@@ -2439,11 +2480,25 @@ inline void cWorker::route_tunnel_entry(rte_mbuf* mbuf)
 
 	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
 	{
-		route_tunnel_stack4.insert(mbuf);
+		if (metadata->vrfId == 0)
+		{
+			route_tunnel_stack4.insert(mbuf);
+		}
+		else
+		{
+			vrf_route_tunnel_stack4.insert(mbuf);
+		}
 	}
 	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
 	{
-		route_tunnel_stack6.insert(mbuf);
+		if (metadata->vrfId == 0)
+		{
+			route_tunnel_stack6.insert(mbuf);
+		}
+		else
+		{
+			vrf_route_tunnel_stack6.insert(mbuf);
+		}
 	}
 	else
 	{
@@ -2455,10 +2510,14 @@ inline void cWorker::route_tunnel_handle4()
 {
 	const auto& base = bases[localBaseId & 1];
 
-	if (unlikely(route_tunnel_stack4.mbufsCount == 0))
+	unsigned int countVrf0 = route_tunnel_stack4.mbufsCount;
+	unsigned int countVrfOther = vrf_route_tunnel_stack4.mbufsCount;
+	if (unlikely(countVrf0 + countVrfOther == 0))
 	{
 		return;
 	}
+	route_tunnel_stack4.copy_from(vrf_route_tunnel_stack4);
+	vrf_route_tunnel_stack4.clear();
 
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_tunnel_stack4.mbufsCount;
@@ -2468,13 +2527,22 @@ inline void cWorker::route_tunnel_handle4()
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 
-		route_ipv4_keys[mbuf_i] = ipv4Header->dst_addr;
+		route_keys.ipv4[mbuf_i] = ipv4Header->dst_addr;
+		route_keys.vrfs[mbuf_i] = metadata->vrfId;
 
 		calcHash(mbuf);
 		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
 	}
 
-	base.globalBase->route_tunnel_lpm4->lookup(route_ipv4_keys, route_ipv4_values, route_tunnel_stack4.mbufsCount);
+	if (countVrf0 != 0)
+	{
+		base.globalBase->route_tunnel_lpm4->lookup(route_keys.ipv4, route_ipv4_values, countVrf0);
+	}
+	if (countVrfOther != 0)
+	{
+		base.globalBase->vrf_route_tunnel_lpm4.Lookup(route_keys.ipv4 + countVrf0, route_keys.vrfs + countVrf0, route_ipv4_values + countVrf0, countVrfOther);
+	}
+
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_tunnel_stack4.mbufsCount;
 	     mbuf_i++)
@@ -2586,10 +2654,14 @@ inline void cWorker::route_tunnel_handle6()
 {
 	const auto& base = bases[localBaseId & 1];
 
-	if (unlikely(route_tunnel_stack6.mbufsCount == 0))
+	unsigned int countVrf0 = route_tunnel_stack6.mbufsCount;
+	unsigned int countVrfOther = vrf_route_tunnel_stack6.mbufsCount;
+	if (unlikely(countVrf0 + countVrfOther == 0))
 	{
 		return;
 	}
+	route_tunnel_stack6.copy_from(vrf_route_tunnel_stack6);
+	vrf_route_tunnel_stack6.clear();
 
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_tunnel_stack6.mbufsCount;
@@ -2599,13 +2671,22 @@ inline void cWorker::route_tunnel_handle6()
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 		rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
 
-		rte_memcpy(route_ipv6_keys[mbuf_i].bytes, ipv6Header->dst_addr, 16);
+		rte_memcpy(route_keys.ipv6[mbuf_i].bytes, ipv6Header->dst_addr, 16);
+		route_keys.vrfs[mbuf_i] = metadata->vrfId;
 
 		calcHash(mbuf);
 		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
 	}
 
-	base.globalBase->route_tunnel_lpm6->lookup(route_ipv6_keys, route_ipv6_values, route_tunnel_stack6.mbufsCount);
+	if (countVrf0 != 0)
+	{
+		base.globalBase->route_tunnel_lpm6->lookup(route_keys.ipv6, route_ipv6_values, countVrf0);
+	}
+	if (countVrfOther != 0)
+	{
+		base.globalBase->vrf_route_tunnel_lpm6.Lookup(route_keys.ipv6 + countVrf0, route_keys.vrfs + countVrf0, route_ipv6_values + countVrf0, countVrfOther);
+	}
+
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < route_tunnel_stack6.mbufsCount;
 	     mbuf_i++)
@@ -2982,6 +3063,10 @@ inline void cWorker::nat64stateful_lan_handle()
 		const auto& key = nat64stateful_lan_keys[mbuf_i];
 
 		const auto& nat64stateful = base.globalBase->nat64statefuls[metadata->flow.data.nat64stateful_id];
+		if (nat64stateful.vrf_lan != 0)
+		{
+			metadata->vrfId = nat64stateful.vrf_lan;
+		}
 
 		dataplane::globalBase::nat64stateful_lan_value* value_lookup = nullptr;
 		dataplane::spinlock_nonrecursive_t* locker = nullptr;
@@ -3273,6 +3358,10 @@ inline void cWorker::nat64stateful_wan_handle()
 		const auto& key = nat64stateful_wan_keys[mbuf_i];
 
 		const auto& nat64stateful = base.globalBase->nat64statefuls[metadata->flow.data.nat64stateful_id];
+		if (nat64stateful.vrf_wan != 0)
+		{
+			metadata->vrfId = nat64stateful.vrf_wan;
+		}
 
 		dataplane::globalBase::nat64stateful_wan_value* value_lookup = nullptr;
 		dataplane::spinlock_nonrecursive_t* locker = nullptr;
@@ -3675,6 +3764,10 @@ inline void cWorker::nat46clat_lan_handle()
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
 		const auto& nat46clat = base.globalBase->nat46clats[metadata->flow.data.nat46clat_id];
+		if (nat46clat.vrf_lan != 0)
+		{
+			metadata->vrfId = nat46clat.vrf_lan;
+		}
 
 		nat46clat_lan_translation(mbuf, nat46clat);
 
@@ -3754,6 +3847,10 @@ inline void cWorker::nat46clat_wan_handle()
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
 		const auto& nat46clat = base.globalBase->nat46clats[metadata->flow.data.nat46clat_id];
+		if (nat46clat.vrf_wan != 0)
+		{
+			metadata->vrfId = nat46clat.vrf_wan;
+		}
 
 		nat46clat_wan_translation(mbuf, nat46clat);
 

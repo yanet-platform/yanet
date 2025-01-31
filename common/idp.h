@@ -112,9 +112,10 @@ using remove = std::vector<ip_prefix_t>;
 
 using clear = std::tuple<>;
 
-using request = std::vector<std::variant<insert,
-                                         remove,
-                                         clear>>;
+using request = std::vector<std::tuple<tVrfId,
+                                       std::variant<insert,
+                                                    remove,
+                                                    clear>>>;
 }
 
 namespace updateGlobalBase
@@ -172,6 +173,7 @@ namespace updateLogicalPort
 using request = std::tuple<tLogicalPortId, ///< @todo: DELETE
                            tPortId,
                            uint16_t, ///< vlanId
+                           tVrfId, ///< vrfId
                            std::array<uint8_t, 6>, ///< etherAddress
                            uint8_t, ///< promiscuous mode
                            common::globalBase::tFlow>;
@@ -230,7 +232,9 @@ using request = std::tuple<nat64stateful_id_t,
                            uint32_t, ///< pool_start
                            uint32_t, ///< pool_size
                            state_timeout,
-                           common::globalBase::flow_t>;
+                           common::globalBase::flow_t,
+                           tVrfId, ///< vrf_lan
+                           tVrfId>; ///< vrf_wan
 }
 
 namespace nat64stateful_pool_update
@@ -267,7 +271,9 @@ using request = std::tuple<nat46clat_id_t,
                            eDscpMarkType, ///< dscp_type
                            uint8_t, ///< dscp
                            tCounterId,
-                           common::globalBase::flow_t>;
+                           common::globalBase::flow_t,
+                           tVrfId, ///< vrf_lan
+                           tVrfId>; ///< vrf_wan
 }
 
 namespace update_balancer

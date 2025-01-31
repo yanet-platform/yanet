@@ -80,6 +80,7 @@ inline void logicalPort()
 	table.insert_row("moduleName",
 	                 "physicalPortName",
 	                 "vlanId",
+	                 "vrf",
 	                 "macAddress",
 	                 "promiscuousMode");
 
@@ -89,7 +90,8 @@ inline void logicalPort()
 		                 std::get<0>(logicalPort),
 		                 std::get<1>(logicalPort),
 		                 std::get<2>(logicalPort),
-		                 std::get<3>(logicalPort) ? "true" : "false");
+		                 std::get<3>(logicalPort),
+		                 std::get<4>(logicalPort) ? "true" : "false");
 	}
 
 	table.Print();

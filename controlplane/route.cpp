@@ -25,7 +25,7 @@ eResult route_t::init()
 	{
 		common::idp::updateGlobalBase::request globalbase;
 		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_lpm_update,
-		                        common::idp::lpm::request({common::idp::lpm::clear()}));
+		                        common::idp::lpm::request({{0, common::idp::lpm::clear()}}));
 		dataplane.updateGlobalBase(std::move(globalbase));
 	}
 
@@ -96,26 +96,14 @@ void route_t::prefix_update(const rib::vrf_priority_t& vrf_priority,
 		        interface_destination_next;
 		for (const auto& [pptn_index, path_info_to_nh_ptr] : *nexthops)
 		{
-			const auto& table_name = std::get<2>(pptns[pptn_index]);
-
 			/// @todo: multi route. vrf
-			bool ignore = false;
 			{
+				const auto& table_name = std::get<2>(pptns[pptn_index]);
 				auto current_guard = generations.current_lock_guard();
-				for (const auto& [name, module] : generations.current().routes) ///< @todo: DELETE
+				if (generations.current().is_ignored_table(table_name))
 				{
-					YANET_GCC_BUG_UNUSED(name);
-
-					if (exist(module.ignore_tables, table_name))
-					{
-						ignore = true;
-						break;
-					}
+					continue;
 				}
-			}
-			if (ignore)
-			{
-				continue;
 			}
 
 			for (const auto& [path_info, nh_ptr] : path_info_to_nh_ptr)
@@ -909,12 +897,12 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : nat64stateless.nat64_prefixes)
 			{
-				prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				              prefix.get_prefix(),
 				              {}, // TODO: get rid of third parameter
 				              std::monostate());
 
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				                     prefix.get_prefix(),
 				                     std::monostate());
 			}
@@ -926,12 +914,12 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : nat64stateless.nat64_prefixes)
 			{
-				prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				              prefix.get_prefix(),
 				              {}, // TODO: get rid of third parameter
 				              uint32_t(0)); ///< @todo: VIRTUAL_PORT
 
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 				                     prefix.get_prefix(),
 				                     uint32_t(0)); ///< @todo: VIRTUAL_PORT
 			}
@@ -943,7 +931,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : config_module.local_prefixes)
 			{
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
 				                     prefix,
 				                     std::monostate());
 			}
@@ -955,7 +943,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& prefix : config_module.local_prefixes)
 			{
-				tunnel_prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
+				tunnel_prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_TUNNEL_FALLBACK},
 				                     prefix,
 				                     std::tuple<>());
 			}
@@ -973,7 +961,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 				{
 					if (!ip_prefix.is_host())
 					{
-						prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+						prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 						              ip_prefix.applyMask(ip_prefix.mask()),
 						              {},
 						              std::monostate());
@@ -999,7 +987,7 @@ void route_t::reload(const controlplane::base_t& base_prev,
 						route::directly_connected_destination_t directly_connected = {interface.interfaceId,
 						                                                              interface_name};
 
-						prefix_update({"default", YANET_RIB_PRIORITY_ROUTE_REPEAT},
+						prefix_update({YANET_RIB_VRF_DEFAULT, YANET_RIB_PRIORITY_ROUTE_REPEAT},
 						              ip_prefix.applyMask(ip_prefix.mask()),
 						              {},
 						              directly_connected);
@@ -1044,7 +1032,12 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 
 	for (auto& [vrf, priority_current_update] : prefixes)
 	{
-		YANET_GCC_BUG_UNUSED(vrf); ///< @todo: VRF
+		std::optional<tVrfId> vrfId = controlPlane->getVrfIdsStorage().GetOrCreate(vrf);
+		if (!vrfId.has_value())
+		{
+			YANET_LOG_DEBUG("Can't get id for vrf: '%s'\n", vrf.c_str());
+			continue;
+		}
 
 		auto& [priority_current, update] = priority_current_update;
 
@@ -1061,7 +1054,7 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 
 			if (lpm_remove.size())
 			{
-				lpm_request.emplace_back(lpm_remove);
+				lpm_request.emplace_back(*vrfId, lpm_remove);
 			}
 		}
 
@@ -1083,7 +1076,7 @@ void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& glob
 
 			if (lpm_insert.size())
 			{
-				lpm_request.emplace_back(lpm_insert);
+				lpm_request.emplace_back(*vrfId, lpm_insert);
 			}
 		}
 	}
@@ -1110,7 +1103,12 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 
 	for (auto& [vrf, priority_current_update] : tunnel_prefixes)
 	{
-		YANET_GCC_BUG_UNUSED(vrf); ///< @todo: VRF
+		std::optional<tVrfId> vrfId = controlPlane->getVrfIdsStorage().GetOrCreate(vrf);
+		if (!vrfId.has_value())
+		{
+			YANET_LOG_DEBUG("Can't get id for vrf: '%s'\n", vrf.c_str());
+			continue;
+		}
 
 		auto& [priority_current, update] = priority_current_update;
 
@@ -1127,7 +1125,7 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 
 			if (lpm_remove.size())
 			{
-				lpm_request.emplace_back(lpm_remove);
+				lpm_request.emplace_back(*vrfId, lpm_remove);
 			}
 		}
 
@@ -1149,7 +1147,7 @@ void route_t::tunnel_prefix_flush_prefixes(common::idp::updateGlobalBase::reques
 
 			if (lpm_insert.size())
 			{
-				lpm_request.emplace_back(lpm_insert);
+				lpm_request.emplace_back(*vrfId, lpm_insert);
 			}
 		}
 	}
