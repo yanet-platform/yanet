@@ -1054,6 +1054,12 @@ eResult cDataPlane::initWorkers()
 			if (worker->socketId != socket_id)
 				continue;
 
+			if (samplers.Full())
+			{
+				YANET_LOG_ERROR("YANET_CONFIG_MAX_SAMPLED_WORKERS_PER_GC exceeded. not all workers will be sampled.");
+				continue;
+			}
+
 			samplers.push_back(&worker->sampler);
 		}
 
