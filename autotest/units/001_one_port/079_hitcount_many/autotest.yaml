@@ -20,3 +20,4 @@ steps:
     expect: 003-expect.pcap
 
 - cli: "hitcount dump acl | diff - TESTDIR/hitcount_expected.txt"
+- cli: "telegraf acl | diff - TESTDIR/telegraf_expected.txt"

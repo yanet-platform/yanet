@@ -18,6 +18,9 @@ steps:
     [
       c1: 1, 104
     ]
+- cli_check: |
+    telegraf acl
+    acl,name=counters,rule=c1 packets=1u,bytes=104u
 
 - sendPackets:
   - port: kni0
@@ -31,6 +34,9 @@ steps:
     [
       c1: 2, 208
     ]
+- cli_check: |
+    telegraf acl
+    acl,name=counters,rule=c1 packets=2u,bytes=208u
 
 - sendPackets:
   - port: kni0
@@ -43,3 +49,6 @@ steps:
     [
       c1: 3, 312
     ]
+- cli_check: |
+    telegraf acl
+    acl,name=counters,rule=c1 packets=3u,bytes=312u
