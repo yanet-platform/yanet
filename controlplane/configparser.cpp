@@ -1651,6 +1651,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 
 		balancer::scheduler scheduler{};
 		balancer::scheduler_params scheduler_params{};
+        uint8_t flags = 0;
 		if (scheduler_string == "rr")
 		{
 			scheduler = balancer::scheduler::rr;
@@ -1667,7 +1668,12 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 				scheduler_params.wlc_power = std::stoll(service_json["scheduler_params"]["wlc_power"].get<std::string>(), nullptr, 10);
 			}
 		}
-		else
+		else if(scheduler_string == "purr")
+        {
+            scheduler = balancer::scheduler::wrr;
+            flags |= YANET_BALANCER_PURE_ROUND_ROBIN;
+        }
+        else
 		{
 			throw error_result_t(eResult::invalidConfigurationFile, "unknown scheduler: " + scheduler_string);
 		}
@@ -1725,7 +1731,6 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			throw error_result_t(eResult::invalidConfigurationFile, "unknown proto");
 		}
 
-		uint8_t flags = 0;
 		if (service_json.value("mss_fix", false) == true)
 		{
 			flags |= YANET_BALANCER_FIX_MSS_FLAG;
@@ -1741,11 +1746,6 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 		if (service_json.value("ops", false) && proto == IPPROTO_UDP)
 		{
 			flags |= YANET_BALANCER_OPS_FLAG;
-		}
-
-		if (service_json.value("pure_round_robin", false))
-		{
-			flags |= YANET_BALANCER_PURE_ROUND_ROBIN;
 		}
 
 		balancer.services.emplace_back(baseNext.services_count + 1, ///< 0 is invalid id
