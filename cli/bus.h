@@ -12,7 +12,7 @@ using bus_request_info = std::tuple<std::string, uint64_t, uint64_t>;
 inline std::vector<bus_request_info> get_bus_requests(common::sdp::DataPlaneInSharedMemory& sdp_data)
 {
 	auto [requests, errors, durations] = sdp_data.BuffersBus();
-	YANET_GCC_BUG_UNUSED(errors);
+	GCC_BUG_UNUSED(errors);
 
 	std::map<common::idp::requestType, std::string> names = {
 	        {common::idp::requestType::updateGlobalBase, "updateGlobalBase"},
@@ -96,8 +96,8 @@ inline void bus_requests()
 inline std::vector<std::pair<std::string, uint64_t>> get_bus_errors(const common::sdp::DataPlaneInSharedMemory& sdp_data)
 {
 	auto [requests, errors, durations] = sdp_data.BuffersBus();
-	YANET_GCC_BUG_UNUSED(requests);
-	YANET_GCC_BUG_UNUSED(durations);
+	GCC_BUG_UNUSED(requests);
+	GCC_BUG_UNUSED(durations);
 
 	std::map<common::idp::errorType, std::string> names = {
 	        {common::idp::errorType::busRead, "busRead"},

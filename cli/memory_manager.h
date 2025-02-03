@@ -12,7 +12,7 @@ void show()
 
 	const auto response = dataplane.memory_manager_stats();
 	const auto& [response_memory_group, response_objects] = response;
-	YANET_GCC_BUG_UNUSED(response_memory_group);
+	GCC_BUG_UNUSED(response_memory_group);
 
 	TablePrinter table;
 	table.insert_row("name", "socket_id", "current");
@@ -46,7 +46,7 @@ void group()
 
 	for (const auto& [name, socket_id, current] : response_objects)
 	{
-		YANET_GCC_BUG_UNUSED(socket_id);
+		GCC_BUG_UNUSED(socket_id);
 
 		currents[name] = std::max(currents[name].value, current);
 	}

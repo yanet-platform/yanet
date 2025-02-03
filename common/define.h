@@ -24,7 +24,7 @@
  *  we can easily remove this macro as it is much easier to grep and remove
  *  than those void(var) statements.
  */
-#define YANET_GCC_BUG_UNUSED(arg) (void)(arg)
+#define GCC_BUG_UNUSED(arg) (void)(arg)
 
 #define YANET_LOG_PRINT(msg, args...) fprintf(stdout, msg, ##args)
 

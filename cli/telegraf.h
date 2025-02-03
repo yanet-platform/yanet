@@ -27,8 +27,8 @@ void ports_stats()
 {
 	interface::dataPlane dataplane;
 	const auto [ports_cfg, cores_cfg, values] = dataplane.getConfig();
-	YANET_GCC_BUG_UNUSED(cores_cfg);
-	YANET_GCC_BUG_UNUSED(values);
+	GCC_BUG_UNUSED(cores_cfg);
+	GCC_BUG_UNUSED(values);
 
 	const std::vector<std::tuple<const char*, common::idp::port_stats_t>> ports_stats_per_type{
 	        {"port", dataplane.get_ports_stats()},
@@ -40,9 +40,9 @@ void ports_stats()
 		for (const auto& [port_id, stats] : ports_stats)
 		{
 			const auto& [interface_name, socket_id, eth_addr, pci] = ports_cfg.at(port_id);
-			YANET_GCC_BUG_UNUSED(socket_id);
-			YANET_GCC_BUG_UNUSED(eth_addr);
-			YANET_GCC_BUG_UNUSED(pci);
+			GCC_BUG_UNUSED(socket_id);
+			GCC_BUG_UNUSED(eth_addr);
+			GCC_BUG_UNUSED(pci);
 			const auto& [rx_packets, rx_bytes, rx_errors, rx_drops, tx_packets, tx_bytes, tx_errors, tx_drops] = stats;
 
 			printf("%s,physicalPortName=%s "
@@ -453,7 +453,7 @@ void dregress()
 	std::map<common::community_t, std::string> communities;
 	for (const auto& [community, peer_link_orig] : communities_orig)
 	{
-		YANET_GCC_BUG_UNUSED(peer_link_orig);
+		GCC_BUG_UNUSED(peer_link_orig);
 
 		uint32_t link_id = 0;
 
@@ -588,7 +588,7 @@ void other()
 	const auto& [flagFirst, workers, ports] = controlPlane.telegraf_other();
 	const auto rib_summary = controlPlane.rib_summary();
 	const auto limit_summary = controlPlane.limit_summary();
-	YANET_GCC_BUG_UNUSED(flagFirst);
+	GCC_BUG_UNUSED(flagFirst);
 
 	for (const auto& workerIter : workers)
 	{
@@ -667,7 +667,7 @@ void service()
 
 		for (const auto& [virtual_ip, proto, virtual_port, nap_connections, packets, bytes, real_disabled_packets, real_disabled_bytes] : services)
 		{
-			YANET_GCC_BUG_UNUSED(nap_connections);
+			GCC_BUG_UNUSED(nap_connections);
 
 			common::idp::balancer_service_connections::service_key_t key = {module_id,
 			                                                                virtual_ip,
@@ -677,7 +677,7 @@ void service()
 			uint32_t connections = 0;
 			for (auto& [socket_id, service_connections] : balancer_service_connections)
 			{
-				YANET_GCC_BUG_UNUSED(socket_id);
+				GCC_BUG_UNUSED(socket_id);
 
 				const auto& socket_connections = service_connections[key].value;
 				if (socket_connections > connections)

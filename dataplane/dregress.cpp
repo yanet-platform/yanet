@@ -113,11 +113,11 @@ void dregress_t::insert(rte_mbuf* mbuf)
 		}
 
 		const auto& [prefix, nexthop, is_best, label, community, peer_as, origin_as] = *direction;
-		YANET_GCC_BUG_UNUSED(prefix);
-		YANET_GCC_BUG_UNUSED(is_best);
-		YANET_GCC_BUG_UNUSED(community);
-		YANET_GCC_BUG_UNUSED(peer_as);
-		YANET_GCC_BUG_UNUSED(origin_as);
+		GCC_BUG_UNUSED(prefix);
+		GCC_BUG_UNUSED(is_best);
+		GCC_BUG_UNUSED(community);
+		GCC_BUG_UNUSED(peer_as);
+		GCC_BUG_UNUSED(origin_as);
 
 		labelled_nexthop = ipv6_address_t::convert(nexthop);
 		labelled_label = label;
@@ -543,11 +543,11 @@ std::optional<dregress::direction_t> dregress_t::lookup(rte_mbuf* mbuf)
 	auto direction = (*std::next(directions.begin(), rand() % directions.size())).second;
 	{
 		auto& [prefix, nexthop, is_best, label, community, peer_as, origin_as] = direction;
-		YANET_GCC_BUG_UNUSED(nexthop);
-		YANET_GCC_BUG_UNUSED(label);
-		YANET_GCC_BUG_UNUSED(community);
-		YANET_GCC_BUG_UNUSED(peer_as);
-		YANET_GCC_BUG_UNUSED(origin_as);
+		GCC_BUG_UNUSED(nexthop);
+		GCC_BUG_UNUSED(label);
+		GCC_BUG_UNUSED(community);
+		GCC_BUG_UNUSED(peer_as);
+		GCC_BUG_UNUSED(origin_as);
 
 		if (prefix.mask() != mask_max)
 		{

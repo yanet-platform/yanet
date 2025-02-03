@@ -241,21 +241,21 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 		                  ipv6_outer_source_network,
 		                  reals] : balancer.services)
 		{
-			YANET_GCC_BUG_UNUSED(service_id);
-			YANET_GCC_BUG_UNUSED(version);
-			YANET_GCC_BUG_UNUSED(scheduler);
-			YANET_GCC_BUG_UNUSED(scheduler_params);
-			YANET_GCC_BUG_UNUSED(reals);
-			YANET_GCC_BUG_UNUSED(flags);
-			YANET_GCC_BUG_UNUSED(forwarding_method);
-			YANET_GCC_BUG_UNUSED(ipv4_outer_source_network);
-			YANET_GCC_BUG_UNUSED(ipv6_outer_source_network);
+			GCC_BUG_UNUSED(service_id);
+			GCC_BUG_UNUSED(version);
+			GCC_BUG_UNUSED(scheduler);
+			GCC_BUG_UNUSED(scheduler_params);
+			GCC_BUG_UNUSED(reals);
+			GCC_BUG_UNUSED(flags);
+			GCC_BUG_UNUSED(forwarding_method);
+			GCC_BUG_UNUSED(ipv4_outer_source_network);
+			GCC_BUG_UNUSED(ipv6_outer_source_network);
 
 			service_counters.remove({module_name, {virtual_ip, proto, virtual_port}});
 
 			for (const auto& [real_ip, real_port, real_weight] : reals)
 			{
-				YANET_GCC_BUG_UNUSED(real_weight);
+				GCC_BUG_UNUSED(real_weight);
 
 				const std::tuple<std::string,
 				                 balancer::service_key_t,
@@ -286,14 +286,14 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 		                  ipv6_outer_source_network,
 		                  reals] : balancer.services)
 		{
-			YANET_GCC_BUG_UNUSED(service_id);
-			YANET_GCC_BUG_UNUSED(version);
-			YANET_GCC_BUG_UNUSED(scheduler);
-			YANET_GCC_BUG_UNUSED(scheduler_params);
-			YANET_GCC_BUG_UNUSED(flags);
-			YANET_GCC_BUG_UNUSED(forwarding_method);
-			YANET_GCC_BUG_UNUSED(ipv4_outer_source_network);
-			YANET_GCC_BUG_UNUSED(ipv6_outer_source_network);
+			GCC_BUG_UNUSED(service_id);
+			GCC_BUG_UNUSED(version);
+			GCC_BUG_UNUSED(scheduler);
+			GCC_BUG_UNUSED(scheduler_params);
+			GCC_BUG_UNUSED(flags);
+			GCC_BUG_UNUSED(forwarding_method);
+			GCC_BUG_UNUSED(ipv4_outer_source_network);
+			GCC_BUG_UNUSED(ipv6_outer_source_network);
 
 			service_counters.insert({module_name, {virtual_ip, proto, virtual_port}});
 
@@ -301,7 +301,7 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 
 			for (const auto& [real_ip, real_port, real_weight] : reals)
 			{
-				YANET_GCC_BUG_UNUSED(real_weight);
+				GCC_BUG_UNUSED(real_weight);
 
 				const std::tuple<std::string,
 				                 balancer::service_key_t,
@@ -405,10 +405,10 @@ common::icp::balancer_summary::response balancer_t::balancer_summary() const
 
 	for (auto& [response_module_name, response_services, response_reals_enabled, response_reals, response_connections, response_next_module] : response)
 	{
-		YANET_GCC_BUG_UNUSED(response_services);
-		YANET_GCC_BUG_UNUSED(response_reals_enabled);
-		YANET_GCC_BUG_UNUSED(response_reals);
-		YANET_GCC_BUG_UNUSED(response_next_module);
+		GCC_BUG_UNUSED(response_services);
+		GCC_BUG_UNUSED(response_reals_enabled);
+		GCC_BUG_UNUSED(response_reals);
+		GCC_BUG_UNUSED(response_next_module);
 
 		auto it = name_id.find(response_module_name);
 		if (it == name_id.end())
@@ -421,15 +421,15 @@ common::icp::balancer_summary::response balancer_t::balancer_summary() const
 		response_connections = 0;
 		for (const auto& [socket_id, service_connections] : balancer_service_connections)
 		{
-			YANET_GCC_BUG_UNUSED(socket_id);
+			GCC_BUG_UNUSED(socket_id);
 
 			uint32_t socket_connections = 0;
 			for (const auto& [key, value] : service_connections)
 			{
 				const auto& [balancer_id, virtual_ip, proto, virtual_port] = key;
-				YANET_GCC_BUG_UNUSED(virtual_ip);
-				YANET_GCC_BUG_UNUSED(proto);
-				YANET_GCC_BUG_UNUSED(virtual_port);
+				GCC_BUG_UNUSED(virtual_ip);
+				GCC_BUG_UNUSED(proto);
+				GCC_BUG_UNUSED(virtual_port);
 
 				if (response_module_id == balancer_id)
 				{
@@ -462,7 +462,7 @@ common::icp::balancer_service::response balancer_t::balancer_service(const commo
 	for (auto& [module, balancer] : services)
 	{
 		const auto& [module_id, module_name] = module;
-		YANET_GCC_BUG_UNUSED(module_id);
+		GCC_BUG_UNUSED(module_id);
 
 		if (filter_module &&
 		    module_name != *filter_module)
@@ -495,9 +495,9 @@ common::icp::balancer_service::response balancer_t::balancer_service(const commo
 			response[module][service_key].swap(service);
 
 			auto& [scheduler, version, connections, packets, bytes] = response[module][service_key];
-			YANET_GCC_BUG_UNUSED(scheduler);
-			YANET_GCC_BUG_UNUSED(version);
-			YANET_GCC_BUG_UNUSED(connections); ///< @todo: DELETE
+			GCC_BUG_UNUSED(scheduler);
+			GCC_BUG_UNUSED(version);
+			GCC_BUG_UNUSED(connections); ///< @todo: DELETE
 
 			auto it = counters.find({module_name,
 			                         {virtual_ip, proto, virtual_port}});
@@ -527,7 +527,7 @@ common::icp::balancer_real_find::response balancer_t::balancer_real_find(const c
 	for (auto& [module, balancer] : reals)
 	{
 		const auto& [module_id, module_name] = module;
-		YANET_GCC_BUG_UNUSED(module_id);
+		GCC_BUG_UNUSED(module_id);
 
 		if (filter_module &&
 		    module_name != *filter_module)
@@ -560,15 +560,15 @@ common::icp::balancer_real_find::response balancer_t::balancer_real_find(const c
 			response[module][service_key].swap(service);
 
 			auto& [scheduler, version, response_reals] = response[module][service_key];
-			YANET_GCC_BUG_UNUSED(scheduler);
-			YANET_GCC_BUG_UNUSED(version);
+			GCC_BUG_UNUSED(scheduler);
+			GCC_BUG_UNUSED(version);
 
 			std::vector<common::icp::balancer_real_find::real> filtered_reals;
 			for (auto& [real_ip, real_port, enabled, weight, connections, packets, bytes] : response_reals)
 			{
-				YANET_GCC_BUG_UNUSED(connections); ///< @todo: DELETE
-				YANET_GCC_BUG_UNUSED(packets);
-				YANET_GCC_BUG_UNUSED(bytes);
+				GCC_BUG_UNUSED(connections); ///< @todo: DELETE
+				GCC_BUG_UNUSED(packets);
+				GCC_BUG_UNUSED(bytes);
 
 				if (filter_real_ip &&
 				    real_ip != *filter_real_ip)
@@ -668,11 +668,11 @@ void balancer_t::update_service(const balancer::generation_config_t& generation_
 		                  ipv6_outer_source_network,
 		                  reals] : balancer.services)
 		{
-			YANET_GCC_BUG_UNUSED(flags);
-			YANET_GCC_BUG_UNUSED(scheduler_params);
-			YANET_GCC_BUG_UNUSED(forwarding_method);
-			YANET_GCC_BUG_UNUSED(ipv4_outer_source_network);
-			YANET_GCC_BUG_UNUSED(ipv6_outer_source_network);
+			GCC_BUG_UNUSED(flags);
+			GCC_BUG_UNUSED(scheduler_params);
+			GCC_BUG_UNUSED(forwarding_method);
+			GCC_BUG_UNUSED(ipv4_outer_source_network);
+			GCC_BUG_UNUSED(ipv6_outer_source_network);
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
@@ -684,9 +684,9 @@ void balancer_t::update_service(const balancer::generation_config_t& generation_
 			auto& [service_scheduler, service_version, service_connections, service_packets, service_bytes] = generation_services.services[{balancer.balancer_id, module_name}][{virtual_ip, proto, virtual_port}];
 			service_scheduler = to_string(scheduler); ///< @todo: OPT
 			service_version = version;
-			YANET_GCC_BUG_UNUSED(service_connections); ///< @todo: DELETE
-			YANET_GCC_BUG_UNUSED(service_packets); ///< filled in request
-			YANET_GCC_BUG_UNUSED(service_bytes); ///< filled in request
+			GCC_BUG_UNUSED(service_connections); ///< @todo: DELETE
+			GCC_BUG_UNUSED(service_packets); ///< filled in request
+			GCC_BUG_UNUSED(service_bytes); ///< filled in request
 
 			auto& [reals_service_scheduler, reals_version, service_reals] = generation_services.reals[{balancer.balancer_id, module_name}][{virtual_ip, proto, virtual_port}];
 			reals_service_scheduler = service_scheduler;
@@ -764,8 +764,8 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 		                  ipv6_outer_source_network,
 		                  reals] : balancer.services)
 		{
-			YANET_GCC_BUG_UNUSED(scheduler_params);
-			YANET_GCC_BUG_UNUSED(version);
+			GCC_BUG_UNUSED(scheduler_params);
+			GCC_BUG_UNUSED(version);
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
@@ -776,7 +776,7 @@ void balancer_t::compile(common::idp::updateGlobalBase::request& globalbase,
 
 			for (const auto& [real_ip, real_port, weight] : reals)
 			{
-				YANET_GCC_BUG_UNUSED(weight);
+				GCC_BUG_UNUSED(weight);
 
 				balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
 
@@ -845,13 +845,13 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 		                  ipv6_outer_source_network,
 		                  reals] : balancer.services)
 		{
-			YANET_GCC_BUG_UNUSED(flags);
-			YANET_GCC_BUG_UNUSED(scheduler);
-			YANET_GCC_BUG_UNUSED(scheduler_params);
-			YANET_GCC_BUG_UNUSED(version);
-			YANET_GCC_BUG_UNUSED(forwarding_method);
-			YANET_GCC_BUG_UNUSED(ipv4_outer_source_network);
-			YANET_GCC_BUG_UNUSED(ipv6_outer_source_network);
+			GCC_BUG_UNUSED(flags);
+			GCC_BUG_UNUSED(scheduler);
+			GCC_BUG_UNUSED(scheduler_params);
+			GCC_BUG_UNUSED(version);
+			GCC_BUG_UNUSED(forwarding_method);
+			GCC_BUG_UNUSED(ipv4_outer_source_network);
+			GCC_BUG_UNUSED(ipv6_outer_source_network);
 
 			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
 			{
@@ -871,16 +871,18 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 
 				bool enabled = false;
 				uint32_t effective_weight = weight;
+				if (auto it = reals_enabled.find(key); it != reals_enabled.end())
 				{
-					auto it = reals_enabled.find(key);
-					if (it != reals_enabled.end())
+					enabled = true;
+					if (it->second.has_value())
 					{
-						enabled = true;
-						if (it->second.has_value())
-						{
-							effective_weight = it->second.value();
-						}
+						effective_weight = it->second.value();
 					}
+				}
+
+				if (auto found_weight = get_effective_weight(reals_wlc_weight, key); found_weight)
+				{
+					effective_weight = *found_weight;
 				}
 
 				uint32_t real_unordered_id = 0;
@@ -926,8 +928,143 @@ void balancer_t::reconfigure_wlc_thread()
 {
 	while (!flagStop)
 	{
-		balancer_real_flush();
+		if (balancer_t::reconfigure_wlc())
+		{
+			balancer_real_flush();
+		}
 
 		std::this_thread::sleep_for(std::chrono::seconds(YANET_CONFIG_BALANCER_WLC_RECONFIGURE));
 	}
+}
+
+bool balancer_t::reconfigure_wlc()
+{
+	bool wlc_weight_changed = false;
+
+	common::idp::updateGlobalBaseBalancer::request balancer;
+	const auto balancer_real_connections = dataplane.balancer_real_connections();
+
+	std::lock_guard<std::mutex> guard(reals_enabled_mutex);
+
+	for (const auto& [module_name, balancer] : generations_config.current().config_balancers)
+	{
+
+		for (const auto& [service_id,
+		                  virtual_ip,
+		                  proto,
+		                  virtual_port,
+		                  version,
+		                  scheduler,
+		                  scheduler_params,
+		                  forwarding_method,
+		                  flags,
+		                  ipv4_outer_source_network,
+		                  ipv6_outer_source_network,
+		                  reals] : balancer.services)
+		{
+			GCC_BUG_UNUSED(flags);
+			GCC_BUG_UNUSED(version);
+			GCC_BUG_UNUSED(forwarding_method);
+			GCC_BUG_UNUSED(ipv4_outer_source_network);
+			GCC_BUG_UNUSED(ipv6_outer_source_network);
+
+			if (scheduler != ::balancer::scheduler::wlc)
+			{
+				continue;
+			}
+
+			if (service_id >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
+			{
+				continue;
+			}
+
+			std::vector<std::tuple<balancer::real_key_global_t, uint32_t, uint32_t>> service_reals_usage_info;
+			uint32_t connection_sum = 0;
+			uint32_t weight_sum = 0;
+
+			for (const auto& [real_ip, real_port, weight] : reals)
+			{
+				balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
+
+				auto weight_found = get_effective_weight(reals_enabled, key);
+				uint32_t effective_weight = weight_found ? weight_found.value() : weight;
+
+				weight_sum += effective_weight;
+
+				// don`t count connections for disabled reals - it can make other reals "feel" underloaded
+				if (effective_weight == 0)
+				{
+					continue;
+				}
+
+				common::idp::balancer_real_connections::real_key_t real_connections_key = {balancer.balancer_id,
+				                                                                           virtual_ip,
+				                                                                           proto,
+				                                                                           virtual_port.value(),
+				                                                                           real_ip,
+				                                                                           real_port.value()};
+				uint32_t connections = 0;
+				for (auto& [socket_id, real_connections] : balancer_real_connections)
+				{
+					GCC_BUG_UNUSED(socket_id);
+
+					if (auto it = real_connections.find(real_connections_key);
+					    it != real_connections.end())
+					{
+						connections += it->second;
+					}
+				}
+
+				connection_sum += connections;
+
+				service_reals_usage_info.emplace_back(key,
+				                                      effective_weight,
+				                                      connections);
+			}
+
+			for (auto [key,
+			           effective_weight,
+			           connections] : service_reals_usage_info)
+			{
+				uint32_t wlc_power = scheduler_params.wlc_power;
+				if (wlc_power < 1 || wlc_power > 100)
+				{
+					wlc_power = YANET_CONFIG_BALANCER_WLC_DEFAULT_POWER;
+				}
+
+				effective_weight = calculate_wlc_weight(effective_weight, connections, weight_sum, connection_sum, wlc_power);
+
+				if (reals_wlc_weight[key] != effective_weight)
+				{
+					reals_wlc_weight[key] = effective_weight;
+					real_updates.insert(key);
+					if (in_reload)
+					{
+						real_reload_updates.insert(key);
+					}
+					wlc_weight_changed = true;
+				}
+			}
+		}
+	}
+
+	return wlc_weight_changed;
+}
+
+uint32_t balancer_t::calculate_wlc_weight(uint32_t weight, uint32_t connections, uint32_t weight_sum, uint32_t connection_sum, uint32_t wlc_power)
+{
+	if (weight == 0 || weight_sum == 0 || connection_sum < weight_sum)
+	{
+		return weight;
+	}
+
+	auto wlc_ratio = std::max(1.0, wlc_power * (1 - 1.0 * connections * weight_sum / connection_sum / weight));
+	auto wlc_weight = (uint32_t)(weight * wlc_ratio);
+
+	if (wlc_weight > YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX)
+	{
+		wlc_weight = YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX;
+	}
+
+	return wlc_weight;
 }

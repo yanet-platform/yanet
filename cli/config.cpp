@@ -366,7 +366,7 @@ void allow(const std::string& module,
 	checkModuleType(decap, "decap");
 
 	const auto& [prefixes, inserted] = decap.emplace("ipv6DestinationPrefixes", nlohmann::json::array_t{});
-	YANET_GCC_BUG_UNUSED(inserted);
+	GCC_BUG_UNUSED(inserted);
 
 	if (allowPrefix(*prefixes, prefixRaw, announceRaw))
 	{
@@ -436,7 +436,7 @@ static void allowAny(const std::string& module,
 	checkModuleType(nat64, "nat64stateless");
 
 	const auto& [prefixes, inserted] = nat64.emplace("nat64_prefixes", nlohmann::json::array_t{});
-	YANET_GCC_BUG_UNUSED(inserted);
+	GCC_BUG_UNUSED(inserted);
 
 	if (allowPrefix(*prefixes, prefixRaw, announceRaw))
 	{

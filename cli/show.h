@@ -579,7 +579,7 @@ static void list_fw_rules(unsigned int mask, bool list)
 			{
 				if (list)
 				{
-					YANET_GCC_BUG_UNUSED(counter);
+					GCC_BUG_UNUSED(counter);
 					table.insert_row(id, ruleno, label, text);
 				}
 				else

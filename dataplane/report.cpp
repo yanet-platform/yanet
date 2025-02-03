@@ -73,7 +73,7 @@ nlohmann::json cReport::getReport()
 
 	for (const auto& [core_id, worker] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 		jsonReport["worker_gcs"].emplace_back(convertWorkerGC(worker));
 	}
 

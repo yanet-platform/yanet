@@ -170,11 +170,11 @@ struct tsc_monitoring_t
 
 		for (const auto& [core, socket, ipc_key, offset] : response)
 		{
-			YANET_GCC_BUG_UNUSED(socket);
+			GCC_BUG_UNUSED(socket);
 			if (ipc_cache.find(ipc_key) == ipc_cache.end())
 			{
 				auto&& [shmaddr, size] = common::ipc::SharedMemory::OpenBufferKey(ipc_key, false);
-				YANET_GCC_BUG_UNUSED(size);
+				GCC_BUG_UNUSED(size);
 
 				if (shmaddr == nullptr)
 				{
