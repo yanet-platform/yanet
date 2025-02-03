@@ -11,7 +11,7 @@ void fw_dump_t::dump_dnscache()
 		const auto& [lh, addresses, actual] = values;
 		bool comma = false;
 
-		YANET_GCC_BUG_UNUSED(lh);
+		GCC_BUG_UNUSED(lh);
 		std::cerr << fqdn << " ";
 		for (const auto& addr : addresses)
 		{
@@ -33,7 +33,7 @@ void fw_dump_t::dump_tables()
 	{
 		const auto& [lh, table] = values;
 
-		YANET_GCC_BUG_UNUSED(lh);
+		GCC_BUG_UNUSED(lh);
 		std::cerr << "table " << name << " create type " << types[table.index()] << std::endl;
 		if (std::holds_alternative<tables::prefix_skipto_t>(table))
 		{
@@ -64,7 +64,7 @@ void fw_dump_t::dump_macros()
 		const auto& [lh, prefixes, used] = values;
 		bool comma = false;
 
-		YANET_GCC_BUG_UNUSED(lh);
+		GCC_BUG_UNUSED(lh);
 		if (!used)
 		{
 			// comment unused macros
@@ -250,7 +250,7 @@ void fw_dump_t::dump_rule(rule_ptr_t rulep)
 		std::cerr << "# via: ";
 		for (const auto& [name, how] : rulep->ifaces)
 		{
-			YANET_GCC_BUG_UNUSED(how);
+			GCC_BUG_UNUSED(how);
 			if (many)
 				std::cerr << " or ";
 			std::cerr << name;
@@ -264,7 +264,7 @@ void fw_dump_t::dump_rule(rule_ptr_t rulep)
 		std::cerr << "# via table: ";
 		for (const auto& [how, tables] : rulep->iface_tables)
 		{
-			YANET_GCC_BUG_UNUSED(how);
+			GCC_BUG_UNUSED(how);
 			for (const auto& name : tables)
 			{
 				if (comma)
@@ -283,7 +283,7 @@ void fw_dump_t::dump_rules()
 	std::cerr << "#----------------------------------------" << std::endl;
 	for (auto& [ruleno, rules] : m_conf->m_rules)
 	{
-		YANET_GCC_BUG_UNUSED(ruleno);
+		GCC_BUG_UNUSED(ruleno);
 		for (auto rulep : rules)
 		{
 			dump_rule(rulep);

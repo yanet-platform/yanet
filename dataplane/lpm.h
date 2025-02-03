@@ -450,8 +450,8 @@ protected:
 	                    const unsigned int& step,
 	                    tChunk8& chunk)
 	{
-		YANET_GCC_BUG_UNUSED(needWait);
-		YANET_GCC_BUG_UNUSED(step);
+		GCC_BUG_UNUSED(needWait);
+		GCC_BUG_UNUSED(step);
 
 		for (unsigned int mask_i = 0;
 		     mask_i < (((unsigned int)1) << (8 - mask));
@@ -602,8 +602,8 @@ protected:
 	                    const unsigned int& step,
 	                    tChunk8& chunk)
 	{
-		YANET_GCC_BUG_UNUSED(needWait);
-		YANET_GCC_BUG_UNUSED(step);
+		GCC_BUG_UNUSED(needWait);
+		GCC_BUG_UNUSED(step);
 
 		for (unsigned int mask_i = 0;
 		     mask_i < (((unsigned int)1) << (8 - mask));
@@ -1687,7 +1687,7 @@ protected:
 	                              const unsigned int from_chunk_id,
 	                              const unsigned int extended_chunk_id)
 	{
-		YANET_GCC_BUG_UNUSED(updater);
+		GCC_BUG_UNUSED(updater);
 
 		const auto& from_chunk = from_chunks[from_chunk_id];
 		auto& extended_chunk = extended_chunks[extended_chunk_id];

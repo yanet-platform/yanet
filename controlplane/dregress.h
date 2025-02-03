@@ -38,7 +38,7 @@ public:
 		/// @todo: VRF
 		for (const auto& [moduleName, dregress] : dregresses)
 		{
-			YANET_GCC_BUG_UNUSED(moduleName);
+			GCC_BUG_UNUSED(moduleName);
 
 			our_as.insert(dregress.ourAs.begin(), dregress.ourAs.end());
 		}
@@ -49,7 +49,7 @@ public:
 		/// @todo: VRF
 		for (const auto& [moduleName, dregress] : dregresses)
 		{
-			YANET_GCC_BUG_UNUSED(moduleName);
+			GCC_BUG_UNUSED(moduleName);
 
 			for (const auto& community : communities)
 			{

@@ -42,7 +42,7 @@ void tun64_t::reload(const controlplane::base_t& base_prev,
 
 		for (const auto& [ipv4_address, mapping] : tunnel.mappings)
 		{
-			YANET_GCC_BUG_UNUSED(mapping);
+			GCC_BUG_UNUSED(mapping);
 			mappings_counters.insert({name, ipv4_address});
 		}
 	}
@@ -53,7 +53,7 @@ void tun64_t::reload(const controlplane::base_t& base_prev,
 
 		for (const auto& [ipv4_address, mapping] : tunnel.mappings)
 		{
-			YANET_GCC_BUG_UNUSED(mapping);
+			GCC_BUG_UNUSED(mapping);
 			mappings_counters.remove({name, ipv4_address});
 		}
 	}
@@ -133,7 +133,7 @@ void tun64_t::compile(common::idp::updateGlobalBase::request& globalbase,
 			const auto& [ipv6_address, location] = mapping;
 			const auto counter_id = mappings_counters.get_id({name, ipv4_address});
 
-			YANET_GCC_BUG_UNUSED(location);
+			GCC_BUG_UNUSED(location);
 			tun64mappings_update_request.emplace_back(tunnel.tun64Id,
 			                                          ipv4_address,
 			                                          ipv6_address,

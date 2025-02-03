@@ -63,7 +63,7 @@ eResult tAutotest::init(const std::string& binaryPath,
                         bool dumpPackets,
                         const std::vector<std::string>& configFilePaths)
 {
-	YANET_GCC_BUG_UNUSED(binaryPath);
+	GCC_BUG_UNUSED(binaryPath);
 	this->dumpPackets = dumpPackets;
 	this->configFilePaths = configFilePaths;
 
@@ -857,10 +857,10 @@ bool tAutotest::step_checkCounters(const YAML::Node& yamlStep)
 	auto fwList = controlPlane.getFwList(common::icp::getFwList::requestType::static_rules_original);
 	for (auto& [ruleno, rules] : fwList)
 	{
-		YANET_GCC_BUG_UNUSED(ruleno);
+		GCC_BUG_UNUSED(ruleno);
 		for (auto& [id, counter, text] : rules)
 		{
-			YANET_GCC_BUG_UNUSED(text);
+			GCC_BUG_UNUSED(text);
 			counters[id] = counter;
 		}
 	}
