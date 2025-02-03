@@ -47,6 +47,7 @@ cWorker::cWorker(cDataPlane* dataPlane) :
         ring_lowPriority(nullptr),
         ring_toFreePackets(nullptr),
         ring_log(nullptr),
+        roundRobinCounter(0),
         packetsToSWNPRemainder(dataPlane->config.SWNormalPriorityRateLimitPerWorker)
 {
 }
@@ -4129,7 +4130,8 @@ inline void cWorker::balancer_handle()
 				continue;
 			}
 
-			const auto& real_id = ring->reals[range->start + (metadata->hash % range->size)];
+			const auto& shift = service.flags & YANET_BALANCER_PURE_ROUND_ROBIN ? ++roundRobinCounter : metadata->hash;
+			const auto& real_id = ring->reals[range->start + (shift % range->size)];
 			const auto& real_unordered = base.globalBase->balancer_reals[real_id];
 			if (!value)
 			{
