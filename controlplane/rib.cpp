@@ -1,6 +1,6 @@
 #include "rib.h"
-#include "libbird.h"
 #include "controlplane.h"
+#include "libbird.h"
 
 #include <fcntl.h>
 
@@ -62,10 +62,6 @@ eResult rib_t::init()
 
 	funcThreads.emplace_back([this]() {
 		rib_thread();
-	});
-
-	funcThreads.emplace_back([this]() {
-		bird_thread();
 	});
 
 	return eResult::success;
@@ -869,22 +865,41 @@ void rib_t::rib_thread()
 
 		std::this_thread::sleep_for(std::chrono::milliseconds{200});
 	}
-
 }
 
-void rib_t::bird_thread()
+void rib_t::bird_import_get()
 {
-	while (!flagStop) {
-		read_bird_feed("/tmp/export.sock", "default", this);
+	auto route = controlPlane->getRoute();
+	for (auto& [vrf, response] : route)
+	{
+		YANET_GCC_BUG_UNUSED(vrf);
+		auto imports = response.bird_imports;
+
+		for (auto& import : imports)
+		{
+			funcThreads.emplace_back([this, import]() {
+				bird_thread(import.socket, import.vrf);
+			});
+		}
+	}
+}
+
+void rib_t::bird_thread(const std::string& socket, const std::string& vrf)
+{
+	YANET_LOG_DEBUG("Run bird thread: socket(%s), vrf(%s)\n",
+	                socket.data(),
+	                vrf.data());
+	while (!flagStop)
+	{
+		read_bird_feed(socket.c_str(), vrf.c_str(), this);
 
 		common::icp::rib_update::clear request = {"bgp", std::nullopt};
-/*                std::get<1>(request) = {peer_address,
-                                        {"default", ///< @todo: vrf
-                                         YANET_RIB_PRIORITY_DEFAULT}};
-*/
+		/*                std::get<1>(request) = {peer_address,
+		                                        {"default", ///< @todo: vrf
+		                                         YANET_RIB_PRIORITY_DEFAULT}};
+		*/
 		rib_clear(request);
 
 		std::this_thread::sleep_for(std::chrono::milliseconds{200});
 	}
-
 }

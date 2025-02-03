@@ -106,6 +106,7 @@ protected: /** commands */
 	common::icp::acl_unwind::response acl_unwind(const common::icp::acl_unwind::request& request) const;
 	common::icp::acl_lookup::response acl_lookup(const common::icp::acl_lookup::request& request) const;
 	common::icp::controlplane_values::response controlplane_values() const;
+	common::icp::route_config::response getRoute() const;
 
 	common::icp::getDecapPrefixes::response command_getDecapPrefixes();
 	common::icp::getNat64statelessTranslations::response command_getNat64statelessTranslations();

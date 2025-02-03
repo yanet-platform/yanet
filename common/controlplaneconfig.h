@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include "balancer.h"
+#include "define.h"
 #include "scheduler.h"
 #include "type.h"
 
@@ -104,6 +105,19 @@ public:
 	common::globalBase::tFlow flow;
 };
 
+class bird_import_t
+{
+public:
+	SERIALIZABLE(socket, vrf);
+
+public:
+	inline static const std::string socketStr = "socket";
+	inline static const std::string vrfStr = "vrf";
+
+	std::string socket;
+	std::string vrf;
+};
+
 class config_t
 {
 public:
@@ -114,7 +128,7 @@ public:
 	nlohmann::json save() const;
 	*/
 
-	SERIALIZABLE(routeId, to_kernel_prefixes, vrf, tunnel_enabled, ignore_tables, ipv4_source_address, ipv6_source_address, udp_destination_port, local_prefixes, peers, interfaces);
+	SERIALIZABLE(routeId, to_kernel_prefixes, vrf, tunnel_enabled, ignore_tables, ipv4_source_address, ipv6_source_address, udp_destination_port, local_prefixes, peers, interfaces, bird_imports);
 
 public:
 	tRouteId routeId;
@@ -128,6 +142,7 @@ public:
 	std::set<common::ip_prefix_t> local_prefixes; ///< for fallback to default
 	std::map<uint32_t, std::string> peers;
 	std::map<std::string, interface_t> interfaces;
+	std::vector<bird_import_t> bird_imports;
 };
 
 }
