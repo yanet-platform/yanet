@@ -1668,7 +1668,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 				scheduler_params.wlc_power = std::stoll(service_json["scheduler_params"]["wlc_power"].get<std::string>(), nullptr, 10);
 			}
 		}
-		else if(scheduler_string == "purr")
+		else if (scheduler_string == "purr")
         {
             scheduler = balancer::scheduler::wrr;
             flags |= YANET_BALANCER_PURE_ROUND_ROBIN;
