@@ -165,7 +165,7 @@ public:
 	{
 		for (const auto& [gap_size, address, mask] : prefixes)
 		{
-			YANET_GCC_BUG_UNUSED(gap_size);
+			GCC_BUG_UNUSED(gap_size);
 
 			if (is_mask_gapped(mask))
 			{
@@ -176,7 +176,7 @@ public:
 
 		for (const auto& [gap_size, address, mask] : prefixes)
 		{
-			YANET_GCC_BUG_UNUSED(gap_size);
+			GCC_BUG_UNUSED(gap_size);
 
 			if (!is_mask_gapped(mask))
 			{
@@ -270,7 +270,7 @@ public:
 		{
 			const auto& [warp_address, warp_mask] = map_key;
 			const auto& [shift, warp_chunk_id] = map_value;
-			YANET_GCC_BUG_UNUSED(shift);
+			GCC_BUG_UNUSED(shift);
 
 			std::set<unsigned int> last_multirefs_chunk_ids;
 			get_last_gapped_chunks_step(warp_address, warp_mask, last_multirefs_chunk_ids, root_chunk_id);
@@ -512,7 +512,7 @@ protected:
 			{
 				const auto& [prev_address, prev_mask] = key;
 				const auto& [prev_shift, prev_warp_chunk_id] = value;
-				YANET_GCC_BUG_UNUSED(prev_warp_chunk_id);
+				GCC_BUG_UNUSED(prev_warp_chunk_id);
 
 				type_t shared_shadow_mask = warp_shadow_mask & (prev_mask & (prev_mask + 1));
 
@@ -569,8 +569,8 @@ protected:
 			const auto& [warp_address, warp_mask] = map_key;
 			const auto& [shift, warp_chunk_id] = map_value;
 
-			YANET_GCC_BUG_UNUSED(shift);
-			YANET_GCC_BUG_UNUSED(warp_chunk_id);
+			GCC_BUG_UNUSED(shift);
+			GCC_BUG_UNUSED(warp_chunk_id);
 
 			type_t warp_shadow_mask = warp_mask & (warp_mask + 1);
 

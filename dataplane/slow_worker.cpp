@@ -519,7 +519,7 @@ bool SlowWorker::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 
 			for (auto& [socketId, globalBaseAtomic] : slow_worker_->dataPlane->globalBaseAtomics)
 			{
-				YANET_GCC_BUG_UNUSED(socketId);
+				GCC_BUG_UNUSED(socketId);
 
 				dataplane::globalBase::fw_state_value_t* lookup_value = nullptr;
 				dataplane::spinlock_nonrecursive_t* locker = nullptr;
@@ -600,7 +600,7 @@ bool SlowWorker::handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf)
 
 			for (auto& [socketId, globalBaseAtomic] : slow_worker_->dataPlane->globalBaseAtomics)
 			{
-				YANET_GCC_BUG_UNUSED(socketId);
+				GCC_BUG_UNUSED(socketId);
 
 				dataplane::globalBase::fw_state_value_t* lookup_value = nullptr;
 				dataplane::spinlock_nonrecursive_t* locker = nullptr;

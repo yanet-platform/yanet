@@ -156,33 +156,33 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 	try
 	{
 		const auto& [dataplane_physicalports, dataplane_workers, dataplane_values] = dataPlaneConfig;
-		YANET_GCC_BUG_UNUSED(dataplane_workers);
-		YANET_GCC_BUG_UNUSED(dataplane_values);
+		GCC_BUG_UNUSED(dataplane_workers);
+		GCC_BUG_UNUSED(dataplane_values);
 
 		for (const auto& [core_id, worker] : dataplane_workers)
 		{
-			YANET_GCC_BUG_UNUSED(core_id);
+			GCC_BUG_UNUSED(core_id);
 			const auto& [ports, socket_id] = worker;
-			YANET_GCC_BUG_UNUSED(ports);
+			GCC_BUG_UNUSED(ports);
 			// add entry for sockets with workers, including slow worker
 			baseNext.socket_interfaces[socket_id] = {};
 		}
 		for (const auto& [route_name, route] : baseNext.routes)
 		{
-			YANET_GCC_BUG_UNUSED(route_name);
+			GCC_BUG_UNUSED(route_name);
 
 			for (const auto& [interface_name, interface] : route.interfaces)
 			{
-				YANET_GCC_BUG_UNUSED(interface_name);
+				GCC_BUG_UNUSED(interface_name);
 
 				if (exist(baseNext.logicalPorts, interface.nextModule))
 				{
 					const auto& logicalport = baseNext.logicalPorts[interface.nextModule];
 
 					const auto& [physicalport_name, socket_id, mac_address, pci] = dataplane_physicalports.find(logicalport.physicalPortId)->second;
-					YANET_GCC_BUG_UNUSED(physicalport_name);
-					YANET_GCC_BUG_UNUSED(mac_address);
-					YANET_GCC_BUG_UNUSED(pci);
+					GCC_BUG_UNUSED(physicalport_name);
+					GCC_BUG_UNUSED(mac_address);
+					GCC_BUG_UNUSED(pci);
 
 					baseNext.socket_interfaces[socket_id].emplace(interface.interfaceId);
 				}

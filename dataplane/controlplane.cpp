@@ -262,7 +262,7 @@ common::idp::getSlowWorkerStats::response cControlPlane::SlowWorkerStatsResponse
 
 	for (const auto& [core_id, worker] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 
 		hashtable_gc_stats.emplace_back(worker->socket_id,
 		                                "nat64stateful.lan.state.ht",
@@ -307,7 +307,7 @@ common::idp::get_dregress_counters::response cControlPlane::get_dregress_counter
 	common::dregress::counters_t counters_v6;
 	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		YANET_GCC_BUG_UNUSED(core);
+		GCC_BUG_UNUSED(core);
 		dregress_t& dregress = slow->Dregress();
 		auto guard = dregress.LockCounters();
 		counters_v4.merge(dregress.Counters4());
@@ -326,7 +326,7 @@ common::idp::get_ports_stats::response cControlPlane::get_ports_stats()
 
 	for (const auto& [portId, port] : dataPlane->ports)
 	{
-		YANET_GCC_BUG_UNUSED(port);
+		GCC_BUG_UNUSED(port);
 
 		rte_eth_stats stats;
 		{
@@ -360,7 +360,7 @@ common::idp::get_ports_stats_extended::response cControlPlane::get_ports_stats_e
 
 	for (const auto& [portId, _] : dataPlane->ports)
 	{
-		YANET_GCC_BUG_UNUSED(_);
+		GCC_BUG_UNUSED(_);
 
 		auto portStats = dataPlane->getPortStats(portId);
 		response[portId] = portStats;
@@ -406,7 +406,7 @@ common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePo
 		/// all ports
 		for (auto& [core, slow] : dataPlane->slow_workers)
 		{
-			YANET_GCC_BUG_UNUSED(core);
+			GCC_BUG_UNUSED(core);
 			const auto& kni_worker = slow->KniWorker();
 
 			auto stats = kni_worker.PortsStats().first;
@@ -448,7 +448,7 @@ std::optional<std::reference_wrapper<const dataplane::sKniStats>> cControlPlane:
 	// Dumb iteration over slow workers and their assigned ports, should not be a bottleneck
 	for (auto& [core, slow] : dataPlane->slow_workers)
 	{
-		YANET_GCC_BUG_UNUSED(core);
+		GCC_BUG_UNUSED(core);
 		if (const auto& stats = slow->KniWorker().PortStats(pid))
 		{
 			return stats;
@@ -479,7 +479,7 @@ common::idp::getFWState::response cControlPlane::getFWState()
 
 	for (const auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 
 		worker_gc->fw_state_mutex.lock();
 		auto fw_state = worker_gc->fw_state;
@@ -524,7 +524,7 @@ common::idp::getFWStateStats::response cControlPlane::getFWStateStats() ///< @to
 
 	for (auto& [socket_id, globalbase_atomics] : dataPlane->globalBaseAtomics)
 	{
-		YANET_GCC_BUG_UNUSED(socket_id);
+		GCC_BUG_UNUSED(socket_id);
 
 		stats.fwstate4_size = std::max(stats.fwstate4_size, (uint64_t)globalbase_atomics->updater.fw4_state.get_stats().keys_count);
 		stats.fwstate6_size = std::max(stats.fwstate6_size, (uint64_t)globalbase_atomics->updater.fw6_state.get_stats().keys_count);
@@ -537,7 +537,7 @@ eResult cControlPlane::clearFWState()
 {
 	for (auto& [socketId, globalBaseAtomic] : dataPlane->globalBaseAtomics)
 	{
-		YANET_GCC_BUG_UNUSED(socketId);
+		GCC_BUG_UNUSED(socketId);
 
 		globalBaseAtomic->fw4_state->clear();
 		globalBaseAtomic->fw6_state->clear();
@@ -588,9 +588,9 @@ common::idp::getConfig::response cControlPlane::getConfig() const
 	for (const auto& [port_id, port] : dataPlane->ports)
 	{
 		const auto& [interface_name, rx_queues, tx_queues_count, mac_address, pci, symmetric_mode] = port;
-		YANET_GCC_BUG_UNUSED(rx_queues);
-		YANET_GCC_BUG_UNUSED(tx_queues_count);
-		YANET_GCC_BUG_UNUSED(symmetric_mode);
+		GCC_BUG_UNUSED(rx_queues);
+		GCC_BUG_UNUSED(tx_queues_count);
+		GCC_BUG_UNUSED(symmetric_mode);
 
 		response_ports[port_id] = {interface_name,
 		                           rte_eth_dev_socket_id(port_id),
@@ -760,7 +760,7 @@ common::idp::samples::response cControlPlane::samples()
 	std::set<common::idp::samples::sample_t> samples;
 	for (auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 
 		std::lock_guard<std::mutex> guard(worker_gc->samples_mutex);
 
@@ -840,7 +840,7 @@ common::idp::limits::response cControlPlane::limits()
 
 	for (const auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 		worker_gc->limits(response);
 	}
 
@@ -864,7 +864,7 @@ common::idp::balancer_connection::response cControlPlane::balancer_connection(co
 
 	for (auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 
 		auto& response_connections = response[worker_gc->socket_id];
 
@@ -928,7 +928,7 @@ common::idp::balancer_connection::response cControlPlane::balancer_connection(co
 					}
 
 					/// @todo: filter_real_port
-					YANET_GCC_BUG_UNUSED(filter_real_port);
+					GCC_BUG_UNUSED(filter_real_port);
 
 					auto& connections = response_connections[{balancer_id,
 					                                          virtual_ip,
@@ -962,7 +962,7 @@ common::idp::balancer_service_connections::response cControlPlane::balancer_serv
 
 	for (const auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 
 		auto current_guard = worker_gc->balancer_service_connections.current_lock_guard();
 		response[worker_gc->socket_id] = worker_gc->balancer_service_connections.current();
@@ -977,7 +977,7 @@ common::idp::balancer_real_connections::response cControlPlane::balancer_real_co
 
 	for (const auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 
 		auto current_guard = worker_gc->balancer_real_connections.current_lock_guard();
 		response[worker_gc->socket_id] = worker_gc->balancer_real_connections.current();
@@ -1080,7 +1080,7 @@ eResult cControlPlane::dump_physical_port(const common::idp::dump_physical_port:
 		/// start dump traffic to interface
 		for (auto& [socket_id, globalbase_atomic] : dataPlane->globalBaseAtomics)
 		{
-			YANET_GCC_BUG_UNUSED(socket_id);
+			GCC_BUG_UNUSED(socket_id);
 
 			__atomic_or_fetch(&globalbase_atomic->physicalPort_flags[*port_id],
 			                  (uint8_t)(flag),
@@ -1092,7 +1092,7 @@ eResult cControlPlane::dump_physical_port(const common::idp::dump_physical_port:
 		/// stop dump traffic to interface
 		for (auto& [socket_id, globalbase_atomic] : dataPlane->globalBaseAtomics)
 		{
-			YANET_GCC_BUG_UNUSED(socket_id);
+			GCC_BUG_UNUSED(socket_id);
 
 			__atomic_and_fetch(&globalbase_atomic->physicalPort_flags[*port_id],
 			                   (uint8_t)(~flag),
@@ -1107,7 +1107,7 @@ eResult cControlPlane::balancer_state_clear()
 {
 	for (auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 		worker_gc->balancer_state_clear();
 	}
 
@@ -1120,7 +1120,7 @@ common::idp::nat64stateful_state::response cControlPlane::nat64stateful_state(co
 
 	for (auto& [core_id, worker_gc] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 		worker_gc->nat64stateful_state(request, response);
 	}
 
@@ -1202,7 +1202,7 @@ void cControlPlane::waitAllWorkers()
 
 	for (const auto& [core_id, worker] : dataPlane->worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 
 		uint64_t startIteration = worker->iteration;
 		uint64_t nextIteration = startIteration;

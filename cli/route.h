@@ -92,7 +92,7 @@ void get(const std::string& route_name,
 	for (const auto& item : response)
 	{
 		const auto& [ingress_physical_ports, prefix, nexthop, egress_interface, labels] = item;
-		YANET_GCC_BUG_UNUSED(prefix);
+		GCC_BUG_UNUSED(prefix);
 
 		table.insert_row(ingress_physical_ports,
 		                 nexthop.is_default() ? std::string("") : nexthop.toString(),
@@ -162,7 +162,7 @@ void get(const std::string& route_name,
 	for (const auto& item : response)
 	{
 		const auto& [ingress_physical_ports, prefix, nexthop, label, egress_interface, peer, weight_percent] = item;
-		YANET_GCC_BUG_UNUSED(prefix);
+		GCC_BUG_UNUSED(prefix);
 
 		table.insert_row(ingress_physical_ports,
 		                 nexthop.is_default() ? std::string("") : nexthop.toString(),

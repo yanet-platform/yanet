@@ -44,7 +44,7 @@ int initLogger()
 
 	for (auto& [core, workers_vector] : workers)
 	{
-		YANET_GCC_BUG_UNUSED(workers_vector);
+		GCC_BUG_UNUSED(workers_vector);
 		auto ring = rte_ring_lookup(("r_log_" + std::to_string(core)).c_str());
 		if (ring != nullptr)
 		{
@@ -151,7 +151,7 @@ int runLogger()
 				if (aclConfig != nullptr)
 				{
 					auto& [serial, ifaces, rules] = *aclConfig;
-					YANET_GCC_BUG_UNUSED(serial);
+					GCC_BUG_UNUSED(serial);
 
 					auto it = ifaces.find(sample->acl_id);
 					if (it != ifaces.end())

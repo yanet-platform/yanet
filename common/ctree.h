@@ -146,8 +146,8 @@ struct ctree
 		                   const std::vector<std::string>& key_names,
 		                   const std::function<void(const std::string& key, const values_t&)>& callback) const
 		{
-			YANET_GCC_BUG_UNUSED(key_index);
-			YANET_GCC_BUG_UNUSED(key_names);
+			GCC_BUG_UNUSED(key_index);
+			GCC_BUG_UNUSED(key_names);
 
 			callback(key, values);
 		}
@@ -195,7 +195,7 @@ struct ctree
 		{
 			for (auto& [next_counter, next_node] : next)
 			{
-				YANET_GCC_BUG_UNUSED(next_counter);
+				GCC_BUG_UNUSED(next_counter);
 				delete next_node;
 			}
 		}
@@ -271,7 +271,7 @@ struct ctree
 			{
 				for (const auto& [next_counter, next_node] : next)
 				{
-					YANET_GCC_BUG_UNUSED(next_counter);
+					GCC_BUG_UNUSED(next_counter);
 					static_cast<node_t<next_counters_T...>*>(next_node)->convert_update(next_converts...);
 				}
 			}

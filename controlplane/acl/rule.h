@@ -1117,12 +1117,12 @@ public:
 		ids.emplace_back(rulep->ruleid);
 		for (const auto& [name, how] : rulep->ifaces)
 		{
-			YANET_GCC_BUG_UNUSED(how); // XXX: we can use in/out filters
+			GCC_BUG_UNUSED(how); // XXX: we can use in/out filters
 			via.insert(name);
 		}
 		for (const auto& [direction, tables] : rulep->iface_tables)
 		{
-			YANET_GCC_BUG_UNUSED(direction); // XXX: we can use in/out filters
+			GCC_BUG_UNUSED(direction); // XXX: we can use in/out filters
 			for (const auto& tablename : tables)
 			{
 				if (configp->m_tables.count(tablename) == 0)
@@ -1136,7 +1136,7 @@ public:
 					const auto& ifnames = std::get<ipfw::tables::ifname_t>(table);
 					for (const auto& [iface, label] : ifnames)
 					{
-						YANET_GCC_BUG_UNUSED(label);
+						GCC_BUG_UNUSED(label);
 						via.insert(iface);
 					}
 				}
@@ -1144,7 +1144,7 @@ public:
 				{
 					YANET_LOG_WARNING("wrong type for interface table %s\n", tablename.data());
 				}
-				YANET_GCC_BUG_UNUSED(location);
+				GCC_BUG_UNUSED(location);
 			}
 		}
 	}

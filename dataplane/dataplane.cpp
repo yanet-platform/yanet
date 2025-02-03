@@ -68,7 +68,7 @@ cDataPlane::~cDataPlane()
 	}
 	for (auto& [socket_id, rte_mempool] : socket_cplane_mempools)
 	{
-		YANET_GCC_BUG_UNUSED(socket_id);
+		GCC_BUG_UNUSED(socket_id);
 		rte_mempool_free(rte_mempool);
 	}
 }
@@ -233,7 +233,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 
 		for (const auto& [core_id, worker_gc] : worker_gcs)
 		{
-			YANET_GCC_BUG_UNUSED(core_id);
+			GCC_BUG_UNUSED(core_id);
 			gc_sockets_used.emplace(worker_gc->socket_id);
 		}
 
@@ -485,7 +485,7 @@ eResult cDataPlane::initPorts()
 	{
 		const std::string& interfaceName = configPortIter.first;
 		const auto& [pci, name, symmetric_mode, rss_flags] = configPortIter.second;
-		YANET_GCC_BUG_UNUSED(pci);
+		GCC_BUG_UNUSED(pci);
 
 		tPortId portId = 0;
 
@@ -938,8 +938,8 @@ eResult cDataPlane::initWorkers()
 		for (const auto& [port_id, port] : ports)
 		{
 			const auto& [interface_name, rx_queues, tx_queues_count, mac_address, pci, symmetric_mode] = port;
-			YANET_GCC_BUG_UNUSED(mac_address);
-			YANET_GCC_BUG_UNUSED(pci);
+			GCC_BUG_UNUSED(mac_address);
+			GCC_BUG_UNUSED(pci);
 
 			if (!basePermanently.ports.Register(port_id))
 				return eResult::invalidPortsCount;
@@ -1037,7 +1037,7 @@ eResult cDataPlane::initWorkers()
 	worker_gc_t::PortToSocketArray port_to_socket;
 	for (const auto& [port_id, port] : ports)
 	{
-		YANET_GCC_BUG_UNUSED(port);
+		GCC_BUG_UNUSED(port);
 		port_to_socket[port_id] = rte_eth_dev_socket_id(port_id);
 	}
 
@@ -1384,7 +1384,7 @@ void cDataPlane::init_worker_base()
 
 	for (auto& [core_id, worker] : worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 
 		auto* base = &worker->bases[worker->current_base_id];
 		auto* base_next = &worker->bases[worker->current_base_id ^ 1];
@@ -1407,7 +1407,7 @@ void cDataPlane::timestamp_thread()
 		{
 			for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
 			{
-				YANET_GCC_BUG_UNUSED(socket_id);
+				GCC_BUG_UNUSED(socket_id);
 				globalbase_atomic->currentTime = current_time;
 			}
 
@@ -1439,7 +1439,7 @@ void cDataPlane::SWRateLimiterTimeTracker()
 
 			for (auto& [core, slow] : slow_workers)
 			{
-				YANET_GCC_BUG_UNUSED(core);
+				GCC_BUG_UNUSED(core);
 				slow->ResetIcmpOutRemainder(config.SWICMPOutRateLimit / config.rateLimitDivisor);
 			}
 
@@ -1911,7 +1911,7 @@ void cDataPlane::switch_worker_base()
 
 	for (auto& [core_id, worker] : worker_gcs)
 	{
-		YANET_GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(core_id);
 
 		auto* base_next = &worker->bases[worker->current_base_id ^ 1];
 		base_nexts.emplace_back(worker->socket_id, base_next);
@@ -2179,7 +2179,7 @@ const std::set<tCoreId> cDataPlane::FastWorkerCores() const
 	std::set<tCoreId> cores;
 	for (auto& [core, workers] : config.workers)
 	{
-		YANET_GCC_BUG_UNUSED(workers);
+		GCC_BUG_UNUSED(workers);
 		if (!cores.insert(core).second)
 		{
 			YANET_LOG_ERROR("Same core specified in config for multiple workers\n");
@@ -2302,9 +2302,9 @@ eResult cDataPlane::checkConfig()
 		for (const auto& portIter : config.ports)
 		{
 			const auto& [pci, name, symmetric_mode, rss_flags] = portIter.second;
-			YANET_GCC_BUG_UNUSED(pci);
-			YANET_GCC_BUG_UNUSED(symmetric_mode);
-			YANET_GCC_BUG_UNUSED(rss_flags);
+			GCC_BUG_UNUSED(pci);
+			GCC_BUG_UNUSED(symmetric_mode);
+			GCC_BUG_UNUSED(rss_flags);
 
 			if (exist(names, name))
 			{
@@ -2402,9 +2402,9 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 	for (const auto& port : config.ports)
 	{
 		const auto& [pci, name, symmetric_mode, rss_flags] = port.second;
-		YANET_GCC_BUG_UNUSED(name);
-		YANET_GCC_BUG_UNUSED(symmetric_mode);
-		YANET_GCC_BUG_UNUSED(rss_flags);
+		GCC_BUG_UNUSED(name);
+		GCC_BUG_UNUSED(symmetric_mode);
+		GCC_BUG_UNUSED(rss_flags);
 
 		// Do not whitelist sock dev virtual devices
 		if (StartsWith(name, SOCK_DEV_PREFIX))
