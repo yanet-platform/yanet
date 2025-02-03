@@ -1651,7 +1651,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 
 		balancer::scheduler scheduler{};
 		balancer::scheduler_params scheduler_params{};
-        uint8_t flags = 0;
+		uint8_t flags = 0;
 		if (scheduler_string == "rr")
 		{
 			scheduler = balancer::scheduler::rr;
@@ -1669,11 +1669,11 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			}
 		}
 		else if (scheduler_string == "purr")
-        {
-            scheduler = balancer::scheduler::wrr;
-            flags |= YANET_BALANCER_PURE_ROUND_ROBIN;
-        }
-        else
+		{
+			scheduler = balancer::scheduler::wrr;
+			flags |= YANET_BALANCER_PURE_ROUND_ROBIN;
+		}
+		else
 		{
 			throw error_result_t(eResult::invalidConfigurationFile, "unknown scheduler: " + scheduler_string);
 		}
