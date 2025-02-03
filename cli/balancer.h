@@ -74,7 +74,7 @@ void service(std::string module_string,
 		{
 			const auto& [virtual_ip, proto, virtual_port] = service_key;
 			const auto& [scheduler, version, nap_connections, packets, bytes] = service_value;
-			YANET_GCC_BUG_UNUSED(nap_connections); ///< @todo: DELETE
+			GCC_BUG_UNUSED(nap_connections); ///< @todo: DELETE
 
 			auto proto_string = controlplane::balancer::from_proto(proto);
 
@@ -86,7 +86,7 @@ void service(std::string module_string,
 			uint32_t connections = 0;
 			for (auto& [socket_id, service_connections] : balancer_service_connections)
 			{
-				YANET_GCC_BUG_UNUSED(socket_id);
+				GCC_BUG_UNUSED(socket_id);
 
 				const auto& socket_connections = service_connections[key].value;
 				if (socket_connections > connections)
@@ -227,7 +227,7 @@ void real_find(std::string module_string,
 				uint32_t connections = 0;
 				for (auto& [socket_id, real_connections] : balancer_real_connections)
 				{
-					YANET_GCC_BUG_UNUSED(socket_id);
+					GCC_BUG_UNUSED(socket_id);
 
 					const auto& socket_connections = real_connections[key].value;
 					if (socket_connections > connections)
@@ -309,7 +309,7 @@ void state(std::string module,
 	/// @todo: OPT
 	for (const auto& [socket_id, services_real_connections] : response)
 	{
-		YANET_GCC_BUG_UNUSED(socket_id);
+		GCC_BUG_UNUSED(socket_id);
 
 		for (const auto& [services_real, connections] : services_real_connections)
 		{
@@ -319,7 +319,7 @@ void state(std::string module,
 
 			for (const auto& [client_ip, client_port, timestamp_create, timestamp_last_packet, timestamp_gc] : connections)
 			{
-				YANET_GCC_BUG_UNUSED(timestamp_gc);
+				GCC_BUG_UNUSED(timestamp_gc);
 
 				auto it = map.find({client_ip, client_port});
 				if (it != map.end())

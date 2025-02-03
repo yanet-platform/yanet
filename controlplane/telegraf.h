@@ -23,7 +23,7 @@ public:
 	{
 		for (const auto& [module_name, dregress] : base_next.dregresses)
 		{
-			YANET_GCC_BUG_UNUSED(module_name);
+			GCC_BUG_UNUSED(module_name);
 
 			communities.insert(dregress.communities.begin(), dregress.communities.end());
 		}
@@ -31,7 +31,7 @@ public:
 
 		for (const auto& [module_name, route] : base_next.routes)
 		{
-			YANET_GCC_BUG_UNUSED(module_name);
+			GCC_BUG_UNUSED(module_name);
 
 			peers.insert(route.peers.begin(), route.peers.end());
 		}

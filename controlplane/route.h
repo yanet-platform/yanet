@@ -106,7 +106,7 @@ public:
 
 		for (const auto& [module_name, route] : base_next.routes)
 		{
-			YANET_GCC_BUG_UNUSED(module_name);
+			GCC_BUG_UNUSED(module_name);
 
 			for (const auto& [interface_name, interface] : route.interfaces)
 			{

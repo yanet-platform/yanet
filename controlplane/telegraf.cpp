@@ -138,7 +138,7 @@ common::icp::telegraf_unsafe::response telegraf_t::telegraf_unsafe()
 		{
 			const auto& [encap_packets, encap_bytes, encap_dropped, decap_packets, decap_bytes, decap_unknown] = tun64Stats.at(name);
 
-			YANET_GCC_BUG_UNUSED(tunnel);
+			GCC_BUG_UNUSED(tunnel);
 			responseTun64[name] = {encap_packets, encap_bytes, encap_dropped, decap_packets, decap_bytes, decap_unknown};
 		}
 	}
@@ -174,7 +174,7 @@ common::icp::telegraf_mappings::response telegraf_t::telegraf_mappings()
 				const auto& [encap_packets, encap_bytes, decap_packets, decap_bytes] = counters.at({name, ipv4_address});
 				const common::tun64mapping::stats_t stats = {encap_packets, encap_bytes, decap_packets, decap_bytes};
 
-				YANET_GCC_BUG_UNUSED(location);
+				GCC_BUG_UNUSED(location);
 				response.emplace_back(name, ipv4_address, ipv6_address, stats);
 			}
 		}
@@ -217,7 +217,7 @@ common::icp::telegraf_dregress_traffic::response telegraf_t::telegraf_dregress_t
 		{
 			const auto& [is_ipv4, peer_id, nexthop, origin_as] = key;
 			const auto& [packets, bytes] = value;
-			YANET_GCC_BUG_UNUSED(origin_as);
+			GCC_BUG_UNUSED(origin_as);
 
 			auto it = dregress_traffic_counters_prev.find(key);
 			if (it != dregress_traffic_counters_prev.end())
