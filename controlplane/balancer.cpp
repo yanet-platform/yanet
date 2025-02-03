@@ -871,22 +871,18 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 
 				bool enabled = false;
 				uint32_t effective_weight = weight;
+				if (auto it = reals_enabled.find(key); it != reals_enabled.end())
 				{
-					auto it = reals_enabled.find(key);
-					if (it != reals_enabled.end())
+					enabled = true;
+					if (it->second.has_value())
 					{
-						enabled = true;
-						if (it->second.has_value())
-						{
-							effective_weight = it->second.value();
-						}
+						effective_weight = it->second.value();
 					}
 				}
 
-				auto reals_wlc = reals_wlc_weight.find(key);
-				if (reals_wlc != reals_wlc_weight.end() && reals_wlc->second.has_value())
+				if (auto found_weight = get_effective_weight(reals_wlc_weight, key); found_weight)
 				{
-					effective_weight = reals_wlc->second.value();
+					effective_weight = *found_weight;
 				}
 
 				uint32_t real_unordered_id = 0;
@@ -966,11 +962,11 @@ bool balancer_t::reconfigure_wlc()
 		                  ipv6_outer_source_network,
 		                  reals] : balancer.services)
 		{
-			(void)flags;
-			(void)version;
-			(void)forwarding_method;
-			(void)ipv4_outer_source_network;
-			(void)ipv6_outer_source_network;
+			GCC_BUG_UNUSED(flags);
+			GCC_BUG_UNUSED(version);
+			GCC_BUG_UNUSED(forwarding_method);
+			GCC_BUG_UNUSED(ipv4_outer_source_network);
+			GCC_BUG_UNUSED(ipv6_outer_source_network);
 
 			if (scheduler != ::balancer::scheduler::wlc)
 			{
@@ -989,17 +985,9 @@ bool balancer_t::reconfigure_wlc()
 			for (const auto& [real_ip, real_port, weight] : reals)
 			{
 				balancer::real_key_global_t key = {module_name, {virtual_ip, proto, virtual_port}, {real_ip, real_port}};
-				uint32_t effective_weight = weight;
-				{
-					auto it = reals_enabled.find(key);
-					if (it != reals_enabled.end())
-					{
-						if (it->second.has_value())
-						{
-							effective_weight = it->second.value();
-						}
-					}
-				}
+
+				auto weight_found = get_effective_weight(reals_enabled, key);
+				uint32_t effective_weight = weight_found ? weight_found.value() : weight;
 
 				weight_sum += effective_weight;
 
@@ -1018,14 +1006,13 @@ bool balancer_t::reconfigure_wlc()
 				uint32_t connections = 0;
 				for (auto& [socket_id, real_connections] : balancer_real_connections)
 				{
-					(void)socket_id;
+					GCC_BUG_UNUSED(socket_id);
 
-					auto it = real_connections.find(real_connections_key);
-					if (it == real_connections.end())
+					if (auto it = real_connections.find(real_connections_key);
+					    it != real_connections.end())
 					{
-						continue;
+						connections += it->second;
 					}
-					connections += it->second;
 				}
 
 				connection_sum += connections;
