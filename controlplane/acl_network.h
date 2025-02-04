@@ -4,6 +4,7 @@
 #include "acl/network.h"
 #include "acl_base.h"
 #include "acl_tree.h"
+#include "common/type.h"
 
 namespace acl::compiler
 {
@@ -28,7 +29,6 @@ public:
 		group_id = 1;
 		filters.clear();
 		filter_ids.clear();
-		filter_to_rule_ids.clear();
 		filter_to_group_ids.clear();
 		bitmask.clear();
 		map.clear();
@@ -112,7 +112,7 @@ public:
 		     filter_id < filters.size();
 		     filter_id++)
 		{
-			for (const auto& group_id : filter_to_group_ids[filter_id])
+			for (tAclGroupId group_id : filter_to_group_ids[filter_id])
 			{
 				reverse_map.find(group_id)->second.insert(filter_id);
 			}
@@ -142,9 +142,9 @@ public:
 
 		tree.Remap(remap);
 
-		for (auto& group_ids : filter_to_group_ids)
+		for (GroupIds& group_ids : filter_to_group_ids)
 		{
-			for (auto& group_id : group_ids)
+			for (tAclGroupId group_id : group_ids)
 			{
 				group_id = remap[group_id];
 			}
@@ -162,7 +162,7 @@ public:
 
 	const GroupIds& get_group_ids_by_filter(const filter& filter) const
 	{
-		const auto filter_id = filter_ids.find(filter)->second;
+		tAclFilterId filter_id = filter_ids.find(filter)->second;
 		return filter_to_group_ids[filter_id];
 	}
 
@@ -202,8 +202,7 @@ public:
 	tAclGroupId group_id;
 
 	std::vector<filter> filters;
-	std::map<filter, unsigned int> filter_ids;
-	std::vector<std::vector<unsigned int>> filter_to_rule_ids;
+	std::map<filter, tAclFilterId> filter_ids;
 
 	std::vector<GroupIds> filter_to_group_ids;
 

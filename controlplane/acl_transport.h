@@ -19,7 +19,7 @@ public:
 	void clear();
 	unsigned int collect(const unsigned int rule_id, const filter& filter);
 	void prepare();
-	void emplace_variation(const unsigned int network_table_group_id, const std::set<unsigned int>& filter_ids);
+	void emplace_variation(const unsigned int network_table_group_id, const std::set<tAclFilterId>& filter_ids);
 	void distribute();
 	void compile();
 	void populate();
@@ -62,7 +62,7 @@ public:
 	std::vector<layer> layers;
 
 	std::vector<filter> filters;
-	std::map<filter, unsigned int> filter_ids;
+	std::map<filter, tAclFilterId> filter_ids;
 	std::vector<std::vector<unsigned int>> filter_to_rule_ids;
 
 	std::vector<GroupIds> filter_to_group_ids;

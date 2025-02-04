@@ -45,7 +45,7 @@ void transport_t::prepare()
 }
 
 void transport_t::emplace_variation(const unsigned int network_table_group_id,
-                                    const std::set<unsigned int>& filter_ids)
+                                    const std::set<tAclFilterId>& filter_ids)
 {
 	size_t size = ((size_t)-1) - filter_ids.size();
 	auto it = variation.find(std::tie(size, filter_ids));

@@ -35,13 +35,13 @@ public:
 	tAclGroupId group_id;
 
 	std::vector<filter> filters;
-	std::map<filter, unsigned int> filter_ids;
+	std::map<filter, tAclFilterId> filter_ids;
 	std::vector<std::vector<unsigned int>> filter_id_to_rule_ids;
 	std::vector<GroupIds> filter_id_to_group_ids;
-	std::map<tAclGroupId, std::set<unsigned int>> group_id_to_filter_ids;
+	std::map<tAclGroupId, std::set<tAclFilterId>> group_id_to_filter_ids;
 
 	std::vector<GroupIds> filter_id_to_group_ids_next;
-	std::map<tAclGroupId, std::set<unsigned int>> group_id_to_filter_ids_next;
+	std::map<tAclGroupId, std::set<tAclFilterId>> group_id_to_filter_ids_next;
 
 	std::vector<uint8_t> bitmask; /// @todo: bitmask_t
 };

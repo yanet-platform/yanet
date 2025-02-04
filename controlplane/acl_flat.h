@@ -1,9 +1,8 @@
 #pragma once
 
-#include "acl/bitset.h"
 #include "acl_base.h"
-
 #include "common/acl.h"
+#include "common/type.h"
 
 namespace acl::compiler
 {
@@ -169,7 +168,7 @@ public:
 
 	const GroupIds& get_group_ids_by_filter(const filter& filter) const
 	{
-		const auto filter_id = filter_ids.find(filter)->second;
+		tAclFilterId filter_id = filter_ids.find(filter)->second;
 		return filter_id_to_group_ids[filter_id];
 	}
 
@@ -180,7 +179,7 @@ public:
 	tAclGroupId group_id;
 
 	std::vector<filter> filters;
-	std::map<filter, unsigned int> filter_ids;
+	std::map<filter, tAclFilterId> filter_ids;
 	std::vector<GroupIds> filter_id_to_group_ids;
 
 	std::set<tAclGroupId> used_group_ids_set;

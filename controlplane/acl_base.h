@@ -4,6 +4,7 @@
 #include <vector>
 
 using GroupIds = std::vector<tAclGroupId>;
+using FilterIds = std::vector<tAclFilterId>;
 
 namespace acl
 {

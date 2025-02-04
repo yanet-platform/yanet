@@ -69,7 +69,7 @@ public:
 	std::set<tAclGroupId> bitmask; /// @todo: bitmask_t
 
 	std::vector<GroupIds> filter_id_to_group_ids;
-	std::map<tAclGroupId, std::set<unsigned int>> group_id_to_filter_ids;
+	std::map<tAclGroupId, std::set<tAclFilterId>> group_id_to_filter_ids;
 	std::vector<GroupIds> transport_table_filter_id_to_group_ids;
 
 	common::idp::updateGlobalBase::acl_transport_table::request acl_transport_table;

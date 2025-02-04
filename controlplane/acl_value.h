@@ -25,7 +25,7 @@ public:
 	std::vector<common::acl::value_t> vector;
 
 	std::vector<filter> filters;
-	std::map<filter, unsigned int> filter_ids;
+	std::map<filter, tAclFilterId> filter_ids;
 };
 
 }
