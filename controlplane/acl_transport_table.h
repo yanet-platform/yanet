@@ -49,8 +49,19 @@ protected:
 
 	using DimensionArray = decltype(std::declval<Layer>().table)::DimensionArray;
 
-	// keys has dims #0..4 set
-	void table_insert(transport_table::Layer& layer, DimensionArray& keys, const GroupIds& network_table_group_ids);
+	tAclGroupId compress_network_table_group_id(Layer& layer, tAclGroupId nt_group_id);
+
+	// FIXME: is this correct? add description
+	// For performance, all loops are done in one place.
+	// This avoids repeated calls to a smaller helper function
+	// and keeps the logic of "remap_group_ids[value]" inlined.
+	void table_insert(Layer& layer,
+	                  const GroupIds& net_flags,
+	                  const GroupIds& protocol,
+	                  const GroupIds& group1,
+	                  const GroupIds& group2,
+	                  const GroupIds& group3,
+	                  const GroupIds& network_table);
 
 	// keys has dims #0..4 set
 	void table_get(transport_table::Layer& layer, DimensionArray& keys, const GroupIds& network_table_group_ids);
