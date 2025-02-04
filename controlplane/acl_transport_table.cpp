@@ -146,6 +146,7 @@ void transport_table::thread_t::prepare()
 
 			if (network_table_group_id >= layer.remap_network_table_group_ids.size())
 			{
+				//FIXME: wtf.. so inefficient
 				layer.remap_network_table_group_ids.resize(network_table_group_id + 1, 0);
 			}
 

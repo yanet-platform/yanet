@@ -14,6 +14,7 @@ namespace acl
 /**
  * The %bitset_t class represents a sequence of bits.
  */
+//TODO: just std::bitset..???
 struct bitset_t
 {
 public:
