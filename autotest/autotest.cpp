@@ -291,6 +291,7 @@ bool readTimeLimited(int fd, u_char* buf, ssize_t len, std::chrono::system_clock
 		switch (ret)
 		{
 			case 0:
+				YANET_LOG_ERROR("Failed to read packets: end of file\n");
 				return false;
 			case -1:
 				if ((errno == EAGAIN) || (errno = EWOULDBLOCK))
@@ -299,6 +300,7 @@ bool readTimeLimited(int fd, u_char* buf, ssize_t len, std::chrono::system_clock
 				}
 				else
 				{
+					YANET_LOG_ERROR("Failed to read packets: %s\n", strerror(errno));
 					return false;
 				}
 				break;

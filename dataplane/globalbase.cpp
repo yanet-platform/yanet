@@ -9,6 +9,7 @@
 #include "worker_gc.h"
 
 #include "common/counters.h"
+#include "common/deferer.h"
 #include "common/define.h"
 
 #include "debug_latch.h"
@@ -1433,7 +1434,6 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 	                  counter_id,
 	                  scheduler,
 	                  forwarding_method,
-	                  default_wlc_power,
 	                  real_start,
 	                  real_size,
 	                  ipv4_outer_source_network,
@@ -1484,7 +1484,6 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 		balancer_service.real_start = real_start;
 		balancer_service.real_size = real_size;
 		balancer_service.scheduler = scheduler;
-		balancer_service.wlc_power = default_wlc_power;
 		balancer_service.forwarding_method = forwarding_method;
 		balancer_service.outer_source_network_flag = outer_source_network_flag;
 		balancer_service.ipv4_outer_source_network = ipv4_prefix;
@@ -1565,7 +1564,7 @@ eResult generation::update_balancer_services(const common::idp::updateGlobalBase
 
 	std::copy(binding.begin(), binding.end(), balancer_service_reals);
 
-	evaluate_service_ring();
+	evaluate_service_ring(ServiceRingOp::Rebuild);
 
 	return eResult::success;
 }
@@ -1588,19 +1587,9 @@ eResult generation::update_balancer_unordered_real(const common::idp::updateGlob
 		real_state = new_state;
 	}
 
-	evaluate_service_ring();
+	evaluate_service_ring(ServiceRingOp::Update);
 
 	return eResult::success;
-}
-
-double wlc_ratio(uint32_t weight, uint32_t connections, uint32_t weight_sum, uint32_t connection_sum, uint32_t power)
-{
-	if (weight == 0 || weight_sum == 0 || connection_sum < weight_sum)
-	{
-		return 1;
-	}
-	auto a = power * (1 - 1.0 * connections * weight_sum / connection_sum / weight);
-	return std::max(1.0, a);
 }
 
 inline uint64_t generation::count_real_connections(uint32_t counter_id)
@@ -1628,78 +1617,162 @@ inline uint64_t generation::count_real_connections(uint32_t counter_id)
 	return (sessions_created - sessions_destroyed + sessions_created_gc - sessions_destroyed_gc) / dataPlane->numaNodesInUse;
 }
 
-void generation::evaluate_service_ring()
+balancer_real_id_t* generation::rebuild_service_ring_one_wrr(
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service)
+{
+	utils::Deferer defer([]() { YADECAP_MEMORY_BARRIER_COMPILE; });
+	for (uint32_t real_idx = service.real_start;
+	     real_idx < service.real_start + service.real_size;
+	     ++real_idx)
+	{
+		balancer_real_id_t real_id = balancer_service_reals[real_idx];
+		const balancer_real_state_t& state = balancer_real_states[real_id];
+
+		if (state.weight == 0)
+		{
+			continue;
+		}
+
+		auto weight = state.weight;
+
+		while (weight-- > 0)
+		{
+			if (start == do_not_exceed)
+			{
+				YANET_LOG_ERROR("Balancer service exceeded ring chunk bounds\n");
+				return start;
+			}
+			*start = real_id;
+			++start;
+		}
+	}
+
+	return start;
+}
+
+std::vector<generation::RealWeight> generation::ServiceWeights(const balancer_service_t& service)
+{
+	std::vector<RealWeight> weights;
+	weights.reserve(service.real_size);
+	for (uint32_t real_idx = service.real_start;
+	     real_idx < service.real_start + service.real_size;
+	     ++real_idx)
+	{
+		balancer_real_id_t real_id = balancer_service_reals[real_idx];
+		uint32_t weight = balancer_real_states[real_id].weight;
+
+		weights.emplace_back(real_id, weight);
+	}
+	return weights;
+}
+
+balancer_real_id_t* generation::rebuild_service_ring_one_chash(
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service)
+{
+	std::vector<std::pair<ipv6_address_t, balancer_real_id_t>> reals;
+	reals.reserve(service.real_size);
+	for (uint32_t real_idx = service.real_start;
+	     real_idx < service.real_start + service.real_size;
+	     ++real_idx)
+	{
+		balancer_real_id_t real_id = balancer_service_reals[real_idx];
+		ipv6_address_t& ip = balancer_reals[real_id].destination;
+		reals.emplace_back(ip, real_id);
+	}
+	auto updater = chash::WeightUpdater::MakeWeightUpdater(
+	        reals,
+	        YANET_DEFAULT_BALANCER_REAL_MAPPINGS_LIMIT,
+	        YANET_DEFAULT_BALANCER_CELLS_PER_WEIGHT_UNIT);
+	if (!updater)
+	{
+		YANET_THROW("Failed to intialize updater for balancer service reals");
+		std::abort();
+	}
+	updater.value().InitLookup(ServiceWeights(service), start);
+
+	chash_updaters.emplace(&service, std::move(updater.value()));
+	return start + updater.value().LookupSize();
+}
+
+balancer_real_id_t* generation::update_service_ring_one_chash(
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service)
+{
+	auto up = chash_updaters.find(&service);
+	if (up == chash_updaters.end())
+	{
+		YANET_LOG_ERROR("No state information for updating requested service.\n");
+		return start;
+	}
+	auto& updater = up->second;
+	updater.UpdateLookup(ServiceWeights(service), start);
+	return start + updater.LookupSize();
+}
+
+balancer_real_id_t* generation::evaluate_service_ring_one(
+        ServiceRingOp op,
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service)
+{
+	balancer_real_id_t* end{start};
+	using scheduler = ::balancer::scheduler;
+	switch (service.scheduler)
+	{
+		case scheduler::rr:
+		case scheduler::wrr:
+			end = rebuild_service_ring_one_wrr(
+			        start, do_not_exceed, service);
+			break;
+		case scheduler::wlc:
+		case scheduler::chash:
+			if (op == ServiceRingOp::Rebuild)
+			{
+				end = rebuild_service_ring_one_chash(
+				        start, do_not_exceed, service);
+			}
+			else
+			{
+				end = update_service_ring_one_chash(start, do_not_exceed, service);
+			}
+			{
+				std::unordered_map<balancer_real_id_t, std::size_t> freq;
+				for (auto c = start; c != end; ++c)
+				{
+					freq[*c]++;
+				}
+			}
+			break;
+		default:
+			YANET_THROW("Unknown balancer service scheduler type");
+	}
+	return end;
+}
+
+void generation::evaluate_service_ring(ServiceRingOp op)
 {
 	balancer_service_ring_t* ring = &balancer_service_ring;
-	uint32_t weight_pos = 0;
-	for (uint32_t service_idx = 0; service_idx < balancer_services_count; ++service_idx)
+	balancer_real_id_t* service_start = ring->reals;
+	for (uint32_t service_idx = 0;
+	     service_idx < balancer_services_count;
+	     ++service_idx, service_start += YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX)
 	{
-		balancer_service_t* service = balancer_services + balancer_active_services[service_idx];
-		uint64_t connection_sum = 0;
-		uint32_t weight_sum = 0;
-		if (service->scheduler == ::balancer::scheduler::wlc)
-		{
-			for (uint32_t real_idx = service->real_start;
-			     real_idx < service->real_start + service->real_size;
-			     ++real_idx)
-			{
-				uint32_t real_id = balancer_service_reals[real_idx];
-				balancer_real_state_t* state = balancer_real_states + real_id;
-				// don`t count connections for disabled reals - it can make other reals "feel" underloaded
-				if (state->weight == 0)
-				{
-					continue;
-				}
-				weight_sum += state->weight;
+		const balancer_service_t& service = balancer_services[balancer_active_services[service_idx]];
 
-				const balancer_real_t& real = balancer_reals[real_id];
-				connection_sum += count_real_connections(real.counter_id);
-			}
-		}
+		balancer_service_range_t& range = ring->ranges[balancer_active_services[service_idx]];
 
-		balancer_service_range_t* range = ring->ranges + balancer_active_services[service_idx];
-
-		range->start = weight_pos;
-		for (uint32_t real_idx = service->real_start;
-		     real_idx < service->real_start + service->real_size;
-		     ++real_idx)
-		{
-			uint32_t real_id = balancer_service_reals[real_idx];
-			const balancer_real_t& real = balancer_reals[real_id];
-			balancer_real_state_t* state = balancer_real_states + real_id;
-
-			if (state->weight == 0)
-			{
-				continue;
-			}
-
-			auto weight = state->weight;
-
-			if (service->scheduler == ::balancer::scheduler::wlc)
-			{
-				uint64_t real_connections = count_real_connections(real.counter_id);
-
-				weight = (int)(weight * wlc_ratio(state->weight, real_connections, weight_sum, connection_sum, service->wlc_power));
-				// todo check weight change
-			}
-
-			// clamp weight to a maximum possible value
-			if (weight > YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX)
-			{
-				// TODO: think about accounting the clamping
-				weight = YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX;
-			}
-
-			while (weight-- > 0)
-			{
-				ring->reals[weight_pos++] = real_id;
-			}
-		}
-
-		YADECAP_MEMORY_BARRIER_COMPILE;
-
-		range->size = weight_pos - range->start;
-		weight_pos = range->start + service->real_size * YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX;
+		range.start = std::distance(ring->reals, service_start);
+		auto service_end = evaluate_service_ring_one(
+		        op,
+		        service_start,
+		        service_start + YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX,
+		        service);
+		range.size = std::distance(service_start, service_end);
 	}
 }
 

@@ -207,7 +207,7 @@ using service_t = std::tuple<balancer_service_id_t,
                              std::optional<uint16_t>, ///< vport
                              std::optional<std::string>, ///< version
                              ::balancer::scheduler,
-                             ::balancer::scheduler_params,
+                             uint32_t, ///< wlc power
                              ::balancer::forwarding_method,
                              uint8_t, ///< flags: mss_fix|ops
                              std::optional<common::ipv4_prefix_t>, ///< ipv4_outer_source_network
