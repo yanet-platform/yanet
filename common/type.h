@@ -34,6 +34,7 @@ using nat46clat_id_t = uint32_t;
 using tAclId = uint32_t;
 using tAclRuleId = uint32_t;
 using tAclGroupId = uint32_t;
+using tAclFilterId = uint32_t;
 using dregress_id_t = uint32_t;
 using balancer_id_t = uint32_t;
 using balancer_service_id_t = uint32_t;
