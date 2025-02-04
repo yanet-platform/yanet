@@ -1,12 +1,11 @@
 #pragma once
 
-#include <cinttypes>
-
 #include <vector>
 
 #include "common/define.h"
 #include "common/result.h"
 #include "common/type.h"
+#include "controlplane/acl_base.h"
 
 namespace dataplane
 {
@@ -96,7 +95,7 @@ public:
 
 	public:
 		tAclGroupId group_id;
-		std::vector<tAclGroupId> remap;
+		GroupIds remap;
 		std::array<tAclGroupId, 1u << bits> values;
 	};
 

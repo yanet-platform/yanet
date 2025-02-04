@@ -54,11 +54,11 @@ public:
 	void clear()
 	{
 		values.fill(0);
-		remap_group_ids.clear();
+		remap.clear();
 		group_id = 1;
 		filters.clear();
 		filter_ids.clear();
-		filter_id_group_ids.clear();
+		filter_id_to_group_ids.clear();
 		used_group_ids_set.clear();
 		used_group_ids_vec.clear();
 	}
@@ -77,7 +77,7 @@ public:
 
 	void prepare()
 	{
-		filter_id_group_ids.resize(filter_ids.size());
+		filter_id_to_group_ids.resize(filter_ids.size());
 	}
 
 	void compile()
@@ -86,8 +86,8 @@ public:
 		     filter_id < filters.size();
 		     filter_id++)
 		{
-			remap_group_ids.clear();
-			remap_group_ids.resize(group_id, 0);
+			remap.clear();
+			remap.resize(group_id, 0);
 
 			for (const auto& range : filters[filter_id].vector)
 			{
@@ -101,9 +101,9 @@ public:
 				     i <= range.to();
 				     i++)
 				{
-					if (values[i] < remap_group_ids.size()) ///< check: don't override self rule
+					if (values[i] < remap.size()) ///< check: don't override self rule
 					{
-						auto& remap_group_id = remap_group_ids[values[i]];
+						auto& remap_group_id = remap[values[i]];
 						if (!remap_group_id)
 						{
 							remap_group_id = group_id;
@@ -116,7 +116,7 @@ public:
 			}
 		}
 
-		remap();
+		Remap();
 	}
 
 	void populate()
@@ -151,7 +151,7 @@ public:
 
 			for (const auto group_id : group_ids)
 			{
-				filter_id_group_ids[filter_id].emplace_back(group_id);
+				filter_id_to_group_ids[filter_id].emplace_back(group_id);
 				used_group_ids_set.emplace(group_id);
 			}
 		}
@@ -167,30 +167,30 @@ public:
 		return values[i];
 	}
 
-	const std::vector<tAclGroupId>& get_group_ids_by_filter(const filter& filter) const
+	const GroupIds& get_group_ids_by_filter(const filter& filter) const
 	{
 		const auto filter_id = filter_ids.find(filter)->second;
-		return filter_id_group_ids[filter_id];
+		return filter_id_to_group_ids[filter_id];
 	}
 
 public:
 	std::array<tAclGroupId, 1u << bits> values;
 
-	std::vector<tAclGroupId> remap_group_ids;
+	GroupIds remap;
 	tAclGroupId group_id;
 
 	std::vector<filter> filters;
 	std::map<filter, unsigned int> filter_ids;
-	std::vector<std::vector<tAclGroupId>> filter_id_group_ids;
+	std::vector<GroupIds> filter_id_to_group_ids;
 
 	std::set<tAclGroupId> used_group_ids_set;
-	std::vector<tAclGroupId> used_group_ids_vec;
+	GroupIds used_group_ids_vec;
 
 protected:
-	void remap()
+	void Remap()
 	{
-		remap_group_ids.clear();
-		remap_group_ids.resize(group_id, 0);
+		remap.clear();
+		remap.resize(group_id, 0);
 
 		group_id = 1;
 
@@ -198,7 +198,7 @@ protected:
 		     i < 1u << bits;
 		     i++)
 		{
-			auto& remap_group_ip = remap_group_ids[values[i]];
+			auto& remap_group_ip = remap[values[i]];
 			if (!remap_group_ip)
 			{
 				remap_group_ip = group_id;

@@ -359,10 +359,10 @@ void compiler_t::network_compile()
 	               network_ipv6_source.reverse_map.size(),
 	               network_ipv6_destination.reverse_map.size());
 
-	network_ipv4_source.remap(source_group_id);
-	network_ipv4_destination.remap(destination_group_id);
-	network_ipv6_source.remap(source_group_id);
-	network_ipv6_destination.remap(destination_group_id);
+	network_ipv4_source.Remap(source_group_id);
+	network_ipv4_destination.Remap(destination_group_id);
+	network_ipv6_source.Remap(source_group_id);
+	network_ipv6_destination.Remap(destination_group_id);
 
 	YANET_LOG_INFO("acl::compile: collisions: %u, %u, %u, %u\n",
 	               network_ipv4_source.collisions,
@@ -382,7 +382,7 @@ void compiler_t::network_table_compile()
 	network_table.populate();
 
 	YANET_LOG_INFO("acl::compile: group_ids: %lu\n",
-	               network_table.group_id_filter_ids.size());
+	               network_table.group_id_to_filter_ids.size());
 }
 
 void compiler_t::network_flags_compile()
@@ -400,13 +400,13 @@ void compiler_t::transport_compile()
 	transport.prepare();
 
 	std::set<unsigned int> transport_filters;
-	for (const auto& [network_table_group_id, network_table_filter_ids] : network_table.group_id_filter_ids)
+	for (const auto& [network_table_group_id, network_table_filter_ids] : network_table.group_id_to_filter_ids)
 	{
 		transport_filters.clear();
 
 		for (const auto network_table_filter_id : network_table_filter_ids)
 		{
-			for (const auto rule_id : network_table.filter_id_rule_ids[network_table_filter_id])
+			for (const auto rule_id : network_table.filter_id_to_rule_ids[network_table_filter_id])
 			{
 				transport_filters.emplace(rules[rule_id].transport_filter_id);
 			}
@@ -427,7 +427,7 @@ void compiler_t::transport_compile()
 	transport.populate();
 
 	/// remap group ids after distribute
-	network_table.remap();
+	network_table.Remap();
 }
 
 void compiler_t::transport_table_compile()
@@ -441,7 +441,7 @@ void compiler_t::transport_table_compile()
 	for (const auto& thread : transport_table.threads)
 	{
 		size += thread.acl_transport_table.size();
-		group_ids += thread.group_id_filter_ids.size();
+		group_ids += thread.group_id_to_filter_ids.size();
 	}
 	YANET_LOG_INFO("acl::compile: size: %lu\n",
 	               size);

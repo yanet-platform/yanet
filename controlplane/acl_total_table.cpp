@@ -12,12 +12,12 @@ total_table_t::total_table_t(compiler_t* compiler) :
 void total_table_t::clear()
 {
 	table.clear();
-	remap_group_ids.clear();
+	remap.clear();
 	group_id = 1;
 	filters.clear();
 	filter_ids.clear();
-	filter_id_by_rule_id.clear();
-	filter_id_group_ids.clear();
+	rule_id_to_filter_id.clear();
+	filter_id_to_group_ids.clear();
 	bitmask.clear();
 	map.clear();
 	reverse_map.clear();
@@ -35,13 +35,13 @@ unsigned int total_table_t::collect(const unsigned int rule_id, const filter& fi
 		it = filter_ids.emplace_hint(it, filter, filter_ids.size());
 	}
 
-	filter_id_by_rule_id.emplace_back(it->second);
+	rule_id_to_filter_id.emplace_back(it->second);
 	return it->second;
 }
 
 void total_table_t::prepare()
 {
-	filter_id_group_ids.resize(filter_ids.size());
+	filter_id_to_group_ids.resize(filter_ids.size());
 }
 
 void total_table_t::compile()
@@ -54,7 +54,7 @@ void total_table_t::compile()
 		const auto filter_id = rule.total_table_filter_id;
 		const auto group_id = rule.value_filter_id;
 
-		if (!filter_id_group_ids[filter_id].empty())
+		if (!filter_id_to_group_ids[filter_id].empty())
 		{
 			continue;
 		}
@@ -95,7 +95,7 @@ void total_table_t::compile()
 				{
 					// If the rule is termineting and has been used, then we mark filter_id
 					// as filled in to prevent further additional checks.
-					filter_id_group_ids[filter_id].emplace(it->second);
+					filter_id_to_group_ids[filter_id].emplace(it->second);
 				}
 			}
 		}

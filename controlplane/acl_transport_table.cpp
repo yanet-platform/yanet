@@ -16,7 +16,7 @@ void transport_table_t::clear()
 	threads.clear();
 	filters.clear();
 	filter_ids.clear();
-	filter_id_rule_ids.clear();
+	filter_id_to_rule_ids.clear();
 }
 
 unsigned int transport_table_t::collect(const unsigned int rule_id, const filter& filter)
@@ -25,11 +25,11 @@ unsigned int transport_table_t::collect(const unsigned int rule_id, const filter
 	if (it == filter_ids.end())
 	{
 		filters.emplace_back(filter);
-		filter_id_rule_ids.emplace_back();
+		filter_id_to_rule_ids.emplace_back();
 		it = filter_ids.emplace_hint(it, filter, filter_ids.size());
 	}
 
-	filter_id_rule_ids[it->second].emplace_back(rule_id);
+	filter_id_to_rule_ids[it->second].emplace_back(rule_id);
 	return it->second;
 }
 
@@ -168,8 +168,8 @@ void transport_table::thread_t::compile()
 		remap.resize(group_id, 0);
 
 		const auto& [network_table_filter_id, network_flags_filter_id, transport_filter_id] = transport_table->filters[filter_id];
-		const auto& network_table_group_ids_orig = transport_table->compiler->network_table.filter_id_group_ids[network_table_filter_id];
-		const auto& network_flags_group_ids = transport_table->compiler->network_flags.filter_id_group_ids[network_flags_filter_id];
+		const auto& network_table_group_ids_orig = transport_table->compiler->network_table.filter_id_to_group_ids[network_table_filter_id];
+		const auto& network_flags_group_ids = transport_table->compiler->network_flags.filter_id_to_group_ids[network_flags_filter_id];
 
 		GroupIds network_table_group_ids;
 		GroupIds network_table_group_ids_curr;
@@ -208,16 +208,16 @@ void transport_table::thread_t::compile()
 				}
 			}
 
-			const auto& protocol_group_ids = transport_layer.protocol.filter_id_group_ids[transport_layer.protocol_id[transport_filter_id]];
-			const auto& tcp_source_group_ids = transport_layer.tcp_source.filter_id_group_ids[transport_layer.tcp_source_id[transport_filter_id]];
-			const auto& tcp_destination_group_ids = transport_layer.tcp_destination.filter_id_group_ids[transport_layer.tcp_destination_id[transport_filter_id]];
-			const auto& tcp_flags_group_ids = transport_layer.tcp_flags.filter_id_group_ids[transport_layer.tcp_flags_id[transport_filter_id]];
-			const auto& udp_source_group_ids = transport_layer.udp_source.filter_id_group_ids[transport_layer.udp_source_id[transport_filter_id]];
-			const auto& udp_destination_group_ids = transport_layer.udp_destination.filter_id_group_ids[transport_layer.udp_destination_id[transport_filter_id]];
-			const auto& icmpv4_type_code_group_ids = transport_layer.icmp_type_code.filter_id_group_ids[transport_layer.icmpv4_type_code_id[transport_filter_id]];
-			const auto& icmpv4_identifier_group_ids = transport_layer.icmp_identifier.filter_id_group_ids[transport_layer.icmpv4_identifier_id[transport_filter_id]];
-			const auto& icmpv6_type_code_group_ids = transport_layer.icmp_type_code.filter_id_group_ids[transport_layer.icmpv6_type_code_id[transport_filter_id]];
-			const auto& icmpv6_identifier_group_ids = transport_layer.icmp_identifier.filter_id_group_ids[transport_layer.icmpv6_identifier_id[transport_filter_id]];
+			const auto& protocol_group_ids = transport_layer.protocol.filter_id_to_group_ids[transport_layer.protocol_id[transport_filter_id]];
+			const auto& tcp_source_group_ids = transport_layer.tcp_source.filter_id_to_group_ids[transport_layer.tcp_source_id[transport_filter_id]];
+			const auto& tcp_destination_group_ids = transport_layer.tcp_destination.filter_id_to_group_ids[transport_layer.tcp_destination_id[transport_filter_id]];
+			const auto& tcp_flags_group_ids = transport_layer.tcp_flags.filter_id_to_group_ids[transport_layer.tcp_flags_id[transport_filter_id]];
+			const auto& udp_source_group_ids = transport_layer.udp_source.filter_id_to_group_ids[transport_layer.udp_source_id[transport_filter_id]];
+			const auto& udp_destination_group_ids = transport_layer.udp_destination.filter_id_to_group_ids[transport_layer.udp_destination_id[transport_filter_id]];
+			const auto& icmpv4_type_code_group_ids = transport_layer.icmp_type_code.filter_id_to_group_ids[transport_layer.icmpv4_type_code_id[transport_filter_id]];
+			const auto& icmpv4_identifier_group_ids = transport_layer.icmp_identifier.filter_id_to_group_ids[transport_layer.icmpv4_identifier_id[transport_filter_id]];
+			const auto& icmpv6_type_code_group_ids = transport_layer.icmp_type_code.filter_id_to_group_ids[transport_layer.icmpv6_type_code_id[transport_filter_id]];
+			const auto& icmpv6_identifier_group_ids = transport_layer.icmp_identifier.filter_id_to_group_ids[transport_layer.icmpv6_identifier_id[transport_filter_id]];
 
 			for (const auto& protocol_group_id : protocol_group_ids)
 			{
@@ -335,8 +335,8 @@ void transport_table::thread_t::populate()
 		bitmask.clear();
 
 		const auto& [network_table_filter_id, network_flags_filter_id, transport_filter_id] = transport_table->filters[filter_id];
-		const auto& network_table_group_ids_orig = transport_table->compiler->network_table.filter_id_group_ids[network_table_filter_id];
-		const auto& network_flags_group_ids = transport_table->compiler->network_flags.filter_id_group_ids[network_flags_filter_id];
+		const auto& network_table_group_ids_orig = transport_table->compiler->network_table.filter_id_to_group_ids[network_table_filter_id];
+		const auto& network_flags_group_ids = transport_table->compiler->network_flags.filter_id_to_group_ids[network_flags_filter_id];
 
 		GroupIds network_table_group_ids;
 		GroupIds network_table_group_ids_curr;
@@ -375,16 +375,16 @@ void transport_table::thread_t::populate()
 				}
 			}
 
-			const auto& protocol_group_ids = transport_layer.protocol.filter_id_group_ids[transport_layer.protocol_id[transport_filter_id]];
-			const auto& tcp_source_group_ids = transport_layer.tcp_source.filter_id_group_ids[transport_layer.tcp_source_id[transport_filter_id]];
-			const auto& tcp_destination_group_ids = transport_layer.tcp_destination.filter_id_group_ids[transport_layer.tcp_destination_id[transport_filter_id]];
-			const auto& tcp_flags_group_ids = transport_layer.tcp_flags.filter_id_group_ids[transport_layer.tcp_flags_id[transport_filter_id]];
-			const auto& udp_source_group_ids = transport_layer.udp_source.filter_id_group_ids[transport_layer.udp_source_id[transport_filter_id]];
-			const auto& udp_destination_group_ids = transport_layer.udp_destination.filter_id_group_ids[transport_layer.udp_destination_id[transport_filter_id]];
-			const auto& icmpv4_type_code_group_ids = transport_layer.icmp_type_code.filter_id_group_ids[transport_layer.icmpv4_type_code_id[transport_filter_id]];
-			const auto& icmpv4_identifier_group_ids = transport_layer.icmp_identifier.filter_id_group_ids[transport_layer.icmpv4_identifier_id[transport_filter_id]];
-			const auto& icmpv6_type_code_group_ids = transport_layer.icmp_type_code.filter_id_group_ids[transport_layer.icmpv6_type_code_id[transport_filter_id]];
-			const auto& icmpv6_identifier_group_ids = transport_layer.icmp_identifier.filter_id_group_ids[transport_layer.icmpv6_identifier_id[transport_filter_id]];
+			const auto& protocol_group_ids = transport_layer.protocol.filter_id_to_group_ids[transport_layer.protocol_id[transport_filter_id]];
+			const auto& tcp_source_group_ids = transport_layer.tcp_source.filter_id_to_group_ids[transport_layer.tcp_source_id[transport_filter_id]];
+			const auto& tcp_destination_group_ids = transport_layer.tcp_destination.filter_id_to_group_ids[transport_layer.tcp_destination_id[transport_filter_id]];
+			const auto& tcp_flags_group_ids = transport_layer.tcp_flags.filter_id_to_group_ids[transport_layer.tcp_flags_id[transport_filter_id]];
+			const auto& udp_source_group_ids = transport_layer.udp_source.filter_id_to_group_ids[transport_layer.udp_source_id[transport_filter_id]];
+			const auto& udp_destination_group_ids = transport_layer.udp_destination.filter_id_to_group_ids[transport_layer.udp_destination_id[transport_filter_id]];
+			const auto& icmpv4_type_code_group_ids = transport_layer.icmp_type_code.filter_id_to_group_ids[transport_layer.icmpv4_type_code_id[transport_filter_id]];
+			const auto& icmpv4_identifier_group_ids = transport_layer.icmp_identifier.filter_id_to_group_ids[transport_layer.icmpv4_identifier_id[transport_filter_id]];
+			const auto& icmpv6_type_code_group_ids = transport_layer.icmp_type_code.filter_id_to_group_ids[transport_layer.icmpv6_type_code_id[transport_filter_id]];
+			const auto& icmpv6_identifier_group_ids = transport_layer.icmp_identifier.filter_id_to_group_ids[transport_layer.icmpv6_identifier_id[transport_filter_id]];
 
 			for (const auto& protocol_group_id : protocol_group_ids)
 			{
@@ -491,7 +491,7 @@ void transport_table::thread_t::populate()
 		for (const auto i : bitmask)
 		{
 			filter_id_to_group_ids[filter_id].emplace_back(i);
-			group_id_filter_ids[i].emplace(filter_id);
+			group_id_to_filter_ids[i].emplace(filter_id);
 			transport_table_filter_id_to_group_ids[filter_id].emplace_back(i);
 		}
 	}

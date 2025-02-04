@@ -3,6 +3,7 @@
 
 #include "../acl/network.h"
 #include "../acl_tree.h"
+#include "controlplane/acl_base.h"
 
 namespace
 {
@@ -28,7 +29,7 @@ TEST(acl_tree, basic)
 	tree.prepare();
 
 	tAclGroupId group_id = 1;
-	std::vector<tAclGroupId> remap_group_ids;
+	GroupIds remap_group_ids;
 
 	{
 		remap_group_ids.resize(0);
@@ -52,7 +53,7 @@ TEST(acl_tree, basic)
 
 	{
 		std::vector<uint8_t> bitmask;
-		std::vector<tAclGroupId> group_ids;
+		GroupIds group_ids;
 
 		bitmask.resize(0);
 		bitmask.resize(group_id, 0);
@@ -71,13 +72,13 @@ TEST(acl_tree, basic)
 			}
 		}
 
-		std::vector<tAclGroupId> group_ids_expect = {3};
+		GroupIds group_ids_expect = {3};
 		EXPECT_THAT(group_ids, group_ids_expect);
 	}
 
 	{
 		std::vector<uint8_t> bitmask;
-		std::vector<tAclGroupId> group_ids;
+		GroupIds group_ids;
 
 		bitmask.resize(0);
 		bitmask.resize(group_id, 0);
@@ -96,13 +97,13 @@ TEST(acl_tree, basic)
 			}
 		}
 
-		std::vector<tAclGroupId> group_ids_expect = {2};
+		GroupIds group_ids_expect = {2};
 		EXPECT_THAT(group_ids, group_ids_expect);
 	}
 
 	{
 		std::vector<uint8_t> bitmask;
-		std::vector<tAclGroupId> group_ids;
+		GroupIds group_ids;
 
 		bitmask.resize(0);
 		bitmask.resize(group_id, 0);
@@ -121,7 +122,7 @@ TEST(acl_tree, basic)
 			}
 		}
 
-		std::vector<tAclGroupId> group_ids_expect = {2, 3};
+		GroupIds group_ids_expect = {2, 3};
 		EXPECT_THAT(group_ids, group_ids_expect);
 	}
 }
@@ -136,7 +137,7 @@ TEST(acl_tree, gapped)
 	tree.prepare();
 
 	tAclGroupId group_id = 1;
-	std::vector<tAclGroupId> remap_group_ids;
+	GroupIds remap_group_ids;
 
 	{
 		remap_group_ids.resize(0);
@@ -160,7 +161,7 @@ TEST(acl_tree, gapped)
 
 	{
 		std::vector<uint8_t> bitmask;
-		std::vector<tAclGroupId> group_ids;
+		GroupIds group_ids;
 
 		bitmask.resize(0);
 		bitmask.resize(group_id, 0);
@@ -179,13 +180,13 @@ TEST(acl_tree, gapped)
 			}
 		}
 
-		std::vector<tAclGroupId> group_ids_expect = {3};
+		GroupIds group_ids_expect = {3};
 		EXPECT_THAT(group_ids, group_ids_expect);
 	}
 
 	{
 		std::vector<uint8_t> bitmask;
-		std::vector<tAclGroupId> group_ids;
+		GroupIds group_ids;
 
 		bitmask.resize(0);
 		bitmask.resize(group_id, 0);
@@ -204,13 +205,13 @@ TEST(acl_tree, gapped)
 			}
 		}
 
-		std::vector<tAclGroupId> group_ids_expect = {3};
+		GroupIds group_ids_expect = {3};
 		EXPECT_THAT(group_ids, group_ids_expect);
 	}
 
 	{
 		std::vector<uint8_t> bitmask;
-		std::vector<tAclGroupId> group_ids;
+		GroupIds group_ids;
 
 		bitmask.resize(0);
 		bitmask.resize(group_id, 0);
@@ -229,13 +230,13 @@ TEST(acl_tree, gapped)
 			}
 		}
 
-		std::vector<tAclGroupId> group_ids_expect = {2};
+		GroupIds group_ids_expect = {2};
 		EXPECT_THAT(group_ids, group_ids_expect);
 	}
 
 	{
 		std::vector<uint8_t> bitmask;
-		std::vector<tAclGroupId> group_ids;
+		GroupIds group_ids;
 
 		bitmask.resize(0);
 		bitmask.resize(group_id, 0);
@@ -254,13 +255,13 @@ TEST(acl_tree, gapped)
 			}
 		}
 
-		std::vector<tAclGroupId> group_ids_expect = {2};
+		GroupIds group_ids_expect = {2};
 		EXPECT_THAT(group_ids, group_ids_expect);
 	}
 
 	{
 		std::vector<uint8_t> bitmask;
-		std::vector<tAclGroupId> group_ids;
+		GroupIds group_ids;
 
 		bitmask.resize(0);
 		bitmask.resize(group_id, 0);
@@ -279,13 +280,13 @@ TEST(acl_tree, gapped)
 			}
 		}
 
-		std::vector<tAclGroupId> group_ids_expect = {2};
+		GroupIds group_ids_expect = {2};
 		EXPECT_THAT(group_ids, group_ids_expect);
 	}
 
 	{
 		std::vector<uint8_t> bitmask;
-		std::vector<tAclGroupId> group_ids;
+		GroupIds group_ids;
 
 		bitmask.resize(0);
 		bitmask.resize(group_id, 0);
@@ -304,7 +305,7 @@ TEST(acl_tree, gapped)
 			}
 		}
 
-		std::vector<tAclGroupId> group_ids_expect = {2, 3};
+		GroupIds group_ids_expect = {2, 3};
 		EXPECT_THAT(group_ids, group_ids_expect);
 	}
 }

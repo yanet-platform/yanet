@@ -12,12 +12,10 @@ transport_t::transport_t(compiler_t* compiler) :
 void transport_t::clear()
 {
 	layers.clear();
-	remap_group_ids.clear();
-	group_id = 1;
 	filters.clear();
 	filter_ids.clear();
-	filter_rule_ids.clear();
-	filter_group_ids.clear();
+	filter_to_rule_ids.clear();
+	filter_to_group_ids.clear();
 	bitmask.clear();
 	map.clear();
 	reverse_map.clear();
@@ -32,11 +30,11 @@ unsigned int transport_t::collect(const unsigned int rule_id,
 	if (it == filter_ids.end())
 	{
 		filters.emplace_back(filter);
-		filter_rule_ids.emplace_back();
+		filter_to_rule_ids.emplace_back();
 		it = filter_ids.emplace_hint(it, filter, filter_ids.size());
 	}
 
-	filter_rule_ids[it->second].emplace_back(rule_id);
+	filter_to_rule_ids[it->second].emplace_back(rule_id);
 	return it->second;
 }
 

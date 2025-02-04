@@ -1,9 +1,8 @@
 #pragma once
 
-#include <cstdint>
+#include "common/type.h"
 #include <vector>
 
-using tAclGroupId = uint32_t;
 using GroupIds = std::vector<tAclGroupId>;
 
 namespace acl

@@ -15,6 +15,7 @@
 #include "acl.h"
 #include "balancer.h"
 #include "config.h"
+#include "controlplane/acl_base.h"
 #include "memory_manager.h"
 #include "neighbor.h"
 #include "result.h"
@@ -334,7 +335,7 @@ using request = std::vector<acl::tree_chunk_8bit_t>;
 
 namespace acl_network_table
 {
-using request = std::tuple<uint32_t, std::vector<tAclGroupId>>;
+using request = std::tuple<uint32_t, GroupIds>;
 }
 
 namespace acl_network_flags

@@ -2,6 +2,7 @@
 
 #include <cinttypes>
 
+#include "acl_base.h"
 #include "common/acl.h"
 
 namespace acl::compiler
@@ -191,7 +192,7 @@ public:
 	void insert(const type_t& address,
 	            const type_t& mask,
 	            tAclGroupId& group_id,
-	            std::vector<tAclGroupId>& remap_group_ids)
+	            GroupIds& remap)
 	{
 		if (is_mask_gapped(mask))
 		{
@@ -218,14 +219,14 @@ public:
 					insert(address & warp_shadow_mask,
 					       warp_shadow_mask,
 					       group_id,
-					       remap_group_ids);
+					       remap);
 				}
 
 				{
 					insert(address & it->second,
 					       mask & it->second,
 					       group_id,
-					       remap_group_ids);
+					       remap);
 				}
 			}
 			else
@@ -236,7 +237,7 @@ public:
 				insert_step(address << shift,
 				            mask << shift,
 				            group_id,
-				            remap_group_ids,
+				            remap,
 				            warp_chunk_id);
 			}
 		}
@@ -246,7 +247,7 @@ public:
 			insert_step(address,
 			            mask,
 			            group_id,
-			            remap_group_ids,
+			            remap,
 			            root_chunk_id);
 		}
 	}
@@ -388,10 +389,10 @@ public:
 		                   root_chunk_id);
 	}
 
-	void remap(const std::vector<tAclGroupId>& remap_group_ids)
+	void Remap(const GroupIds& remap)
 	{
 		std::set<unsigned int> prev_chunk_ids; ///< @todo: vector, bitmask?
-		remap_chunk(root_chunk_id, remap_group_ids, prev_chunk_ids);
+		remap_chunk(root_chunk_id, remap, prev_chunk_ids);
 	}
 
 public:
@@ -739,7 +740,7 @@ protected:
 	void insert_step(const type_t& address,
 	                 const type_t& mask,
 	                 tAclGroupId& group_id,
-	                 std::vector<tAclGroupId>& remap_group_ids,
+	                 GroupIds& remap,
 	                 const unsigned int chunk_id)
 	{
 		auto& chunk = chunks[chunk_id];
@@ -800,7 +801,7 @@ protected:
 			insert_step(address << bits,
 			            next_mask,
 			            group_id,
-			            remap_group_ids,
+			            remap,
 			            chunk_value.get_chunk_id());
 		}
 		else
@@ -834,7 +835,7 @@ protected:
 				}
 
 				update_group_id_next(group_id,
-				                     remap_group_ids,
+				                     remap,
 				                     chunk_value,
 				                     prev_chunk_ids);
 			}
@@ -842,7 +843,7 @@ protected:
 	}
 
 	void update_group_id_next(tAclGroupId& group_id,
-	                          std::vector<tAclGroupId>& remap_group_ids,
+	                          GroupIds& remap,
 	                          common::acl::tree_value_t& chunk_value,
 	                          std::set<unsigned int>& prev_chunk_ids)
 	{
@@ -858,7 +859,7 @@ protected:
 				     i++)
 				{
 					auto& next_chunk_value = next_chunk.values[i];
-					update_group_id_next(group_id, remap_group_ids, next_chunk_value, prev_chunk_ids);
+					update_group_id_next(group_id, remap, next_chunk_value, prev_chunk_ids);
 				}
 
 				prev_chunk_ids.emplace_hint(it, chunk_value.get_chunk_id());
@@ -866,9 +867,9 @@ protected:
 		}
 		else
 		{
-			if (chunk_value.get_group_id() < remap_group_ids.size()) ///< check: don't override self rule
+			if (chunk_value.get_group_id() < remap.size()) ///< check: don't override self rule
 			{
-				auto& step_remap = remap_group_ids[chunk_value.get_group_id()];
+				auto& step_remap = remap[chunk_value.get_group_id()];
 				if (!step_remap)
 				{
 					step_remap = group_id;
@@ -1165,7 +1166,7 @@ protected:
 	}
 
 	void remap_chunk(const unsigned int chunk_id,
-	                 const std::vector<tAclGroupId>& remap_group_ids,
+	                 const GroupIds& remap,
 	                 std::set<unsigned int>& prev_chunk_ids)
 	{
 		auto& chunk = chunks[chunk_id];
@@ -1189,13 +1190,13 @@ protected:
 			}
 			else
 			{
-				chunk_value.set_group_id(remap_group_ids[chunk_value.get_group_id()]);
+				chunk_value.set_group_id(remap[chunk_value.get_group_id()]);
 			}
 		}
 
 		for (const auto& next_chunk_id : next_chunk_ids)
 		{
-			remap_chunk(next_chunk_id, remap_group_ids, prev_chunk_ids);
+			remap_chunk(next_chunk_id, remap, prev_chunk_ids);
 		}
 	}
 };

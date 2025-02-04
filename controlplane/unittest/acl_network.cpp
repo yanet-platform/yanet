@@ -35,8 +35,8 @@ acl::compiler::network_t<uint128_t>::filter make_filter(const args_T&... prefixe
 }
 
 template<typename type_t>
-std::vector<tAclGroupId> get_by_prefix(acl::compiler::network_t<type_t>& network,
-                                       const std::string& prefix)
+GroupIds get_by_prefix(acl::compiler::network_t<type_t>& network,
+                       const std::string& prefix)
 {
 	const auto group_ids = network.get_group_ids_by_prefix({prefix});
 	return group_ids;
@@ -50,7 +50,7 @@ tAclGroupId get_by_address(acl::compiler::network_t<type_t>& network,
 }
 
 template<typename... args_T>
-void expect_group_ids_helper(std::vector<tAclGroupId>& vector,
+void expect_group_ids_helper(GroupIds& vector,
                              const unsigned int group_id,
                              const args_T... group_ids)
 {
@@ -63,9 +63,9 @@ void expect_group_ids_helper(std::vector<tAclGroupId>& vector,
 }
 
 template<typename... args_T>
-std::vector<tAclGroupId> expect_group_ids(const args_T... group_ids)
+GroupIds expect_group_ids(const args_T... group_ids)
 {
-	std::vector<tAclGroupId> result;
+	GroupIds result;
 	expect_group_ids_helper(result, group_ids...);
 	return result;
 }
@@ -134,7 +134,7 @@ TEST(acl_network, gapped_simple)
 	acl_network.populate();
 
 	tAclGroupId shared_group_id = 21;
-	acl_network.remap(shared_group_id);
+	acl_network.Remap(shared_group_id);
 
 	EXPECT_THAT(acl_network.tree.multirefs_chunk_ids.size(), 1); ///< one gapped mask
 	EXPECT_THAT(acl_network.tree.multirefs_chunk_ids.begin()->second.size(), 1 + 1); ///< has two last_multirefs
@@ -178,7 +178,7 @@ TEST(acl_network, gapped_simple_4bit)
 	acl_network.populate();
 
 	tAclGroupId shared_group_id = 1;
-	acl_network.remap(shared_group_id);
+	acl_network.Remap(shared_group_id);
 
 	EXPECT_THAT(acl_network.tree.multirefs_chunk_ids.size(), 1); ///< one gapped mask
 
@@ -216,7 +216,7 @@ TEST(acl_network, gapped_simple_4bit_6bit)
 	acl_network.populate();
 
 	tAclGroupId shared_group_id = 1;
-	acl_network.remap(shared_group_id);
+	acl_network.Remap(shared_group_id);
 
 	EXPECT_THAT(acl_network.tree.multirefs_chunk_ids.size(), 1); ///< one gapped mask
 
@@ -257,7 +257,7 @@ TEST(acl_network, intersection)
 	acl_network.populate();
 
 	tAclGroupId shared_group_id = 1;
-	acl_network.remap(shared_group_id);
+	acl_network.Remap(shared_group_id);
 
 	EXPECT_THAT(acl_network.tree.multirefs_chunk_ids.size(), 1); ///< one gapped mask
 
@@ -294,7 +294,7 @@ TEST(acl_network, intersection_aa_bb)
 	acl_network.populate();
 
 	tAclGroupId shared_group_id = 1;
-	acl_network.remap(shared_group_id);
+	acl_network.Remap(shared_group_id);
 
 	EXPECT_THAT(acl_network.tree.multirefs_chunk_ids.size(), 1); ///< one gapped mask
 
@@ -334,7 +334,7 @@ TEST(acl_network, bug_find_gapped_mask)
 	acl_network.populate();
 
 	tAclGroupId shared_group_id = 1;
-	acl_network.remap(shared_group_id);
+	acl_network.Remap(shared_group_id);
 
 	EXPECT_THAT(get_by_prefix(acl_network, "::/::"), expect_group_ids(1, 2, 3));
 

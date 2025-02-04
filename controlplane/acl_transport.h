@@ -61,14 +61,11 @@ public:
 
 	std::vector<layer> layers;
 
-	std::vector<tAclGroupId> remap_group_ids;
-	tAclGroupId group_id;
-
 	std::vector<filter> filters;
 	std::map<filter, unsigned int> filter_ids;
-	std::vector<std::vector<unsigned int>> filter_rule_ids;
+	std::vector<std::vector<unsigned int>> filter_to_rule_ids;
 
-	std::vector<std::vector<tAclGroupId>> filter_group_ids;
+	std::vector<GroupIds> filter_to_group_ids;
 
 	std::vector<uint8_t> bitmask; /// @todo: bitmask_t
 

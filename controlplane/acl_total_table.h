@@ -28,13 +28,13 @@ public:
 
 	std::map<common::acl::total_key_t, tAclGroupId> table;
 
-	std::vector<tAclGroupId> remap_group_ids;
+	GroupIds remap;
 	tAclGroupId group_id;
 
 	std::vector<filter> filters;
 	std::map<filter, unsigned int> filter_ids;
-	std::vector<unsigned int> filter_id_by_rule_id;
-	std::vector<std::set<tAclGroupId>> filter_id_group_ids;
+	std::vector<unsigned int> rule_id_to_filter_id;
+	std::vector<std::set<tAclGroupId>> filter_id_to_group_ids;
 
 	std::vector<uint8_t> bitmask; /// @todo: bitmask_t
 

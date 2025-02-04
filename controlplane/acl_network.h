@@ -24,12 +24,12 @@ public:
 	void clear()
 	{
 		tree.clear();
-		remap_group_ids.clear();
+		remap.clear();
 		group_id = 1;
 		filters.clear();
 		filter_ids.clear();
-		filter_rule_ids.clear();
-		filter_group_ids.clear();
+		filter_to_rule_ids.clear();
+		filter_to_group_ids.clear();
 		bitmask.clear();
 		map.clear();
 		reverse_map.clear();
@@ -58,7 +58,7 @@ public:
 	void prepare()
 	{
 		tree.prepare();
-		filter_group_ids.resize(filter_ids.size());
+		filter_to_group_ids.resize(filter_ids.size());
 	}
 
 	void compile()
@@ -67,12 +67,12 @@ public:
 		     filter_id < filters.size();
 		     filter_id++)
 		{
-			remap_group_ids.resize(0);
-			remap_group_ids.resize(group_id, 0);
+			remap.resize(0);
+			remap.resize(group_id, 0);
 
 			for (const auto& network : filters[filter_id])
 			{
-				tree.insert(network.addr, network.mask, group_id, remap_group_ids);
+				tree.insert(network.addr, network.mask, group_id, remap);
 			}
 		}
 
@@ -99,27 +99,27 @@ public:
 			{
 				if (bitmask[i])
 				{
-					filter_group_ids[filter_id].emplace_back(i);
+					filter_to_group_ids[filter_id].emplace_back(i);
 					reverse_map.try_emplace(i, bitset_t(filters.size()));
 				}
 			}
 		}
 	}
 
-	void remap(tAclGroupId& shared_group_id)
+	void Remap(tAclGroupId& shared_group_id)
 	{
 		for (unsigned int filter_id = 0;
 		     filter_id < filters.size();
 		     filter_id++)
 		{
-			for (const auto& group_id : filter_group_ids[filter_id])
+			for (const auto& group_id : filter_to_group_ids[filter_id])
 			{
 				reverse_map.find(group_id)->second.insert(filter_id);
 			}
 		}
 
-		remap_group_ids.resize(0);
-		remap_group_ids.resize(group_id, 0);
+		remap.resize(0);
+		remap.resize(group_id, 0);
 
 		for (const auto& [group_id, filter_bitmask] : reverse_map)
 		{
@@ -128,31 +128,31 @@ public:
 			{
 				map.emplace_hint(it, filter_bitmask, group_id);
 
-				remap_group_ids[group_id] = shared_group_id;
+				remap[group_id] = shared_group_id;
 				shared_group_id++;
 			}
 			else
 			{
 				/// dont panic. this is fine
 
-				remap_group_ids[group_id] = remap_group_ids[it->second];
+				remap[group_id] = remap[it->second];
 				collisions++;
 			}
 		}
 
-		tree.remap(remap_group_ids);
+		tree.Remap(remap);
 
-		for (auto& group_ids : filter_group_ids)
+		for (auto& group_ids : filter_to_group_ids)
 		{
 			for (auto& group_id : group_ids)
 			{
-				group_id = remap_group_ids[group_id];
+				group_id = remap[group_id];
 			}
 		}
 
 		for (const auto& [group_id, filter_bitmask] : reverse_map)
 		{
-			reverse_map_next.emplace(remap_group_ids[group_id], filter_bitmask);
+			reverse_map_next.emplace(remap[group_id], filter_bitmask);
 		}
 		reverse_map.swap(reverse_map_next);
 
@@ -160,15 +160,15 @@ public:
 		group_id = shared_group_id;
 	}
 
-	const std::vector<tAclGroupId>& get_group_ids_by_filter(const filter& filter) const
+	const GroupIds& get_group_ids_by_filter(const filter& filter) const
 	{
 		const auto filter_id = filter_ids.find(filter)->second;
-		return filter_group_ids[filter_id];
+		return filter_to_group_ids[filter_id];
 	}
 
-	std::vector<tAclGroupId> get_group_ids_by_prefix(const ::acl::network_t& network)
+	GroupIds get_group_ids_by_prefix(const ::acl::network_t& network)
 	{
-		std::vector<tAclGroupId> result;
+		GroupIds result;
 
 		bitmask.resize(0);
 		bitmask.resize(group_id, 0);
@@ -198,14 +198,14 @@ public:
 
 	tree_t<type_t, 8> tree;
 
-	std::vector<tAclGroupId> remap_group_ids;
+	GroupIds remap;
 	tAclGroupId group_id;
 
 	std::vector<filter> filters;
 	std::map<filter, unsigned int> filter_ids;
-	std::vector<std::vector<unsigned int>> filter_rule_ids;
+	std::vector<std::vector<unsigned int>> filter_to_rule_ids;
 
-	std::vector<std::vector<tAclGroupId>> filter_group_ids;
+	std::vector<GroupIds> filter_to_group_ids;
 
 	std::vector<uint8_t> bitmask; /// @todo: bitmask_t
 

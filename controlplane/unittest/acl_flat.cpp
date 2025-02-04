@@ -1,5 +1,3 @@
-#include <fstream>
-
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -9,7 +7,7 @@ namespace
 {
 
 template<typename... args_T>
-void expect_group_ids_helper(std::vector<tAclGroupId>& vector,
+void expect_group_ids_helper(GroupIds& vector,
                              const unsigned int group_id,
                              const args_T... group_ids)
 {
@@ -22,9 +20,9 @@ void expect_group_ids_helper(std::vector<tAclGroupId>& vector,
 }
 
 template<typename... args_T>
-std::vector<tAclGroupId> expect_group_ids(const args_T... group_ids)
+GroupIds expect_group_ids(const args_T... group_ids)
 {
-	std::vector<tAclGroupId> result;
+	GroupIds result;
 	expect_group_ids_helper(result, group_ids...);
 	return result;
 }
