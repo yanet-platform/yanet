@@ -1656,6 +1656,7 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 
 		balancer::scheduler scheduler{};
 		balancer::scheduler_params scheduler_params{};
+		uint8_t flags = 0;
 		if (scheduler_string == "rr")
 		{
 			scheduler = balancer::scheduler::rr;
@@ -1671,6 +1672,11 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			{
 				scheduler_params.wlc_power = std::stoll(service_json["scheduler_params"]["wlc_power"].get<std::string>(), nullptr, 10);
 			}
+		}
+		else if (scheduler_string == "purr")
+		{
+			scheduler = balancer::scheduler::wrr;
+			flags |= YANET_BALANCER_PURE_ROUND_ROBIN;
 		}
 		else
 		{
@@ -1730,7 +1736,6 @@ void config_parser_t::loadConfig_balancer_services(controlplane::base_t& baseNex
 			throw error_result_t(eResult::invalidConfigurationFile, "unknown proto");
 		}
 
-		uint8_t flags = 0;
 		if (service_json.value("mss_fix", false) == true)
 		{
 			flags |= YANET_BALANCER_FIX_MSS_FLAG;
