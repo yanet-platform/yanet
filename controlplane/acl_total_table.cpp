@@ -66,7 +66,7 @@ void total_table_t::compile()
 		bool used = false;
 		for (const auto& thread : compiler->transport_table.threads)
 		{
-			for (const auto transport_table_group_id : thread.transport_table_filter_id_group_ids[transport_table_filter_id])
+			for (const auto transport_table_group_id : thread.transport_table_filter_id_to_group_ids[transport_table_filter_id])
 			{
 				key.transport_id = transport_table_group_id;
 				auto it = table.find(key);

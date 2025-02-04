@@ -3,11 +3,9 @@
 #include <thread>
 #include <utility>
 
-#include "acl/bitset.h"
 #include "acl_base.h"
 #include "ndarray.h"
 
-#include "common/acl.h"
 #include "common/idp.h"
 
 namespace acl::compiler
@@ -31,7 +29,7 @@ struct Layer
 	static constexpr auto Dimension = 6;
 
 	NDArray<tAclGroupId, Dimension> table;
-	std::vector<tAclGroupId> remap_network_table_group_ids;
+	GroupIds remap_network_table;
 };
 
 class thread_t
@@ -52,10 +50,10 @@ protected:
 	using DimensionArray = decltype(std::declval<Layer>().table)::DimensionArray;
 
 	// keys has dims #0..4 set
-	void table_insert(transport_table::Layer& layer, DimensionArray& keys, const std::vector<unsigned int>& network_table_group_ids);
+	void table_insert(transport_table::Layer& layer, DimensionArray& keys, const GroupIds& network_table_group_ids);
 
 	// keys has dims #0..4 set
-	void table_get(transport_table::Layer& layer, DimensionArray& keys, const std::vector<unsigned int>& network_table_group_ids);
+	void table_get(transport_table::Layer& layer, DimensionArray& keys, const GroupIds& network_table_group_ids);
 
 public:
 	transport_table_t* transport_table;
@@ -67,12 +65,12 @@ public:
 	std::map<unsigned int, transport_table::Layer> layers;
 
 	tAclGroupId group_id;
-	std::vector<tAclGroupId> remap_group_ids;
+	GroupIds remap;
 	std::set<tAclGroupId> bitmask; /// @todo: bitmask_t
 
-	std::vector<std::vector<tAclGroupId>> filter_id_group_ids;
+	std::vector<GroupIds> filter_id_to_group_ids;
 	std::map<tAclGroupId, std::set<unsigned int>> group_id_filter_ids;
-	std::vector<std::vector<tAclGroupId>> transport_table_filter_id_group_ids;
+	std::vector<GroupIds> transport_table_filter_id_to_group_ids;
 
 	common::idp::updateGlobalBase::acl_transport_table::request acl_transport_table;
 

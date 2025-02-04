@@ -1,12 +1,10 @@
 #pragma once
 
-#include <map>
-#include <set>
-#include <unordered_map>
-
-#include <cinttypes>
+#include <cstdint>
+#include <vector>
 
 using tAclGroupId = uint32_t;
+using GroupIds = std::vector<tAclGroupId>;
 
 namespace acl
 {

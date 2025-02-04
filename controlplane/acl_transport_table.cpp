@@ -110,8 +110,8 @@ void transport_table::thread_t::join()
 
 void transport_table::thread_t::prepare()
 {
-	filter_id_group_ids.resize(transport_table->filter_ids.size());
-	transport_table_filter_id_group_ids.resize(transport_table->filter_ids.size());
+	filter_id_to_group_ids.resize(transport_table->filter_ids.size());
+	transport_table_filter_id_to_group_ids.resize(transport_table->filter_ids.size());
 
 	for (unsigned int layer_id = thread_id;
 	     layer_id < transport_table->compiler->transport.layers.size();
@@ -144,13 +144,13 @@ void transport_table::thread_t::prepare()
 		{
 			const unsigned int network_table_group_id = transport_layer.network_table_group_ids_vec[i] >> transport_table->compiler->transport_layers_shift;
 
-			if (network_table_group_id >= layer.remap_network_table_group_ids.size())
+			if (network_table_group_id >= layer.remap_network_table.size())
 			{
 				//FIXME: wtf.. so inefficient
-				layer.remap_network_table_group_ids.resize(network_table_group_id + 1, 0);
+				layer.remap_network_table.resize(network_table_group_id + 1, 0);
 			}
 
-			layer.remap_network_table_group_ids[network_table_group_id] = i;
+			layer.remap_network_table[network_table_group_id] = i;
 		}
 	}
 }
@@ -164,16 +164,16 @@ void transport_table::thread_t::compile()
 	     filter_id < transport_table->filters.size();
 	     filter_id++)
 	{
-		remap_group_ids.clear();
-		remap_group_ids.resize(group_id, 0);
+		remap.clear();
+		remap.resize(group_id, 0);
 
 		const auto& [network_table_filter_id, network_flags_filter_id, transport_filter_id] = transport_table->filters[filter_id];
 		const auto& network_table_group_ids_orig = transport_table->compiler->network_table.filter_id_group_ids[network_table_filter_id];
 		const auto& network_flags_group_ids = transport_table->compiler->network_flags.filter_id_group_ids[network_flags_filter_id];
 
-		std::vector<tAclGroupId> network_table_group_ids;
-		std::vector<tAclGroupId> network_table_group_ids_curr;
-		std::vector<tAclGroupId> network_table_group_ids_next = network_table_group_ids_orig;
+		GroupIds network_table_group_ids;
+		GroupIds network_table_group_ids_curr;
+		GroupIds network_table_group_ids_next = network_table_group_ids_orig;
 
 		for (unsigned int layer_id = thread_id;
 		     layer_id < transport_table->compiler->transport.layers.size();
@@ -338,9 +338,9 @@ void transport_table::thread_t::populate()
 		const auto& network_table_group_ids_orig = transport_table->compiler->network_table.filter_id_group_ids[network_table_filter_id];
 		const auto& network_flags_group_ids = transport_table->compiler->network_flags.filter_id_group_ids[network_flags_filter_id];
 
-		std::vector<tAclGroupId> network_table_group_ids;
-		std::vector<tAclGroupId> network_table_group_ids_curr;
-		std::vector<tAclGroupId> network_table_group_ids_next = network_table_group_ids_orig;
+		GroupIds network_table_group_ids;
+		GroupIds network_table_group_ids_curr;
+		GroupIds network_table_group_ids_next = network_table_group_ids_orig;
 
 		for (unsigned int layer_id = thread_id;
 		     layer_id < transport_table->compiler->transport.layers.size();
@@ -490,9 +490,9 @@ void transport_table::thread_t::populate()
 
 		for (const auto i : bitmask)
 		{
-			filter_id_group_ids[filter_id].emplace_back(i);
+			filter_id_to_group_ids[filter_id].emplace_back(i);
 			group_id_filter_ids[i].emplace(filter_id);
-			transport_table_filter_id_group_ids[filter_id].emplace_back(i);
+			transport_table_filter_id_to_group_ids[filter_id].emplace_back(i);
 		}
 	}
 }
@@ -526,18 +526,18 @@ void transport_table::thread_t::result()
 
 void transport_table::thread_t::table_insert(transport_table::Layer& layer,
                                              DimensionArray& keys,
-                                             const std::vector<unsigned int>& network_table_group_ids)
+                                             const GroupIds& network_table_group_ids)
 {
 	for (unsigned int network_table_group_id : network_table_group_ids)
 	{
-		unsigned int idx5 = layer.remap_network_table_group_ids[network_table_group_id >> transport_table->compiler->transport_layers_shift];
+		unsigned int idx5 = layer.remap_network_table[network_table_group_id >> transport_table->compiler->transport_layers_shift];
 		keys[5] = idx5;
 
 		auto& value = layer.table(keys);
 
-		if (value < remap_group_ids.size()) ///< check: don't override self rule
+		if (value < remap.size()) ///< check: don't override self rule
 		{
-			auto& remap_group_ip = remap_group_ids[value];
+			auto& remap_group_ip = remap[value];
 			if (!remap_group_ip)
 			{
 				remap_group_ip = group_id;
@@ -551,11 +551,11 @@ void transport_table::thread_t::table_insert(transport_table::Layer& layer,
 
 void transport_table::thread_t::table_get(transport_table::Layer& layer,
                                           DimensionArray& keys,
-                                          const std::vector<unsigned int>& network_table_group_ids)
+                                          const GroupIds& network_table_group_ids)
 {
 	for (const auto network_table_group_id : network_table_group_ids)
 	{
-		unsigned int idx5 = layer.remap_network_table_group_ids[network_table_group_id >> transport_table->compiler->transport_layers_shift];
+		unsigned int idx5 = layer.remap_network_table[network_table_group_id >> transport_table->compiler->transport_layers_shift];
 		keys[5] = idx5;
 
 		auto value = layer.table(keys);

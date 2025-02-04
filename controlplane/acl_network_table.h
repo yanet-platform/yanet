@@ -1,7 +1,8 @@
 #pragma once
 
-#include "acl/bitset.h"
 #include "acl_base.h"
+#include <map>
+#include <set>
 
 namespace acl::compiler
 {
