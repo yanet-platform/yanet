@@ -524,7 +524,7 @@ void transport_table::thread_t::result()
 	}
 }
 
-void transport_table::thread_t::table_insert(transport_table::layer_t& layer,
+void transport_table::thread_t::table_insert(transport_table::Layer& layer,
                                              DimensionArray& keys,
                                              const std::vector<unsigned int>& network_table_group_ids)
 {
@@ -549,7 +549,7 @@ void transport_table::thread_t::table_insert(transport_table::layer_t& layer,
 	}
 }
 
-void transport_table::thread_t::table_get(transport_table::layer_t& layer,
+void transport_table::thread_t::table_get(transport_table::Layer& layer,
                                           DimensionArray& keys,
                                           const std::vector<unsigned int>& network_table_group_ids)
 {

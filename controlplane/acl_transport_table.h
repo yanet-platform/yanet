@@ -18,20 +18,19 @@ class transport_table_t;
 namespace transport_table
 {
 
-/* dimension:
- *   network_flags
- *   protocol
- *   group1
- *   group2
- *   group3
- *   network_table
- */
-constexpr static unsigned int dimension = 6;
-
-class layer_t
+struct Layer
 {
-public:
-	NDArray<tAclGroupId, dimension> table;
+	/* dimension:
+	 *   network_flags
+	 *   protocol
+	 *   group1
+	 *   group2
+	 *   group3
+	 *   network_table
+	 */
+	static constexpr auto Dimension = 6;
+
+	NDArray<tAclGroupId, Dimension> table;
 	std::vector<tAclGroupId> remap_network_table_group_ids;
 };
 
@@ -50,13 +49,13 @@ protected:
 	void populate();
 	void result();
 
-	using DimensionArray = decltype(std::declval<layer_t>().table)::DimensionArray;
+	using DimensionArray = decltype(std::declval<Layer>().table)::DimensionArray;
 
 	// keys has dims #0..4 set
-	void table_insert(transport_table::layer_t& layer, DimensionArray& keys, const std::vector<unsigned int>& network_table_group_ids);
+	void table_insert(transport_table::Layer& layer, DimensionArray& keys, const std::vector<unsigned int>& network_table_group_ids);
 
 	// keys has dims #0..4 set
-	void table_get(transport_table::layer_t& layer, DimensionArray& keys, const std::vector<unsigned int>& network_table_group_ids);
+	void table_get(transport_table::Layer& layer, DimensionArray& keys, const std::vector<unsigned int>& network_table_group_ids);
 
 public:
 	transport_table_t* transport_table;
@@ -65,7 +64,7 @@ public:
 
 	std::thread thread;
 
-	std::map<unsigned int, transport_table::layer_t> layers;
+	std::map<unsigned int, transport_table::Layer> layers;
 
 	tAclGroupId group_id;
 	std::vector<tAclGroupId> remap_group_ids;
