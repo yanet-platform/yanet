@@ -354,6 +354,7 @@ protected:
 	uint64_t* bursts; // CONFIG_YADECAP_MBUFS_BURST_SIZE + 1
 	uint64_t* counters; // YANET_CONFIG_COUNTERS_SIZE
 	uint64_t* aclCounters; // YANET_CONFIG_ACL_COUNTERS_SIZE
+	uint64_t roundRobinCounter;
 
 	// will decrease with each new packet sent to slow worker, replenishes each N mseconds
 	int32_t packetsToSWNPRemainder;
