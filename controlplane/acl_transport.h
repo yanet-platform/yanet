@@ -63,7 +63,7 @@ public:
 
 	std::vector<filter> filters;
 	std::map<filter, tAclFilterId> filter_ids;
-	std::vector<std::vector<unsigned int>> filter_to_rule_ids;
+	std::vector<RuleIds> filter_to_rule_ids;
 
 	std::vector<GroupIds> filter_to_group_ids;
 

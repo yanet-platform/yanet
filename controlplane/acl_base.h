@@ -5,6 +5,7 @@
 
 using GroupIds = std::vector<tAclGroupId>;
 using FilterIds = std::vector<tAclFilterId>;
+using RuleIds = std::vector<tAclRuleId>;
 
 namespace acl
 {
