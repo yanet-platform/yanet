@@ -163,6 +163,7 @@ void transport_table::thread_t::compile()
 
 	for (const auto& [network_table_filter_id, network_flags_filter_id, transport_filter_id] : transport_table->filters)
 	{
+		//FIXME: why? just use unordered_map?
 		remap.clear();
 		remap.resize(group_id, 0);
 

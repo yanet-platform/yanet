@@ -26,6 +26,7 @@ public:
 public:
 	acl::compiler_t* compiler;
 
+	//FIXME: map? Why not unordered?
 	std::map<common::acl::total_key_t, tAclGroupId> table;
 
 	GroupIds remap;
