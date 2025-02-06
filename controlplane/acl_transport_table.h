@@ -50,8 +50,13 @@ protected:
 	void populate();
 	void result();
 
-	void table_insert(transport_table::layer_t& layer, const std::array<size_t, dimension>& table_indexes, const std::vector<unsigned int>& network_table_group_ids);
-	void table_get(transport_table::layer_t& layer, const std::array<size_t, dimension>& table_indexes, const std::vector<unsigned int>& network_table_group_ids);
+	using DimensionArray = decltype(std::declval<layer_t>().table)::DimensionArray;
+
+	// keys has dims #0..4 set
+	void table_insert(transport_table::layer_t& layer, DimensionArray& keys, const std::vector<unsigned int>& network_table_group_ids);
+
+	// keys has dims #0..4 set
+	void table_get(transport_table::layer_t& layer, DimensionArray& keys, const std::vector<unsigned int>& network_table_group_ids);
 
 public:
 	transport_table_t* transport_table;
