@@ -137,19 +137,8 @@ void transport_table::thread_t::prepare()
 		                    transport_layer.network_table_group_ids_vec.size());
 
 		/// prepare remap vector for compress network_table_group_ids
-		for (unsigned int i = 0;
-		     i < transport_layer.network_table_group_ids_vec.size();
-		     i++)
-		{
-			const unsigned int network_table_group_id = transport_layer.network_table_group_ids_vec[i] >> transport_table->compiler->transport_layers_shift;
-
-			if (network_table_group_id >= layer.remap_network_table_group_ids.size())
-			{
-				layer.remap_network_table_group_ids.resize(network_table_group_id + 1, 0);
-			}
-
-			layer.remap_network_table_group_ids[network_table_group_id] = i;
-		}
+		layer.prepare_remap_map(transport_layer.network_table_group_ids_vec,
+		                        transport_table->compiler->transport_layers_shift);
 	}
 }
 
@@ -526,8 +515,7 @@ void transport_table::thread_t::table_insert(transport_table::layer_t& layer,
 {
 	for (unsigned int network_table_group_id : network_table_group_ids)
 	{
-		unsigned int idx5 = layer.remap_network_table_group_ids[network_table_group_id >> transport_table->compiler->transport_layers_shift];
-		keys[5] = idx5;
+		keys[5] = layer.lookup_remap_map(network_table_group_id, transport_table->compiler->transport_layers_shift);
 
 		auto& value = layer.table(keys);
 
@@ -551,8 +539,7 @@ void transport_table::thread_t::table_get(transport_table::layer_t& layer,
 {
 	for (const auto network_table_group_id : network_table_group_ids)
 	{
-		unsigned int idx5 = layer.remap_network_table_group_ids[network_table_group_id >> transport_table->compiler->transport_layers_shift];
-		keys[5] = idx5;
+		keys[5] = layer.lookup_remap_map(network_table_group_id, transport_table->compiler->transport_layers_shift);
 
 		auto value = layer.table(keys);
 
