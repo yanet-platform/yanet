@@ -32,7 +32,32 @@ class layer_t
 {
 public:
 	NDArray<tAclGroupId, dimension> table;
-	std::vector<tAclGroupId> remap_network_table_group_ids;
+	// TODO: try to use absl flat_hash_map or similar, since we do not need iterator stability
+	std::unordered_map<tAclGroupId, tAclGroupId> remap_network_table_group_ids;
+
+	void prepare_remap_map(
+	        const std::vector<unsigned int>& network_table_group_ids_vec,
+	        unsigned int transport_layers_shift)
+	{
+		remap_network_table_group_ids.reserve(network_table_group_ids_vec.size());
+
+		for (tAclGroupId i = 0; i < network_table_group_ids_vec.size(); ++i)
+		{
+			tAclGroupId compressed = network_table_group_ids_vec[i] >> transport_layers_shift;
+
+			remap_network_table_group_ids[compressed] = i;
+		}
+	}
+
+	tAclGroupId lookup_remap_map(
+	        tAclGroupId network_table_group_id,
+	        unsigned int transport_layers_shift) const
+	{
+		tAclGroupId compressed = network_table_group_id >> transport_layers_shift;
+
+		const auto it = remap_network_table_group_ids.find(compressed);
+		return (it != remap_network_table_group_ids.end()) ? it->second : 0;
+	}
 };
 
 class thread_t
