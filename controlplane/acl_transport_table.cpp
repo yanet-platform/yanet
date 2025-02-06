@@ -222,14 +222,14 @@ void transport_table::thread_t::compile()
 			{
 				/// @todo: skip tcp,udp,icmp
 
-				table_indexes[1] = layer.table.get_index(1, protocol_group_id - 1); /// id always start with 1
-				table_indexes[2] = layer.table.get_index(2, 0);
-				table_indexes[3] = layer.table.get_index(3, 0);
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = protocol_group_id - 1; /// id always start with 1
+				table_indexes[2] = 0;
+				table_indexes[3] = 0;
+				table_indexes[4] = 0;
 
 				for (const auto network_flags_group_id : network_flags_group_ids)
 				{
-					table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
+					table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
 					table_insert(layer, table_indexes, network_table_group_ids_curr);
 				}
 			}
@@ -238,20 +238,20 @@ void transport_table::thread_t::compile()
 
 			/// tcp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_TCP) - 1); /// id always start with 1
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_TCP) - 1; /// id always start with 1
 
 				for (const auto& tcp_source_id : tcp_source_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, tcp_source_id);
+					table_indexes[2] = tcp_source_id;
 					for (const auto& tcp_destination_id : tcp_destination_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, tcp_destination_id);
+						table_indexes[3] = tcp_destination_id;
 						for (const auto& tcp_flags_id : tcp_flags_group_ids)
 						{
-							table_indexes[4] = layer.table.get_index(4, tcp_flags_id);
+							table_indexes[4] = tcp_flags_id;
 							for (const auto network_flags_group_id : network_flags_group_ids)
 							{
-								table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
+								table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
 								table_insert(layer, table_indexes, network_table_group_ids_curr);
 							}
 						}
@@ -261,18 +261,18 @@ void transport_table::thread_t::compile()
 
 			/// udp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_UDP) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_UDP) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& udp_source_id : udp_source_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, udp_source_id);
+					table_indexes[2] = udp_source_id;
 					for (const auto& udp_destination_id : udp_destination_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, udp_destination_id);
+						table_indexes[3] = udp_destination_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
 							table_insert(layer, table_indexes, network_table_group_ids_curr);
 						}
 					}
@@ -281,18 +281,18 @@ void transport_table::thread_t::compile()
 
 			/// icmp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_ICMP) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_ICMP) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& icmp_type_code_id : icmpv4_type_code_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, icmp_type_code_id);
+					table_indexes[2] = icmp_type_code_id;
 					for (const auto& icmp_identifier_id : icmpv4_identifier_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, icmp_identifier_id);
+						table_indexes[3] = icmp_identifier_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
 							table_insert(layer, table_indexes, network_table_group_ids_curr);
 						}
 					}
@@ -301,18 +301,18 @@ void transport_table::thread_t::compile()
 
 			/// icmp_v6
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_ICMPV6) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_ICMPV6) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& icmp_type_code_id : icmpv6_type_code_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, icmp_type_code_id);
+					table_indexes[2] = icmp_type_code_id;
 					for (const auto& icmp_identifier_id : icmpv6_identifier_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, icmp_identifier_id);
+						table_indexes[3] = icmp_identifier_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
 							table_insert(layer, table_indexes, network_table_group_ids_curr);
 						}
 					}
@@ -389,14 +389,14 @@ void transport_table::thread_t::populate()
 			{
 				/// @todo: skip tcp,udp,icmp
 
-				table_indexes[1] = layer.table.get_index(1, protocol_group_id - 1); /// id always start with 1
-				table_indexes[2] = layer.table.get_index(2, 0);
-				table_indexes[3] = layer.table.get_index(3, 0);
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = protocol_group_id - 1; /// id always start with 1
+				table_indexes[2] = 0;
+				table_indexes[3] = 0;
+				table_indexes[4] = 0;
 
 				for (const auto network_flags_group_id : network_flags_group_ids)
 				{
-					table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
+					table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
 					table_get(layer, table_indexes, network_table_group_ids_curr);
 				}
 			}
@@ -405,20 +405,20 @@ void transport_table::thread_t::populate()
 
 			/// tcp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_TCP) - 1); /// id always start with 1
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_TCP) - 1; /// id always start with 1
 
 				for (const auto& tcp_source_id : tcp_source_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, tcp_source_id);
+					table_indexes[2] = tcp_source_id;
 					for (const auto& tcp_destination_id : tcp_destination_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, tcp_destination_id);
+						table_indexes[3] = tcp_destination_id;
 						for (const auto& tcp_flags_id : tcp_flags_group_ids)
 						{
-							table_indexes[4] = layer.table.get_index(4, tcp_flags_id);
+							table_indexes[4] = tcp_flags_id;
 							for (const auto network_flags_group_id : network_flags_group_ids)
 							{
-								table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
+								table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
 								table_get(layer, table_indexes, network_table_group_ids_curr);
 							}
 						}
@@ -428,18 +428,18 @@ void transport_table::thread_t::populate()
 
 			/// udp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_UDP) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_UDP) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& udp_source_id : udp_source_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, udp_source_id);
+					table_indexes[2] = udp_source_id;
 					for (const auto& udp_destination_id : udp_destination_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, udp_destination_id);
+						table_indexes[3] = udp_destination_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
 							table_get(layer, table_indexes, network_table_group_ids_curr);
 						}
 					}
@@ -448,18 +448,18 @@ void transport_table::thread_t::populate()
 
 			/// icmp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_ICMP) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_ICMP) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& icmp_type_code_id : icmpv4_type_code_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, icmp_type_code_id);
+					table_indexes[2] = icmp_type_code_id;
 					for (const auto& icmp_identifier_id : icmpv4_identifier_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, icmp_identifier_id);
+						table_indexes[3] = icmp_identifier_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
 							table_get(layer, table_indexes, network_table_group_ids_curr);
 						}
 					}
@@ -468,18 +468,18 @@ void transport_table::thread_t::populate()
 
 			/// icmp_v6
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_ICMPV6) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_ICMPV6) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& icmp_type_code_id : icmpv6_type_code_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, icmp_type_code_id);
+					table_indexes[2] = icmp_type_code_id;
 					for (const auto& icmp_identifier_id : icmpv6_identifier_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, icmp_identifier_id);
+						table_indexes[3] = icmp_identifier_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
 							table_get(layer, table_indexes, network_table_group_ids_curr);
 						}
 					}
@@ -505,7 +505,7 @@ void transport_table::thread_t::result()
 		const auto& transport_layer = transport_table->compiler->transport.layers[layer_id];
 		auto& layer = layers[layer_id];
 
-		acl_transport_table.reserve(acl_transport_table.size() + layer.table.values.size());
+		acl_transport_table.reserve(acl_transport_table.size() + layer.table.size());
 
 		layer.table.for_each([&](const std::array<unsigned int, dimension>& keys,
 		                         const unsigned int value) {
@@ -527,17 +527,12 @@ void transport_table::thread_t::table_insert(transport_table::layer_t& layer,
                                              const std::array<size_t, dimension>& table_indexes,
                                              const std::vector<unsigned int>& network_table_group_ids)
 {
-	/// calc index for keys[0, 1, 2, 3, 4]
-	size_t total_index = 0;
-	for (const auto index : table_indexes)
+	for (unsigned int network_table_group_id : network_table_group_ids)
 	{
-		total_index += index;
-	}
+		unsigned int idx5 = layer.remap_network_table_group_ids[network_table_group_id >> transport_table->compiler->transport_layers_shift];
+		keys[5] = idx5;
 
-	for (const auto network_table_group_id : network_table_group_ids)
-	{
-		///                                            calc index with key[5]
-		auto& value = layer.table.values[total_index + layer.remap_network_table_group_ids[network_table_group_id >> transport_table->compiler->transport_layers_shift]];
+		auto& value = layer.table(keys);
 
 		if (value < remap_group_ids.size()) ///< check: don't override self rule
 		{
@@ -557,17 +552,13 @@ void transport_table::thread_t::table_get(transport_table::layer_t& layer,
                                           const std::array<size_t, dimension>& table_indexes,
                                           const std::vector<unsigned int>& network_table_group_ids)
 {
-	/// calc index for keys[0, 1, 2, 3, 4]
-	size_t total_index = 0;
-	for (const auto index : table_indexes)
-	{
-		total_index += index;
-	}
-
 	for (const auto network_table_group_id : network_table_group_ids)
 	{
-		///                                                 calc index with key[5]
-		const auto value = layer.table.values[total_index + layer.remap_network_table_group_ids[network_table_group_id >> transport_table->compiler->transport_layers_shift]];
+		unsigned int idx5 = layer.remap_network_table_group_ids[network_table_group_id >> transport_table->compiler->transport_layers_shift];
+		keys[5] = idx5;
+
+		auto value = layer.table(keys);
+
 		bitmask.emplace(value);
 	}
 }
