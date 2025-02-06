@@ -107,7 +107,6 @@ public:
 	FlatMap remap_group_ids;
 	std::set<tAclGroupId> bitmask; /// @todo: bitmask_t
 
-	std::vector<std::vector<tAclGroupId>> filter_id_group_ids;
 	std::map<tAclGroupId, std::set<unsigned int>> group_id_filter_ids;
 	std::vector<std::vector<tAclGroupId>> transport_table_filter_id_group_ids;
 	// FIXME: I have a strong feeling that a containter with all groups should be already presented somewhere.
