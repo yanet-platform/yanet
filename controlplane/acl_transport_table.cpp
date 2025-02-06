@@ -150,7 +150,7 @@ void transport_table::thread_t::compile()
 	for (auto [network_table_filter_id, network_flags_filter_id, transport_filter_id] : transport_table->filters)
 	{
 		remap_group_ids.clear();
-		remap_group_ids.resize(group_id, 0);
+		initial_group_id = group_id;
 
 		const auto& network_table_group_ids_orig = transport_table->compiler->network_table.filter_id_group_ids[network_table_filter_id];
 		const auto& network_flags_group_ids = transport_table->compiler->network_flags.filter_id_group_ids[network_flags_filter_id];
@@ -519,16 +519,19 @@ void transport_table::thread_t::table_insert(transport_table::layer_t& layer,
 
 		auto& value = layer.table(keys);
 
-		if (value < remap_group_ids.size()) ///< check: don't override self rule
-		{
-			auto& remap_group_ip = remap_group_ids[value];
-			if (!remap_group_ip)
-			{
-				remap_group_ip = group_id;
-				group_id += threads_count;
-			}
+		if (value >= initial_group_id)
+			continue;
 
-			value = remap_group_ip;
+		auto it = remap_group_ids.find(value);
+		if (it == remap_group_ids.end()) ///< check: don't override self rule
+		{
+			remap_group_ids.insert_unique(value, group_id);
+			value = group_id;
+			group_id += threads_count;
+		}
+		else
+		{
+			value = it->second;
 		}
 	}
 }
