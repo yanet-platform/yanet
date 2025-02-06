@@ -110,7 +110,6 @@ void transport_table::thread_t::join()
 
 void transport_table::thread_t::prepare()
 {
-	filter_id_group_ids.resize(transport_table->filter_ids.size());
 	transport_table_filter_id_group_ids.resize(transport_table->filter_ids.size());
 
 	for (unsigned int layer_id = thread_id;
@@ -478,7 +477,6 @@ void transport_table::thread_t::populate()
 
 		for (const auto i : bitmask)
 		{
-			filter_id_group_ids[filter_id].emplace_back(i);
 			group_id_filter_ids[i].emplace(filter_id);
 			transport_table_filter_id_group_ids[filter_id].emplace_back(i);
 		}
