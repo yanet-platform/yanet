@@ -155,7 +155,7 @@ void transport_table::thread_t::prepare()
 
 void transport_table::thread_t::compile()
 {
-	std::array<size_t, dimension> table_indexes;
+	DimensionArray table_indexes;
 	table_indexes.fill(0);
 
 	for (auto [network_table_filter_id, network_flags_filter_id, transport_filter_id] : transport_table->filters)
@@ -320,7 +320,7 @@ void transport_table::thread_t::compile()
 
 void transport_table::thread_t::populate()
 {
-	std::array<size_t, dimension> table_indexes;
+	DimensionArray table_indexes;
 	table_indexes.fill(0);
 
 	for (unsigned int filter_id = 0;
@@ -504,7 +504,7 @@ void transport_table::thread_t::result()
 
 		acl_transport_table.reserve(acl_transport_table.size() + layer.table.size());
 
-		layer.table.for_each([&](const std::array<unsigned int, dimension>& keys,
+		layer.table.for_each([&](const DimensionArray& keys,
 		                         const unsigned int value) {
 			common::acl::transport_key_t key;
 			key.network_flags = keys[0] + 1; /// id always start with 1
@@ -521,7 +521,7 @@ void transport_table::thread_t::result()
 }
 
 void transport_table::thread_t::table_insert(transport_table::layer_t& layer,
-                                             const std::array<size_t, dimension>& table_indexes,
+                                             DimensionArray& keys,
                                              const std::vector<unsigned int>& network_table_group_ids)
 {
 	for (unsigned int network_table_group_id : network_table_group_ids)
@@ -546,7 +546,7 @@ void transport_table::thread_t::table_insert(transport_table::layer_t& layer,
 }
 
 void transport_table::thread_t::table_get(transport_table::layer_t& layer,
-                                          const std::array<size_t, dimension>& table_indexes,
+                                          DimensionArray& keys,
                                           const std::vector<unsigned int>& network_table_group_ids)
 {
 	for (const auto network_table_group_id : network_table_group_ids)
