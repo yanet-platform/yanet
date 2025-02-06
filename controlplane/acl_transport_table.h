@@ -105,7 +105,8 @@ public:
 	std::map<unsigned int, transport_table::layer_t> layers;
 
 	tAclGroupId group_id;
-	std::vector<tAclGroupId> remap_group_ids;
+	tAclGroupId initial_group_id;
+	FlatMap remap_group_ids;
 	std::set<tAclGroupId> bitmask; /// @todo: bitmask_t
 
 	std::vector<std::vector<tAclGroupId>> filter_id_group_ids;
