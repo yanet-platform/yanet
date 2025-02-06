@@ -1,9 +1,10 @@
 #pragma once
 
 #include <thread>
+#include <utility>
 
 #include "acl_base.h"
-#include "acl_table.h"
+#include "ndarray.h"
 
 #include "common/idp.h"
 
@@ -28,7 +29,7 @@ constexpr static unsigned int dimension = 6;
 class layer_t
 {
 public:
-	table_t<dimension> table;
+	NDArray<tAclGroupId, dimension> table;
 	std::vector<tAclGroupId> remap_network_table_group_ids;
 };
 
