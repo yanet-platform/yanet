@@ -16,7 +16,6 @@ void transport_table_t::clear()
 	threads.clear();
 	filters.clear();
 	filter_ids.clear();
-	filter_id_rule_ids.clear();
 }
 
 unsigned int transport_table_t::collect(const unsigned int rule_id, const filter& filter)
@@ -25,11 +24,9 @@ unsigned int transport_table_t::collect(const unsigned int rule_id, const filter
 	if (it == filter_ids.end())
 	{
 		filters.emplace_back(filter);
-		filter_id_rule_ids.emplace_back();
 		it = filter_ids.emplace_hint(it, filter, filter_ids.size());
 	}
 
-	filter_id_rule_ids[it->second].emplace_back(rule_id);
 	return it->second;
 }
 
