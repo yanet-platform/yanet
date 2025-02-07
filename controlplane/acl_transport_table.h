@@ -90,7 +90,7 @@ protected:
 	using DimensionArray = decltype(std::declval<layer_t>().table)::DimensionArray;
 
 	void table_insert(transport_table::layer_t& layer, const DimensionArray& keys);
-	void table_get(const transport_table::layer_t& layer, const DimensionArray& keys);
+	void table_get(const transport_table::layer_t& layer, const DimensionArray& keys, unsigned int filter_id);
 
 public:
 	transport_table_t* transport_table;
@@ -104,12 +104,11 @@ public:
 	tAclGroupId group_id;
 	tAclGroupId initial_group_id;
 	FlatMap remap_group_ids;
-	std::set<tAclGroupId> bitmask; /// @todo: bitmask_t
 
 #ifdef ACL_DEBUG
 	std::unordered_set<tAclGroupId> unuque_group_ids;
 #endif
-	std::vector<std::vector<tAclGroupId>> transport_table_filter_id_group_ids;
+	std::vector<std::set<tAclGroupId>> transport_table_filter_id_group_ids;
 
 	common::idp::updateGlobalBase::acl_transport_table::request acl_transport_table;
 
