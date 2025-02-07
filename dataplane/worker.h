@@ -222,6 +222,9 @@ protected:
 
 	inline void populate_hitcount_map(const std::string& id, rte_mbuf* mbuf);
 
+	inline rte_mbuf* create_icmp_package_time_exceeded(rte_mbuf* mbuf_in);
+	inline bool is_valid_ttl(rte_mbuf* mbuf);
+
 protected:
 	/// @todo: move to slow_worker_t
 public:

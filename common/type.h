@@ -526,6 +526,15 @@ public:
 		return (address[0] & 0xff) == 0xff;
 	}
 
+	[[nodiscard]] bool is_default() const
+	{
+		if (operator==(ipv6_address_t()))
+		{
+			return true;
+		}
+		return false;
+	}
+
 protected:
 	std::array<uint8_t, 16> address;
 };
@@ -1922,6 +1931,7 @@ struct common
 	uint64_t leakedMbufs;
 	uint64_t logs_packets;
 	uint64_t logs_drops;
+	uint64_t ttl_exceeded;
 };
 
 struct port
