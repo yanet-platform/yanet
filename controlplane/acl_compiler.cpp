@@ -448,7 +448,7 @@ void compiler_t::transport_table_compile()
 
 	for (const auto& thread : transport_table.threads)
 	{
-		compiler::transport_table::FlatSet unique_groups;
+		FlatSet<tAclGroupId> unique_groups;
 
 		for (const auto& s : thread.transport_table_filter_id_group_ids)
 		{
