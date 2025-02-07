@@ -88,7 +88,7 @@ protected:
 	using DimensionArray = decltype(std::declval<layer_t>().table)::DimensionArray;
 
 	void table_insert(transport_table::layer_t& layer, const DimensionArray& keys);
-	void table_get(const transport_table::layer_t& layer, const DimensionArray& keys);
+	void table_get(const transport_table::layer_t& layer, const DimensionArray& keys, unsigned int filter_id);
 
 public:
 	transport_table_t* transport_table;
@@ -102,15 +102,8 @@ public:
 	tAclGroupId group_id;
 	tAclGroupId initial_group_id;
 	FlatMap remap_group_ids;
-	std::set<tAclGroupId> bitmask; /// @todo: bitmask_t
 
-#ifdef ACL_DEBUG
-	std::unordered_set<tAclGroupId> unuque_group_ids;
-#endif
-	std::vector<std::vector<tAclGroupId>> transport_table_filter_id_group_ids;
-	// FIXME: I have a strong feeling that a containter with all groups should be already presented somewhere.
-	// Even if it does not, maybe all I need is a vector, since we don't have to order groups.
-	std::set<tAclGroupId> all_groups;
+	std::unordered_map<tAclGroupId, std::unordered_set<unsigned int>> group_id_filter_ids;
 
 	common::idp::updateGlobalBase::acl_transport_table::request acl_transport_table;
 
