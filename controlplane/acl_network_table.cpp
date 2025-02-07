@@ -112,8 +112,7 @@ void network_table_t::populate()
 	     filter_id < filters.size();
 	     filter_id++)
 	{
-		bitmask.resize(0);
-		bitmask.resize(group_id, 0);
+		bitmask.clear();
 
 		const auto& [network_ipv4_source_filter_id,
 		             network_ipv4_destination_filter_id,
@@ -145,15 +144,10 @@ void network_table_t::populate()
 			}
 		}
 
-		for (unsigned int i = 0;
-		     i < bitmask.size();
-		     i++)
+		for (unsigned int i : bitmask)
 		{
-			if (bitmask[i])
-			{
-				filter_id_group_ids[filter_id].emplace_back(i);
-				group_id_filter_ids[i].emplace(filter_id);
-			}
+			filter_id_group_ids[filter_id].emplace_back(i);
+			group_id_filter_ids[i].emplace(filter_id);
 		}
 	}
 }
@@ -183,7 +177,7 @@ void network_table_t::table_get(const DimensionArray& keys)
 {
 	auto value = table(keys);
 
-	bitmask[value] = 1;
+	bitmask.insert(value);
 }
 
 void network_table_t::remap()
