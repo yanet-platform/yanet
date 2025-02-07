@@ -445,10 +445,19 @@ void compiler_t::transport_table_compile()
 	               size);
 #ifdef ACL_DEBUG
 	size_t group_ids = 0;
+
 	for (const auto& thread : transport_table.threads)
 	{
-		group_ids += thread.unuque_group_ids.size();
+		compiler::transport_table::FlatSet unique_groups;
+
+		for (const auto& s : thread.transport_table_filter_id_group_ids)
+		{
+			unique_groups.insert(s.begin(), s.end());
+		}
+
+		group_ids = unique_groups.size();
 	}
+
 	YANET_LOG_INFO("acl::compile: group_ids: %lu\n",
 	               group_ids);
 #else
