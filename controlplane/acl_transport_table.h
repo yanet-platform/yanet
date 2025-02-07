@@ -109,9 +109,6 @@ public:
 	tAclGroupId initial_group_id;
 	FlatMap remap_group_ids;
 
-#ifdef ACL_DEBUG
-	std::unordered_set<tAclGroupId> unuque_group_ids;
-#endif
 	std::vector<FlatSet> transport_table_filter_id_group_ids;
 
 	common::idp::updateGlobalBase::acl_transport_table::request acl_transport_table;
