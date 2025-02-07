@@ -54,7 +54,7 @@ public:
 	std::vector<std::vector<tAclGroupId>> filter_id_group_ids_next;
 	std::map<tAclGroupId, std::set<unsigned int>> group_id_filter_ids_next;
 
-	std::vector<uint8_t> bitmask; /// @todo: bitmask_t
+	FlatSet<tAclGroupId> bitmask; /// @todo: bitmask_t
 };
 
 }
