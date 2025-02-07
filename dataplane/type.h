@@ -131,6 +131,11 @@ struct ipv4_address_t
 		return result;
 	}
 
+	[[nodiscard]] bool is_default() const
+	{
+		return address == 0;
+	}
+
 	uint32_t address;
 };
 
@@ -808,6 +813,12 @@ struct state_timeout_config_t
 	uint32_t default_timeout;
 };
 
+struct host_config_t
+{
+	ipv4_address_t ipv4_address{};
+	ipv6_address_t ipv6_address{};
+	bool show_real_address{};
+};
 }
 
 }

@@ -386,6 +386,13 @@ public:
 	std::set<common::ipv6_prefix_t> dst6_early_decap;
 };
 
+class host_t
+{
+public:
+	ipv4_address_t ipv4_address{};
+	ipv6_address_t ipv6_address{};
+	bool show_real_address{};
+};
 }
 
 //
@@ -453,6 +460,7 @@ public:
 	        rib;
 
 	common::memory_manager::memory_group root_memory_group;
+	base::host_t host_config{};
 };
 
 //

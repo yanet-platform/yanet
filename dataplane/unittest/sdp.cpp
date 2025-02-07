@@ -113,6 +113,7 @@ public:
 		counters_stats["leakedMbufs"] = offsetof(common::worker::stats::common, leakedMbufs);
 		counters_stats["logs_packets"] = offsetof(common::worker::stats::common, logs_packets);
 		counters_stats["logs_drops"] = offsetof(common::worker::stats::common, logs_drops);
+		counters_stats["ttl_exceeded"] = offsetof(common::worker::stats::common, ttl_exceeded);
 		for (const auto& iter : counters_stats)
 		{
 			metadata.counter_positions[iter.first] = (metadata.start_stats + iter.second) / sizeof(uint64_t);

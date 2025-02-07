@@ -1,12 +1,16 @@
 #pragma once
 
+#include <netinet/icmp6.h>
+#include <netinet/ip_icmp.h>
 #include <rte_config.h>
 #include <rte_ip.h>
+#include <rte_tcp.h>
 #include <rte_udp.h>
 
 #include "common/type.h"
 
 #include "common.h"
+#include "type.h"
 
 namespace dataplane
 {
@@ -40,4 +44,5 @@ static_assert(sizeof(metadata) + sizeof(rte_ipv6_hdr) ///< encap
                       <= RTE_PKTMBUF_HEADROOM,
               "invalid size of headroom");
 
+void calcHash(rte_mbuf* mbuf, uint8_t flags = 0);
 }

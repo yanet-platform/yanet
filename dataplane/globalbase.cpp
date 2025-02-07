@@ -424,6 +424,10 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		{
 			result = tscs_base_value_update(std::get<common::idp::updateGlobalBase::tscs_base_value_update::request>(data));
 		}
+		else if (type == common::idp::updateGlobalBase::requestType::update_host_config)
+		{
+			result = update_host_config(std::get<common::idp::updateGlobalBase::update_host_config::request>(data));
+		}
 		else
 		{
 			YADECAP_LOG_ERROR("invalid request type\n");
@@ -2418,4 +2422,18 @@ eResult generation::fwstate_synchronization_update(const common::idp::updateGlob
 	});
 
 	return eResult::success;
+}
+
+eResult generation::update_host_config(const common::idp::updateGlobalBase::update_host_config::request& request)
+{
+	eResult result = eResult::success;
+
+	auto [ipv4_address, ipv6_address, show_real_address] = request;
+
+	host_config = dataplane::globalBase::host_config_t{
+	        ipv4_address_t::convert(ipv4_address),
+	        ipv6_address_t::convert(ipv6_address),
+	        show_real_address};
+
+	return result;
 }
