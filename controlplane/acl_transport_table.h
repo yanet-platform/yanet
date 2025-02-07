@@ -103,7 +103,7 @@ public:
 
 	std::thread thread;
 
-	std::map<unsigned int, transport_table::layer_t> layers;
+	std::vector<transport_table::layer_t> layers;
 
 	tAclGroupId group_id;
 	tAclGroupId initial_group_id;

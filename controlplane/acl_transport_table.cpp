@@ -108,6 +108,7 @@ void transport_table::thread_t::join()
 void transport_table::thread_t::prepare()
 {
 	transport_table_filter_id_group_ids.resize(transport_table->filter_ids.size());
+	layers.resize(transport_table->compiler->transport.layers.size());
 
 	for (unsigned int layer_id = thread_id;
 	     layer_id < transport_table->compiler->transport.layers.size();
