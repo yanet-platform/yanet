@@ -106,6 +106,8 @@ void transport_table::thread_t::join()
 
 void transport_table::thread_t::prepare()
 {
+	layers.resize(transport_table->compiler->transport.layers.size());
+
 	for (unsigned int layer_id = thread_id;
 	     layer_id < transport_table->compiler->transport.layers.size();
 	     layer_id += threads_count)
