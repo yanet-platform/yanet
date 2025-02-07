@@ -72,7 +72,7 @@ void compiler_t::compile(const std::vector<rule_t>& unwind_rules,
 	{
 		auto& [width, values] = result.acl_network_table;
 		width = network_table.width;
-		values.swap(network_table.values);
+		values.swap(network_table.table.values());
 	}
 
 	result.acl_network_flags.swap(network_flags.filters);
@@ -376,7 +376,7 @@ void compiler_t::network_table_compile()
 	network_table.prepare(source_group_id, destination_group_id);
 
 	YANET_LOG_INFO("acl::compile: size: %lu\n",
-	               network_table.values.size());
+	               network_table.table.size());
 
 	network_table.compile();
 	network_table.populate();
