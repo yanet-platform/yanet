@@ -2,6 +2,7 @@
 
 #include "acl/bitset.h"
 #include "acl_base.h"
+#include "ndarray.h"
 
 namespace acl::compiler
 {
@@ -28,7 +29,18 @@ public:
 	acl::compiler_t* compiler;
 
 	uint32_t width;
-	std::vector<tAclGroupId> values;
+	/* dimension:
+	 *   network_source
+	 *   network_destination
+	 */
+	constexpr static unsigned int dimension = 2;
+
+	NDArray<tAclGroupId, dimension> table;
+
+	using DimensionArray = decltype(table)::DimensionArray;
+
+	void table_insert(const DimensionArray& keys);
+	void table_get(const DimensionArray& keys);
 
 	std::vector<tAclGroupId> remap_group_ids;
 	tAclGroupId group_id;
