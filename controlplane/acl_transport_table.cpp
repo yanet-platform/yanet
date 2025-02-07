@@ -471,7 +471,7 @@ void transport_table::thread_t::populate()
 		for (const auto i : bitmask)
 		{
 #ifdef ACL_DEBUG
-			group_id_filter_ids[i].emplace(filter_id);
+			unuque_group_ids.insert(i);
 #endif
 			transport_table_filter_id_group_ids[filter_id].emplace_back(i);
 			all_groups.insert(i);
