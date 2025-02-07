@@ -298,6 +298,7 @@ void cWorker::FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata)
 	counters_stats["leakedMbufs"] = offsetof(common::worker::stats::common, leakedMbufs);
 	counters_stats["logs_packets"] = offsetof(common::worker::stats::common, logs_packets);
 	counters_stats["logs_drops"] = offsetof(common::worker::stats::common, logs_drops);
+	counters_stats["ttl_exceeded"] = offsetof(common::worker::stats::common, ttl_exceeded);
 	for (const auto& iter : counters_stats)
 	{
 		metadata.counter_positions[iter.first] = (metadata.start_stats + iter.second) / sizeof(uint64_t);
@@ -1693,6 +1694,15 @@ inline void cWorker::acl_ingress_flow(rte_mbuf* mbuf,
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 	metadata->flow = flow;
+
+	if (flow != common::globalBase::eFlowType::route_local && !is_valid_ttl(mbuf))
+	{
+		auto new_mbuf = create_icmp_package_time_exceeded(mbuf);
+		drop(mbuf);
+		if (new_mbuf)
+			route_entry(new_mbuf);
+		return;
+	}
 
 	if (flow.type == common::globalBase::eFlowType::tun64_ipv4_checked)
 	{
@@ -5969,4 +5979,136 @@ inline void cWorker::populate_hitcount_map(const std::string& id, rte_mbuf* mbuf
 
 	entry.count++;
 	entry.bytes += mbuf->pkt_len;
+}
+
+inline rte_mbuf* cWorker::create_icmp_package_time_exceeded(rte_mbuf* mbuf)
+{
+	const auto& host_config = bases[localBaseId & 1].globalBase->host_config;
+	rte_mbuf* new_mbuf = rte_pktmbuf_alloc(mempool);
+	if (new_mbuf == nullptr)
+	{
+		return nullptr;
+	}
+
+	auto metadata = YADECAP_METADATA(new_mbuf);
+	*metadata = *YADECAP_METADATA(mbuf);
+
+	// copy ethernet_header
+	rte_memcpy(rte_pktmbuf_mtod(new_mbuf, char*),
+	           rte_pktmbuf_mtod(mbuf, char*),
+	           metadata->network_headerOffset);
+
+	// copy transport header
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
+		rte_memcpy(rte_pktmbuf_mtod_offset(new_mbuf, char*, metadata->network_headerOffset),
+		           rte_pktmbuf_mtod_offset(mbuf, char*, metadata->network_headerOffset),
+		           sizeof(rte_ipv4_hdr));
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		rte_memcpy(rte_pktmbuf_mtod_offset(new_mbuf, char*, metadata->network_headerOffset),
+		           rte_pktmbuf_mtod_offset(mbuf, char*, metadata->network_headerOffset),
+		           sizeof(rte_ipv6_hdr));
+	}
+	else
+	{
+		return nullptr;
+	}
+
+	// rewrite transport header
+
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
+		rte_ipv4_hdr* ip_header = rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+		ip_header->version_ihl = 0x45;
+		ip_header->fragment_offset = 0;
+		ip_header->time_to_live = 128;
+		RTE_SWAP(ip_header->dst_addr, ip_header->src_addr);
+		if (!host_config.hidden_real_ip && !host_config.ipv4_address.is_default())
+		{
+			ip_header->src_addr = host_config.ipv4_address.address;
+		}
+		ip_header->next_proto_id = IPPROTO_ICMP;
+		ip_header->packet_id = rte_cpu_to_be_16(0x01);
+		ip_header->total_length = rte_cpu_to_be_16(sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_icmp_hdr));
+		ip_header->hdr_checksum = 0;
+		ip_header->hdr_checksum = rte_ipv4_cksum(ip_header);
+
+		metadata->transport_headerType = IPPROTO_ICMP;
+		metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(struct rte_ipv4_hdr);
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		rte_ipv6_hdr* ip_header = rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		ip_header->hop_limits = 128;
+		{
+			uint8_t addr[16];
+			rte_memcpy(addr, ip_header->src_addr, 16);
+			rte_memcpy(ip_header->src_addr, ip_header->dst_addr, 16);
+			rte_memcpy(ip_header->dst_addr, addr, 16);
+			if (!host_config.hidden_real_ip && !host_config.ipv6_address.empty())
+			{
+				rte_memcpy(ip_header->src_addr, host_config.ipv6_address.bytes, 16);
+			}
+		}
+		ip_header->proto = IPPROTO_ICMPV6;
+		ip_header->payload_len = rte_cpu_to_be_16(sizeof(rte_icmp_hdr));
+
+		metadata->transport_headerType = IPPROTO_ICMPV6;
+		metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(struct rte_ipv6_hdr);
+	}
+
+	// fill icmp header
+	rte_icmp_hdr* icmp_header = rte_pktmbuf_mtod_offset(new_mbuf, rte_icmp_hdr*, metadata->transport_headerOffset);
+	icmp_header->icmp_type = 11; // time exceeded
+	icmp_header->icmp_code = 0; // TTL  expired in transit
+	icmp_header->icmp_ident = 0;
+	icmp_header->icmp_seq_nb = 0;
+	if (metadata->transport_headerType == IPPROTO_ICMP)
+	{
+		icmp_header->icmp_type = 11;
+		yanet_icmpv4_checksum((icmp_header_t*)icmp_header, sizeof(icmp_header_t));
+	}
+	else
+	{
+		icmp_header->icmp_type = 3;
+		rte_ipv6_hdr* ip_header = rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		yanet_icmpv6_checksum((icmp_header_t*)icmp_header, sizeof(icmp_header_t), ip_header->src_addr, ip_header->dst_addr);
+	}
+
+	// update metadata
+	metadata->network_flags = 0;
+	metadata->transport_flags = 0;
+	calcHash(mbuf);
+
+	new_mbuf->pkt_len = metadata->transport_headerOffset + sizeof(rte_icmp_hdr);
+	new_mbuf->data_len = metadata->transport_headerOffset + sizeof(rte_icmp_hdr);
+
+	stats->ttl_exceeded++;
+	return new_mbuf;
+}
+
+inline bool cWorker::is_valid_ttl(rte_mbuf* mbuf)
+{
+	auto metadata = YADECAP_METADATA(mbuf);
+
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
+		rte_ipv4_hdr* ip_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+		if (ip_header->time_to_live <= 1)
+		{
+			return false;
+		}
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		rte_ipv6_hdr* ip_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		if (ip_header->hop_limits <= 1)
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
