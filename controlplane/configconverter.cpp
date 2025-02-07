@@ -31,6 +31,7 @@ eResult config_converter_t::process(uint32_t serial)
 		processBalancer();
 		processDregress();
 		processAcl();
+		processHostConfig();
 
 		buildAcl();
 	}
@@ -823,6 +824,15 @@ void config_converter_t::processAcl()
 			acl.nextModuleRules.emplace_back(flow);
 		}
 	}
+}
+
+void config_converter_t::processHostConfig()
+{
+	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::update_host_config,
+	                        common::idp::updateGlobalBase::update_host_config::request{
+	                                baseNext.host_config.ipv4_address,
+	                                baseNext.host_config.ipv6_address,
+	                                baseNext.host_config.show_real_address});
 }
 
 void config_converter_t::acl_rules_early_decap(controlplane::base::acl_t& acl) const

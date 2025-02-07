@@ -79,8 +79,6 @@ protected:
 
 	YANET_NEVER_INLINE void mainThread();
 
-	inline void calcHash(rte_mbuf* mbuf, uint8_t without_ports = 0);
-
 public:
 	void preparePacket(rte_mbuf* mbuf); ///< @todo: inline
 
@@ -221,6 +219,7 @@ protected:
 	inline uint32_t get_state_timeout(rte_mbuf* mbuf, dataplane::metadata* metadata, const dataplane::globalBase::state_timeout_config_t& state_timeout_config);
 
 	inline void populate_hitcount_map(const std::string& id, rte_mbuf* mbuf);
+	inline bool is_expired_ttl(rte_mbuf* mbuf);
 
 protected:
 	/// @todo: move to slow_worker_t

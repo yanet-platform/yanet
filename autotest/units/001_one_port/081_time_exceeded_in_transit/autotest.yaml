@@ -1,0 +1,25 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
+- ipv6Update: "::/0 -> fe80::1"
+
+- subtest: host_config is empty
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+- reload: controlplane_full_config_show_real_address_disabled.conf
+
+- subtest: "full host_config: show_real_address disabled"
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+- reload: controlplane_full_config_show_real_address_enabled.conf
+
+- subtest: "full host_config: show_real_address enabled"
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap

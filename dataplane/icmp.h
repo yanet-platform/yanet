@@ -2,9 +2,11 @@
 
 #include <netinet/icmp6.h>
 #include <netinet/ip_icmp.h>
+#include <variant>
 
 #include "checksum.h"
 #include "type.h"
+#include <rte_mbuf.h>
 
 inline bool yanet_icmp_translate_v6_to_v4(icmp_header_t* icmpHeader,
                                           uint16_t length,
@@ -76,4 +78,24 @@ inline bool yanet_icmp_translate_v4_to_v6(icmp_header_t* icmpHeader,
 	icmpHeader->checksum = ~csum;
 
 	return true;
+}
+
+namespace yanet::icmp
+{
+
+enum class TypePackage
+{
+	TimeExceeded = 0
+};
+
+struct CreateTimeExceededPackagePayload
+{
+	rte_mbuf* mbuf_source;
+	const dataplane::globalBase::host_config_t host_config;
+};
+
+using CreatePackagePayload = std::variant<CreateTimeExceededPackagePayload>;
+
+uint32_t create_icmp_package(TypePackage type, rte_mbuf* mbuf_target, const CreatePackagePayload& payload);
+uint32_t create_icmp_package_time_exceeded(rte_mbuf* mbuf_target, const CreateTimeExceededPackagePayload& payload);
 }

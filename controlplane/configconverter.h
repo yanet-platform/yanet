@@ -41,6 +41,7 @@ protected:
 	void processBalancer();
 	void processDregress();
 	void processAcl();
+	void processHostConfig();
 	void buildAcl();
 
 	void serializeLogicalPorts();
