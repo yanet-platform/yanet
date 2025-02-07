@@ -10,14 +10,6 @@
 #include "common/acl.h"
 #include "common/idp.h"
 
-#if defined(CUSTOM_HASH_STRUCTURES)
-#include "hash_table7.hpp"
-#include "unordered_dense.h"
-#else
-#include <unordered_map>
-#include <unordered_set>
-#endif
-
 namespace acl::compiler
 {
 
@@ -36,20 +28,11 @@ namespace transport_table
  */
 constexpr static unsigned int dimension = 6;
 
-#if defined(CUSTOM_HASH_STRUCTURES)
-// TODO: check another maps/hashes. Note that they should work with gcc 7.5 on Ubuntu18
-using FlatMap = emhash7::HashMap<tAclGroupId, tAclGroupId>;
-using FlatSet = ankerl::unordered_dense::set<tAclGroupId>;
-#else
-using FlatMap = std::unordered_map<tAclGroupId, tAclGroupId>;
-using FlatSet = std::unordered_set<tAclGroupId>;
-#endif
-
 class layer_t
 {
 public:
 	NDArray<tAclGroupId, dimension> table;
-	FlatMap remap_network_table_group_ids;
+	FlatMap<tAclGroupId, tAclGroupId> remap_network_table_group_ids;
 
 	void prepare_remap_map(
 	        const std::vector<unsigned int>& network_table_group_ids_vec,
@@ -107,9 +90,9 @@ public:
 
 	tAclGroupId group_id;
 	tAclGroupId initial_group_id;
-	FlatMap remap_group_ids;
+	FlatMap<tAclGroupId, tAclGroupId> remap_group_ids;
 
-	std::vector<FlatSet> transport_table_filter_id_group_ids;
+	std::vector<FlatSet<tAclGroupId>> transport_table_filter_id_group_ids;
 
 	common::idp::updateGlobalBase::acl_transport_table::request acl_transport_table;
 
