@@ -27,6 +27,7 @@
 #include "checksum.h"
 #include "common.h"
 #include "dataplane.h"
+#include "icmp.h"
 #include "metadata.h"
 #include "prepare.h"
 #include "worker.h"
@@ -298,6 +299,7 @@ void cWorker::FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata)
 	counters_stats["leakedMbufs"] = offsetof(common::worker::stats::common, leakedMbufs);
 	counters_stats["logs_packets"] = offsetof(common::worker::stats::common, logs_packets);
 	counters_stats["logs_drops"] = offsetof(common::worker::stats::common, logs_drops);
+	counters_stats["ttl_exceeded"] = offsetof(common::worker::stats::common, ttl_exceeded);
 	for (const auto& iter : counters_stats)
 	{
 		metadata.counter_positions[iter.first] = (metadata.start_stats + iter.second) / sizeof(uint64_t);
@@ -389,62 +391,6 @@ YANET_NEVER_INLINE void cWorker::mainThread()
 		}
 
 		iteration++;
-	}
-}
-
-inline void cWorker::calcHash(rte_mbuf* mbuf, uint8_t flags)
-{
-	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
-	metadata->hash = 0;
-
-	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
-	{
-		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-
-		metadata->hash = rte_hash_crc(&ipv4Header->next_proto_id, 1, metadata->hash);
-		metadata->hash = rte_hash_crc(&ipv4Header->src_addr, 4 + 4, metadata->hash);
-	}
-	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
-	{
-		rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
-
-		metadata->hash = rte_hash_crc(&ipv6Header->proto, 1, metadata->hash);
-		metadata->hash = rte_hash_crc(&ipv6Header->src_addr, 16 + 16, metadata->hash);
-	}
-
-	if (!((metadata->network_flags & YANET_NETWORK_FLAG_NOT_FIRST_FRAGMENT) || (flags & YANET_BALANCER_PURE_L3)))
-	{
-		if (metadata->transport_headerType == IPPROTO_ICMP)
-		{
-			icmp_header_t* icmpHeader = rte_pktmbuf_mtod_offset(mbuf, icmp_header_t*, metadata->transport_headerOffset);
-
-			if (icmpHeader->type == ICMP_ECHO ||
-			    icmpHeader->type == ICMP_ECHOREPLY)
-			{
-				metadata->hash = rte_hash_crc(&icmpHeader->identifier, 2, metadata->hash);
-			}
-		}
-		else if (metadata->transport_headerType == IPPROTO_ICMPV6)
-		{
-			icmpv6_header_t* icmpHeader = rte_pktmbuf_mtod_offset(mbuf, icmpv6_header_t*, metadata->transport_headerOffset);
-
-			if (icmpHeader->type == ICMP6_ECHO_REQUEST ||
-			    icmpHeader->type == ICMP6_ECHO_REPLY)
-			{
-				metadata->hash = rte_hash_crc(&icmpHeader->identifier, 2, metadata->hash);
-			}
-		}
-		else if (metadata->transport_headerType == IPPROTO_TCP)
-		{
-			rte_tcp_hdr* tcpHeader = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
-			metadata->hash = rte_hash_crc(&tcpHeader->src_port, 2 + 2, metadata->hash);
-		}
-		else if (metadata->transport_headerType == IPPROTO_UDP)
-		{
-			rte_udp_hdr* udpHeader = rte_pktmbuf_mtod_offset(mbuf, rte_udp_hdr*, metadata->transport_headerOffset);
-			metadata->hash = rte_hash_crc(&udpHeader->src_port, 2 + 2, metadata->hash);
-		}
 	}
 }
 
@@ -1694,6 +1640,25 @@ inline void cWorker::acl_ingress_flow(rte_mbuf* mbuf,
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 	metadata->flow = flow;
 
+	if (flow != common::globalBase::eFlowType::route_local && is_expired_ttl(mbuf))
+	{
+		rte_mbuf* new_mbuf = rte_pktmbuf_alloc(mempool);
+		yanet::icmp::CreatePackagePayload payload = yanet::icmp::CreateTimeExceededPackagePayload{
+		        .mbuf_source = mbuf,
+		        .host_config = bases[localBaseId & 1].globalBase->host_config};
+		if (yanet::icmp::create_icmp_package(yanet::icmp::TypePackage::TimeExceeded, new_mbuf, payload) == 0)
+		{
+			route_entry(new_mbuf);
+			stats->ttl_exceeded++;
+		}
+		else
+		{
+			rte_pktmbuf_free(new_mbuf);
+		}
+		drop(mbuf);
+		return;
+	}
+
 	if (flow.type == common::globalBase::eFlowType::tun64_ipv4_checked)
 	{
 		tun64_ipv4_checked(mbuf);
@@ -2134,7 +2099,7 @@ inline void cWorker::route_handle4()
 
 		route_ipv4_keys[mbuf_i] = ipv4Header->dst_addr;
 
-		calcHash(mbuf);
+		dataplane::calcHash(mbuf);
 	}
 
 	base.globalBase->route_lpm4->lookup(route_ipv4_keys, route_ipv4_values, route_stack4.mbufsCount);
@@ -2262,7 +2227,7 @@ inline void cWorker::route_handle6()
 
 		rte_memcpy(route_ipv6_keys[mbuf_i].bytes, ipv6Header->dst_addr, 16);
 
-		calcHash(mbuf);
+		dataplane::calcHash(mbuf);
 	}
 
 	base.globalBase->route_lpm6->lookup(route_ipv6_keys, route_ipv6_values, route_stack6.mbufsCount);
@@ -2470,7 +2435,7 @@ inline void cWorker::route_tunnel_handle4()
 
 		route_ipv4_keys[mbuf_i] = ipv4Header->dst_addr;
 
-		calcHash(mbuf);
+		dataplane::calcHash(mbuf);
 		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
 	}
 
@@ -2601,7 +2566,7 @@ inline void cWorker::route_tunnel_handle6()
 
 		rte_memcpy(route_ipv6_keys[mbuf_i].bytes, ipv6Header->dst_addr, 16);
 
-		calcHash(mbuf);
+		dataplane::calcHash(mbuf);
 		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
 	}
 
@@ -3957,7 +3922,7 @@ inline void cWorker::balancer_handle()
 		const balancer_service_id_t service_id = metadata->flow.data.atomic >> 8;
 		const auto& service = base.globalBase->balancer_services[service_id];
 
-		calcHash(mbuf, service.flags);
+		dataplane::calcHash(mbuf, service.flags);
 		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
 
 		auto& key = balancer_keys[mbuf_i];
@@ -5625,7 +5590,7 @@ inline void cWorker::dregress_entry(rte_mbuf* mbuf)
 
 	/// @todo: opt
 	preparePacket(mbuf);
-	calcHash(mbuf);
+	dataplane::calcHash(mbuf);
 
 	slowWorker_entry_normalPriority(mbuf, common::globalBase::eFlowType::slowWorker_dregress);
 }
@@ -5969,4 +5934,28 @@ inline void cWorker::populate_hitcount_map(const std::string& id, rte_mbuf* mbuf
 
 	entry.count++;
 	entry.bytes += mbuf->pkt_len;
+}
+
+inline bool cWorker::is_expired_ttl(rte_mbuf* mbuf)
+{
+	auto metadata = YADECAP_METADATA(mbuf);
+
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
+		rte_ipv4_hdr* ip_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+		if (ip_header->time_to_live <= 1)
+		{
+			return true;
+		}
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		rte_ipv6_hdr* ip_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		if (ip_header->hop_limits <= 1)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }

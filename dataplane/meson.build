@@ -23,7 +23,9 @@ sources = files('bus.cpp',
                 'slow_worker.cpp',
                 'sock_dev.cpp',
                 'worker.cpp',
-                'worker_gc.cpp')
+                'worker_gc.cpp',
+                'icmp.cpp',
+                'metadata.cpp')
 
 foreach arch : archs
     foreach yanet_config : yanet_configs
