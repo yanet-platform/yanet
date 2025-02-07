@@ -136,7 +136,6 @@ public:
 
 	std::vector<filter> filters;
 	std::map<filter, unsigned int> filter_ids;
-	std::vector<std::vector<unsigned int>> filter_id_rule_ids;
 };
 
 }
