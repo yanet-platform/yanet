@@ -89,11 +89,8 @@ protected:
 
 	using DimensionArray = decltype(std::declval<layer_t>().table)::DimensionArray;
 
-	// keys has dims #0..4 set
-	void table_insert(transport_table::layer_t& layer, DimensionArray& keys, const std::vector<unsigned int>& network_table_group_ids);
-
-	// keys has dims #0..4 set
-	void table_get(transport_table::layer_t& layer, DimensionArray& keys, const std::vector<unsigned int>& network_table_group_ids);
+	void table_insert(transport_table::layer_t& layer, const DimensionArray& keys);
+	void table_get(const transport_table::layer_t& layer, const DimensionArray& keys);
 
 public:
 	transport_table_t* transport_table;
