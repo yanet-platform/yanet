@@ -456,7 +456,7 @@ void compiler_t::transport_table_compile()
 	size_t group_ids = 0;
 	for (const auto& thread : transport_table.threads)
 	{
-		group_ids += thread.unuque_group_ids.size();
+		group_ids += thread.group_id_filter_ids.size();
 	}
 	YANET_LOG_INFO("acl::compile: group_ids: %lu\n",
 	               group_ids);

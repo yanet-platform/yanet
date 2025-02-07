@@ -22,11 +22,11 @@ void total_table_t::collect(const unsigned int rule_id, const filter& filter)
 
 void total_table_t::prepare()
 {
-	for (auto& thread : compiler->transport_table.threads)
+	for (const auto& thread : compiler->transport_table.threads)
 	{
-		for (auto group : thread.all_groups)
+		for (const auto& [group, filter_ids] : thread.group_id_filter_ids)
 		{
-			for (auto filter_id : thread.group_id_filter_ids[group])
+			for (auto filter_id : filter_ids)
 			{
 				for (const auto& [rule_id, acl_id] : acl_rules_by_filter_id[filter_id])
 				{
@@ -51,7 +51,7 @@ void total_table_t::compile()
 
 	for (auto& thread : compiler->transport_table.threads)
 	{
-		for (auto group : thread.all_groups)
+		for (const auto& [group, filter_ids] : thread.group_id_filter_ids)
 		{
 			YANET_LOG_DEBUG("Processing group %u:\n", group);
 
