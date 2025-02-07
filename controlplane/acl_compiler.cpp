@@ -446,16 +446,23 @@ void compiler_t::transport_table_compile()
 	transport_table.populate();
 
 	size_t size = 0;
-	size_t group_ids = 0;
 	for (const auto& thread : transport_table.threads)
 	{
 		size += thread.acl_transport_table.size();
-		group_ids += thread.group_id_filter_ids.size();
 	}
 	YANET_LOG_INFO("acl::compile: size: %lu\n",
 	               size);
+#ifdef ACL_DEBUG
+	size_t group_ids = 0;
+	for (const auto& thread : transport_table.threads)
+	{
+		group_ids += thread.group_id_filter_ids.size();
+	}
 	YANET_LOG_INFO("acl::compile: group_ids: %lu\n",
 	               group_ids);
+#else
+	YANET_LOG_INFO("acl::compile: group_ids: enable ACL_DEBUG to see\n");
+#endif
 }
 
 void compiler_t::total_table_compile()
