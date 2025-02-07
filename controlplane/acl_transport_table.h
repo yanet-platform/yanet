@@ -121,6 +121,9 @@ public:
 class transport_table_t
 {
 public:
+	// FIXME: why don't we use threads if the code supports parallelization?
+	// I feel like this place is bugged, at least, setting threads_count to something
+	// other than one resulted in wrong ACL results for me
 	transport_table_t(acl::compiler_t* compiler, const unsigned int threads_count = 1);
 
 public:
