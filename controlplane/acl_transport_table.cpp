@@ -153,7 +153,7 @@ void transport_table::thread_t::compile()
 
 		std::vector<tAclGroupId> network_table_group_ids;
 		std::vector<tAclGroupId> network_table_group_ids_curr;
-		std::vector<tAclGroupId> network_table_group_ids_next = network_table_group_ids_orig;
+		std::vector<tAclGroupId> network_table_group_ids_next(network_table_group_ids_orig.begin(), network_table_group_ids_orig.end());
 
 		for (unsigned int layer_id = thread_id;
 		     layer_id < transport_table->compiler->transport.layers.size();
@@ -353,7 +353,7 @@ void transport_table::thread_t::populate()
 
 		std::vector<tAclGroupId> network_table_group_ids;
 		std::vector<tAclGroupId> network_table_group_ids_curr;
-		std::vector<tAclGroupId> network_table_group_ids_next = network_table_group_ids_orig;
+		std::vector<tAclGroupId> network_table_group_ids_next(network_table_group_ids_orig.begin(), network_table_group_ids_orig.end());
 
 		for (unsigned int layer_id = thread_id;
 		     layer_id < transport_table->compiler->transport.layers.size();
