@@ -13,13 +13,16 @@ class transport_t
 public:
 	transport_t(acl::compiler_t* compiler);
 
+private:
+	void emplace_variation(const unsigned int network_table_group_id, const std::set<unsigned int>& filter_ids);
+
 public:
 	using filter = filter_transport;
 
 	void clear();
 	unsigned int collect(const unsigned int rule_id, const filter& filter);
 	void prepare();
-	void emplace_variation(const unsigned int network_table_group_id, const std::set<unsigned int>& filter_ids);
+	void create_variations();
 	void distribute();
 	void compile();
 	void populate();
