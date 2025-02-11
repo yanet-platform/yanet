@@ -42,8 +42,9 @@ public:
 	void table_insert(const DimensionArray& keys);
 	void table_get(const DimensionArray& keys);
 
-	std::vector<tAclGroupId> remap_group_ids;
 	tAclGroupId group_id;
+	tAclGroupId initial_group_id;
+	FlatMap<tAclGroupId, tAclGroupId> remap_group_ids;
 
 	std::vector<filter> filters;
 	std::map<filter, unsigned int> filter_ids;
