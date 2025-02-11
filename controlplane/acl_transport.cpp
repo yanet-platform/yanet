@@ -59,6 +59,25 @@ void transport_t::emplace_variation(const unsigned int network_table_group_id,
 	it->second.emplace_back(network_table_group_id);
 }
 
+void transport_t::create_variations()
+{
+	std::set<unsigned int> transport_filters;
+	for (const auto& [network_table_group_id, network_table_filter_ids] : compiler->network_table.group_id_filter_ids)
+	{
+		transport_filters.clear();
+
+		for (const auto network_table_filter_id : network_table_filter_ids)
+		{
+			for (const auto rule_id : compiler->network_table.filter_id_rule_ids[network_table_filter_id])
+			{
+				transport_filters.emplace(compiler->rules[rule_id].transport_filter_id);
+			}
+		}
+
+		emplace_variation(network_table_group_id, transport_filters);
+	}
+}
+
 void transport_t::distribute()
 {
 	for (const auto& [key, network_table_group_ids] : variation)
