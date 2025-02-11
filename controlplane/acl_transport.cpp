@@ -46,25 +46,11 @@ void transport_t::prepare()
 	get_layer(0);
 }
 
-void transport_t::emplace_variation(const unsigned int network_table_group_id,
-                                    const std::set<unsigned int>& filter_ids)
-{
-	size_t size = ((size_t)-1) - filter_ids.size();
-	auto it = variation.find(std::tie(size, filter_ids));
-	if (it == variation.end())
-	{
-		it = variation.emplace_hint(it, std::tie(size, filter_ids), std::vector<unsigned int>());
-	}
-
-	it->second.emplace_back(network_table_group_id);
-}
-
 void transport_t::create_variations()
 {
-	std::set<unsigned int> transport_filters;
 	for (const auto& [network_table_group_id, network_table_filter_ids] : compiler->network_table.group_id_filter_ids)
 	{
-		transport_filters.clear();
+		std::set<unsigned int> transport_filters;
 
 		for (const auto network_table_filter_id : network_table_filter_ids)
 		{
@@ -74,17 +60,14 @@ void transport_t::create_variations()
 			}
 		}
 
-		emplace_variation(network_table_group_id, transport_filters);
+		variation[std::move(transport_filters)].push_back(network_table_group_id);
 	}
 }
 
 void transport_t::distribute()
 {
-	for (const auto& [key, network_table_group_ids] : variation)
+	for (const auto& [filter_ids, network_table_group_ids] : variation)
 	{
-		const auto& [size, filter_ids] = key;
-		(void)size;
-
 		unsigned int best_layer_id = 0;
 		size_t best_filter_ids_count = std::numeric_limits<size_t>::max();
 
