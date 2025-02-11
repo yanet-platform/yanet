@@ -67,7 +67,7 @@ void network_table_t::compile()
 	for (auto [network_ipv4_source_filter_id, network_ipv4_destination_filter_id, network_ipv6_source_filter_id, network_ipv6_destination_filter_id] : filters)
 	{
 		remap_group_ids.clear();
-		remap_group_ids.resize(group_id, 0);
+		initial_group_id = group_id;
 
 		const auto& network_ipv4_source_group_ids = compiler->network_ipv4_source.filter_group_ids[network_ipv4_source_filter_id];
 		const auto& network_ipv4_destination_group_ids = compiler->network_ipv4_destination.filter_group_ids[network_ipv4_destination_filter_id];
@@ -149,20 +149,19 @@ void network_table_t::table_insert(const DimensionArray& keys)
 {
 	auto& value = table(keys);
 
-	if (value < remap_group_ids.size()) ///< check: don't override self rule
-	{
-		auto& remap_group_ip = remap_group_ids[value];
-		if (!remap_group_ip)
-		{
-			remap_group_ip = group_id;
-			group_id++;
-		}
+	if (value >= initial_group_id)
+		return;
 
-		value = remap_group_ip;
+	auto it = remap_group_ids.find(value);
+	if (it == remap_group_ids.end()) ///< check: don't override self rule
+	{
+		remap_group_ids.insert_unique(value, group_id);
+		value = group_id;
+		group_id++;
 	}
 	else
 	{
-		/// dont panic. this is fine
+		value = it->second;
 	}
 }
 
@@ -176,7 +175,6 @@ void network_table_t::table_get(const DimensionArray& keys)
 void network_table_t::remap()
 {
 	remap_group_ids.clear();
-	remap_group_ids.resize(group_id, 0);
 
 	for (unsigned int layer_id = 0;
 	     layer_id < compiler->transport.layers.size();
@@ -186,10 +184,11 @@ void network_table_t::remap()
 
 		for (const auto network_table_group_id : layer.network_table_group_ids_vec)
 		{
-			auto& remap_group_id = remap_group_ids[network_table_group_id];
-			if (!remap_group_id)
+			auto it = remap_group_ids.find(network_table_group_id);
+			if (it == remap_group_ids.end())
 			{
-				remap_group_id = (network_table_group_id << compiler->transport_layers_shift) | layer_id;
+				tAclGroupId new_id = (network_table_group_id << compiler->transport_layers_shift) | layer_id;
+				remap_group_ids.insert_unique(network_table_group_id, new_id);
 			}
 			else
 			{
