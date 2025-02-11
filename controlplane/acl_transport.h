@@ -38,8 +38,8 @@ public:
 		flat_t<uint16_t> icmp_type_code;
 		flat_t<uint16_t> icmp_identifier;
 
-		std::set<unsigned int> filter_ids_set;
-		std::set<unsigned int> network_table_group_ids_set;
+		FlatSet<unsigned int> filter_ids_set;
+		FlatSet<unsigned int> network_table_group_ids_set;
 
 		std::vector<unsigned int> filter_ids_vec;
 		std::vector<unsigned int> network_table_group_ids_vec;
