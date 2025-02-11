@@ -25,3 +25,5 @@ steps:
   - port: kni0
     send: 002-send.pcap
     expect: 002-expect.pcap
+- cli:
+  - rib static remove default 1.0.0.0/24 4444::1 1100 10000
