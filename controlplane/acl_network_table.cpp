@@ -20,7 +20,6 @@ void network_table_t::clear()
 	filter_id_rule_ids.clear();
 	filter_id_group_ids.clear();
 	filter_id_group_ids_next.clear();
-	bitmask.clear();
 }
 
 unsigned int network_table_t::collect(const unsigned int rule_id,
@@ -110,8 +109,6 @@ void network_table_t::populate()
 	     filter_id < filters.size();
 	     filter_id++)
 	{
-		bitmask.clear();
-
 		const auto& [network_ipv4_source_filter_id,
 		             network_ipv4_destination_filter_id,
 		             network_ipv6_source_filter_id,
@@ -128,7 +125,7 @@ void network_table_t::populate()
 			for (unsigned int k2 : network_ipv4_destination_group_ids)
 			{
 				table_indexes[1] = k2;
-				table_get(table_indexes);
+				table_get(table_indexes, filter_id);
 			}
 		}
 
@@ -138,13 +135,8 @@ void network_table_t::populate()
 			for (unsigned int k2 : network_ipv6_destination_group_ids)
 			{
 				table_indexes[1] = k2;
-				table_get(table_indexes);
+				table_get(table_indexes, filter_id);
 			}
-		}
-
-		for (unsigned int i : bitmask)
-		{
-			filter_id_group_ids[filter_id].emplace_back(i);
 		}
 	}
 }
@@ -169,11 +161,11 @@ void network_table_t::table_insert(const DimensionArray& keys)
 	}
 }
 
-void network_table_t::table_get(const DimensionArray& keys)
+void network_table_t::table_get(const DimensionArray& keys, unsigned int filter_id)
 {
 	auto value = table(keys);
 
-	bitmask.insert(value);
+	filter_id_group_ids[filter_id].emplace(value);
 }
 
 void network_table_t::remap()
@@ -212,7 +204,7 @@ void network_table_t::remap()
 	{
 		for (const auto group_id : filter_id_group_ids[filter_id])
 		{
-			filter_id_group_ids_next[filter_id].emplace_back(remap_group_ids[group_id]);
+			filter_id_group_ids_next[filter_id].emplace(remap_group_ids[group_id]);
 		}
 	}
 	filter_id_group_ids_next.swap(filter_id_group_ids);
