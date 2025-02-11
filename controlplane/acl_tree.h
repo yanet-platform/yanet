@@ -289,6 +289,7 @@ public:
 		}
 	}
 
+	// TODO: Needs to be optimized, it takes all the time in network_t::populate
 	void get(const type_t& address,
 	         const type_t& mask,
 	         std::vector<uint8_t>& group_ids_bitmask) ///< @todo: static_bitmask_t
