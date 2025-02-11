@@ -19,9 +19,7 @@ void network_table_t::clear()
 	filter_ids.clear();
 	filter_id_rule_ids.clear();
 	filter_id_group_ids.clear();
-	group_id_filter_ids.clear();
 	filter_id_group_ids_next.clear();
-	group_id_filter_ids_next.clear();
 	bitmask.clear();
 }
 
@@ -147,7 +145,6 @@ void network_table_t::populate()
 		for (unsigned int i : bitmask)
 		{
 			filter_id_group_ids[filter_id].emplace_back(i);
-			group_id_filter_ids[i].emplace(filter_id);
 		}
 	}
 }
@@ -219,12 +216,6 @@ void network_table_t::remap()
 		}
 	}
 	filter_id_group_ids_next.swap(filter_id_group_ids);
-
-	for (auto& [group_id, filter_ids] : group_id_filter_ids)
-	{
-		group_id_filter_ids_next[remap_group_ids[group_id]].swap(filter_ids);
-	}
-	group_id_filter_ids_next.swap(group_id_filter_ids);
 
 	for (auto& layer : compiler->transport.layers)
 	{

@@ -48,19 +48,22 @@ void transport_t::prepare()
 
 void transport_t::create_variations()
 {
-	for (const auto& [network_table_group_id, network_table_filter_ids] : compiler->network_table.group_id_filter_ids)
-	{
-		std::set<unsigned int> transport_filters;
+	std::unordered_map<unsigned int, std::set<unsigned int>> group_id_transport_filters;
 
-		for (const auto network_table_filter_id : network_table_filter_ids)
+	for (unsigned int filter_id = 0; filter_id < compiler->network_table.filters.size(); ++filter_id)
+	{
+		for (tAclGroupId group_id : compiler->network_table.filter_id_group_ids[filter_id])
 		{
-			for (const auto rule_id : compiler->network_table.filter_id_rule_ids[network_table_filter_id])
+			for (unsigned int rule_id : compiler->network_table.filter_id_rule_ids[filter_id])
 			{
-				transport_filters.emplace(compiler->rules[rule_id].transport_filter_id);
+				group_id_transport_filters[group_id].emplace(compiler->rules[rule_id].transport_filter_id);
 			}
 		}
+	}
 
-		variation[std::move(transport_filters)].push_back(network_table_group_id);
+	for (auto& [group_id, transport_filters] : group_id_transport_filters)
+	{
+		variation[std::move(transport_filters)].push_back(group_id);
 	}
 }
 
