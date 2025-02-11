@@ -13,9 +13,6 @@ class transport_t
 public:
 	transport_t(acl::compiler_t* compiler);
 
-private:
-	void emplace_variation(const unsigned int network_table_group_id, const std::set<unsigned int>& filter_ids);
-
 public:
 	using filter = filter_transport;
 
@@ -79,9 +76,22 @@ public:
 	std::map<tAclGroupId, bitset_t> reverse_map;
 	std::map<tAclGroupId, bitset_t> reverse_map_next;
 
-	std::map<std::tuple<size_t,
-	                    std::set<unsigned int>>,
-	         std::vector<unsigned int>>
+	struct VariationComparator
+	{
+		bool operator()(const std::set<unsigned int>& a,
+		                const std::set<unsigned int>& b) const
+		{
+			if (a.size() != b.size())
+			{
+				return a.size() > b.size();
+			}
+			return a < b;
+		}
+	};
+
+	std::map<std::set<unsigned int>,
+	         std::vector<unsigned int>,
+	         VariationComparator>
 	        variation;
 
 protected:
