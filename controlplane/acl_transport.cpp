@@ -67,34 +67,38 @@ void transport_t::distribute()
 		(void)size;
 
 		unsigned int best_layer_id = 0;
-		size_t best_filter_ids_count = (size_t)-1;
+		size_t best_filter_ids_count = std::numeric_limits<size_t>::max();
 
 		for (unsigned int layer_id = 0;
 		     layer_id < compiler->transport_layers_size_max;
 		     layer_id++)
 		{
-			const auto& layer = get_layer(layer_id);
+			const auto& layer_filter_ids = get_layer(layer_id).filter_ids_set;
+			auto contains_filter = [&layer_filter_ids](unsigned int id) {
+				return layer_filter_ids.find(id) != layer_filter_ids.end();
+			};
 
-			std::set<unsigned int> merged_filter_ids; ///< @todo: bitmask
-			merged_filter_ids = layer.filter_ids_set;
-			merged_filter_ids.insert(filter_ids.begin(), filter_ids.end());
-
-			if (merged_filter_ids.size() == layer.filter_ids_set.size())
+			if (layer_filter_ids.empty())
 			{
 				best_layer_id = layer_id;
 				break;
 			}
 
-			if (layer.filter_ids_set.empty())
+			// Check if all filters are already in the set
+			if (std::all_of(filter_ids.begin(), filter_ids.end(), contains_filter))
 			{
 				best_layer_id = layer_id;
 				break;
 			}
 
-			if (merged_filter_ids.size() < best_filter_ids_count)
+			size_t new_size = layer_filter_ids.size() +
+			                  // Count how many new filters would be added
+			                  std::count_if(filter_ids.begin(), filter_ids.end(), std::not_fn(contains_filter));
+
+			if (new_size < best_filter_ids_count)
 			{
 				best_layer_id = layer_id;
-				best_filter_ids_count = merged_filter_ids.size();
+				best_filter_ids_count = new_size;
 			}
 		}
 
