@@ -187,6 +187,18 @@ protected:
 	inline void balancer_ipv4_source(rte_ipv4_hdr* header, const ipv4_address_t& balancer, const dataplane::globalBase::balancer_service_t& service);
 	inline void balancer_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::balancer_state_value_t* value);
 
+	// proxy
+	inline void proxy_entry(rte_mbuf* mbuf);
+	inline void proxy_handle();
+	inline void proxy_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
+	inline dataplane::proxy::proxy_link_key_t get_proxy_link_key_t(const rte_mbuf* mbuf, bool inverted = false);
+	inline bool transform_to_syn_ack_package(rte_mbuf* mbuf);
+	inline rte_mbuf* cWorker::create_syn_package(const rte_mbuf* mbuf, const common::ip_address_t& host_ip_address, uint16_t host_port, const std::vector<char>& tcp_syn_options);
+	inline rte_mbuf* create_proxy_package(const rte_mbuf* mbuf, const dataplane::proxy::proxy_link_value_t* proxy_link_value);
+	inline std::pair<common::ip_address_t, uint16_t> get_free_link(uint16_t ip_type);
+	inline void release_link(std::pair<common::ip_address_t, uint16_t> link);
+	inline void rewrite_package_to_proxy(rte_mbuf* mbuf, const dataplane::proxy::proxy_link_value_t* proxy_link_value);
+
 	/// fw state
 	using FlowFromState = std::optional<common::globalBase::tFlow>;
 	inline FlowFromState acl_checkstate(rte_mbuf* mbuf);
@@ -315,6 +327,7 @@ protected:
 	worker::tStack<> logicalPort_egress_stack;
 	worker::tStack<> acl_ingress_stack4;
 	worker::tStack<> acl_ingress_stack6;
+	worker::tStack<> proxy_stack;
 	worker::tStack<> tun64_stack4;
 	worker::tStack<> tun64_stack6;
 	worker::tStack<> decap_stack;

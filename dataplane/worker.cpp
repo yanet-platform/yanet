@@ -15,6 +15,7 @@
 #include <rte_mbuf.h>
 #include <rte_tcp.h>
 #include <rte_udp.h>
+#include <rte_random.h>
 
 #include "common/counters.h"
 #include "common/define.h"
@@ -31,7 +32,9 @@
 #include "prepare.h"
 #include "worker.h"
 
-//
+namespace {
+	const uint8_t FRESH_TTL = 128;
+}
 
 cWorker::cWorker(cDataPlane* dataPlane) :
         dataPlane(dataPlane),
@@ -5969,4 +5972,567 @@ inline void cWorker::populate_hitcount_map(const std::string& id, rte_mbuf* mbuf
 
 	entry.count++;
 	entry.bytes += mbuf->pkt_len;
+}
+
+// PROXY HANDLER
+inline void cWorker::proxy_entry(rte_mbuf* mbuf)
+{
+	proxy_stack.insert(mbuf);
+}
+
+inline void cWorker::proxy_flow(rte* mbuf, const common::globalBase::tFlow& flow) 
+{
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+	metadata->flow = flow;
+
+	if (flow.type == common::globalBase::eFlowType::route)
+	{
+		route_entry(mbuf);
+	}
+	else if (flow.type == common::globalBase::eFlowType::controlPlane)
+	{
+		controlPlane(mbuf);
+	}
+	else
+	{
+		drop(mbuf);
+	}
+}
+
+inline void cWorker::proxy_handle()
+{
+	if (unlikely(proxy_stack.mbufsCount == 0))
+	{
+		return;
+	}
+
+	const auto& base = bases[localBaseId & 1];
+
+	for (unsigned int mbuf_i = 0;
+	     mbuf_i < proxy_stack.mbufsCount;
+	     mbuf_i++)
+	{
+		rte_mbuf* mbuf = balancer_stack.mbufs[mbuf_i];
+		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+
+		// drop all not-TCP package 
+		if (metadata->transport_headerType != IPPROTO_TCP)
+		{
+			drop(mbuf);
+		}
+		rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+
+		if (tcp_header->tcp_flags & TCP_SYN_FLAG && tcp_header->tcp_flags & TCP_ACK_FLAG)
+		{
+			auto key = get_proxy_link_key_t(mbuf);
+			dataplane::spinlock_nonrecursive_t* locker_service = nullptr;
+			dataplane::proxy::proxy_link_value_t* proxy_link_service;
+
+			auto hash = basePermanently.globalBaseAtomic->proxy_link_ht->lookup(key, proxy_link_service, locker);
+			if (proxy_link_service == nullptr)
+			{
+				drop(mbuf)
+				locker_service->unlock();
+				continue;
+			}
+
+			auto* proxy_package = create_proxy_package(mbuf, proxy_link_service);
+			if (proxy_package == nullptr)
+			{
+				drop(mbuf)
+				locker_service->unlock();
+				continue;
+			}
+
+			auto key_client = dataplane::proxy::proxy_link_key_t{
+				.ip_source = proxy_link->target_ip_address,
+				.ip_destination = key.ip_source,
+				.port_source = proxy_link->target_port,
+				.port_destination = key.port_source,
+			};
+			dataplane::proxy::proxy_link_value_t* proxy_link_client = nullptr;
+			dataplane::spinlock_nonrecursive_t* locker_client = nullptr;
+			basePermanently.globalBaseAtomic->proxy_link_ht->lookup(key_client, proxy_link_client, locker_client);
+			if (proxy_link_client == nullptr)
+			{
+				drop(mbuf)
+				rte_pktmbuf_free(proxy_package);
+				locker_service->unlock();
+				locker_client->unlock();
+				continue;
+			}
+
+			proxy_link_service->delta_acknowledgement = rte_cpu_to_be_32(tcp_header->sent_seq) - proxy_link_client->delta_acknowledgement;
+			proxy_link_client->delta_acknowledgement = proxy_link_service->delta_acknowledgement;
+			proxy_link_service->current_status = dataplane::proxy::StatusLink::ESTABLISHED;
+			
+			locker_service->unlock();
+			locker_client->unlock();
+			rte_pktmbuf_free(mbuf);
+			mbuf = proxy_package;
+		}
+		else if (tcp_header->tcp_flags & TCP_SYN_FLAG)
+		{
+			if (!transform_to_syn_ack_package(mbuf))
+			{
+				drop(mbuf);
+				continue;
+			}
+		}
+		else if (tcp_header->tcp_flags & TCP_ACK_FLAG)
+		{
+			auto key = get_proxy_link_key_t(mbuf);
+			dataplane::spinlock_nonrecursive_t* locker = nullptr;
+			dataplane::proxy::proxy_link_value_t* proxy_link;
+			
+			auto hash = basePermanently.globalBaseAtomic->proxy_link_ht->lookup(key, proxy_link, locker);
+			if (proxy_link == nullptr)
+			{
+				drop(mbuf)
+				locker->unlock();
+				continue;
+			}
+
+			if (proxy_link->current_status == dataplane::proxy::StatusLink::SYN_RECEIVED)
+			{
+				// get free link (ip_address and port to connecting service)
+				auto [host_ip_address, host_port] = get_free_link(YADECAP_METADATA(mbuf)->network_headerType);
+				if (host_ip_address.is_default() || host_port == 0) // one may use only host_port
+				{
+					drop(mbuf);	
+					locker->unlock();
+					continue;
+				}
+
+				auto sync_package = create_syn_package(mbuf, host_ip_address, host_port, proxy_link->tcp_sync_optionals);
+				if (sync_package == nullptr)
+				{
+					drop(mbuf);	
+					release_link({host_ip_address, host_port});
+					locker->unlock();
+					continue;
+				}
+				
+				auto key_new_link = get_proxy_link_key_t(sync_package, true);
+				auto new_proxy_link = dataplane::proxy::proxy_link_value_t{
+					.current_status = dataplane::proxy::StatusLink::SYN_SENT,
+					.type_link = dataplane::proxy::TypeLink::SERVICE,
+					.target_ip_address = key.ip_source,
+					.target_port = key.port_source,
+					};
+				
+				if(!basePermanently.globalBaseAtomic->proxy_link_ht->insert(calculate_hash_crc(key), key, new_proxy_link))
+				{
+					rte_pktmbuf_free(sync_package);
+					drop(mbuf);
+					release_link({host_ip_address, host_port});
+					locker->unlock();
+					continue;
+				}
+
+				rte_pktmbuf_free(mbuf);
+				mbuf = sync_package;
+				proxy_link->current_status = dataplane::proxy::StatusLink::ESTABLISHED;
+				proxy_link->target_port = host_port;
+				proxy_link->target_ip_address = host_ip_address;
+				locker->unlock();
+			}
+			else if (proxy_link->current_status == dataplane::proxy::StatusLink::ESTABLISHED)
+			{
+				rewrite_package_to_proxy(mbuf, proxy_link);
+			}
+		} 
+		else
+		{
+			auto key = get_proxy_link_key_t(mbuf);
+			dataplane::spinlock_nonrecursive_t* locker = nullptr;
+			dataplane::proxy::proxy_link_value_t* proxy_link;
+			
+			auto hash = basePermanently.globalBaseAtomic->proxy_link_ht->lookup(key, proxy_link, locker);
+			if (proxy_link == nullptr)
+			{
+				drop(mbuf)
+				locker->unlock();
+				continue;
+			}
+			rewrite_package_to_proxy(mbuf, proxy_link);
+		}
+
+		proxy_flow(mbuf, proxy.flow);
+	}
+
+	proxy_stack.clear();
+}
+
+inline dataplane::proxy::proxy_link_key_t cWorker::get_proxy_link_key_t(const rte_mbuf* mbuf, bool inverted)
+{
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+	rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+	
+	auto key = dataplane::globalBase::proxy::proxy_link_key_t{};
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
+		rte_ipv4_hdr* ip_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+		if (!inverted)
+		{
+			key.ip_source = common::ipv4_address_t(ip_header->src_addr);
+			key.ip_destination = common::ipv4_address_t(ip_header->dst_addr);
+		}
+		else
+		{
+			key.ip_destination = common::ipv4_address_t(ip_header->src_addr);
+			key.ip_source = common::ipv4_address_t(ip_header->dst_addr);	
+		}
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		rte_ipv6_hdr* ip_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		
+		if (!inverted)
+		{
+			key.ip_source = common::ipv6_address_t(ip_header->src_addr);
+			key.ip_destination = common::ipv6_address_t(ip_header->dst_addr);
+		}
+		else
+		{
+			key.ip_destination = common::ipv6_address_t(ip_header->src_addr);
+			key.ip_source = common::ipv6_address_t(ip_header->dst_addr);
+		}	
+	}
+
+	if (!inverted)
+	{
+		key.port_source = rte_cpu_to_be_16(tcp_header->src_port);
+		key.port_destination = rte_cpu_to_be_16(tcp_header->dst_port);
+	}
+	else
+	{
+		key.port_destination= rte_cpu_to_be_16(tcp_header->src_port);
+		key.port_source = rte_cpu_to_be_16(tcp_header->dst_port);
+	}
+
+	return key; 
+}
+
+inline bool cWorker::transform_to_syn_ack_package(rte_mbuf* mbuf) // todo: make sync-cookies
+{
+	rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+	void* ip_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+	
+	auto key = get_proxy_link_key_t(mbuf);
+	auto value = dataplane::proxy::proxy_link_value_t{
+		.current_status = dataplane::proxy::StatusLink::SYN_RECEIVED,
+		.type_link = dataplane::proxy::TypeLink::CLIENT,
+		.tcp_sync_optionals = (tcp_header->data_off >> 4) <= 5 ? std::vector<char>() :
+			std::vector<char>((char*)tcp_header + sizeof(tcp_header), (char*)tcp_header + sizeof(tcp_header) + ((tcp_header->data_off >> 4) - 5) * 4),
+		.delta_acknowledgement = tcp_header->sent_seq,
+	};
+
+	// registration sync in hashtable
+	if(!basePermanently.globalBaseAtomic->proxy_link_ht->insert_or_update(calculate_hash_crc(key), key, value))
+	{
+		return false;
+	}
+			
+	// transform package to sync-ack package
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{	
+		rte_ipv4_hdr* ipv4_header = (rte_ipv4_hdr*)ip_header;
+		RTE_SWAP(ipv4_header->src_addr, ipv4_header->dst_addr);
+		ipv4_header->time_to_live = FRESH_TTL; // update ttl
+		ipv4_header->hdr_checksum = 0;
+		ipv4_header->hdr_checksum = rte_ipv4_cksum(ipv4_header);
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		rte_ipv6_hdr* ipv6_header = (rte_ipv6_hdr*)ip_header;
+		uint8_t addr[16];
+		rte_memcpy(addr, ipv6_header->dst_addr, 16);
+		rte_memcpy(ipv6_header->dst_addr, ipv6_header->src_addr, 16);
+		rte_memcpy(ipv6_header->src_addr, addr, 16);
+		ipv6_header->hop_limits = FRESH_TTL;
+	}
+
+	RTE_SWAP(tcp_header->dst_port, tcp_header->src_port);
+	RTE_SWAP(tcp_header->sent_seq, tcp_header->recv_ack);
+	tcp_header->recv_ack = rte_cpu_to_be_16(rte_cpu_to_be_16(tcp_header->recv_ack) + 1);
+	tcp_header->sent_seq = rte_rand();
+	tcp_header->tcp_flags |= TCP_ACK_FLAG;
+	tcp_header->cksum = 0;
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{	
+		tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ip_header, tcp_header)
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		tcp_header->cksum = rte_ipv6_udptcp_cksum((rte_ipv6_hdr*)ip_header, tcp_header)
+	}
+	dataplane::metadata::calcHash(metadata);
+}
+
+inline rte_mbuf* cWorker::create_syn_package(const rte_mbuf* mbuf, const common::ip_address_t& host_ip_address, uint16_t host_port, const std::vector<char>& tcp_syn_options)
+{
+	if(mbuf == nullptr)
+		return nullptr;
+
+	rte_mbuf* new_mbuf = rte_pktmbuf_alloc(mempool);
+	if (new_mbuf == nullptr)
+	{
+		return nullptr;
+	}
+
+	auto metadata = YADECAP_METADATA(new_mbuf);	
+	metadata = *YADECAP_METADATA(mbuf);
+	size_t size_proxy_hdr = 0;
+
+	// copy L2-header
+	rte_memcpy(rte_pktmbuf_mtod(new_mbuf, char*),
+	           rte_pktmbuf_mtod(mbuf, char*),
+	           metadata->network_headerOffset);
+	
+	// rewrite L3 main header
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
+		rte_memcpy(rte_pktmbuf_mtod_offset(new_mbuf, char*, metadata->network_headerOffset),
+		           rte_pktmbuf_mtod_offset(mbuf, char*, metadata->network_headerOffset),
+		           sizeof(rte_ipv4_hdr));
+
+		rte_ipv4_hdr* ip_header = rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+		ip_header->version_ihl = 0x45;
+		ip_header->fragment_offset = 0;
+		ip_header->next_proto_id = IPPROTO_TCP;
+		ip_header->src_addr = host_ip_address.get_ipv4().address; // set ip-address proxy-machine
+		ip_header->total_length = rte_cpu_to_be_16(sizeof(rte_ipv4_hdr) + sizeof(rte_tcp_hdr) + tcp_syn_options.size());
+
+		ip_header->hdr_checksum = 0;
+		ip_header->hdr_checksum = rte_ipv4_cksum(ip_header);
+
+		// set new transport_headerOffset
+		metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv4_hdr);
+		size_proxy_hdr = sizeof(dataplane::proxy::proxy_v2_ipv4_hdr);
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		rte_memcpy(rte_pktmbuf_mtod_offset(new_mbuf, char*, metadata->network_headerOffset),
+		           rte_pktmbuf_mtod_offset(mbuf, char*, metadata->network_headerOffset),
+		           sizeof(rte_ipv6_hdr));
+		
+		rte_ipv6_hdr* ip_header = rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		ip_header->proto = IPPROTO_TCP; //getting rid of optional headers
+		rte_memcpy(ip_header->src_addr,  host_ip_address.get_ipv6().address.data(), 16); //set ip-address proxy-machine, need rewrite to pool-addresses
+		ip_header->payload_len = rte_cpu_to_be_16(sizeof(rte_tcp_hdr) + tcp_syn_options.size());
+
+		// set new transport_headerOffset
+		metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv6_hdr);
+		size_proxy_hdr = sizeof(dataplane::proxy::proxy_v2_ipv6_hdr);
+	}
+	else
+	{
+		release_link({host_ip_address, host_port});
+		rte_pktmbuf_free(new_mbuf)
+		return nullptr;
+	}
+
+	// rewrite L4 header
+	rte_memcpy(rte_pktmbuf_mtod_offset(new_mbuf, char*, metadata->transport_headerOffset),
+		           rte_pktmbuf_mtod_offset(mbuf, char*, YADECAP_METADATA(mbuf)->transport_headerOffset,
+		           sizeof(rte_tcp_hdr)));
+	
+	rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(new_mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+	tcp_header->tcp_flags = TCP_SYN_FLAG;
+	tcp_header->src_port = rte_cpu_to_be_16(host_port);
+	tcp_header->recv_ack = 0;
+	tcp_header->sent_seq = rte_cpu_to_be_32(rte_cpu_to_be_32(tcp_header->sent_seq) - 1 - size_proxy_hdr);
+	tcp_header->data_off = (5 + (tcp_syn_options.size()>>2))<<4;
+	
+	// write tcp options
+	rte_memcpy(rte_pktmbuf_mtod_offset(new_mbuf, char*, metadata->transport_headerOffset + 20),
+		        tcp_syn_options.data(), tcp_syn_options.size());
+
+	tcp_header->cksum = 0;
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
+		tcp_header->cksum = rte_ipv4_udptcp_cksum(rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv4_hdr*, metadata->network_headerOffset), tcp_header);
+	}
+	else
+	{
+		tcp_header->cksum = rte_ipv6_udptcp_cksum(rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv6_hdr*, metadata->network_headerOffset), tcp_header);
+	}
+
+	new_mbuf->pkt_len = metadata->transport_headerOffset + 20 + tcp_syn_options.size();
+	new_mbuf->data_len = new_mbuf->pkt_len;
+
+	dataplane::calcHash(metadata);
+	return new_mbuf;
+}
+
+inline rte_mbuf* cWorker::create_proxy_package(const rte_mbuf* mbuf, dataplane::proxy::proxy_link_value_t* proxy_link_value)
+{
+	if(mbuf == nullptr)
+		return nullptr;
+
+	rte_mbuf* new_mbuf = rte_pktmbuf_alloc(mempool);
+	if (new_mbuf == nullptr)
+	{
+		return nullptr;
+	}
+
+	void* dst_address = nullptr;
+
+	auto metadata = YADECAP_METADATA(new_mbuf);	
+	metadata = *YADECAP_METADATA(mbuf);
+
+	// copy L2-header
+	rte_memcpy(rte_pktmbuf_mtod(new_mbuf, char*),
+	           rte_pktmbuf_mtod(mbuf, char*),
+	           metadata->network_headerOffset);
+
+	// rewrite L3 main header
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
+		rte_memcpy(rte_pktmbuf_mtod_offset(new_mbuf, char*, metadata->network_headerOffset),
+		           rte_pktmbuf_mtod_offset(mbuf, char*, metadata->network_headerOffset),
+		           sizeof(rte_ipv4_hdr));
+
+		rte_ipv4_hdr* ip_header = rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+		ip_header->version_ihl = 0x45;
+		ip_header->fragment_offset = 0;
+		ip_header->next_proto_id = IPPROTO_TCP;
+		ip_header->time_to_live = FRESH_TTL;
+		RTE_SWAP(ip_header->src_addr, ip_header->dst_addr);
+		dst_address = &ip_header->dst_addr;
+		ip_header->total_length = rte_cpu_to_be_16(sizeof(rte_ipv4_hdr) + sizeof(rte_tcp_hdr) + sizeof(dataplane::proxy::proxy_v2_ipv4_hdr));
+
+		ip_header->hdr_checksum = 0;
+		ip_header->hdr_checksum = rte_ipv4_cksum(ip_header);
+
+		// set new transport_headerOffset
+		metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv4_hdr);
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		rte_memcpy(rte_pktmbuf_mtod_offset(new_mbuf, char*, metadata->network_headerOffset),
+		           rte_pktmbuf_mtod_offset(mbuf, char*, metadata->network_headerOffset),
+		           sizeof(rte_ipv6_hdr));
+		
+		rte_ipv6_hdr* ip_header = rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		ip_header->proto = IPPROTO_TCP; //getting rid of optional headers
+		uint8_t addr[16];
+		rte_memcpy(addr, ipv6_header->dst_addr, 16);
+		rte_memcpy(ipv6_header->dst_addr, ipv6_header->src_addr, 16);
+		rte_memcpy(ipv6_header->src_addr, addr, 16);
+		dst_address = ipv6_header->dst_addr;
+		ip_header->hop_limits = FRESH_TTL;
+		ip_header->payload_len = rte_cpu_to_be_16(sizeof(rte_tcp_hdr) + sizeof(dataplane::proxy::proxy_v2_ipv6_hdr));
+
+		// set new transport_headerOffset
+		metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv6_hdr);
+	}
+	else
+	{
+		rte_pktmbuf_free(new_mbuf)
+		return nullptr;
+	}
+
+	rte_memcpy(rte_pktmbuf_mtod_offset(new_mbuf, char*, metadata->transport_headerOffset),
+	           rte_pktmbuf_mtod_offset(mbuf, char*, YADECAP_METADATA(mbuf)->transport_headerOffset,
+	           sizeof(rte_tcp_hdr)));
+	
+	rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(new_mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+
+	tcp_header->tcp_flags = TCP_ACK_FLAG;
+	RTE_SWAP(tcp_header->dst_port, tcp_header->src_port);
+	RTE_SWAP(tcp_header->recv_ack, tcp_header->sent_seq);
+	tcp_header->data_off = 5<<4;
+	tcp_header->recv_ack = rte_cpu_to_be_16(rte_cpu_to_be_16(tcp_header->recv_ack) + 1);
+	tcp_header->cksum = 0;
+
+	rte_memcpy(proxy_header->signature, dataplane::proxy::PROXY_V2_SIGNATURE, 12);
+	proxy_header->version_cmd = (dataplane::proxy::PROXY_VERSION_V2 << 4) + dataplane::proxy::PROXY_CMD_PROXY;
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
+		dataplane::proxy::proxy_v2_ipv4_hdr* proxy_header = rte_pktmbuf_mtod_offset(new_mbuf, dataplane::proxy::proxy_v2_ipv4_hdr*, metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
+		rte_memcpy(proxy_header->signature, dataplane::proxy::PROXY_V2_SIGNATURE, 12);
+		proxy_header->version_cmd = (dataplane::proxy::PROXY_VERSION_V2 << 4) + dataplane::proxy::PROXY_CMD_PROXY;
+		proxy_header->af_proto = (dataplane::proxy::PROXY_AF_INET << 4) + dataplane::proxy::PROXY_PROTO_STREAM;
+		proxy_header->addr_len = rte_cpu_to_be_16(4+4+4);
+		proxy_header->src_addr = proxy_link_value->target_ip_address.get_ipv4();
+		proxy_header->dst_addr = *(uint32_t*)dst_address;
+		proxy_header->src_port = rte_cpu_to_be_16(proxy_link_value->target_port);
+		proxy_header->dst_port = tcp_header->dst_port;
+
+		tcp_header->cksum = rte_ipv4_udptcp_cksum(rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv4_hdr*, metadata->network_headerOffset), tcp_header)
+		new_mbuf->pkt_len = metadata->transport_headerOffset + sizeof(rte_tcp_hdr) + sizeof(dataplane::proxy::proxy_v2_ipv4_hdr);
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		dataplane::proxy::proxy_v2_ipv6_hdr* proxy_header = rte_pktmbuf_mtod_offset(new_mbuf, dataplane::proxy::proxy_v2_ipv6_hdr*, metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
+		rte_memcpy(proxy_header->signature, dataplane::proxy::PROXY_V2_SIGNATURE, 12);
+		proxy_header->version_cmd = (dataplane::proxy::PROXY_VERSION_V2 << 4) + dataplane::proxy::PROXY_CMD_PROXY;
+		proxy_header->af_proto = (dataplane::proxy::PROXY_AF_INET6 << 4) + dataplane::proxy::PROXY_PROTO_STREAM;
+		proxy_header->addr_len = rte_cpu_to_be_16(16+16+4);
+		rte_memcpy(proxy_header->src_addr,proxy_link_value->target_ip_address.get_ipv6().data(), 16);
+		rte_memcpy(proxy_header->dst_addr, dst_address, 16);
+		proxy_header->src_port = rte_cpu_to_be_16(proxy_link_value->target_port);
+		proxy_header->dst_port = tcp_header->dst_port;
+
+		tcp_header->cksum = rte_ipv4_udptcp_cksum(rte_pktmbuf_mtod_offset(new_mbuf, rte_ipv6_hdr*, metadata->network_headerOffset), tcp_header)
+		new_mbuf->pkt_len = metadata->transport_headerOffset + sizeof(rte_tcp_hdr) + sizeof(dataplane::proxy::proxy_v2_ipv6_hdr);
+	}
+
+	new_mbuf->buf_len = new_mbuf->pkt_len;
+	dataplane::calcHash(metadata);
+
+	return new_mbuf;
+}
+
+inline void cWorker::rewrite_package_to_proxy(rte_mbuf* mbuf, const dataplane::proxy::proxy_link_value_t* proxy_link_value)
+{
+	if (proxy_link_value == nullptr || mbuf == nullptr)
+		return;
+
+	auto metadata = YADECAP_METADATA(new_mbuf);	
+	metadata = *YADECAP_METADATA(mbuf);
+
+	if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))
+	{
+		rte_ipv4_hdr* ip_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+		rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+
+		if (proxy_link_value->type_link == dataplane::proxy::TypeLink::SERVICE)
+		{
+			ip_header->dst_addr = proxy_link_value->target_ip_address.get_ipv4().address;
+			tcp_header->sent_seq = rte_cpu_to_be_32(rte_cpu_to_be_16(tcp_header->sent_seq) + proxy_link_value->delta_acknowledgement);
+		}
+		else if (proxy_link_value->type_link == dataplane::proxy::TypeLink::CLIENT)
+		{
+			ip_header->src_addr = proxy_link_value->target_ip_address.get_ipv4().address;
+			tcp_header->recv_ack = rte_cpu_to_be_32(rte_cpu_to_be_16(tcp_header->recv_ack) + proxy_link_value->delta_acknowledgement);
+		} 
+
+		ip_header->hdr_checksum = 0;
+		ip_header->hdr_checksum = rte_ipv4_cksum(ip_header);
+		tcp_header->cksum = 0;
+		tcp_header->cksum = rte_ipv4_udptcp_cksum(ip_header, tcp_header);
+	}
+	else if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6))
+	{
+		rte_ipv6_hdr* ip_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+		rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+
+		if (proxy_link_value->type_link == dataplane::proxy::TypeLink::SERVICE)
+		{
+			rte_memcpy(ip_header->dst_addr, proxy_link_value->target_ip_address.get_ipv6().data(), 16);
+			tcp_header->sent_seq = rte_cpu_to_be_32(rte_cpu_to_be_16(tcp_header->sent_seq) + proxy_link_value->delta_acknowledgement);
+		}
+		else if (proxy_link_value->type_link == dataplane::proxy::TypeLink::CLIENT)
+		{
+			rte_memcpy(ip_header->src_addr, proxy_link_value->target_ip_address.get_ipv6().data(), 16);
+			tcp_header->recv_ack = rte_cpu_to_be_32(rte_cpu_to_be_16(tcp_header->recv_ack) + proxy_link_value->delta_acknowledgement);
+		} 
+		
+		tcp_header->cksum = 0;
+		tcp_header->cksum = rte_ipv6_udptcp_cksum(ip_header, tcp_header);
+	}
 }

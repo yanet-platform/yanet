@@ -1,6 +1,7 @@
 #pragma once
 
 #include <rte_ether.h>
+#include <rte_common.h>
 
 #include "common/balancer.h"
 #include "common/scheduler.h"
@@ -244,6 +245,115 @@ namespace base
 {
 class permanently;
 class generation;
+}
+
+namespace proxy
+{
+
+extern const uint8_t PROXY_V2_SIGNATURE[12];
+
+enum 
+{
+	PROXY_VERSION_V2 = 0x2
+};	
+
+enum
+{
+	PROXY_CMD_LOCAL = 0x1,
+	PROXY_CMD_PROXY
+};
+
+enum
+{
+	PROXY_AF_UNSET = 0x0,
+	PROXY_AF_INET,
+	PROXY_AF_INET6,
+	PROXY_AF_UNIX
+};
+
+enum
+{
+	PROXY_PROTO_STREAM = 0x1,
+	PROXY_PROTO_DGRAM = 0x2
+};
+
+struct proxy_v2_ipv4_hdr
+{
+	uint8_t signature[12]; //  Proxy Protocol v2 Signature 
+	union {
+		uint8_t version_cmd; 
+		struct {
+			uint8_t version:4; // Version 
+			uint8_t cmd:4; // Command 
+		};
+	};
+	union {
+		uint8_t af_proto; 
+		struct {
+			uint8_t af:4; // Address Family
+			uint8_t proto:4; // Transport Protocol
+		};
+	};
+	rte_be16_t addr_len; // Address Length (Big Endian)
+	uint32_t src_addr;
+	uint32_t dst_addr;
+	rte_be16_t src_port; // Src Port (Big Endian).
+	rte_be16_t dst_port;
+} __rte_packed;
+
+struct proxy_v2_ipv6_hdr
+{
+	uint8_t signature[12]; //  Proxy Protocol v2 Signature 
+	union {
+		uint8_t version_cmd; 
+		struct {
+			uint8_t version:4; // Version 
+			uint8_t cmd:4; // Command 
+		};
+	};
+	union {
+		uint8_t af_proto; 
+		struct {
+			uint8_t af:4; // Address Family
+			uint8_t proto:4; // Transport Protocol
+		};
+	};
+	uint16_t addr_len; // Address Length (Big Endian)
+	uint8_t src_addr[16]; // IP address of source
+	uint8_t dst_addr[16];
+	uint16_t src_port; // Port of source (Big Endian).
+	uint16_t dst_port;
+} __rte_packed;
+
+	enum class StatusLink {
+		SYN_RECEIVED = 0,
+		SYN_SENT, 
+		ESTABLISHED
+	}
+
+	enum class TypeLink {
+		CLIENT,
+		SERVICE
+	}
+
+	struct proxy_link_key_t
+	{
+		common::ip_address_t ip_source;
+		common::ip_address_t ip_destination;
+		uint16_t port_source;
+		uint16_t port_destination;
+	}
+
+	struct proxy_link_value_t
+	{
+		StatusLink current_status{};
+		TypeLink type_link {};
+		std::vector<char> tcp_sync_optionals{};
+		common::ip_address_t target_ip_address;
+		uint16_t target_port;
+		unt32_t delta_acknowledgement = 0;
+	};
+
 }
 
 namespace globalBase
@@ -807,6 +917,18 @@ struct state_timeout_config_t
 	uint32_t udp_timeout;
 	uint32_t default_timeout;
 };
+
+namespace proxy 
+{
+
+struct proxy_t 
+{
+	ipv4_address_t ipv4_address{};
+	ipv6_address_t ipv6_address{};
+	common::globalBase::tFlow flow;
+};
+
+}
 
 }
 

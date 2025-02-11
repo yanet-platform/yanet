@@ -17,6 +17,7 @@
 #include "lpm.h"
 #include "type.h"
 #include "updater.h"
+#include "proxy.h"
 
 /// @todo: move
 #define YADECAP_GB_DSCP_FLAG_MARK ((uint8_t)1)
@@ -84,6 +85,11 @@ namespace balancer
 using state_ht = hashtable_mod_spinlock_dynamic<balancer_state_key_t, balancer_state_value_t, 16>;
 }
 
+namespace proxy
+{
+	using link_ht = hashtable_mod_spinlock_dynamic<proxy_link_key_t, proxy_link_value_t, 16>;
+}
+
 class atomic
 {
 public:
@@ -124,6 +130,7 @@ public: ///< @todo
 	nat64stateful::lan_ht* nat64stateful_lan_state;
 	nat64stateful::wan_ht* nat64stateful_wan_state;
 	balancer::state_ht* balancer_state;
+	proxy::link_ht* proxy_link_ht;
 
 	bool tsc_active_state;
 };
@@ -231,6 +238,7 @@ public: ///< @todo
 	dregress_t dregresses[CONFIG_YADECAP_DREGRESS_SIZE]; ///< @todo: slow global base
 	fw_state_sync_config_t fw_state_sync_configs[CONFIG_YADECAP_ACLS_SIZE];
 	tun64_t tun64tunnels[CONFIG_YADECAP_TUN64_SIZE];
+	proxy::proxy_t proxies[YANET_CONFIG_PROXIES_SIZE];
 
 	uint8_t decap_enabled;
 	uint8_t nat64stateful_enabled;
@@ -241,6 +249,7 @@ public: ///< @todo
 	uint8_t sampler_enabled;
 	uint8_t tun64_enabled;
 	uint8_t early_decap_enabled;
+	uint8_t proxy_enabled;
 
 	uint32_t serial;
 
