@@ -40,7 +40,7 @@ public:
 	using DimensionArray = decltype(table)::DimensionArray;
 
 	void table_insert(const DimensionArray& keys);
-	void table_get(const DimensionArray& keys);
+	void table_get(const DimensionArray& keys, unsigned int filter_id);
 
 	tAclGroupId group_id;
 	tAclGroupId initial_group_id;
@@ -50,10 +50,8 @@ public:
 	std::map<filter, unsigned int> filter_ids;
 	std::vector<std::vector<unsigned int>> filter_id_rule_ids;
 
-	std::vector<std::vector<tAclGroupId>> filter_id_group_ids;
-	std::vector<std::vector<tAclGroupId>> filter_id_group_ids_next;
-
-	FlatSet<tAclGroupId> bitmask; /// @todo: bitmask_t
+	std::vector<FlatSet<tAclGroupId>> filter_id_group_ids;
+	std::vector<FlatSet<tAclGroupId>> filter_id_group_ids_next;
 };
 
 }
