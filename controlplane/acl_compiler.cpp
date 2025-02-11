@@ -390,8 +390,23 @@ void compiler_t::network_table_compile()
 	network_table.compile();
 	network_table.populate();
 
+#ifdef ACL_DEBUG
+	size_t group_ids = 0;
+
+	FlatSet<tAclGroupId> unique_groups;
+
+	for (const auto& groups : network_table.filter_id_group_ids)
+	{
+		unique_groups.insert(groups.begin(), groups.end());
+	}
+
+	group_ids = unique_groups.size();
+
 	YANET_LOG_INFO("acl::compile: group_ids: %lu\n",
-	               network_table.group_id_filter_ids.size());
+	               group_ids);
+#else
+	YANET_LOG_INFO("acl::compile: group_ids: enable ACL_DEBUG to see\n");
+#endif
 }
 
 void compiler_t::network_flags_compile()
