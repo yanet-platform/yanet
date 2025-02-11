@@ -408,21 +408,7 @@ void compiler_t::transport_compile()
 {
 	transport.prepare();
 
-	std::set<unsigned int> transport_filters;
-	for (const auto& [network_table_group_id, network_table_filter_ids] : network_table.group_id_filter_ids)
-	{
-		transport_filters.clear();
-
-		for (const auto network_table_filter_id : network_table_filter_ids)
-		{
-			for (const auto rule_id : network_table.filter_id_rule_ids[network_table_filter_id])
-			{
-				transport_filters.emplace(rules[rule_id].transport_filter_id);
-			}
-		}
-
-		transport.emplace_variation(network_table_group_id, transport_filters);
-	}
+	transport.create_variations();
 
 	YANET_LOG_INFO("acl::compile: variations: %lu\n",
 	               transport.variation.size());
