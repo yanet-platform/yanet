@@ -70,10 +70,12 @@ protected:
 	bool step_reload_async(const YAML::Node& yamlStep);
 	bool step_echo(const YAML::Node& yamlStep);
 	bool step_dumpPackets(const YAML::Node& yamlStep, const std::string& path);
+	bool step_bird(const YAML::Node& yamlStep, const std::string& path);
 
 	eResult initSockets();
 	eResult initSharedMemory();
 	void fflushSharedMemory();
+	void stopBirdThreads();
 
 	bool step_memorize_counter_value(const YAML::Node& yamlStep);
 	bool step_diff_with_kept_counter_value(const YAML::Node& yamlStep);
@@ -129,6 +131,9 @@ protected:
 	std::string memorized_counter_name;
 	uint32_t memorized_coreId;
 	uint64_t memorized_counter_value;
+
+	std::vector<std::thread> birdThreads;
+	std::vector<int> birdDescriptors;
 };
 
 bool readTimeLimited(int fd, u_char* data, ssize_t len, std::chrono::system_clock::time_point time_to_give_up);
