@@ -22,7 +22,7 @@ public:
 	void compile();
 
 public:
-	std::map<common::acl::total_key_t, unsigned int> table;
+	FlatMap<common::acl::total_key_t, unsigned int> table;
 
 private:
 	acl::compiler_t* compiler;
