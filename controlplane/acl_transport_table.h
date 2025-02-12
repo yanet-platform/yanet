@@ -10,6 +10,12 @@
 #include "common/acl.h"
 #include "common/idp.h"
 
+#if defined(CUSTOM_HASH_STRUCTURES)
+#include "hash_table7.hpp"
+#else
+#include <unordered_map>
+#endif
+
 namespace acl::compiler
 {
 
@@ -28,12 +34,18 @@ namespace transport_table
  */
 constexpr static unsigned int dimension = 6;
 
+#if defined(CUSTOM_HASH_STRUCTURES)
+// TODO: check another maps/hashes. Note that they should work with gcc 7.5 on Ubuntu18
+using FlatMap = emhash7::HashMap<tAclGroupId, tAclGroupId>;
+#else
+using FlatMap = std::unordered_map<tAclGroupId, tAclGroupId>;
+#endif
+
 class layer_t
 {
 public:
 	NDArray<tAclGroupId, dimension> table;
-	// TODO: try to use absl flat_hash_map or similar, since we do not need iterator stability
-	std::unordered_map<tAclGroupId, tAclGroupId> remap_network_table_group_ids;
+	FlatMap remap_network_table_group_ids;
 
 	void prepare_remap_map(
 	        const std::vector<unsigned int>& network_table_group_ids_vec,
