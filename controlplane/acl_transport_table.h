@@ -12,8 +12,10 @@
 
 #if defined(CUSTOM_HASH_STRUCTURES)
 #include "hash_table7.hpp"
+#include "unordered_dense.h"
 #else
 #include <unordered_map>
+#include <unordered_set>
 #endif
 
 namespace acl::compiler
@@ -37,8 +39,10 @@ constexpr static unsigned int dimension = 6;
 #if defined(CUSTOM_HASH_STRUCTURES)
 // TODO: check another maps/hashes. Note that they should work with gcc 7.5 on Ubuntu18
 using FlatMap = emhash7::HashMap<tAclGroupId, tAclGroupId>;
+using FlatSet = ankerl::unordered_dense::set<tAclGroupId>;
 #else
 using FlatMap = std::unordered_map<tAclGroupId, tAclGroupId>;
+using FlatSet = std::unordered_set<tAclGroupId>;
 #endif
 
 class layer_t
@@ -108,7 +112,7 @@ public:
 #ifdef ACL_DEBUG
 	std::unordered_set<tAclGroupId> unuque_group_ids;
 #endif
-	std::vector<std::unordered_set<tAclGroupId>> transport_table_filter_id_group_ids;
+	std::vector<FlatSet> transport_table_filter_id_group_ids;
 
 	common::idp::updateGlobalBase::acl_transport_table::request acl_transport_table;
 
