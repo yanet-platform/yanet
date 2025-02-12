@@ -453,6 +453,7 @@ public:
 	        rib;
 
 	common::memory_manager::memory_group root_memory_group;
+	std::map<std::pair<std::string, std::string>, int> birds_import;
 };
 
 //

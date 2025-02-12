@@ -3,6 +3,8 @@
 #include "common/icp.h"
 #include "common/type.h"
 #include "controlplane/rib.h"
+#include <sys/un.h>
+#include <unistd.h>
 #include <vector>
 
 static inline bool
@@ -591,8 +593,21 @@ parse_route_update(uintptr_t* ppos, uintptr_t end, const char* vrf, common::icp:
 	return true;
 }
 
-void read_bird_feed(const char* sock_name, const char* vrf, class rib_t* rib)
+/**
+ * read_bird_feed
+ * @sock_name: the path to the unix socket through which bird uploads data
+ * @vrf: the string with the vrf name
+ * @handler: handler events for receiving data from bird
+ * @pipe_close: the pipe descriptor through which information about the need to terminate the stream will
+ *              be transmitted, a negative value means that verification should be disabled.
+ *
+ * return value:
+ * - true: some kind of error has occurred and it may be worth running the function after some time interval.
+ * - false: data was received through pipe indicating that the thread needs to be completed
+ */
+bool read_bird_feed(const char* sock_name, const char* vrf, rib_update_handler handler, int pipe_close)
 {
+	bool result = true;
 	/* Connect to bird export socket. */
 	int bird_sock = socket(AF_UNIX, SOCK_STREAM, 0);
 	struct sockaddr_un server_addr;
@@ -602,7 +617,8 @@ void read_bird_feed(const char* sock_name, const char* vrf, class rib_t* rib)
 	            (struct sockaddr*)&server_addr,
 	            sizeof(server_addr)) != 0)
 	{
-		return;
+		YANET_LOG_ERROR("error connect to socket %s, %d: %s\n", server_addr.sun_path, errno, strerror(errno));
+		return result;
 	}
 
 	/*
@@ -613,8 +629,13 @@ void read_bird_feed(const char* sock_name, const char* vrf, class rib_t* rib)
 	void* read_buf = malloc(buf_size);
 	if (read_buf == NULL)
 	{
+		YANET_LOG_ERROR("error malloc buffer size: %ld", buf_size);
+		if (pipe_close >= 0)
+		{
+			close(pipe_close);
+		}
 		close(bird_sock);
-		return;
+		return result;
 	}
 	/*
 	 * The variable is the offset to read data to and denotes the first
@@ -631,6 +652,28 @@ void read_bird_feed(const char* sock_name, const char* vrf, class rib_t* rib)
 
 	for (;;)
 	{
+		if (pipe_close >= 0)
+		{
+			/* Waiting either for receiving data in the socket, or for a signal to close the stream via pipe */
+			int max_sd = (pipe_close > bird_sock ? pipe_close : bird_sock);
+			fd_set rfds;
+			FD_ZERO(&rfds);
+			FD_SET(pipe_close, &rfds);
+			FD_SET(bird_sock, &rfds);
+
+			int retval = select(max_sd + 1, &rfds, NULL, NULL, NULL);
+			if (retval < 0)
+			{
+				YANET_LOG_ERROR("!!!!! error select %d: %s\n", errno, strerror(errno));
+			}
+			else if (FD_ISSET(pipe_close, &rfds))
+			{
+				result = false;
+				YANET_LOG_INFO("closing thread for reading the vrf=%s from the bird socket: %s\n", vrf, sock_name);
+				break;
+			}
+		}
+
 		/* Read as mush as possible data */
 		ssize_t readen = read(bird_sock,
 		                      (void*)((uintptr_t)read_buf + read_pos),
@@ -662,8 +705,8 @@ void read_bird_feed(const char* sock_name, const char* vrf, class rib_t* rib)
 			parse_pos = pos - (uintptr_t)read_buf;
 		}
 
-		rib->rib_update(requests);
-		rib->rib_flush();
+		handler(requests);
+		requests.clear();
 
 		if (buf_size - read_pos < buf_size / 2)
 		{
@@ -675,8 +718,12 @@ void read_bird_feed(const char* sock_name, const char* vrf, class rib_t* rib)
 		}
 	}
 
+	if (pipe_close >= 0)
+	{
+		close(pipe_close);
+	}
 	free(read_buf);
 	close(bird_sock);
 
-	return;
+	return result;
 }

@@ -1,6 +1,8 @@
 #ifndef LIBBIRD_H
 #define LIBBIRD_H
 
+#include "common/icp.h"
+#include <functional>
 #include <stdint.h>
 
 #define NET_IP4 1
@@ -182,6 +184,8 @@ typedef union net_addr_union
 	net_addr_mpls mpls;
 } net_addr_union;
 
-void read_bird_feed(const char* sock_name, const char* vrf, class rib_t* rib);
+using rib_update_handler = std::function<void(common::icp::rib_update::request&)>;
+
+bool read_bird_feed(const char* sock_name, const char* vrf, rib_update_handler handler, int pipe_close = -1);
 
 #endif
