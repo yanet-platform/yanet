@@ -91,10 +91,15 @@ struct transport_key_t
 
 struct total_key_t
 {
-	constexpr bool operator<(const total_key_t& second) const
+	bool operator==(const total_key_t& second) const
 	{
-		return std::tie(acl_id, transport_id) <
+		return std::tie(acl_id, transport_id) ==
 		       std::tie(second.acl_id, second.transport_id);
+	}
+
+	bool operator!=(const total_key_t& second) const
+	{
+		return !(*this == second);
 	}
 
 	tAclGroupId acl_id;
@@ -168,3 +173,15 @@ using ranges_uint8_t = ranges_t<uint8_t>;
 using ranges_uint16_t = ranges_t<uint16_t>;
 
 }
+
+template<>
+struct std::hash<common::acl::total_key_t>
+{
+	std::size_t operator()(const common::acl::total_key_t& key) const noexcept
+	{
+		std::size_t res = 0;
+		common::hash_combine(res, key.acl_id);
+		common::hash_combine(res, key.transport_id);
+		return res;
+	}
+};
