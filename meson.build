@@ -33,8 +33,9 @@ if get_option('enable_acl_debug')
 endif
 
 if get_option('custom_hash_structures')
-    # This is header-only library without meson.build
+    # These are header-only libraries without their own meson.build
     emhash_dep = declare_dependency(include_directories: 'subprojects/emhash')
+    ankerl_dep = declare_dependency(include_directories: 'subprojects/ankerl/include/ankerl')
     add_global_arguments('-DCUSTOM_HASH_STRUCTURES', language: 'cpp')
 endif
 
