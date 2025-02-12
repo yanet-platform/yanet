@@ -4,6 +4,9 @@ dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
 dependencies += libyanet_fwparser_dep
 dependencies += libyanet_protobuf_dep
+if get_option('custom_hash_structures')
+    dependencies += emhash_dep
+endif
 
 sources = files('acl_compiler.cpp',
                 'acl.cpp',
