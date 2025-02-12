@@ -12,16 +12,9 @@ total_table_t::total_table_t(compiler_t* compiler) :
 void total_table_t::clear()
 {
 	table.clear();
-	remap_group_ids.clear();
-	group_id = 1;
 	filters.clear();
 	filter_ids.clear();
-	filter_id_by_rule_id.clear();
 	filled_filter_ids.clear();
-	bitmask.clear();
-	map.clear();
-	reverse_map.clear();
-	reverse_map_next.clear();
 }
 
 unsigned int total_table_t::collect(const unsigned int rule_id, const filter& filter)
@@ -35,7 +28,6 @@ unsigned int total_table_t::collect(const unsigned int rule_id, const filter& fi
 		it = filter_ids.emplace_hint(it, filter, filter_ids.size());
 	}
 
-	filter_id_by_rule_id.emplace_back(it->second);
 	return it->second;
 }
 
