@@ -26,7 +26,7 @@ public:
 public:
 	acl::compiler_t* compiler;
 
-	std::map<common::acl::total_key_t, tAclGroupId> table;
+	FlatMap<common::acl::total_key_t, tAclGroupId> table;
 
 	std::vector<tAclGroupId> remap_group_ids;
 	tAclGroupId group_id;
