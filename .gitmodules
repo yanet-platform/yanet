@@ -4,3 +4,6 @@
 [submodule "subprojects/json"]
 	path = subprojects/json
 	url = https://github.com/nlohmann/json.git
+[submodule "subprojects/emhash"]
+	path = subprojects/emhash
+	url = https://github.com/ktprime/emhash.git
