@@ -34,7 +34,7 @@ public:
 	std::vector<filter> filters;
 	std::map<filter, unsigned int> filter_ids;
 	std::vector<unsigned int> filter_id_by_rule_id;
-	std::vector<std::set<tAclGroupId>> filter_id_group_ids;
+	FlatSet<unsigned int> filled_filter_ids;
 
 	std::vector<uint8_t> bitmask; /// @todo: bitmask_t
 
