@@ -7,3 +7,6 @@
 [submodule "subprojects/emhash"]
 	path = subprojects/emhash
 	url = https://github.com/ktprime/emhash.git
+[submodule "subprojects/ankerl"]
+	path = subprojects/ankerl
+	url = https://github.com/martinus/unordered_dense
