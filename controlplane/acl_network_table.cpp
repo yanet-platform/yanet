@@ -144,7 +144,7 @@ void network_table_t::table_insert(const DimensionArray& keys)
 	auto it = remap_group_ids.find(value);
 	if (it == remap_group_ids.end()) ///< check: don't override self rule
 	{
-		remap_group_ids.insert_unique(value, group_id);
+		remap_group_ids.emplace(value, group_id);
 		value = group_id;
 		group_id++;
 	}
@@ -177,7 +177,7 @@ void network_table_t::remap()
 			if (it == remap_group_ids.end())
 			{
 				tAclGroupId new_id = (network_table_group_id << compiler->transport_layers_shift) | layer_id;
-				remap_group_ids.insert_unique(network_table_group_id, new_id);
+				remap_group_ids.emplace(network_table_group_id, new_id);
 			}
 			else
 			{
