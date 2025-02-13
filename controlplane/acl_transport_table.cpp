@@ -576,7 +576,7 @@ void transport_table::thread_t::table_insert(transport_table::layer_t& layer,
 	auto it = remap_group_ids.find(value);
 	if (it == remap_group_ids.end()) ///< check: don't override self rule
 	{
-		remap_group_ids.insert_unique(value, group_id);
+		remap_group_ids.emplace(value, group_id);
 		value = group_id;
 		group_id += threads_count;
 	}
