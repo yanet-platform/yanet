@@ -96,9 +96,9 @@ void compiler_t::compile(const std::vector<rule_t>& unwind_rules,
 	}
 
 	result.acl_total_table.reserve(total_table.table.size());
-	for (const auto& [value, id, key] : total_table.table)
+
+	for (const auto& [key, value] : total_table.table)
 	{
-		(void)id;
 		result.acl_total_table.emplace_back(key, value);
 	}
 
@@ -472,8 +472,8 @@ void compiler_t::total_table_compile()
 	total_table.prepare();
 	total_table.compile();
 
-	YANET_LOG_INFO("acl::compile: size: %u\n",
-	               total_table.table.size());
+	YANET_LOG_INFO("acl::compile: size: %zu\n",
+	               static_cast<size_t>(total_table.table.size()));
 }
 
 void compiler_t::value_compile()
