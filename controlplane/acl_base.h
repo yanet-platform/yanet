@@ -9,6 +9,7 @@
 using tAclGroupId = uint32_t;
 
 #if defined(CUSTOM_HASH_STRUCTURES)
+#define EMH_BUCKET_INDEX 0
 #include "hash_table7.hpp"
 #include "unordered_dense.h"
 

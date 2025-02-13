@@ -65,7 +65,7 @@ void total_table_t::compile()
 				{
 					// If there is no such key in table, then we save [key, group_id]
 					// without any additional checks.
-					table.insert_unique(key, group_id);
+					table.emplace(key, group_id);
 					used = true;
 				}
 				else
