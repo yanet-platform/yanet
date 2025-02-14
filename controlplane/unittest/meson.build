@@ -5,6 +5,10 @@ dependencies += dependency('threads')
 dependencies += dependency('gtest')
 dependencies += dependency('gtest_main')
 dependencies += libyanet_fwparser_dep
+if get_option('custom_hash_structures')
+    dependencies += emhash_dep
+    dependencies += ankerl_dep
+endif
 
 controlplane_sources = files('../acl_compiler.cpp',
                              '../acl.cpp',
