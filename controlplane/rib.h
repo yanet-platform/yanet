@@ -1,5 +1,6 @@
 #pragma once
 
+#include "libbird.h"
 #include "module.h"
 #include <atomic>
 #include <mutex>
@@ -19,6 +20,20 @@ using path_info_to_nexthop_stuff_ptr_t = common::rib::path_info_to_nexthop_stuff
 
 }
 
+class BirdReaders
+{
+public:
+	void StartReader(const std::string& vrf_name, const std::string& socket_path, int delay, rib_update_handler handler);
+	void TryStopReader(const std::string& vrf_name, const std::string& socket_path);
+	void TryStopAllReaders();
+
+private:
+	using bird_reader_key = std::pair<std::string, std::string>; // vrf + socket_path
+
+	std::vector<std::thread> bird_threads;
+	std::map<bird_reader_key, int> thread_pipes;
+};
+
 class rib_t : public cModule
 {
 public:
@@ -26,6 +41,7 @@ public:
 	~rib_t() override = default;
 
 	eResult init() override;
+	void stop() override;
 	void reload(const controlplane::base_t& base_prev, const controlplane::base_t& base_next, common::idp::updateGlobalBase::request& globalbase) override;
 
 	void rib_update(const common::icp::rib_update::request& request);
@@ -46,6 +62,7 @@ private:
 	void rib_eor(const common::icp::rib_update::eor& request);
 
 	void rib_thread();
+	void reload_bird_threads(const controlplane::base_t& base_prev, const controlplane::base_t& base_next);
 
 protected:
 	mutable std::mutex rib_update_mutex;
@@ -80,4 +97,6 @@ protected:
 	                              common::uint64, ///< paths
 	                              common::uint8>> ///< eor
 	        summary;
+
+	BirdReaders bird_readers;
 };

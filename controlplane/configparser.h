@@ -21,6 +21,7 @@ protected:
 	void loadConfig_logicalPort(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson);
 	void loadConfig_route(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_route_peers(controlplane::base_t& baseNext, controlplane::route::config_t& route, const nlohmann::json& json, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
+	void loadConfig_route_bird(controlplane::base_t& baseNext, const nlohmann::json& birdJson);
 	void loadConfig_decap(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson);
 	void loadConfig_nat64stateful(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_nat64stateless(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);

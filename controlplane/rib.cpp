@@ -1,5 +1,8 @@
 #include "rib.h"
 #include "controlplane.h"
+#include "libbird.h"
+
+#include <fcntl.h>
 
 using namespace controlplane::module;
 
@@ -64,6 +67,11 @@ eResult rib_t::init()
 	return eResult::success;
 }
 
+void rib_t::stop()
+{
+	bird_readers.TryStopAllReaders();
+}
+
 void rib_t::reload([[maybe_unused]] const controlplane::base_t& base_prev,
                    const controlplane::base_t& base_next,
                    [[maybe_unused]] common::idp::updateGlobalBase::request& globalbase)
@@ -115,6 +123,8 @@ void rib_t::reload([[maybe_unused]] const controlplane::base_t& base_prev,
 	}
 
 	rib_update(request);
+
+	reload_bird_threads(base_prev, base_next);
 }
 
 void rib_t::rib_update(const common::icp::rib_update::request& request)
@@ -872,5 +882,92 @@ void rib_t::rib_thread()
 		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds{200});
+	}
+}
+
+void rib_t::reload_bird_threads(const controlplane::base_t& base_prev, const controlplane::base_t& base_next)
+{
+	for (const auto& [key, delay] : base_next.birds_import)
+	{
+		if (base_prev.birds_import.find(key) == base_prev.birds_import.end())
+		{
+			const auto& [vrf_name, socket_path] = key;
+			bird_readers.StartReader(vrf_name, socket_path, delay, [this](common::icp::rib_update::request& request) {
+				rib_update(request);
+				rib_flush();
+				request.clear();
+			});
+		}
+	}
+
+	for (const auto& iter : base_prev.birds_import)
+	{
+		if (base_next.birds_import.find(iter.first) == base_next.birds_import.end())
+		{
+			const auto& [vrf_name, socket_path] = iter.first;
+			bird_readers.TryStopReader(vrf_name, socket_path);
+		}
+	}
+}
+
+void BirdReaders::StartReader(const std::string& vrf_name, const std::string& socket_path, int delay, rib_update_handler handler)
+{
+	YANET_LOG_INFO("run a thread to read the vrf=%s from the bird socket: %s\n", vrf_name.c_str(), socket_path.c_str());
+	int pipes[2];
+	if (pipe(pipes) < 0)
+	{
+		YANET_LOG_ERROR("error create pipes %d: %s\n", errno, strerror(errno));
+		return;
+	}
+	thread_pipes[{vrf_name, socket_path}] = pipes[1];
+	bird_threads.emplace_back([vrf_name, socket_path, delay, handler, pipes]() {
+		if (delay > 0)
+		{
+			sleep(delay);
+		}
+		while (true)
+		{
+			common::icp::rib_update::request request;
+			if (!read_bird_feed(socket_path.c_str(), vrf_name.c_str(), handler, pipes[0]))
+			{
+				break;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds{200});
+		}
+	});
+}
+
+void BirdReaders::TryStopReader(const std::string& vrf_name, const std::string& socket_path)
+{
+	auto iter = thread_pipes.find({vrf_name, socket_path});
+	if (iter == thread_pipes.end())
+	{
+		YANET_LOG_ERROR("try stopping a thread to read the vrf=%s from the bird socket: %s, but thread not found\n",
+		                vrf_name.c_str(),
+		                socket_path.c_str());
+	}
+	else
+	{
+		YANET_LOG_INFO("try stopping a thread to read the vrf=%s from the bird socket: %s\n",
+		               vrf_name.c_str(),
+		               socket_path.c_str());
+		close(iter->second);
+		thread_pipes.erase(iter);
+	}
+}
+
+void BirdReaders::TryStopAllReaders()
+{
+	for (auto& iter : thread_pipes)
+	{
+		close(iter.second);
+	}
+
+	for (auto& thread : bird_threads)
+	{
+		if (thread.joinable())
+		{
+			thread.join();
+		}
 	}
 }

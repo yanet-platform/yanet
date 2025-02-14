@@ -1,0 +1,49 @@
+steps:
+- cli:
+  - rib prefixes
+- bird:
+  - data: bird-master4_1.dat
+    sock: /tmp/yanet-bird-master4_1.sock
+  - data: bird-master6_1.dat
+    sock: /tmp/yanet-bird-master6_1.sock
+- sleep: 5
+- cli:
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+
+- bird:
+  - data: bird-master4_2.dat
+    sock: /tmp/yanet-bird-master4_2.sock
+  - data: bird-master6_2.dat
+    sock: /tmp/yanet-bird-master6_2.sock
+- sleep: 1
+- reload: controlplane2.conf
+- sleep: 5
+- cli:
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 002-expect.pcap
+
+- bird:
+  - data: bird-master4_3.dat
+    sock: /tmp/yanet-bird-master4_3.sock
+  - data: bird-master6_3.dat
+    sock: /tmp/yanet-bird-master6_3.sock
+- sleep: 1
+- reload: controlplane3.conf
+- sleep: 5
+- cli:
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 003-expect.pcap

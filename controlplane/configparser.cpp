@@ -135,6 +135,12 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 		{
 			loadConfig_memory_group(baseNext.root_memory_group, rootJson["memory_groups"]);
 		}
+
+		if (exist(rootJson, "bird_import"))
+		{
+			loadConfig_route_bird(baseNext,
+			                      rootJson["bird_import"]);
+		}
 	}
 	catch (const error_result_t& err)
 	{
@@ -195,6 +201,30 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 	}
 
 	return baseNext;
+}
+
+void config_parser_t::loadConfig_route_bird(controlplane::base_t& baseNext,
+                                            const nlohmann::json& birdJson)
+{
+	for (const auto& elemJson : birdJson)
+	{
+
+		std::string vrf = elemJson.value("vrf", "");
+		if (vrf.empty())
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "invalid configuration file: bird_import: vrf is not set");
+		}
+
+		std::string socket = elemJson.value("socket", "");
+		if (socket.empty())
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "invalid configuration file: bird_import: socket is not set");
+		}
+
+		int delay = elemJson.value("delay", 0);
+
+		baseNext.birds_import[{vrf, socket}] = delay;
+	}
 }
 
 void config_parser_t::loadConfig_logicalPort(controlplane::base_t& baseNext,
