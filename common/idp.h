@@ -164,7 +164,8 @@ enum class requestType : uint32_t
 	nat46clat_update,
 	dump_tags_ids,
 	tsc_state_update,
-	tscs_base_value_update
+	tscs_base_value_update,
+	update_host_config
 };
 
 namespace updateLogicalPort
@@ -502,6 +503,13 @@ namespace tscs_base_value_update
 using request = std::tuple<uint32_t, uint32_t>;
 }
 
+namespace update_host_config
+{
+using request = std::tuple<common::ipv4_address_t, ///< host address ipv4
+                           common::ipv6_address_t, ///< host address ipv6
+                           bool>; ///< hidden ip_address of host
+}
+
 using requestVariant = std::variant<std::tuple<>,
                                     updateLogicalPort::request,
                                     updateDecap::request,
@@ -537,7 +545,8 @@ using requestVariant = std::variant<std::tuple<>,
                                     sampler_update::request, /// + update_early_decap_flags::request, tsc_state_update::request
                                     serial_update::request,
                                     nat46clat_update::request,
-                                    tscs_base_value_update::request>;
+                                    tscs_base_value_update::request,
+                                    update_host_config::request>;
 
 using request = std::vector<std::tuple<requestType,
                                        requestVariant>>;

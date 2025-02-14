@@ -135,6 +135,11 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 		{
 			loadConfig_memory_group(baseNext.root_memory_group, rootJson["memory_groups"]);
 		}
+
+		if (exist(rootJson, "hostConfig"))
+		{
+			loadConfig_host(baseNext.host_config, rootJson["hostConfig"]);
+		}
 	}
 	catch (const error_result_t& err)
 	{
@@ -1945,5 +1950,29 @@ void config_parser_t::loadConfig_memory_group(common::memory_manager::memory_gro
 		}
 
 		memory_group.memory_groups.emplace_back(memory_group_next);
+	}
+}
+
+void config_parser_t::loadConfig_host(controlplane::base::host_t& host_config, const nlohmann::json& json)
+{
+	if (exist(json, "addresses"))
+	{
+		for (auto& address : json["addresses"].items())
+		{
+			auto ip = common::ip_address_t(address.value().get<std::string>());
+			if (ip.is_ipv4())
+			{
+				host_config.ipv4_address = ip.get_ipv4();
+			}
+			else
+			{
+				host_config.ipv6_address = ip.get_ipv6();
+			}
+		}
+	}
+
+	if (exist(json, "showRealAddress"))
+	{
+		host_config.show_real_address = json["showRealAddress"].get<bool>();
 	}
 }

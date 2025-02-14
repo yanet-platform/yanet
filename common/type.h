@@ -1922,6 +1922,7 @@ struct common
 	uint64_t leakedMbufs;
 	uint64_t logs_packets;
 	uint64_t logs_drops;
+	uint64_t ttl_exceeded;
 };
 
 struct port

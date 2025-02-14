@@ -1,0 +1,25 @@
+:BEGIN
+add skipto :IN ip from any to any in
+
+:IN
+add deny udp from 10.0.0.0/24 to any
+add allow tcp from 10.0.0.0/24 to 10.0.0.0/24 dst-port 80,443
+add deny tcp from 10.1.0.0/24 to 21.0.0.16/28 src-port 1024 frag
+add allow tcp from 10.1.0.0/24 to 21.0.0.16/28 src-port 1024
+add allow icmp from 10.2.0.0/24 to any frag
+add deny icmp from 10.2.0.0/24 to any icmptypes 1,2,3,9,10,13
+add allow icmp from 10.0.0.0/8 to 10.0.0.0/8
+
+add deny tcp from any to 2000::1:0/112
+add allow udp from 2000::1:0/112 to 2000::1:0/112 dst-port 53
+add deny udp from 2000::0/112 to any src-port 53 dst-port 53 frag
+add allow udp from 2000::0/112 to any src-port 53 dst-port 53
+add deny icmp6 from 2200::/112 to 2000::/112
+add allow icmp6 from any to 2000::/112
+add deny tcp from 2300::/112 to 2300::/112 tcpflags urg,psh
+add allow tcp from 2300::/112 to 2300::/112
+add deny tcp from 2301::/112 to 2301::/112 tcpflags fin,!rst
+add allow tcp from 2301::/112 to 2301::/112
+
+add allow tcp from any to any established
+add deny ip from any to any
