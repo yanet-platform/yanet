@@ -125,7 +125,7 @@ public:
 		     filter_id < filters.size();
 		     filter_id++)
 		{
-			std::set<tAclGroupId> group_ids;
+			FlatSet<tAclGroupId> group_ids;
 
 			for (const auto& range : filters[filter_id].vector)
 			{
@@ -183,7 +183,7 @@ public:
 	std::map<filter, unsigned int> filter_ids;
 	std::vector<std::vector<tAclGroupId>> filter_id_group_ids;
 
-	std::set<tAclGroupId> used_group_ids_set;
+	FlatSet<tAclGroupId> used_group_ids_set;
 	std::vector<tAclGroupId> used_group_ids_vec;
 
 protected:

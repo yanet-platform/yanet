@@ -26,21 +26,11 @@ public:
 public:
 	acl::compiler_t* compiler;
 
-	std::map<common::acl::total_key_t, tAclGroupId> table;
-
-	std::vector<tAclGroupId> remap_group_ids;
-	tAclGroupId group_id;
+	FlatMap<common::acl::total_key_t, tAclGroupId> table;
 
 	std::vector<filter> filters;
 	std::map<filter, unsigned int> filter_ids;
-	std::vector<unsigned int> filter_id_by_rule_id;
-	std::vector<std::set<tAclGroupId>> filter_id_group_ids;
-
-	std::vector<uint8_t> bitmask; /// @todo: bitmask_t
-
-	std::unordered_map<bitset_t, tAclGroupId> map;
-	std::map<tAclGroupId, bitset_t> reverse_map;
-	std::map<tAclGroupId, bitset_t> reverse_map_next;
+	FlatSet<unsigned int> filled_filter_ids;
 };
 
 }

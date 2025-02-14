@@ -72,7 +72,7 @@ void compiler_t::compile(const std::vector<rule_t>& unwind_rules,
 	{
 		auto& [width, values] = result.acl_network_table;
 		width = network_table.width;
-		values.swap(network_table.values);
+		values.swap(network_table.table.values());
 	}
 
 	result.acl_network_flags.swap(network_flags.filters);
@@ -96,6 +96,7 @@ void compiler_t::compile(const std::vector<rule_t>& unwind_rules,
 	}
 
 	result.acl_total_table.reserve(total_table.table.size());
+
 	for (const auto& [key, value] : total_table.table)
 	{
 		result.acl_total_table.emplace_back(key, value);
@@ -376,13 +377,28 @@ void compiler_t::network_table_compile()
 	network_table.prepare(source_group_id, destination_group_id);
 
 	YANET_LOG_INFO("acl::compile: size: %lu\n",
-	               network_table.values.size());
+	               network_table.table.size());
 
 	network_table.compile();
 	network_table.populate();
 
+#ifdef ACL_DEBUG
+	size_t group_ids = 0;
+
+	FlatSet<tAclGroupId> unique_groups;
+
+	for (const auto& groups : network_table.filter_id_group_ids)
+	{
+		unique_groups.insert(groups.begin(), groups.end());
+	}
+
+	group_ids = unique_groups.size();
+
 	YANET_LOG_INFO("acl::compile: group_ids: %lu\n",
-	               network_table.group_id_filter_ids.size());
+	               group_ids);
+#else
+	YANET_LOG_INFO("acl::compile: group_ids: enable ACL_DEBUG to see\n");
+#endif
 }
 
 void compiler_t::network_flags_compile()
@@ -399,21 +415,7 @@ void compiler_t::transport_compile()
 {
 	transport.prepare();
 
-	std::set<unsigned int> transport_filters;
-	for (const auto& [network_table_group_id, network_table_filter_ids] : network_table.group_id_filter_ids)
-	{
-		transport_filters.clear();
-
-		for (const auto network_table_filter_id : network_table_filter_ids)
-		{
-			for (const auto rule_id : network_table.filter_id_rule_ids[network_table_filter_id])
-			{
-				transport_filters.emplace(rules[rule_id].transport_filter_id);
-			}
-		}
-
-		transport.emplace_variation(network_table_group_id, transport_filters);
-	}
+	transport.create_variations();
 
 	YANET_LOG_INFO("acl::compile: variations: %lu\n",
 	               transport.variation.size());
@@ -437,16 +439,32 @@ void compiler_t::transport_table_compile()
 	transport_table.populate();
 
 	size_t size = 0;
-	size_t group_ids = 0;
 	for (const auto& thread : transport_table.threads)
 	{
 		size += thread.acl_transport_table.size();
-		group_ids += thread.group_id_filter_ids.size();
 	}
 	YANET_LOG_INFO("acl::compile: size: %lu\n",
 	               size);
+#ifdef ACL_DEBUG
+	size_t group_ids = 0;
+
+	for (const auto& thread : transport_table.threads)
+	{
+		FlatSet<tAclGroupId> unique_groups;
+
+		for (const auto& s : thread.transport_table_filter_id_group_ids)
+		{
+			unique_groups.insert(s.begin(), s.end());
+		}
+
+		group_ids = unique_groups.size();
+	}
+
 	YANET_LOG_INFO("acl::compile: group_ids: %lu\n",
 	               group_ids);
+#else
+	YANET_LOG_INFO("acl::compile: group_ids: enable ACL_DEBUG to see\n");
+#endif
 }
 
 void compiler_t::total_table_compile()
@@ -454,8 +472,8 @@ void compiler_t::total_table_compile()
 	total_table.prepare();
 	total_table.compile();
 
-	YANET_LOG_INFO("acl::compile: size: %lu\n",
-	               total_table.table.size());
+	YANET_LOG_INFO("acl::compile: size: %zu\n",
+	               static_cast<size_t>(total_table.table.size()));
 }
 
 void compiler_t::value_compile()
