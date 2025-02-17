@@ -815,6 +815,10 @@ common::idp::limits::response cControlPlane::limits()
 			globalBase->updater.route_lpm6->limits(response);
 			globalBase->updater.route_tunnel_lpm4->limits(response);
 			globalBase->updater.route_tunnel_lpm6->limits(response);
+			globalBase->updater.vrf_route_lpm4->limits(response);
+			globalBase->updater.vrf_route_lpm6->limits(response);
+			globalBase->updater.vrf_route_tunnel_lpm4->limits(response);
+			globalBase->updater.vrf_route_tunnel_lpm6->limits(response);
 
 			globalBase->updater.acl.network_table->limits(response);
 			globalBase->updater.acl.transport_table->limits(response);

@@ -17,6 +17,7 @@
 #include "lpm.h"
 #include "type.h"
 #include "updater.h"
+#include "vrf.h"
 
 /// @todo: move
 #define YADECAP_GB_DSCP_FLAG_MARK ((uint8_t)1)
@@ -133,6 +134,9 @@ public: ///< @todo
 class generation
 {
 public:
+	using vrf_lpm4 = lpm4_24bit_8bit_atomic;
+	using vrf_lpm6 = lpm6_8x16bit_atomic;
+
 	generation(cDataPlane* dataPlane, const tSocketId& socketId);
 	~generation() = default;
 
@@ -214,6 +218,11 @@ public: ///< @todo
 		std::unique_ptr<updater_lpm6_8x16bit> route_lpm6;
 		std::unique_ptr<updater_lpm4_24bit_8bit> route_tunnel_lpm4;
 		std::unique_ptr<updater_lpm6_8x16bit> route_tunnel_lpm6;
+
+		std::unique_ptr<updater_vrf_lpm<uint32_t, vrf_lpm4>> vrf_route_lpm4;
+		std::unique_ptr<updater_vrf_lpm<std::array<uint8_t, 16>, vrf_lpm6>> vrf_route_lpm6;
+		std::unique_ptr<updater_vrf_lpm<uint32_t, vrf_lpm4>> vrf_route_tunnel_lpm4;
+		std::unique_ptr<updater_vrf_lpm<std::array<uint8_t, 16>, vrf_lpm6>> vrf_route_tunnel_lpm6;
 	} updater;
 
 	/// variables above are not needed for cWorker::mainThread()
@@ -250,12 +259,16 @@ public: ///< @todo
 
 	lpm4_24bit_8bit_atomic* route_lpm4;
 	lpm6_8x16bit_atomic* route_lpm6;
+	dataplane::vrflpm::VrfLookuper<uint32_t, vrf_lpm4> vrf_route_lpm4;
+	dataplane::vrflpm::VrfLookuper<ipv6_address_t, vrf_lpm6> vrf_route_lpm6;
 	route_value_t route_values[YANET_CONFIG_ROUTE_VALUES_SIZE];
 
 	YADECAP_CACHE_ALIGNED(align3);
 
 	lpm4_24bit_8bit_atomic* route_tunnel_lpm4;
 	lpm6_8x16bit_atomic* route_tunnel_lpm6;
+	dataplane::vrflpm::VrfLookuper<uint32_t, vrf_lpm4> vrf_route_tunnel_lpm4;
+	dataplane::vrflpm::VrfLookuper<ipv6_address_t, vrf_lpm6> vrf_route_tunnel_lpm6;
 	uint8_t route_tunnel_weights[YANET_CONFIG_ROUTE_TUNNEL_WEIGHTS_SIZE];
 	route_tunnel_value_t route_tunnel_values[YANET_CONFIG_ROUTE_TUNNEL_VALUES_SIZE];
 	ipv4_address_t nat64stateful_pool[YANET_CONFIG_NAT64STATEFUL_POOL_SIZE];
