@@ -675,6 +675,11 @@ nlohmann::json cReport::convertGlobalBase(const dataplane::globalBase::generatio
 	globalBase->updater.route_tunnel_lpm4->report(json["route_tunnel_lpm4"]);
 	globalBase->updater.route_tunnel_lpm6->report(json["route_tunnel_lpm6"]);
 
+	globalBase->updater.vrf_route_lpm4->report(json["vrf_route_lpm4"]);
+	globalBase->updater.vrf_route_lpm6->report(json["vrf_route_lpm6"]);
+	globalBase->updater.vrf_route_tunnel_lpm4->report(json["vrf_route_tunnel_lpm4"]);
+	globalBase->updater.vrf_route_tunnel_lpm6->report(json["vrf_route_tunnel_lpm6"]);
+
 	globalBase->updater.acl.network_table->report(json["acl"]["network_table"]);
 	globalBase->updater.acl.transport_table->report(json["acl"]["transport_table"]);
 	globalBase->updater.acl.total_table->report(json["acl"]["total_table"]);
