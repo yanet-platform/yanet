@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <cstring>
+#include <fcntl.h>
 #include <pcap.h>
 #include <sys/shm.h>
 #include <sys/socket.h>
@@ -1481,6 +1482,12 @@ void tAutotest::mainThread()
 
 					result = step_dumpPackets(yamlStep["dumpPackets"], configFilePath);
 				}
+				else if (yamlStep["bird"])
+				{
+					YANET_LOG_DEBUG("step: bird\n");
+
+					result = step_bird(yamlStep["bird"], configFilePath);
+				}
 				else
 				{
 					YANET_LOG_ERROR("unknown step\n");
@@ -1504,6 +1511,8 @@ void tAutotest::mainThread()
 
 			std::abort();
 		}
+
+		stopBirdThreads();
 
 		YANET_LOG_PRINT(ANSI_COLOR_GREEN "done '%s'\n\n" ANSI_COLOR_RESET, configFilePath.data());
 		fflush(stdout);
@@ -1998,6 +2007,116 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 	}
 
 	return true;
+}
+
+void copyAllFromFileToSocket(int fd_file, int fd_socket)
+{
+	struct sockaddr_in6 address;
+	socklen_t addressLength = sizeof(address);
+	memset((char*)&address, 0, sizeof(address));
+	int clientSocket = accept(fd_socket, (struct sockaddr*)&address, &addressLength);
+	if (clientSocket < 0)
+	{
+		YANET_LOG_ERROR("error on accept socket %d: %s\n", errno, strerror(errno));
+		return;
+	}
+
+	uint8_t buffer[64];
+	ssize_t was_read;
+	while (was_read = read(fd_file, buffer, sizeof(buffer)), was_read > 0)
+	{
+		ssize_t totalSend = 0;
+		while (totalSend < was_read)
+		{
+			int ret = send(clientSocket, buffer + totalSend, was_read - totalSend, MSG_NOSIGNAL);
+			if (ret <= 0)
+			{
+				YANET_LOG_ERROR("error send %d: %s\n", errno, strerror(errno));
+				return;
+			}
+			totalSend += ret;
+		}
+	}
+
+	if (was_read < 0)
+	{
+		YANET_LOG_ERROR("error read %d: %s\n", errno, strerror(errno));
+	}
+	else
+	{
+		YANET_LOG_DEBUG("stopping thread copy from bird data\n");
+	}
+}
+
+bool tAutotest::step_bird(const YAML::Node& yamlStep,
+                          const std::string& path)
+{
+	for (const auto& yamlBird : yamlStep)
+	{
+		std::string filename_data = path + "/" + yamlBird["data"].as<std::string>();
+		std::string filename_sock = yamlBird["sock"].as<std::string>();
+		YANET_LOG_DEBUG("run bird on file data: %s, socket: %s\n", filename_data.c_str(), filename_sock.c_str());
+
+		// Open file
+		int fd_file = open(filename_data.c_str(), O_RDONLY);
+		if (fd_file < 0)
+		{
+			YANET_LOG_ERROR("error '%d: %s' open file: %s\n", fd_file, strerror(fd_file), filename_data.c_str());
+			return false;
+		}
+		birdDescriptors.push_back(fd_file);
+
+		// Prepare socket
+		int fd_socket = socket(AF_UNIX, SOCK_STREAM, 0);
+		if (fd_socket < 0)
+		{
+			YANET_LOG_ERROR("error create socket %d: %s\n", fd_socket, strerror(fd_socket));
+			return false;
+		}
+
+		sockaddr_un address;
+		memset((char*)&address, 0, sizeof(address));
+		address.sun_family = AF_UNIX;
+		strncpy(address.sun_path, filename_sock.c_str(), sizeof(address.sun_path) - 1);
+		address.sun_path[sizeof(address.sun_path) - 1] = 0;
+
+		unlink(filename_sock.c_str());
+
+		if (bind(fd_socket, (struct sockaddr*)&address, sizeof(address)) < 0)
+		{
+			YANET_LOG_ERROR("error bind socket on: %s\n", filename_sock.c_str());
+			return false;
+		}
+
+		if (listen(fd_socket, 64) < 0)
+		{
+			YANET_LOG_ERROR("error listen socket on: %s\n", filename_sock.c_str());
+			return false;
+		}
+		birdDescriptors.push_back(fd_socket);
+
+		birdThreads.emplace_back([fd_file, fd_socket]() {
+			copyAllFromFileToSocket(fd_file, fd_socket);
+		});
+	}
+
+	return true;
+}
+
+void tAutotest::stopBirdThreads()
+{
+	for (int fd : birdDescriptors)
+	{
+		close(fd);
+	}
+
+	for (auto& thread : birdThreads)
+	{
+		if (thread.joinable())
+		{
+			thread.join();
+		}
+	}
 }
 
 void tAutotest::fflushSharedMemory()
