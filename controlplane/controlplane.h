@@ -29,12 +29,12 @@
 class VrfIdStorage
 {
 public:
-	std::optional<tVrfId> Get(const std::string& vrfName);
+	std::optional<tVrfId> Get(const std::string& vrfName) const;
 	std::optional<tVrfId> GetOrCreate(const std::string& vrfName);
 	tVrfId GetOrCreateOrException(const std::string& vrfName, const std::string& message);
 
 private:
-	std::shared_mutex mutex;
+	mutable std::shared_mutex mutex;
 	std::unordered_map<std::string, std::optional<tVrfId>> vrf_ids;
 };
 

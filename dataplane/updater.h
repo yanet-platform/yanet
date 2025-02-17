@@ -5,6 +5,7 @@
 
 #include "common.h"
 #include "common/idp.h"
+#include "common/static_vector.h"
 #include "dynamic_table.h"
 #include "hashtable.h"
 #include "lpm.h"
@@ -673,10 +674,19 @@ public:
 template<typename Address, typename InnerLpmType>
 class updater_vrf_lpm
 {
-public:
-	using stats_t = typename InnerLpmType::stats_t;
 	using UpdaterType = updater_lpm<Address, InnerLpmType>;
 
+	[[nodiscard]] memory_manager::unique_ptr<UpdaterType> Allocate(const std::string& name_vrf)
+	{
+		return memory_manager_->create_unique<UpdaterType>(name_.c_str(),
+		                                                   socket_id_,
+		                                                   sizeof(UpdaterType),
+		                                                   name_vrf.c_str(),
+		                                                   memory_manager_,
+		                                                   socket_id_);
+	}
+
+public:
 	updater_vrf_lpm(const char* name,
 	                dataplane::memory_manager* memory_manager,
 	                tSocketId socket_id) :
@@ -688,6 +698,10 @@ public:
 
 	eResult init()
 	{
+		for (size_t index = 0; index < updaters_.capacity(); index++)
+		{
+			updaters_.emplace_back(memory_manager::unique_ptr<UpdaterType>{nullptr, memory_manager_->deleter()});
+		}
 		return eResult::success;
 	}
 
@@ -702,8 +716,10 @@ public:
 		}
 		if (updaters_[vrf] == nullptr)
 		{
-			std::string name = std::string(name_) + ".vrf" + std::to_string(vrf);
-			updaters_[vrf] = std::make_unique<UpdaterType>(name.c_str(), memory_manager_, socket_id_);
+			std::ostringstream oss;
+			oss << name_ << ".vrf" << vrf;
+			std::string name = oss.str();
+			updaters_[vrf] = Allocate(name);
 			if (updaters_[vrf] == nullptr)
 			{
 				return eResult::errorAllocatingMemory;
@@ -781,7 +797,7 @@ private:
 	std::string name_;
 	dataplane::memory_manager* memory_manager_;
 	tSocketId socket_id_;
-	std::array<std::unique_ptr<UpdaterType>, YANET_RIB_VRF_MAX_NUMBER> updaters_;
+	utils::StaticVector<memory_manager::unique_ptr<UpdaterType>, YANET_RIB_VRF_MAX_NUMBER> updaters_;
 };
 
 }

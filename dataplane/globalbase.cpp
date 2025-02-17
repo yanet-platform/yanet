@@ -233,9 +233,9 @@ eResult generation::init()
 	}
 
 	{
-		updater.vrf_route_lpm4 = std::make_unique<updater_vrf_lpm<uint32_t, vrf_lpm4>>("vrf_route.v4.lpm",
-		                                                                               &dataPlane->memory_manager,
-		                                                                               socketId);
+		updater.vrf_route_lpm4 = std::make_unique<updater_vrf_lpm4>("vrf_route.v4.lpm",
+		                                                            &dataPlane->memory_manager,
+		                                                            socketId);
 		result = updater.vrf_route_lpm4->init();
 		if (result != eResult::success)
 		{
@@ -246,9 +246,9 @@ eResult generation::init()
 	}
 
 	{
-		updater.vrf_route_lpm6 = std::make_unique<updater_vrf_lpm<std::array<uint8_t, 16>, vrf_lpm6>>("vrf_route.v6.lpm",
-		                                                                                              &dataPlane->memory_manager,
-		                                                                                              socketId);
+		updater.vrf_route_lpm6 = std::make_unique<updater_vrf_lpm6>("vrf_route.v6.lpm",
+		                                                            &dataPlane->memory_manager,
+		                                                            socketId);
 		result = updater.vrf_route_lpm6->init();
 		if (result != eResult::success)
 		{
@@ -259,9 +259,9 @@ eResult generation::init()
 	}
 
 	{
-		updater.vrf_route_tunnel_lpm4 = std::make_unique<updater_vrf_lpm<uint32_t, vrf_lpm4>>("vrf_route.tunnel.v4.lpm",
-		                                                                                      &dataPlane->memory_manager,
-		                                                                                      socketId);
+		updater.vrf_route_tunnel_lpm4 = std::make_unique<updater_vrf_lpm4>("vrf_route.tunnel.v4.lpm",
+		                                                                   &dataPlane->memory_manager,
+		                                                                   socketId);
 		result = updater.vrf_route_tunnel_lpm4->init();
 		if (result != eResult::success)
 		{
@@ -272,9 +272,9 @@ eResult generation::init()
 	}
 
 	{
-		updater.vrf_route_tunnel_lpm6 = std::make_unique<updater_vrf_lpm<std::array<uint8_t, 16>, vrf_lpm6>>("vrf_route.tunnel.v6.lpm",
-		                                                                                                     &dataPlane->memory_manager,
-		                                                                                                     socketId);
+		updater.vrf_route_tunnel_lpm6 = std::make_unique<updater_vrf_lpm6>("vrf_route.tunnel.v6.lpm",
+		                                                                   &dataPlane->memory_manager,
+		                                                                   socketId);
 		result = updater.vrf_route_tunnel_lpm6->init();
 		if (result != eResult::success)
 		{
@@ -832,13 +832,7 @@ static bool checkFlow(const common::globalBase::tFlow& flow)
 
 eResult generation::updateLogicalPort(const common::idp::updateGlobalBase::updateLogicalPort::request& request)
 {
-	const auto& logicalPortId = std::get<0>(request);
-	const auto& portId = std::get<1>(request);
-	const auto& vlanId = std::get<2>(request);
-	const auto& vrfId = std::get<3>(request);
-	const auto& etherAddress = std::get<4>(request);
-	const auto& promiscuousMode = std::get<5>(request);
-	const auto& flow = std::get<6>(request);
+	const auto& [logicalPortId, portId, vlanId, vrfId, etherAddress, promiscuousMode, flow] = request;
 
 	if (logicalPortId >= CONFIG_YADECAP_LOGICALPORTS_SIZE)
 	{
