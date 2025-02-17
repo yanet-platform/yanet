@@ -176,6 +176,19 @@ public:
 		}
 	}
 
+	bool is_ignored_table(const std::string& table_name) const
+	{
+		for (const auto& [name, module] : routes)
+		{
+			GCC_BUG_UNUSED(name);
+			if (exist(module.ignore_tables, table_name))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 public:
 	std::map<std::string, controlplane::route::config_t> routes;
 	std::map<ip_prefix_t, std::tuple<tInterfaceId, std::string>> interface_by_neighbors;
