@@ -136,6 +136,8 @@ class generation
 public:
 	using vrf_lpm4 = lpm4_24bit_8bit_atomic;
 	using vrf_lpm6 = lpm6_8x16bit_atomic;
+	using updater_vrf_lpm4 = updater_vrf_lpm<uint32_t, vrf_lpm4>;
+	using updater_vrf_lpm6 = updater_vrf_lpm<std::array<uint8_t, 16>, vrf_lpm6>;
 
 	generation(cDataPlane* dataPlane, const tSocketId& socketId);
 	~generation() = default;
@@ -218,10 +220,10 @@ public: ///< @todo
 		std::unique_ptr<updater_lpm4_24bit_8bit> route_tunnel_lpm4;
 		std::unique_ptr<updater_lpm6_8x16bit> route_tunnel_lpm6;
 
-		std::unique_ptr<updater_vrf_lpm<uint32_t, vrf_lpm4>> vrf_route_lpm4;
-		std::unique_ptr<updater_vrf_lpm<std::array<uint8_t, 16>, vrf_lpm6>> vrf_route_lpm6;
-		std::unique_ptr<updater_vrf_lpm<uint32_t, vrf_lpm4>> vrf_route_tunnel_lpm4;
-		std::unique_ptr<updater_vrf_lpm<std::array<uint8_t, 16>, vrf_lpm6>> vrf_route_tunnel_lpm6;
+		std::unique_ptr<updater_vrf_lpm4> vrf_route_lpm4;
+		std::unique_ptr<updater_vrf_lpm6> vrf_route_lpm6;
+		std::unique_ptr<updater_vrf_lpm4> vrf_route_tunnel_lpm4;
+		std::unique_ptr<updater_vrf_lpm6> vrf_route_tunnel_lpm6;
 	} updater;
 
 	/// variables above are not needed for cWorker::mainThread()

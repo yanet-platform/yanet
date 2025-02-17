@@ -176,7 +176,7 @@ public:
 		}
 	}
 
-	bool is_ignored_table(const std::string& table_name) const
+	[[nodiscard]] bool is_ignored_table(const std::string& table_name) const
 	{
 		for (const auto& [name, module] : routes)
 		{

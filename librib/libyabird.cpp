@@ -93,7 +93,7 @@ void libyabird_t::set_state(const char* peer, int state)
 		common::icp::rib_update::clear request = {"bgp", std::nullopt};
 
 		std::get<1>(request) = {peer_address,
-		                        {"default", ///< @todo: vrf
+		                        {YANET_RIB_VRF_DEFAULT,
 		                         YANET_RIB_PRIORITY_DEFAULT}};
 
 		{
@@ -163,7 +163,7 @@ void libyabird_t::update(yanet_data_t* data)
 
 		{
 			common::icp::rib_update::eor request = {"bgp",
-			                                        "default",
+			                                        YANET_RIB_VRF_DEFAULT,
 			                                        YANET_RIB_PRIORITY_DEFAULT,
 			                                        peer_address,
 			                                        table_name};
@@ -234,7 +234,7 @@ void libyabird_t::update(yanet_data_t* data)
 			      std::holds_alternative<common::icp::rib_update::insert>(rib_request.back())))
 			{
 				common::icp::rib_update::insert request = {"bgp",
-				                                           "default", ///< @todo: vrf
+				                                           YANET_RIB_VRF_DEFAULT,
 				                                           YANET_RIB_PRIORITY_DEFAULT,
 				                                           {}};
 
@@ -293,7 +293,7 @@ void libyabird_t::update(yanet_data_t* data)
 			      std::holds_alternative<common::icp::rib_update::remove>(rib_request.back())))
 			{
 				common::icp::rib_update::remove request = {"bgp",
-				                                           "default", ///< @todo: vrf
+				                                           YANET_RIB_VRF_DEFAULT,
 				                                           YANET_RIB_PRIORITY_DEFAULT,
 				                                           {}};
 				rib_request.emplace_back(request);

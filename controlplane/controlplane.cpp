@@ -1020,7 +1020,7 @@ VrfIdStorage& cControlPlane::getVrfIdsStorage()
 	return vrfIds;
 }
 
-std::optional<tVrfId> VrfIdStorage::Get(const std::string& vrfName)
+std::optional<tVrfId> VrfIdStorage::Get(const std::string& vrfName) const
 {
 	if (vrfName.empty() || vrfName == YANET_RIB_VRF_DEFAULT)
 	{
@@ -1071,7 +1071,9 @@ tVrfId VrfIdStorage::GetOrCreateOrException(const std::string& vrfName, const st
 	std::optional<tVrfId> vrfId = GetOrCreate(vrfName);
 	if (!vrfId.has_value())
 	{
-		throw error_result_t(eResult::invalidVrfId, message + vrfName);
+		std::ostringstream oss;
+		oss << message << ": " << vrfName;
+		throw error_result_t(eResult::invalidVrfId, oss.str());
 	}
 	return *vrfId;
 }

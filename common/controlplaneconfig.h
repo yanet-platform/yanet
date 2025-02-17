@@ -107,11 +107,7 @@ public:
 class config_t
 {
 public:
-	config_t() :
-	        vrf(YANET_RIB_VRF_DEFAULT),
-	        tunnel_enabled(false)
-	{
-	}
+	config_t() = default;
 
 	/** @todo: tag:CP_MODULES
 	void load(const nlohmann::json& json);
@@ -123,7 +119,7 @@ public:
 public:
 	tRouteId routeId;
 	std::set<common::ip_prefix_t> to_kernel_prefixes;
-	std::string vrf{"default"};
+	std::string vrf{YANET_RIB_VRF_DEFAULT};
 	bool tunnel_enabled{};
 	std::set<std::string> ignore_tables;
 	common::ipv4_address_t ipv4_source_address;
