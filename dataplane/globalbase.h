@@ -197,7 +197,6 @@ protected:
 
 	using RealWeight = std::pair<balancer_real_id_t, decltype(balancer_real_state_t::weight)>;
 
-	std::vector<RealWeight> ServiceWeights(const balancer_service_t& service);
 	balancer_real_id_t* rebuild_service_ring_one_wrr(
 	        balancer_real_id_t* start,
 	        const balancer_real_id_t* const do_not_exceed,

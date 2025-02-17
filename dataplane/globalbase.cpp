@@ -1656,47 +1656,38 @@ balancer_real_id_t* generation::rebuild_service_ring_one_wrr(
 	return start;
 }
 
-std::vector<generation::RealWeight> generation::ServiceWeights(const balancer_service_t& service)
+balancer_real_id_t* generation::rebuild_service_ring_one_chash(
+        balancer_real_id_t* start,
+        const balancer_real_id_t* const do_not_exceed,
+        const balancer_service_t& service)
 {
-	std::vector<RealWeight> weights;
+	std::vector<ipv6_address_t> reals;
+	std::vector<std::uint32_t> weights;
+	reals.reserve(service.real_size);
 	weights.reserve(service.real_size);
 	for (uint32_t real_idx = service.real_start;
 	     real_idx < service.real_start + service.real_size;
 	     ++real_idx)
 	{
 		balancer_real_id_t real_id = balancer_service_reals[real_idx];
-		uint32_t weight = balancer_real_states[real_id].weight;
-
-		weights.emplace_back(real_id, weight);
-	}
-	return weights;
-}
-
-balancer_real_id_t* generation::rebuild_service_ring_one_chash(
-        balancer_real_id_t* start,
-        const balancer_real_id_t* const do_not_exceed,
-        const balancer_service_t& service)
-{
-	std::vector<std::pair<ipv6_address_t, balancer_real_id_t>> reals;
-	reals.reserve(service.real_size);
-	for (uint32_t real_idx = service.real_start;
-	     real_idx < service.real_start + service.real_size;
-	     ++real_idx)
-	{
-		balancer_real_id_t real_id = balancer_service_reals[real_idx];
-		ipv6_address_t& ip = balancer_reals[real_id].destination;
-		reals.emplace_back(ip, real_id);
+		reals.emplace_back(balancer_reals[real_id].destination);
+		auto& state = balancer_real_states[real_idx];
+		weights.push_back(state.weight);
 	}
 	auto updater = chash::WeightUpdater::MakeWeightUpdater(
-	        reals,
+	        reals.data(),
+			&balancer_service_reals[service.real_start],
+			weights.data(),
+			service.real_size,
 	        YANET_DEFAULT_BALANCER_REAL_MAPPINGS_LIMIT,
-	        YANET_DEFAULT_BALANCER_CELLS_PER_WEIGHT_UNIT);
+	        YANET_DEFAULT_BALANCER_CELLS_PER_WEIGHT_UNIT,
+			chash::WeightUpdater::LookupRequiredSize(reals.size(), YANET_DEFAULT_BALANCER_CELLS_PER_WEIGHT_UNIT));
 	if (!updater)
 	{
 		YANET_THROW("Failed to intialize updater for balancer service reals");
 		std::abort();
 	}
-	updater.value().InitLookup(ServiceWeights(service), start);
+	updater.value().InitLookup(start);
 
 	chash_updaters.emplace(&service, std::move(updater.value()));
 	return start + updater.value().LookupSize();
@@ -1714,7 +1705,21 @@ balancer_real_id_t* generation::update_service_ring_one_chash(
 		return start;
 	}
 	auto& updater = up->second;
-	updater.UpdateLookup(ServiceWeights(service), start);
+	std::vector<std::uint32_t> weights;
+	weights.reserve(service.real_size);
+	for (uint32_t real_idx = service.real_start;
+	     real_idx < service.real_start + service.real_size;
+	     ++real_idx)
+	{
+		auto& state = balancer_real_states[real_idx];
+		weights.push_back(state.weight);
+	}
+	updater.UpdateLookup(
+		&balancer_service_reals[service.real_start],
+		weights.data(),
+		service.real_size,
+		start
+	);
 	return start + updater.LookupSize();
 }
 
