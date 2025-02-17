@@ -96,26 +96,14 @@ void route_t::prefix_update(const rib::vrf_priority_t& vrf_priority,
 		        interface_destination_next;
 		for (const auto& [pptn_index, path_info_to_nh_ptr] : *nexthops)
 		{
-			const auto& table_name = std::get<2>(pptns[pptn_index]);
-
 			/// @todo: multi route. vrf
-			bool ignore = false;
 			{
+				const auto& table_name = std::get<2>(pptns[pptn_index]);
 				auto current_guard = generations.current_lock_guard();
-				for (const auto& [name, module] : generations.current().routes) ///< @todo: DELETE
+				if (generations.current().is_ignored_table(table_name))
 				{
-					GCC_BUG_UNUSED(name);
-
-					if (exist(module.ignore_tables, table_name))
-					{
-						ignore = true;
-						break;
-					}
+					continue;
 				}
-			}
-			if (ignore)
-			{
-				continue;
 			}
 
 			for (const auto& [path_info, nh_ptr] : path_info_to_nh_ptr)
