@@ -3,6 +3,7 @@
 #include "acl_base.h"
 
 #include "common/acl.h"
+#include "common/type.h"
 
 namespace acl::compiler
 {
@@ -26,7 +27,8 @@ public:
 
 private:
 	acl::compiler_t* compiler;
-	std::unordered_map<unsigned int, std::vector<filter>> acl_rules_by_filter_id;
-	std::unordered_map<tAclGroupId, std::unordered_map<unsigned int, std::set<unsigned int>>> group_to_acl_rule_map;
+
+	using AclRuleIdsMap = std::unordered_map<unsigned int, std::vector<tAclRuleId>>;
+	std::unordered_map<unsigned int, AclRuleIdsMap> filter_id_acl_id_rule_ids;
 };
 }
