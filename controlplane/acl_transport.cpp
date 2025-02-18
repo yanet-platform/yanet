@@ -46,55 +46,64 @@ void transport_t::prepare()
 	get_layer(0);
 }
 
-void transport_t::emplace_variation(const unsigned int network_table_group_id,
-                                    const std::set<unsigned int>& filter_ids)
+void transport_t::create_variations()
 {
-	size_t size = ((size_t)-1) - filter_ids.size();
-	auto it = variation.find(std::tie(size, filter_ids));
-	if (it == variation.end())
+	std::unordered_map<unsigned int, std::set<unsigned int>> group_id_transport_filters;
+
+	for (unsigned int filter_id = 0; filter_id < compiler->network_table.filters.size(); ++filter_id)
 	{
-		it = variation.emplace_hint(it, std::tie(size, filter_ids), std::vector<unsigned int>());
+		for (tAclGroupId group_id : compiler->network_table.filter_id_group_ids[filter_id])
+		{
+			for (unsigned int rule_id : compiler->network_table.filter_id_rule_ids[filter_id])
+			{
+				group_id_transport_filters[group_id].emplace(compiler->rules[rule_id].transport_filter_id);
+			}
+		}
 	}
 
-	it->second.emplace_back(network_table_group_id);
+	for (auto& [group_id, transport_filters] : group_id_transport_filters)
+	{
+		variation[std::move(transport_filters)].push_back(group_id);
+	}
 }
 
 void transport_t::distribute()
 {
-	for (const auto& [key, network_table_group_ids] : variation)
+	for (const auto& [filter_ids, network_table_group_ids] : variation)
 	{
-		const auto& [size, filter_ids] = key;
-		(void)size;
-
 		unsigned int best_layer_id = 0;
-		size_t best_filter_ids_count = (size_t)-1;
+		size_t best_filter_ids_count = std::numeric_limits<size_t>::max();
 
 		for (unsigned int layer_id = 0;
 		     layer_id < compiler->transport_layers_size_max;
 		     layer_id++)
 		{
-			const auto& layer = get_layer(layer_id);
+			const auto& layer_filter_ids = get_layer(layer_id).filter_ids_set;
+			auto contains_filter = [&layer_filter_ids](unsigned int id) {
+				return layer_filter_ids.find(id) != layer_filter_ids.end();
+			};
 
-			std::set<unsigned int> merged_filter_ids; ///< @todo: bitmask
-			merged_filter_ids = layer.filter_ids_set;
-			merged_filter_ids.insert(filter_ids.begin(), filter_ids.end());
-
-			if (merged_filter_ids.size() == layer.filter_ids_set.size())
+			if (layer_filter_ids.empty())
 			{
 				best_layer_id = layer_id;
 				break;
 			}
 
-			if (layer.filter_ids_set.empty())
+			// Check if all filters are already in the set
+			if (std::all_of(filter_ids.begin(), filter_ids.end(), contains_filter))
 			{
 				best_layer_id = layer_id;
 				break;
 			}
 
-			if (merged_filter_ids.size() < best_filter_ids_count)
+			size_t new_size = layer_filter_ids.size() +
+			                  // Count how many new filters would be added
+			                  std::count_if(filter_ids.begin(), filter_ids.end(), std::not_fn(contains_filter));
+
+			if (new_size < best_filter_ids_count)
 			{
 				best_layer_id = layer_id;
-				best_filter_ids_count = merged_filter_ids.size();
+				best_filter_ids_count = new_size;
 			}
 		}
 

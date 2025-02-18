@@ -19,7 +19,7 @@ public:
 	void clear();
 	unsigned int collect(const unsigned int rule_id, const filter& filter);
 	void prepare();
-	void emplace_variation(const unsigned int network_table_group_id, const std::set<unsigned int>& filter_ids);
+	void create_variations();
 	void distribute();
 	void compile();
 	void populate();
@@ -38,8 +38,8 @@ public:
 		flat_t<uint16_t> icmp_type_code;
 		flat_t<uint16_t> icmp_identifier;
 
-		std::set<unsigned int> filter_ids_set;
-		std::set<unsigned int> network_table_group_ids_set;
+		FlatSet<unsigned int> filter_ids_set;
+		FlatSet<unsigned int> network_table_group_ids_set;
 
 		std::vector<unsigned int> filter_ids_vec;
 		std::vector<unsigned int> network_table_group_ids_vec;
@@ -76,9 +76,22 @@ public:
 	std::map<tAclGroupId, bitset_t> reverse_map;
 	std::map<tAclGroupId, bitset_t> reverse_map_next;
 
-	std::map<std::tuple<size_t,
-	                    std::set<unsigned int>>,
-	         std::vector<unsigned int>>
+	struct VariationComparator
+	{
+		bool operator()(const std::set<unsigned int>& a,
+		                const std::set<unsigned int>& b) const
+		{
+			if (a.size() != b.size())
+			{
+				return a.size() > b.size();
+			}
+			return a < b;
+		}
+	};
+
+	std::map<std::set<unsigned int>,
+	         std::vector<unsigned int>,
+	         VariationComparator>
 	        variation;
 
 protected:

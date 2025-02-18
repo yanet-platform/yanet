@@ -46,3 +46,8 @@ option('enable_acl_debug',
        type: 'boolean',
        value: false,
        description: 'Enable ACL debug flags.')
+
+option('custom_hash_structures',
+       type: 'boolean',
+       value: true,
+       description: 'Use flat emhash7::HashMap instead of a regular std::unordered_map when applicable.')

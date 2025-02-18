@@ -32,6 +32,13 @@ if get_option('enable_acl_debug')
     compiler_args += '-DACL_DEBUG'
 endif
 
+if get_option('custom_hash_structures')
+    # These are header-only libraries without their own meson.build
+    emhash_dep = declare_dependency(include_directories: 'subprojects/emhash')
+    ankerl_dep = declare_dependency(include_directories: 'subprojects/ankerl/include/ankerl')
+    add_global_arguments('-DCUSTOM_HASH_STRUCTURES', language: 'cpp')
+endif
+
 # Add all global arguments at once
 add_global_arguments(compiler_args, language: 'cpp')
 

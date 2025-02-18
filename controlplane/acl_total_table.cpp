@@ -12,16 +12,9 @@ total_table_t::total_table_t(compiler_t* compiler) :
 void total_table_t::clear()
 {
 	table.clear();
-	remap_group_ids.clear();
-	group_id = 1;
 	filters.clear();
 	filter_ids.clear();
-	filter_id_by_rule_id.clear();
-	filter_id_group_ids.clear();
-	bitmask.clear();
-	map.clear();
-	reverse_map.clear();
-	reverse_map_next.clear();
+	filled_filter_ids.clear();
 }
 
 unsigned int total_table_t::collect(const unsigned int rule_id, const filter& filter)
@@ -35,13 +28,11 @@ unsigned int total_table_t::collect(const unsigned int rule_id, const filter& fi
 		it = filter_ids.emplace_hint(it, filter, filter_ids.size());
 	}
 
-	filter_id_by_rule_id.emplace_back(it->second);
 	return it->second;
 }
 
 void total_table_t::prepare()
 {
-	filter_id_group_ids.resize(filter_ids.size());
 }
 
 void total_table_t::compile()
@@ -54,7 +45,7 @@ void total_table_t::compile()
 		const auto filter_id = rule.total_table_filter_id;
 		const auto group_id = rule.value_filter_id;
 
-		if (!filter_id_group_ids[filter_id].empty())
+		if (filled_filter_ids.find(filter_id) != filled_filter_ids.end())
 		{
 			continue;
 		}
@@ -74,7 +65,7 @@ void total_table_t::compile()
 				{
 					// If there is no such key in table, then we save [key, group_id]
 					// without any additional checks.
-					it = table.emplace_hint(it, key, group_id);
+					table.emplace(key, group_id);
 					used = true;
 				}
 				else
@@ -95,7 +86,7 @@ void total_table_t::compile()
 				{
 					// If the rule is termineting and has been used, then we mark filter_id
 					// as filled in to prevent further additional checks.
-					filter_id_group_ids[filter_id].emplace(it->second);
+					filled_filter_ids.emplace(filter_id);
 				}
 			}
 		}

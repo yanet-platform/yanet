@@ -2,6 +2,7 @@
 
 #include "acl/bitset.h"
 #include "acl_base.h"
+#include "ndarray.h"
 
 namespace acl::compiler
 {
@@ -28,21 +29,29 @@ public:
 	acl::compiler_t* compiler;
 
 	uint32_t width;
-	std::vector<tAclGroupId> values;
+	/* dimension:
+	 *   network_source
+	 *   network_destination
+	 */
+	constexpr static unsigned int dimension = 2;
 
-	std::vector<tAclGroupId> remap_group_ids;
+	NDArray<tAclGroupId, dimension> table;
+
+	using DimensionArray = decltype(table)::DimensionArray;
+
+	void table_insert(const DimensionArray& keys);
+	void table_get(const DimensionArray& keys, unsigned int filter_id);
+
 	tAclGroupId group_id;
+	tAclGroupId initial_group_id;
+	FlatMap<tAclGroupId, tAclGroupId> remap_group_ids;
 
 	std::vector<filter> filters;
 	std::map<filter, unsigned int> filter_ids;
 	std::vector<std::vector<unsigned int>> filter_id_rule_ids;
-	std::vector<std::vector<tAclGroupId>> filter_id_group_ids;
-	std::map<tAclGroupId, std::set<unsigned int>> group_id_filter_ids;
 
-	std::vector<std::vector<tAclGroupId>> filter_id_group_ids_next;
-	std::map<tAclGroupId, std::set<unsigned int>> group_id_filter_ids_next;
-
-	std::vector<uint8_t> bitmask; /// @todo: bitmask_t
+	std::vector<FlatSet<tAclGroupId>> filter_id_group_ids;
+	std::vector<FlatSet<tAclGroupId>> filter_id_group_ids_next;
 };
 
 }

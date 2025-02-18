@@ -16,7 +16,6 @@ void transport_table_t::clear()
 	threads.clear();
 	filters.clear();
 	filter_ids.clear();
-	filter_id_rule_ids.clear();
 }
 
 unsigned int transport_table_t::collect(const unsigned int rule_id, const filter& filter)
@@ -25,11 +24,9 @@ unsigned int transport_table_t::collect(const unsigned int rule_id, const filter
 	if (it == filter_ids.end())
 	{
 		filters.emplace_back(filter);
-		filter_id_rule_ids.emplace_back();
 		it = filter_ids.emplace_hint(it, filter, filter_ids.size());
 	}
 
-	filter_id_rule_ids[it->second].emplace_back(rule_id);
 	return it->second;
 }
 
@@ -110,8 +107,8 @@ void transport_table::thread_t::join()
 
 void transport_table::thread_t::prepare()
 {
-	filter_id_group_ids.resize(transport_table->filter_ids.size());
 	transport_table_filter_id_group_ids.resize(transport_table->filter_ids.size());
+	layers.resize(transport_table->compiler->transport.layers.size());
 
 	for (unsigned int layer_id = thread_id;
 	     layer_id < transport_table->compiler->transport.layers.size();
@@ -138,25 +135,14 @@ void transport_table::thread_t::prepare()
 		                    transport_layer.network_table_group_ids_vec.size());
 
 		/// prepare remap vector for compress network_table_group_ids
-		for (unsigned int i = 0;
-		     i < transport_layer.network_table_group_ids_vec.size();
-		     i++)
-		{
-			const unsigned int network_table_group_id = transport_layer.network_table_group_ids_vec[i] >> transport_table->compiler->transport_layers_shift;
-
-			if (network_table_group_id >= layer.remap_network_table_group_ids.size())
-			{
-				layer.remap_network_table_group_ids.resize(network_table_group_id + 1, 0);
-			}
-
-			layer.remap_network_table_group_ids[network_table_group_id] = i;
-		}
+		layer.prepare_remap_map(transport_layer.network_table_group_ids_vec,
+		                        transport_table->compiler->transport_layers_shift);
 	}
 }
 
 void transport_table::thread_t::compile()
 {
-	std::array<size_t, dimension> table_indexes;
+	DimensionArray table_indexes;
 	table_indexes.fill(0);
 
 	for (unsigned int filter_id = 0;
@@ -164,7 +150,7 @@ void transport_table::thread_t::compile()
 	     filter_id++)
 	{
 		remap_group_ids.clear();
-		remap_group_ids.resize(group_id, 0);
+		initial_group_id = group_id;
 
 		const auto& [network_table_filter_id, network_flags_filter_id, transport_filter_id] = transport_table->filters[filter_id];
 		const auto& network_table_group_ids_orig = transport_table->compiler->network_table.filter_id_group_ids[network_table_filter_id];
@@ -172,7 +158,7 @@ void transport_table::thread_t::compile()
 
 		std::vector<tAclGroupId> network_table_group_ids;
 		std::vector<tAclGroupId> network_table_group_ids_curr;
-		std::vector<tAclGroupId> network_table_group_ids_next = network_table_group_ids_orig;
+		std::vector<tAclGroupId> network_table_group_ids_next(network_table_group_ids_orig.begin(), network_table_group_ids_orig.end());
 
 		for (unsigned int layer_id = thread_id;
 		     layer_id < transport_table->compiler->transport.layers.size();
@@ -222,15 +208,22 @@ void transport_table::thread_t::compile()
 			{
 				/// @todo: skip tcp,udp,icmp
 
-				table_indexes[1] = layer.table.get_index(1, protocol_group_id - 1); /// id always start with 1
-				table_indexes[2] = layer.table.get_index(2, 0);
-				table_indexes[3] = layer.table.get_index(3, 0);
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = protocol_group_id - 1; /// id always start with 1
+				table_indexes[2] = 0;
+				table_indexes[3] = 0;
+				table_indexes[4] = 0;
 
 				for (const auto network_flags_group_id : network_flags_group_ids)
 				{
-					table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
-					table_insert(layer, table_indexes, network_table_group_ids_curr);
+					table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
+					for (unsigned int network_table_group_id : network_table_group_ids_curr)
+					{
+						table_indexes[5] = layer.lookup_remap_map(
+						        network_table_group_id,
+						        transport_table->compiler->transport_layers_shift);
+
+						table_insert(layer, table_indexes);
+					}
 				}
 			}
 
@@ -238,21 +231,28 @@ void transport_table::thread_t::compile()
 
 			/// tcp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_TCP) - 1); /// id always start with 1
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_TCP) - 1; /// id always start with 1
 
 				for (const auto& tcp_source_id : tcp_source_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, tcp_source_id);
+					table_indexes[2] = tcp_source_id;
 					for (const auto& tcp_destination_id : tcp_destination_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, tcp_destination_id);
+						table_indexes[3] = tcp_destination_id;
 						for (const auto& tcp_flags_id : tcp_flags_group_ids)
 						{
-							table_indexes[4] = layer.table.get_index(4, tcp_flags_id);
+							table_indexes[4] = tcp_flags_id;
 							for (const auto network_flags_group_id : network_flags_group_ids)
 							{
-								table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
-								table_insert(layer, table_indexes, network_table_group_ids_curr);
+								table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
+								for (unsigned int network_table_group_id : network_table_group_ids_curr)
+								{
+									table_indexes[5] = layer.lookup_remap_map(
+									        network_table_group_id,
+									        transport_table->compiler->transport_layers_shift);
+
+									table_insert(layer, table_indexes);
+								}
 							}
 						}
 					}
@@ -261,19 +261,26 @@ void transport_table::thread_t::compile()
 
 			/// udp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_UDP) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_UDP) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& udp_source_id : udp_source_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, udp_source_id);
+					table_indexes[2] = udp_source_id;
 					for (const auto& udp_destination_id : udp_destination_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, udp_destination_id);
+						table_indexes[3] = udp_destination_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
-							table_insert(layer, table_indexes, network_table_group_ids_curr);
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
+							for (unsigned int network_table_group_id : network_table_group_ids_curr)
+							{
+								table_indexes[5] = layer.lookup_remap_map(
+								        network_table_group_id,
+								        transport_table->compiler->transport_layers_shift);
+
+								table_insert(layer, table_indexes);
+							}
 						}
 					}
 				}
@@ -281,19 +288,26 @@ void transport_table::thread_t::compile()
 
 			/// icmp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_ICMP) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_ICMP) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& icmp_type_code_id : icmpv4_type_code_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, icmp_type_code_id);
+					table_indexes[2] = icmp_type_code_id;
 					for (const auto& icmp_identifier_id : icmpv4_identifier_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, icmp_identifier_id);
+						table_indexes[3] = icmp_identifier_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
-							table_insert(layer, table_indexes, network_table_group_ids_curr);
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
+							for (unsigned int network_table_group_id : network_table_group_ids_curr)
+							{
+								table_indexes[5] = layer.lookup_remap_map(
+								        network_table_group_id,
+								        transport_table->compiler->transport_layers_shift);
+
+								table_insert(layer, table_indexes);
+							}
 						}
 					}
 				}
@@ -301,19 +315,26 @@ void transport_table::thread_t::compile()
 
 			/// icmp_v6
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_ICMPV6) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_ICMPV6) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& icmp_type_code_id : icmpv6_type_code_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, icmp_type_code_id);
+					table_indexes[2] = icmp_type_code_id;
 					for (const auto& icmp_identifier_id : icmpv6_identifier_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, icmp_identifier_id);
+						table_indexes[3] = icmp_identifier_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
-							table_insert(layer, table_indexes, network_table_group_ids_curr);
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
+							for (unsigned int network_table_group_id : network_table_group_ids_curr)
+							{
+								table_indexes[5] = layer.lookup_remap_map(
+								        network_table_group_id,
+								        transport_table->compiler->transport_layers_shift);
+
+								table_insert(layer, table_indexes);
+							}
 						}
 					}
 				}
@@ -324,22 +345,20 @@ void transport_table::thread_t::compile()
 
 void transport_table::thread_t::populate()
 {
-	std::array<size_t, dimension> table_indexes;
+	DimensionArray table_indexes;
 	table_indexes.fill(0);
 
 	for (unsigned int filter_id = 0;
 	     filter_id < transport_table->filters.size();
 	     filter_id++)
 	{
-		bitmask.clear();
-
 		const auto& [network_table_filter_id, network_flags_filter_id, transport_filter_id] = transport_table->filters[filter_id];
 		const auto& network_table_group_ids_orig = transport_table->compiler->network_table.filter_id_group_ids[network_table_filter_id];
 		const auto& network_flags_group_ids = transport_table->compiler->network_flags.filter_id_group_ids[network_flags_filter_id];
 
 		std::vector<tAclGroupId> network_table_group_ids;
 		std::vector<tAclGroupId> network_table_group_ids_curr;
-		std::vector<tAclGroupId> network_table_group_ids_next = network_table_group_ids_orig;
+		std::vector<tAclGroupId> network_table_group_ids_next(network_table_group_ids_orig.begin(), network_table_group_ids_orig.end());
 
 		for (unsigned int layer_id = thread_id;
 		     layer_id < transport_table->compiler->transport.layers.size();
@@ -389,15 +408,22 @@ void transport_table::thread_t::populate()
 			{
 				/// @todo: skip tcp,udp,icmp
 
-				table_indexes[1] = layer.table.get_index(1, protocol_group_id - 1); /// id always start with 1
-				table_indexes[2] = layer.table.get_index(2, 0);
-				table_indexes[3] = layer.table.get_index(3, 0);
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = protocol_group_id - 1; /// id always start with 1
+				table_indexes[2] = 0;
+				table_indexes[3] = 0;
+				table_indexes[4] = 0;
 
 				for (const auto network_flags_group_id : network_flags_group_ids)
 				{
-					table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
-					table_get(layer, table_indexes, network_table_group_ids_curr);
+					table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
+					for (unsigned int network_table_group_id : network_table_group_ids_curr)
+					{
+						table_indexes[5] = layer.lookup_remap_map(
+						        network_table_group_id,
+						        transport_table->compiler->transport_layers_shift);
+
+						table_get(layer, table_indexes, filter_id);
+					}
 				}
 			}
 
@@ -405,21 +431,28 @@ void transport_table::thread_t::populate()
 
 			/// tcp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_TCP) - 1); /// id always start with 1
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_TCP) - 1; /// id always start with 1
 
 				for (const auto& tcp_source_id : tcp_source_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, tcp_source_id);
+					table_indexes[2] = tcp_source_id;
 					for (const auto& tcp_destination_id : tcp_destination_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, tcp_destination_id);
+						table_indexes[3] = tcp_destination_id;
 						for (const auto& tcp_flags_id : tcp_flags_group_ids)
 						{
-							table_indexes[4] = layer.table.get_index(4, tcp_flags_id);
+							table_indexes[4] = tcp_flags_id;
 							for (const auto network_flags_group_id : network_flags_group_ids)
 							{
-								table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
-								table_get(layer, table_indexes, network_table_group_ids_curr);
+								table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
+								for (unsigned int network_table_group_id : network_table_group_ids_curr)
+								{
+									table_indexes[5] = layer.lookup_remap_map(
+									        network_table_group_id,
+									        transport_table->compiler->transport_layers_shift);
+
+									table_get(layer, table_indexes, filter_id);
+								}
 							}
 						}
 					}
@@ -428,19 +461,26 @@ void transport_table::thread_t::populate()
 
 			/// udp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_UDP) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_UDP) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& udp_source_id : udp_source_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, udp_source_id);
+					table_indexes[2] = udp_source_id;
 					for (const auto& udp_destination_id : udp_destination_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, udp_destination_id);
+						table_indexes[3] = udp_destination_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
-							table_get(layer, table_indexes, network_table_group_ids_curr);
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
+							for (unsigned int network_table_group_id : network_table_group_ids_curr)
+							{
+								table_indexes[5] = layer.lookup_remap_map(
+								        network_table_group_id,
+								        transport_table->compiler->transport_layers_shift);
+
+								table_get(layer, table_indexes, filter_id);
+							}
 						}
 					}
 				}
@@ -448,19 +488,26 @@ void transport_table::thread_t::populate()
 
 			/// icmp
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_ICMP) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_ICMP) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& icmp_type_code_id : icmpv4_type_code_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, icmp_type_code_id);
+					table_indexes[2] = icmp_type_code_id;
 					for (const auto& icmp_identifier_id : icmpv4_identifier_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, icmp_identifier_id);
+						table_indexes[3] = icmp_identifier_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
-							table_get(layer, table_indexes, network_table_group_ids_curr);
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
+							for (unsigned int network_table_group_id : network_table_group_ids_curr)
+							{
+								table_indexes[5] = layer.lookup_remap_map(
+								        network_table_group_id,
+								        transport_table->compiler->transport_layers_shift);
+
+								table_get(layer, table_indexes, filter_id);
+							}
 						}
 					}
 				}
@@ -468,30 +515,30 @@ void transport_table::thread_t::populate()
 
 			/// icmp_v6
 			{
-				table_indexes[1] = layer.table.get_index(1, transport_layer.protocol.get(IPPROTO_ICMPV6) - 1); /// id always start with 1
-				table_indexes[4] = layer.table.get_index(4, 0);
+				table_indexes[1] = transport_layer.protocol.get(IPPROTO_ICMPV6) - 1; /// id always start with 1
+				table_indexes[4] = 0;
 
 				for (const auto& icmp_type_code_id : icmpv6_type_code_group_ids)
 				{
-					table_indexes[2] = layer.table.get_index(2, icmp_type_code_id);
+					table_indexes[2] = icmp_type_code_id;
 					for (const auto& icmp_identifier_id : icmpv6_identifier_group_ids)
 					{
-						table_indexes[3] = layer.table.get_index(3, icmp_identifier_id);
+						table_indexes[3] = icmp_identifier_id;
 						for (const auto network_flags_group_id : network_flags_group_ids)
 						{
-							table_indexes[0] = layer.table.get_index(0, network_flags_group_id - 1); /// id always start with 1
-							table_get(layer, table_indexes, network_table_group_ids_curr);
+							table_indexes[0] = network_flags_group_id - 1; /// id always start with 1
+							for (unsigned int network_table_group_id : network_table_group_ids_curr)
+							{
+								table_indexes[5] = layer.lookup_remap_map(
+								        network_table_group_id,
+								        transport_table->compiler->transport_layers_shift);
+
+								table_get(layer, table_indexes, filter_id);
+							}
 						}
 					}
 				}
 			}
-		}
-
-		for (const auto i : bitmask)
-		{
-			filter_id_group_ids[filter_id].emplace_back(i);
-			group_id_filter_ids[i].emplace(filter_id);
-			transport_table_filter_id_group_ids[filter_id].emplace_back(i);
 		}
 	}
 }
@@ -505,9 +552,9 @@ void transport_table::thread_t::result()
 		const auto& transport_layer = transport_table->compiler->transport.layers[layer_id];
 		auto& layer = layers[layer_id];
 
-		acl_transport_table.reserve(acl_transport_table.size() + layer.table.values.size());
+		acl_transport_table.reserve(acl_transport_table.size() + layer.table.size());
 
-		layer.table.for_each([&](const std::array<unsigned int, dimension>& keys,
+		layer.table.for_each([&](const DimensionArray& keys,
 		                         const unsigned int value) {
 			common::acl::transport_key_t key;
 			key.network_flags = keys[0] + 1; /// id always start with 1
@@ -524,50 +571,31 @@ void transport_table::thread_t::result()
 }
 
 void transport_table::thread_t::table_insert(transport_table::layer_t& layer,
-                                             const std::array<size_t, dimension>& table_indexes,
-                                             const std::vector<unsigned int>& network_table_group_ids)
+                                             const DimensionArray& keys)
 {
-	/// calc index for keys[0, 1, 2, 3, 4]
-	size_t total_index = 0;
-	for (const auto index : table_indexes)
+	auto& value = layer.table(keys);
+
+	if (value >= initial_group_id)
+		return;
+
+	auto it = remap_group_ids.find(value);
+	if (it == remap_group_ids.end()) ///< check: don't override self rule
 	{
-		total_index += index;
+		remap_group_ids.emplace(value, group_id);
+		value = group_id;
+		group_id += threads_count;
 	}
-
-	for (const auto network_table_group_id : network_table_group_ids)
+	else
 	{
-		///                                            calc index with key[5]
-		auto& value = layer.table.values[total_index + layer.remap_network_table_group_ids[network_table_group_id >> transport_table->compiler->transport_layers_shift]];
-
-		if (value < remap_group_ids.size()) ///< check: don't override self rule
-		{
-			auto& remap_group_ip = remap_group_ids[value];
-			if (!remap_group_ip)
-			{
-				remap_group_ip = group_id;
-				group_id += threads_count;
-			}
-
-			value = remap_group_ip;
-		}
+		value = it->second;
 	}
 }
 
-void transport_table::thread_t::table_get(transport_table::layer_t& layer,
-                                          const std::array<size_t, dimension>& table_indexes,
-                                          const std::vector<unsigned int>& network_table_group_ids)
+void transport_table::thread_t::table_get(const transport_table::layer_t& layer,
+                                          const DimensionArray& keys,
+                                          unsigned int filter_id)
 {
-	/// calc index for keys[0, 1, 2, 3, 4]
-	size_t total_index = 0;
-	for (const auto index : table_indexes)
-	{
-		total_index += index;
-	}
+	auto value = layer.table(keys);
 
-	for (const auto network_table_group_id : network_table_group_ids)
-	{
-		///                                                 calc index with key[5]
-		const auto value = layer.table.values[total_index + layer.remap_network_table_group_ids[network_table_group_id >> transport_table->compiler->transport_layers_shift]];
-		bitmask.emplace(value);
-	}
+	transport_table_filter_id_group_ids[filter_id].emplace(value);
 }
