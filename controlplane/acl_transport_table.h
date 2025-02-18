@@ -90,7 +90,7 @@ public:
 	tAclGroupId initial_group_id;
 	FlatMap<tAclGroupId, tAclGroupId> remap_group_ids;
 
-	std::unordered_map<tAclGroupId, FlatSet<unsigned int>> group_id_filter_ids;
+	FlatMap<tAclGroupId, std::vector<unsigned int>> group_id_filter_ids;
 
 	common::idp::updateGlobalBase::acl_transport_table::request acl_transport_table;
 
