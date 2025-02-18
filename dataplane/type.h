@@ -264,6 +264,7 @@ struct tLogicalPort
 
 	tPortId portId;
 	uint16_t vlanId; ///< big endian
+	tVrfId vrfId;
 	rte_ether_addr etherAddress;
 	uint8_t flags;
 	common::globalBase::tFlow flow;
@@ -321,6 +322,8 @@ struct nat64stateful_t
 	uint32_t pool_size{};
 	tCounterId counter_id;
 	uint8_t ipv4_dscp_flags;
+	tVrfId vrf_lan;
+	tVrfId vrf_wan;
 	struct
 	{
 		uint16_t tcp_syn;
@@ -354,6 +357,8 @@ struct nat46clat_t
 	ipv6_address_t ipv6_destination;
 	tCounterId counter_id;
 	uint8_t ipv4_dscp_flags;
+	tVrfId vrf_lan;
+	tVrfId vrf_wan;
 	common::globalBase::tFlow flow;
 };
 

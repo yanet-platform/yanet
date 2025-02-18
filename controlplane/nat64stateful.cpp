@@ -94,7 +94,9 @@ void nat64stateful_t::compile(common::idp::updateGlobalBase::request& globalbase
 		                                                                                     pool_start,
 		                                                                                     pool_size,
 		                                                                                     nat64stateful.state_timeout,
-		                                                                                     nat64stateful.flow));
+		                                                                                     nat64stateful.flow,
+		                                                                                     nat64stateful.vrf_lan,
+		                                                                                     nat64stateful.vrf_wan));
 
 		pool_start += pool_size;
 	}

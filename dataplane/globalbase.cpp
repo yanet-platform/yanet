@@ -232,6 +232,58 @@ eResult generation::init()
 		route_tunnel_lpm6 = updater.route_tunnel_lpm6->pointer();
 	}
 
+	{
+		updater.vrf_route_lpm4 = std::make_unique<updater_vrf_lpm4>("vrf_route.v4.lpm",
+		                                                            &dataPlane->memory_manager,
+		                                                            socketId);
+		result = updater.vrf_route_lpm4->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		vrf_route_lpm4.Update(updater.vrf_route_lpm4->GetLpms());
+	}
+
+	{
+		updater.vrf_route_lpm6 = std::make_unique<updater_vrf_lpm6>("vrf_route.v6.lpm",
+		                                                            &dataPlane->memory_manager,
+		                                                            socketId);
+		result = updater.vrf_route_lpm6->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		vrf_route_lpm6.Update(updater.vrf_route_lpm6->GetLpms());
+	}
+
+	{
+		updater.vrf_route_tunnel_lpm4 = std::make_unique<updater_vrf_lpm4>("vrf_route.tunnel.v4.lpm",
+		                                                                   &dataPlane->memory_manager,
+		                                                                   socketId);
+		result = updater.vrf_route_tunnel_lpm4->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		vrf_route_tunnel_lpm4.Update(updater.vrf_route_tunnel_lpm4->GetLpms());
+	}
+
+	{
+		updater.vrf_route_tunnel_lpm6 = std::make_unique<updater_vrf_lpm6>("vrf_route.tunnel.v6.lpm",
+		                                                                   &dataPlane->memory_manager,
+		                                                                   socketId);
+		result = updater.vrf_route_tunnel_lpm6->init();
+		if (result != eResult::success)
+		{
+			return result;
+		}
+
+		vrf_route_tunnel_lpm6.Update(updater.vrf_route_tunnel_lpm6->GetLpms());
+	}
+
 	return result;
 }
 
@@ -780,12 +832,7 @@ static bool checkFlow(const common::globalBase::tFlow& flow)
 
 eResult generation::updateLogicalPort(const common::idp::updateGlobalBase::updateLogicalPort::request& request)
 {
-	const auto& logicalPortId = std::get<0>(request);
-	const auto& portId = std::get<1>(request);
-	const auto& vlanId = std::get<2>(request);
-	const auto& etherAddress = std::get<3>(request);
-	const auto& promiscuousMode = std::get<4>(request);
-	const auto& flow = std::get<5>(request);
+	const auto& [logicalPortId, portId, vlanId, vrfId, etherAddress, promiscuousMode, flow] = request;
 
 	if (logicalPortId >= CONFIG_YADECAP_LOGICALPORTS_SIZE)
 	{
@@ -801,6 +848,11 @@ eResult generation::updateLogicalPort(const common::idp::updateGlobalBase::updat
 	{
 		YADECAP_LOG_ERROR("invalid vlanId: '%u'\n", vlanId);
 		return eResult::invalidVlanId;
+	}
+	if (vrfId >= YANET_RIB_VRF_MAX_NUMBER)
+	{
+		YADECAP_LOG_ERROR("invalid vrfId: '%u'\n", vrfId);
+		return eResult::invalidVrfId;
 	}
 	if (flow.type != common::globalBase::eFlowType::acl_ingress &&
 	    flow.type != common::globalBase::eFlowType::route &&
@@ -819,6 +871,7 @@ eResult generation::updateLogicalPort(const common::idp::updateGlobalBase::updat
 	auto& logicalPort = logicalPorts[logicalPortId];
 	logicalPort.portId = portId;
 	logicalPort.vlanId = rte_cpu_to_be_16(vlanId);
+	logicalPort.vrfId = vrfId;
 	memcpy(logicalPort.etherAddress.addr_bytes, etherAddress.data(), 6); ///< @todo: convert
 
 	logicalPort.flags = 0;
@@ -1103,7 +1156,7 @@ eResult generation::updateInterface(const common::idp::updateGlobalBase::updateI
 
 eResult generation::nat64stateful_update(const common::idp::updateGlobalBase::nat64stateful_update::request& request)
 {
-	const auto& [nat64stateful_id, dscp_mark_type, dscp, counter_id, pool_start, pool_size, state_timeout, flow] = request;
+	const auto& [nat64stateful_id, dscp_mark_type, dscp, counter_id, pool_start, pool_size, state_timeout, flow, vrf_lan, vrf_wan] = request;
 
 	if (nat64stateful_id >= YANET_CONFIG_NAT64STATEFULS_SIZE)
 	{
@@ -1178,6 +1231,9 @@ eResult generation::nat64stateful_update(const common::idp::updateGlobalBase::na
 		nat64stateful.state_timeout.icmp = icmp;
 		nat64stateful.state_timeout.other = other;
 	}
+
+	nat64stateful.vrf_lan = vrf_lan;
+	nat64stateful.vrf_wan = vrf_wan;
 
 	nat64stateful_enabled = 1;
 
@@ -1320,7 +1376,7 @@ eResult generation::updateNat64statelessTranslation(const common::idp::updateGlo
 
 eResult generation::nat46clat_update(const common::idp::updateGlobalBase::nat46clat_update::request& request)
 {
-	const auto& [nat46clat_id, ipv6_source, ipv6_destination, dscp_mark_type, dscp, counter_id, flow] = request;
+	const auto& [nat46clat_id, ipv6_source, ipv6_destination, dscp_mark_type, dscp, counter_id, flow, vrf_lan, vrf_wan] = request;
 
 	if (nat46clat_id >= YANET_CONFIG_NAT46CLATS_SIZE)
 	{
@@ -1379,6 +1435,9 @@ eResult generation::nat46clat_update(const common::idp::updateGlobalBase::nat46c
 		YADECAP_LOG_ERROR("invalid dscp_mark_type\n");
 		return eResult::invalidArguments;
 	}
+
+	nat46clat.vrf_lan = vrf_lan;
+	nat46clat.vrf_wan = vrf_wan;
 
 	nat46clat_enabled = 1;
 
@@ -1664,7 +1723,7 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 {
 	eResult result = eResult::success;
 
-	for (const auto& action : request)
+	for (const auto& [vrfId, action] : request)
 	{
 		if (const auto update = std::get_if<common::idp::lpm::insert>(&action))
 		{
@@ -1672,15 +1731,35 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 			{
 				if (prefix.is_ipv4())
 				{
-					result = updater.route_lpm4->insert(prefix.get_ipv4().address(),
-					                                    prefix.get_ipv4().mask(),
-					                                    value_id);
+					if (vrfId == 0)
+					{
+						result = updater.route_lpm4->insert(prefix.get_ipv4().address(),
+						                                    prefix.get_ipv4().mask(),
+						                                    value_id);
+					}
+					else
+					{
+						result = updater.vrf_route_lpm4->insert(vrfId,
+						                                        prefix.get_ipv4().address(),
+						                                        prefix.get_ipv4().mask(),
+						                                        value_id);
+					}
 				}
 				else
 				{
-					result = updater.route_lpm6->insert(prefix.get_ipv6().address(),
-					                                    prefix.get_ipv6().mask(),
-					                                    value_id);
+					if (vrfId == 0)
+					{
+						result = updater.route_lpm6->insert(prefix.get_ipv6().address(),
+						                                    prefix.get_ipv6().mask(),
+						                                    value_id);
+					}
+					else
+					{
+						result = updater.vrf_route_lpm6->insert(vrfId,
+						                                        prefix.get_ipv6().address(),
+						                                        prefix.get_ipv6().mask(),
+						                                        value_id);
+					}
 				}
 
 				if (result != eResult::success)
@@ -1695,13 +1774,31 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 			{
 				if (prefix.is_ipv4())
 				{
-					result = updater.route_lpm4->remove(prefix.get_ipv4().address(),
-					                                    prefix.get_ipv4().mask());
+					if (vrfId == 0)
+					{
+						result = updater.route_lpm4->remove(prefix.get_ipv4().address(),
+						                                    prefix.get_ipv4().mask());
+					}
+					else
+					{
+						result = updater.vrf_route_lpm4->remove(vrfId,
+						                                        prefix.get_ipv4().address(),
+						                                        prefix.get_ipv4().mask());
+					}
 				}
 				else
 				{
-					result = updater.route_lpm6->remove(prefix.get_ipv6().address(),
-					                                    prefix.get_ipv6().mask());
+					if (vrfId == 0)
+					{
+						result = updater.route_lpm6->remove(prefix.get_ipv6().address(),
+						                                    prefix.get_ipv6().mask());
+					}
+					else
+					{
+						result = updater.vrf_route_lpm6->remove(vrfId,
+						                                        prefix.get_ipv6().address(),
+						                                        prefix.get_ipv6().mask());
+					}
 				}
 
 				if (result != eResult::success)
@@ -1717,12 +1814,18 @@ eResult generation::route_lpm_update(const common::idp::updateGlobalBase::route_
 			updater.route_lpm4->clear();
 			updater.route_lpm6->clear();
 
+			updater.vrf_route_lpm4->clear();
+			updater.vrf_route_lpm6->clear();
+
 			return eResult::success;
 		}
 	}
 
 	route_lpm4 = updater.route_lpm4->pointer();
 	route_lpm6 = updater.route_lpm6->pointer();
+
+	vrf_route_lpm4.Update(updater.vrf_route_lpm4->GetLpms());
+	vrf_route_lpm6.Update(updater.vrf_route_lpm6->GetLpms());
 
 	return result;
 }
@@ -1830,7 +1933,7 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 {
 	eResult result = eResult::success;
 
-	for (const auto& action : request)
+	for (const auto& [vrfId, action] : request)
 	{
 		if (const auto update = std::get_if<common::idp::lpm::insert>(&action))
 		{
@@ -1838,15 +1941,35 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 			{
 				if (prefix.is_ipv4())
 				{
-					result = updater.route_tunnel_lpm4->insert(prefix.get_ipv4().address(),
-					                                           prefix.get_ipv4().mask(),
-					                                           value_id);
+					if (vrfId == 0)
+					{
+						result = updater.route_tunnel_lpm4->insert(prefix.get_ipv4().address(),
+						                                           prefix.get_ipv4().mask(),
+						                                           value_id);
+					}
+					else
+					{
+						result = updater.vrf_route_tunnel_lpm4->insert(vrfId,
+						                                               prefix.get_ipv4().address(),
+						                                               prefix.get_ipv4().mask(),
+						                                               value_id);
+					}
 				}
 				else
 				{
-					result = updater.route_tunnel_lpm6->insert(prefix.get_ipv6().address(),
-					                                           prefix.get_ipv6().mask(),
-					                                           value_id);
+					if (vrfId == 0)
+					{
+						result = updater.route_tunnel_lpm6->insert(prefix.get_ipv6().address(),
+						                                           prefix.get_ipv6().mask(),
+						                                           value_id);
+					}
+					else
+					{
+						result = updater.vrf_route_tunnel_lpm6->insert(vrfId,
+						                                               prefix.get_ipv6().address(),
+						                                               prefix.get_ipv6().mask(),
+						                                               value_id);
+					}
 				}
 
 				if (result != eResult::success)
@@ -1861,13 +1984,31 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 			{
 				if (prefix.is_ipv4())
 				{
-					result = updater.route_tunnel_lpm4->remove(prefix.get_ipv4().address(),
-					                                           prefix.get_ipv4().mask());
+					if (vrfId == 0)
+					{
+						result = updater.route_tunnel_lpm4->remove(prefix.get_ipv4().address(),
+						                                           prefix.get_ipv4().mask());
+					}
+					else
+					{
+						result = updater.vrf_route_tunnel_lpm4->remove(vrfId,
+						                                               prefix.get_ipv4().address(),
+						                                               prefix.get_ipv4().mask());
+					}
 				}
 				else
 				{
-					result = updater.route_tunnel_lpm6->remove(prefix.get_ipv6().address(),
-					                                           prefix.get_ipv6().mask());
+					if (vrfId == 0)
+					{
+						result = updater.route_tunnel_lpm6->remove(prefix.get_ipv6().address(),
+						                                           prefix.get_ipv6().mask());
+					}
+					else
+					{
+						result = updater.vrf_route_tunnel_lpm6->remove(vrfId,
+						                                               prefix.get_ipv6().address(),
+						                                               prefix.get_ipv6().mask());
+					}
 				}
 
 				if (result != eResult::success)
@@ -1883,12 +2024,18 @@ eResult generation::route_tunnel_lpm_update(const common::idp::updateGlobalBase:
 			updater.route_tunnel_lpm4->clear();
 			updater.route_tunnel_lpm6->clear();
 
+			updater.vrf_route_tunnel_lpm4->clear();
+			updater.vrf_route_tunnel_lpm6->clear();
+
 			return eResult::success;
 		}
 	}
 
 	route_tunnel_lpm4 = updater.route_tunnel_lpm4->pointer();
 	route_tunnel_lpm6 = updater.route_tunnel_lpm6->pointer();
+
+	vrf_route_tunnel_lpm4.Update(updater.vrf_route_tunnel_lpm4->GetLpms());
+	vrf_route_tunnel_lpm6.Update(updater.vrf_route_tunnel_lpm6->GetLpms());
 
 	return result;
 }

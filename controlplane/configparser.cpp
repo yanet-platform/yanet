@@ -233,6 +233,8 @@ void config_parser_t::loadConfig_logicalPort(controlplane::base_t& baseNext,
 		}
 	}
 
+	logicalPort.vrf = moduleJson.value("vrf", YANET_RIB_VRF_DEFAULT);
+
 	logicalPort.nextModule = moduleJson.value("nextModule", "");
 
 	//
@@ -299,10 +301,7 @@ void config_parser_t::loadConfig_route(controlplane::base_t& baseNext,
 		}
 	}
 
-	if (exist(moduleJson, "vrf"))
-	{
-		route.vrf = moduleJson["vrf"].get<std::string>();
-	}
+	route.vrf = moduleJson.value("vrf", YANET_RIB_VRF_DEFAULT);
 
 	if (exist(moduleJson, "ignore_tables"))
 	{
@@ -590,6 +589,9 @@ void config_parser_t::loadConfig_nat64stateful(controlplane::base_t& baseNext,
 	{
 		nat64stateful.state_timeout = moduleJson["state_timeout"];
 	}
+
+	nat64stateful.vrf_lan_name = moduleJson.value("vrfLan", YANET_RIB_VRF_DEFAULT);
+	nat64stateful.vrf_wan_name = moduleJson.value("vrfWan", YANET_RIB_VRF_DEFAULT);
 
 	nat64stateful.next_module = moduleJson.value("nextModule", "");
 	nat64stateful.nat64stateful_id = nat64stateful_id;
@@ -1090,6 +1092,9 @@ void config_parser_t::loadConfig_nat46clat(controlplane::base_t& baseNext,
 			throw error_result_t(eResult::invalidConfigurationFile, "invalid dscpMarkType: " + dscpMarkTypeString);
 		}
 	}
+
+	nat46clat.vrf_lan_name = moduleJson.value("vrfLan", YANET_RIB_VRF_DEFAULT);
+	nat46clat.vrf_wan_name = moduleJson.value("vrfWan", YANET_RIB_VRF_DEFAULT);
 
 	nat46clat.next_module = moduleJson.value("nextModule", "");
 	nat46clat.nat46clat_id = nat46clat_id;

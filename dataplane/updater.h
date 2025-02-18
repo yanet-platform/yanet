@@ -5,10 +5,12 @@
 
 #include "common.h"
 #include "common/idp.h"
+#include "common/static_vector.h"
 #include "dynamic_table.h"
 #include "hashtable.h"
 #include "lpm.h"
 #include "memory_manager.h"
+#include "vrf.h"
 
 namespace dataplane
 {
@@ -667,6 +669,135 @@ protected:
 
 public:
 	object_type* pointer;
+};
+
+template<typename Address, typename InnerLpmType>
+class updater_vrf_lpm
+{
+	using UpdaterType = updater_lpm<Address, InnerLpmType>;
+
+	[[nodiscard]] memory_manager::unique_ptr<UpdaterType> Allocate(const std::string& name_vrf)
+	{
+		return memory_manager_->create_unique<UpdaterType>(name_.c_str(),
+		                                                   socket_id_,
+		                                                   sizeof(UpdaterType),
+		                                                   name_vrf.c_str(),
+		                                                   memory_manager_,
+		                                                   socket_id_);
+	}
+
+public:
+	updater_vrf_lpm(const char* name,
+	                dataplane::memory_manager* memory_manager,
+	                tSocketId socket_id) :
+	        name_(name),
+	        memory_manager_(memory_manager),
+	        socket_id_(socket_id)
+	{
+	}
+
+	eResult init()
+	{
+		for (size_t index = 0; index < updaters_.capacity(); index++)
+		{
+			updaters_.emplace_back(memory_manager::unique_ptr<UpdaterType>{nullptr, memory_manager_->deleter()});
+		}
+		return eResult::success;
+	}
+
+	eResult insert(tVrfId vrf,
+	               const Address& ip_address,
+	               const uint8_t& mask,
+	               const uint32_t& value_id)
+	{
+		if (vrf >= YANET_RIB_VRF_MAX_NUMBER)
+		{
+			return eResult::invalidId;
+		}
+		if (updaters_[vrf] == nullptr)
+		{
+			std::ostringstream oss;
+			oss << name_ << ".vrf" << vrf;
+			std::string name = oss.str();
+			updaters_[vrf] = Allocate(name);
+			if (updaters_[vrf] == nullptr)
+			{
+				return eResult::errorAllocatingMemory;
+			}
+			eResult result = updaters_[vrf]->init();
+			if (result != eResult::success)
+			{
+				return result;
+			}
+		}
+
+		return updaters_[vrf]->insert(ip_address, mask, value_id);
+	}
+
+	eResult remove(tVrfId vrf,
+	               const Address& ip_address,
+	               const uint8_t& mask)
+	{
+		if (vrf >= YANET_RIB_VRF_MAX_NUMBER)
+		{
+			return eResult::invalidId;
+		}
+		else if (updaters_[vrf] == nullptr)
+		{
+			return eResult::success;
+		}
+		return updaters_[vrf]->remove(ip_address, mask);
+	}
+
+	void limits(common::idp::limits::response& limits) const
+	{
+		for (size_t index = 0; index < YANET_RIB_VRF_MAX_NUMBER; index++)
+		{
+			if (updaters_[index])
+			{
+				updaters_[index]->limits(limits);
+			}
+		}
+	}
+
+	void report(nlohmann::json& report) const
+	{
+		for (size_t index = 0; index < YANET_RIB_VRF_MAX_NUMBER; index++)
+		{
+			if (updaters_[index])
+			{
+				updaters_[index]->report(report);
+			}
+		}
+	}
+
+	void clear()
+	{
+		for (size_t index = 0; index < YANET_RIB_VRF_MAX_NUMBER; index++)
+		{
+			if (updaters_[index])
+			{
+				updaters_[index]->clear();
+				updaters_[index] = nullptr;
+			}
+		}
+	}
+
+	std::array<InnerLpmType*, YANET_RIB_VRF_MAX_NUMBER> GetLpms() const
+	{
+		std::array<InnerLpmType*, YANET_RIB_VRF_MAX_NUMBER> result;
+		for (size_t index = 0; index < YANET_RIB_VRF_MAX_NUMBER; index++)
+		{
+			result[index] = (updaters_[index] == nullptr ? nullptr : updaters_[index]->pointer());
+		}
+		return result;
+	}
+
+private:
+	std::string name_;
+	dataplane::memory_manager* memory_manager_;
+	tSocketId socket_id_;
+	utils::StaticVector<memory_manager::unique_ptr<UpdaterType>, YANET_RIB_VRF_MAX_NUMBER> updaters_;
 };
 
 }
