@@ -16,25 +16,12 @@ void total_table_t::clear()
 
 void total_table_t::collect(const unsigned int rule_id, const filter& filter)
 {
-	auto [via_filter_id, transport_table_filter_id] = filter;
-	acl_rules_by_filter_id[transport_table_filter_id].emplace_back(rule_id, via_filter_id);
+	auto [acl_id, filter_id] = filter;
+	filter_id_acl_id_rule_ids[filter_id][acl_id].push_back(rule_id);
 }
 
 void total_table_t::prepare()
 {
-	for (const auto& thread : compiler->transport_table.threads)
-	{
-		for (const auto& [group, filter_ids] : thread.group_id_filter_ids)
-		{
-			for (auto filter_id : filter_ids)
-			{
-				for (const auto& [rule_id, acl_id] : acl_rules_by_filter_id[filter_id])
-				{
-					group_to_acl_rule_map[group][acl_id].insert(rule_id);
-				}
-			}
-		}
-	}
 }
 
 /**
@@ -55,8 +42,21 @@ void total_table_t::compile()
 		{
 			YANET_LOG_DEBUG("Processing group %u:\n", group);
 
-			auto& acl_rules_map = group_to_acl_rule_map[group];
-			for (auto& [acl_id, rule_ids] : acl_rules_map)
+			std::unordered_map<unsigned, std::set<unsigned>> acl_id_to_rule_ids;
+
+			for (const auto& filter_id : filter_ids)
+			{
+				auto it = filter_id_acl_id_rule_ids.find(filter_id);
+				if (it == filter_id_acl_id_rule_ids.end())
+					continue;
+
+				for (const auto& [acl_id, rile_ids] : it->second)
+				{
+					acl_id_to_rule_ids[acl_id].insert(rile_ids.begin(), rile_ids.end());
+				}
+			}
+
+			for (auto& [acl_id, rule_ids] : acl_id_to_rule_ids)
 			{
 				common::acl::total_key_t key{acl_id, group};
 
