@@ -592,5 +592,9 @@ void transport_table::thread_t::table_get(const transport_table::layer_t& layer,
 {
 	auto value = layer.table(keys);
 
-	group_id_filter_ids[value].emplace(filter_id);
+	std::vector<unsigned int>& vec = group_id_filter_ids[value];
+	if (std::find(vec.begin(), vec.end(), filter_id) == vec.end())
+	{
+		vec.push_back(filter_id);
+	}
 }
