@@ -1671,24 +1671,22 @@ balancer_real_id_t* generation::rebuild_service_ring_one_chash(
 	{
 		balancer_real_id_t real_id = balancer_service_reals[real_idx];
 		reals.emplace_back(balancer_reals[real_id].destination);
-		auto& state = balancer_real_states[real_idx];
-		weights.push_back(state.weight);
+		weights.push_back(balancer_real_states[real_id].weight);
 	}
 	auto updater = chash::WeightUpdater::MakeWeightUpdater(
 	        reals.data(),
-			&balancer_service_reals[service.real_start],
-			weights.data(),
-			service.real_size,
+	        &balancer_service_reals[service.real_start],
+	        weights.data(),
+	        service.real_size,
 	        YANET_DEFAULT_BALANCER_REAL_MAPPINGS_LIMIT,
 	        YANET_DEFAULT_BALANCER_CELLS_PER_WEIGHT_UNIT,
-			chash::WeightUpdater::LookupRequiredSize(reals.size(), YANET_DEFAULT_BALANCER_CELLS_PER_WEIGHT_UNIT));
+	        chash::WeightUpdater::LookupRequiredSize(reals.size(), YANET_DEFAULT_BALANCER_CELLS_PER_WEIGHT_UNIT));
 	if (!updater)
 	{
 		YANET_THROW("Failed to intialize updater for balancer service reals");
 		std::abort();
 	}
 	updater.value().InitLookup(start);
-
 	chash_updaters.emplace(&service, std::move(updater.value()));
 	return start + updater.value().LookupSize();
 }
@@ -1711,15 +1709,16 @@ balancer_real_id_t* generation::update_service_ring_one_chash(
 	     real_idx < service.real_start + service.real_size;
 	     ++real_idx)
 	{
-		auto& state = balancer_real_states[real_idx];
+		balancer_real_id_t real_id = balancer_service_reals[real_idx];
+		auto& state = balancer_real_states[real_id];
 		weights.push_back(state.weight);
 	}
 	updater.UpdateLookup(
-		&balancer_service_reals[service.real_start],
-		weights.data(),
-		service.real_size,
-		start
-	);
+	        &balancer_service_reals[service.real_start],
+	        weights.data(),
+	        service.real_size,
+	        start);
+
 	return start + updater.LookupSize();
 }
 
