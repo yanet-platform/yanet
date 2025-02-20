@@ -211,6 +211,11 @@ struct ipv6_address_t
 		memset(bytes, 0, std::size(bytes));
 	}
 
+	bool operator<(ipv6_address_t other) const
+	{
+		return std::memcmp(bytes, other.bytes, 16) < 0;
+	}
+
 	union
 	{
 		uint8_t bytes[16]; ///< @todo: rename to address
@@ -584,7 +589,8 @@ struct balancer_service_t
 	uint32_t real_size;
 	::balancer::scheduler scheduler;
 	::balancer::forwarding_method forwarding_method;
-	uint32_t wlc_power;
+
+	std::uint32_t wlc_power;
 
 	/*
 	        outer_source_network_flag:
