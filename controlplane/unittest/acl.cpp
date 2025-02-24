@@ -566,8 +566,8 @@ add 500 deny ip from any to any
 
 	ASSERT_EQ(result.acl_total_table.size(), 2);
 
-	// We're interested in second group, i.e the group where src ip is { 1.2.3.4 }
-	visit_action_group(1, [&](const auto& actions) {
+	// We're interested in first group, i.e the group where src ip is { 1.2.3.4 }
+	visit_action_group(0, [&](const auto& actions) {
 		if constexpr (is_with_check_state<decltype(actions)>())
 		{
 			// Check that the default path includes actions before and after the check-state
