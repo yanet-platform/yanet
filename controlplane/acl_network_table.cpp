@@ -12,17 +12,14 @@ network_table_t::network_table_t(acl::compiler_t* compiler) :
 void network_table_t::clear()
 {
 	width = 0;
-	values.resize(0);
+	table.clear();
 	remap_group_ids.clear();
 	group_id = 1;
 	filters.clear();
 	filter_ids.clear();
 	filter_id_rule_ids.clear();
 	filter_id_group_ids.clear();
-	group_id_filter_ids.clear();
 	filter_id_group_ids_next.clear();
-	group_id_filter_ids_next.clear();
-	bitmask.clear();
 }
 
 unsigned int network_table_t::collect(const unsigned int rule_id,
@@ -53,7 +50,7 @@ void network_table_t::prepare(const uint32_t height, const uint32_t width)
 		this->width <<= 1;
 	}
 
-	values.resize(height * this->width);
+	table.prepare(height, this->width);
 
 	filter_id_group_ids.resize(filter_ids.size());
 	filter_id_group_ids_next.resize(filter_ids.size());
@@ -61,65 +58,36 @@ void network_table_t::prepare(const uint32_t height, const uint32_t width)
 
 void network_table_t::compile()
 {
+	DimensionArray table_indexes;
+	table_indexes.fill(0);
+
 	for (auto [network_ipv4_source_filter_id, network_ipv4_destination_filter_id, network_ipv6_source_filter_id, network_ipv6_destination_filter_id] : filters)
 	{
 		remap_group_ids.clear();
-		remap_group_ids.resize(group_id, 0);
+		initial_group_id = group_id;
 
 		const auto& network_ipv4_source_group_ids = compiler->network_ipv4_source.filter_group_ids[network_ipv4_source_filter_id];
 		const auto& network_ipv4_destination_group_ids = compiler->network_ipv4_destination.filter_group_ids[network_ipv4_destination_filter_id];
 		const auto& network_ipv6_source_group_ids = compiler->network_ipv6_source.filter_group_ids[network_ipv6_source_filter_id];
 		const auto& network_ipv6_destination_group_ids = compiler->network_ipv6_destination.filter_group_ids[network_ipv6_destination_filter_id];
 
-		for (const auto& k1 : network_ipv4_source_group_ids)
+		for (unsigned int k1 : network_ipv4_source_group_ids)
 		{
-			uint32_t index = k1 * width;
-
-			for (const auto& k2 : network_ipv4_destination_group_ids)
+			table_indexes[0] = k1;
+			for (unsigned int k2 : network_ipv4_destination_group_ids)
 			{
-				uint32_t i = index + k2;
-
-				if (values[i] < remap_group_ids.size()) ///< check: don't override self rule
-				{
-					auto& remap_group_ip = remap_group_ids[values[i]];
-					if (!remap_group_ip)
-					{
-						remap_group_ip = group_id;
-						group_id++;
-					}
-
-					values[i] = remap_group_ip;
-				}
-				else
-				{
-					/// dont panic. this is fine
-				}
+				table_indexes[1] = k2;
+				table_insert(table_indexes);
 			}
 		}
 
-		for (const auto& k1 : network_ipv6_source_group_ids)
+		for (unsigned int k1 : network_ipv6_source_group_ids)
 		{
-			uint32_t index = k1 * width;
-
-			for (const auto& k2 : network_ipv6_destination_group_ids)
+			table_indexes[0] = k1;
+			for (unsigned int k2 : network_ipv6_destination_group_ids)
 			{
-				uint32_t i = index + k2;
-
-				if (values[i] < remap_group_ids.size()) ///< check: don't override self rule
-				{
-					auto& remap_group_ip = remap_group_ids[values[i]];
-					if (!remap_group_ip)
-					{
-						remap_group_ip = group_id;
-						group_id++;
-					}
-
-					values[i] = remap_group_ip;
-				}
-				else
-				{
-					/// dont panic. this is fine
-				}
+				table_indexes[1] = k2;
+				table_insert(table_indexes);
 			}
 		}
 	}
@@ -127,13 +95,13 @@ void network_table_t::compile()
 
 void network_table_t::populate()
 {
+	DimensionArray table_indexes;
+	table_indexes.fill(0);
+
 	for (unsigned int filter_id = 0;
 	     filter_id < filters.size();
 	     filter_id++)
 	{
-		bitmask.resize(0);
-		bitmask.resize(group_id, 0);
-
 		const auto& [network_ipv4_source_filter_id,
 		             network_ipv4_destination_filter_id,
 		             network_ipv6_source_filter_id,
@@ -144,47 +112,58 @@ void network_table_t::populate()
 		const auto& network_ipv6_source_group_ids = compiler->network_ipv6_source.filter_group_ids[network_ipv6_source_filter_id];
 		const auto& network_ipv6_destination_group_ids = compiler->network_ipv6_destination.filter_group_ids[network_ipv6_destination_filter_id];
 
-		for (const auto& k1 : network_ipv4_source_group_ids)
+		for (unsigned int k1 : network_ipv4_source_group_ids)
 		{
-			uint32_t index = k1 * width;
-
-			for (const auto& k2 : network_ipv4_destination_group_ids)
+			table_indexes[0] = k1;
+			for (unsigned int k2 : network_ipv4_destination_group_ids)
 			{
-				uint32_t i = index + k2;
-
-				bitmask[values[i]] = 1;
+				table_indexes[1] = k2;
+				table_get(table_indexes, filter_id);
 			}
 		}
 
-		for (const auto& k1 : network_ipv6_source_group_ids)
+		for (unsigned int k1 : network_ipv6_source_group_ids)
 		{
-			uint32_t index = k1 * width;
-
-			for (const auto& k2 : network_ipv6_destination_group_ids)
+			table_indexes[0] = k1;
+			for (unsigned int k2 : network_ipv6_destination_group_ids)
 			{
-				uint32_t i = index + k2;
-
-				bitmask[values[i]] = 1;
-			}
-		}
-
-		for (unsigned int i = 0;
-		     i < bitmask.size();
-		     i++)
-		{
-			if (bitmask[i])
-			{
-				filter_id_group_ids[filter_id].emplace_back(i);
-				group_id_filter_ids[i].emplace(filter_id);
+				table_indexes[1] = k2;
+				table_get(table_indexes, filter_id);
 			}
 		}
 	}
 }
 
+void network_table_t::table_insert(const DimensionArray& keys)
+{
+	auto& value = table(keys);
+
+	if (value >= initial_group_id)
+		return;
+
+	auto it = remap_group_ids.find(value);
+	if (it == remap_group_ids.end()) ///< check: don't override self rule
+	{
+		remap_group_ids.emplace(value, group_id);
+		value = group_id;
+		group_id++;
+	}
+	else
+	{
+		value = it->second;
+	}
+}
+
+void network_table_t::table_get(const DimensionArray& keys, unsigned int filter_id)
+{
+	auto value = table(keys);
+
+	filter_id_group_ids[filter_id].emplace(value);
+}
+
 void network_table_t::remap()
 {
 	remap_group_ids.clear();
-	remap_group_ids.resize(group_id, 0);
 
 	for (unsigned int layer_id = 0;
 	     layer_id < compiler->transport.layers.size();
@@ -194,10 +173,11 @@ void network_table_t::remap()
 
 		for (const auto network_table_group_id : layer.network_table_group_ids_vec)
 		{
-			auto& remap_group_id = remap_group_ids[network_table_group_id];
-			if (!remap_group_id)
+			auto it = remap_group_ids.find(network_table_group_id);
+			if (it == remap_group_ids.end())
 			{
-				remap_group_id = (network_table_group_id << compiler->transport_layers_shift) | layer_id;
+				tAclGroupId new_id = (network_table_group_id << compiler->transport_layers_shift) | layer_id;
+				remap_group_ids.emplace(network_table_group_id, new_id);
 			}
 			else
 			{
@@ -206,7 +186,7 @@ void network_table_t::remap()
 		}
 	}
 
-	for (auto& group_id : values)
+	for (auto& group_id : table.values())
 	{
 		group_id = remap_group_ids[group_id];
 	}
@@ -217,16 +197,10 @@ void network_table_t::remap()
 	{
 		for (const auto group_id : filter_id_group_ids[filter_id])
 		{
-			filter_id_group_ids_next[filter_id].emplace_back(remap_group_ids[group_id]);
+			filter_id_group_ids_next[filter_id].emplace(remap_group_ids[group_id]);
 		}
 	}
 	filter_id_group_ids_next.swap(filter_id_group_ids);
-
-	for (auto& [group_id, filter_ids] : group_id_filter_ids)
-	{
-		group_id_filter_ids_next[remap_group_ids[group_id]].swap(filter_ids);
-	}
-	group_id_filter_ids_next.swap(group_id_filter_ids);
 
 	for (auto& layer : compiler->transport.layers)
 	{
