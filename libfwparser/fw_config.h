@@ -549,6 +549,12 @@ private:
 	tables::valtype_t m_curr_valtype{};
 	uint32_t m_curr_value{};
 
+	// Flag to keep track whether a keep-state rule should imply
+	// implicit state check. Resets when we meet a label.
+	// By default it's true since we're not necesserily will have a
+	// label at the beggining of the ruleset
+	bool keep_state_with_implicit_check = true;
+
 	// table entry context
 	tables::curr_entry_t m_curr_table_entry{};
 

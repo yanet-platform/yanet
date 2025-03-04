@@ -203,6 +203,8 @@ void fw_config_t::add_label(const std::string& s)
 	m_last_label = s;
 	m_labels.emplace(s, label_info_t{m_ruleno_last + 1, // we will jump to the next rule
 	                                 location_history_t{(unsigned int)l.begin.line, m_fileno.top()}});
+	// Since we can jump to this place, the next rule with keep-state should also perfrom state check
+	keep_state_with_implicit_check = true;
 }
 
 void fw_config_t::set_macro(const std::string& s)
@@ -826,7 +828,11 @@ void fw_config_t::add_rule_opcode(const rule_t::opcode_arg_t& value)
 			m_curr_rule->recordstate = true;
 			break;
 		case rule_t::opcode_t::KEEPSTATE:
-			m_curr_rule->implicit_check_state = true;
+			if (keep_state_with_implicit_check)
+			{
+				m_curr_rule->implicit_check_state = true;
+				keep_state_with_implicit_check = false;
+			}
 			m_curr_rule->recordstate = true;
 			break;
 		case rule_t::opcode_t::IPID:
