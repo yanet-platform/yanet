@@ -524,6 +524,11 @@ public:
 		return m_labels;
 	}
 
+	[[nodiscard]] unsigned int get_rules_size() const
+	{
+		return m_ruleid_last;
+	}
+
 private:
 	void setup_lexer(const std::string& name, istream_ptr_t isrm, bool nested);
 	// parser's context
