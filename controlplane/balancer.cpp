@@ -1058,13 +1058,16 @@ uint32_t balancer_t::calculate_wlc_weight(uint32_t weight, uint32_t connections,
 		return weight;
 	}
 
-	auto wlc_ratio = std::max(1.0, wlc_power * (1 - 1.0 * connections * weight_sum / connection_sum / weight));
-	auto wlc_weight = (uint32_t)(weight * wlc_ratio);
+	double scaled_connections = connections * weight_sum;
+	double scaled_weight = connection_sum * weight;
+	double connection_ratio = scaled_connections / scaled_weight;
 
-	if (wlc_weight > YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX)
-	{
-		wlc_weight = YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX;
-	}
+	const double MIN_RATIO = 1.0;
+	double wlc_ratio = std::max(MIN_RATIO, wlc_power * (1.0 - connection_ratio));
 
-	return wlc_weight;
+	auto new_weight = static_cast<uint32_t>(std::round(weight * wlc_ratio));
+
+	new_weight = std::min(YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX, new_weight);
+
+	return new_weight;
 }
