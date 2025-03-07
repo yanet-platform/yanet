@@ -843,15 +843,24 @@ inline void shm_info()
 	interface::dataPlane dataplane;
 	const auto response = dataplane.get_shm_info();
 
+	//TODO: unravel inner structure somehow?
+	//think about it later.
 	FillAndPrintTable({"ring name",
 	                   "dump tag",
-	                   "dump size",
-	                   "dump count",
+	                   "dump config",
 	                   "core id",
 	                   "socket id",
 	                   "ipc key",
 	                   "offset"},
 	                  response);
+}
+
+inline void hexdump_ring(const std::string& ring)
+{
+	interface::dataPlane dataplane;
+	const auto& response = dataplane.hexdump_ring(ring);
+	std::cout << "Hexdump for the dump ring " << ring << ":\n"
+	          << response.hexdumped_ring << std::endl;
 }
 
 void shm_tsc_info()
