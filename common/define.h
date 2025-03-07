@@ -98,6 +98,8 @@ extern LogPriority logPriority;
 #define YANET_BALANCER_DEFAULT_MSS_SIZE 536
 #define YANET_BALANCER_FIX_MSS_SIZE 1220
 #define YANET_BALANCER_FIX_MSS_FLAG ((uint8_t)(1u << 0))
+static constexpr size_t YANET_DEFAULT_BALANCER_REAL_MAPPINGS_LIMIT = 100;
+static constexpr size_t YANET_DEFAULT_BALANCER_CELLS_PER_WEIGHT_UNIT = 20;
 
 #define YANET_BALANCER_OPS_FLAG ((uint8_t)(1u << 1))
 #define YANET_BALANCER_PURE_L3 ((uint8_t)(1u << 2))
