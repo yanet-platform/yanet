@@ -524,6 +524,11 @@ public:
 		return m_labels;
 	}
 
+	[[nodiscard]] unsigned int get_rules_size() const
+	{
+		return m_ruleid_last;
+	}
+
 private:
 	void setup_lexer(const std::string& name, istream_ptr_t isrm, bool nested);
 	// parser's context
@@ -535,30 +540,36 @@ private:
 		TABLE,
 		RULE,
 	};
-	rule_ptr_t m_curr_rule;
-	rule_ptr_t m_prev_rule;
-	std::string m_last_label;
+	rule_ptr_t m_curr_rule{};
+	rule_ptr_t m_prev_rule{};
+	std::string m_last_label{};
 
-	entity_type m_curr_entity;
-	std::string m_curr_name;
-	tables::valtype_t m_curr_valtype;
-	uint32_t m_curr_value;
+	entity_type m_curr_entity{};
+	std::string m_curr_name{};
+	tables::valtype_t m_curr_valtype{};
+	uint32_t m_curr_value{};
+
+	// Flag to keep track whether a keep-state rule should imply
+	// implicit state check. Resets when we meet a label.
+	// By default it's true since we're not necesserily will have a
+	// label at the beggining of the ruleset
+	bool keep_state_with_implicit_check = true;
 
 	// table entry context
-	tables::curr_entry_t m_curr_table_entry;
+	tables::curr_entry_t m_curr_table_entry{};
 
 	// addr/ports src or dst
-	bool m_curr_src;
-	rule_t::opcode_t m_curr_opcode;
-	rule_t::flags_options_t m_curr_options;
+	bool m_curr_src{};
+	rule_t::opcode_t m_curr_opcode{};
+	rule_t::flags_options_t m_curr_options{};
 
 	// recv/xmit/via
-	iface_direction_t m_curr_dir;
+	iface_direction_t m_curr_dir{};
 
 	// proto cache
-	std::map<std::string, uint8_t> m_protocols;
+	std::map<std::string, uint8_t> m_protocols{};
 	// services cache
-	std::map<std::string, uint16_t> m_services;
+	std::map<std::string, uint16_t> m_services{};
 
 	// internal methods
 	void check_table();
@@ -570,31 +581,31 @@ protected:
 	bool open(const std::string& file, bool nested = true);
 	bool close();
 
-	fw_lexer_t m_lexer;
-	int m_debug; // debug level
-	unsigned int m_ruleid_last;
-	unsigned int m_ruleno_last;
-	unsigned int m_ruleno_step;
-	std::vector<fw_config_history_t> m_history; // history of opened files
+	fw_lexer_t m_lexer{};
+	int m_debug{}; // debug level
+	unsigned int m_ruleid_last{};
+	unsigned int m_ruleno_last{};
+	unsigned int m_ruleno_step{};
+	std::vector<fw_config_history_t> m_history{}; // history of opened files
 	// lexer cursor location, current filename and its number in m_history
-	std::stack<location> m_location;
-	std::stack<istream_ptr_t> m_filestrm;
-	std::stack<unsigned int> m_fileno;
+	std::stack<location> m_location{};
+	std::stack<istream_ptr_t> m_filestrm{};
+	std::stack<unsigned int> m_fileno{};
 
-	std::map<std::string, dns_addresses_t> m_dns_cache;
-	std::map<std::string, label_info_t> m_labels;
+	std::map<std::string, dns_addresses_t> m_dns_cache{};
+	std::map<std::string, label_info_t> m_labels{};
 
 	// keep track of used skipto labels
 	std::map<std::string,
 	         std::vector<rule_ptr_t>>
-	        m_skipto_labels;
+	        m_skipto_labels{};
 
-	std::map<std::string, macro_t> m_macros;
-	std::map<std::string, table_t> m_tables;
+	std::map<std::string, macro_t> m_macros{};
+	std::map<std::string, table_t> m_tables{};
 	// ruleno -> vector<rule_t *>
 	std::map<unsigned int, // rulenum
 	         std::vector<rule_ptr_t>>
-	        m_rules;
+	        m_rules{};
 };
 
 } // namespace ipfw

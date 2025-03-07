@@ -745,4 +745,31 @@ add skipto :BEGIN-section.service ip from any to any
 	EXPECT_TRUE(parse_rules(rules));
 }
 
+TEST(Parser, 066_KeepState)
+{
+	const auto rules = R"IPFW(
+add deny ip from any to any keep-state
+add deny ip from any to any keep-state
+:JUMP1
+add deny ip from any to any keep-state
+add deny ip from any to any keep-state
+add deny ip from any to any keep-state
+:JUMP2
+add deny ip from any to any keep-state
+add deny ip from any to any keep-state
+add deny ip from any to any keep-state
+add deny ip from any to any keep-state
+)IPFW";
+
+	ipfw::fw_config_t firewall;
+	firewall.schedule_string(rules);
+	EXPECT_TRUE(firewall.parse());
+
+	unsigned int keep_state_rules = 9;
+	unsigned int labels = 2;
+	// Each keep-state within a label block adds an implicit check-state rule
+	unsigned int implicit_check_state_rules = labels + 1;
+	EXPECT_EQ(firewall.get_rules_size(), keep_state_rules + implicit_check_state_rules);
+}
+
 } // namespace
