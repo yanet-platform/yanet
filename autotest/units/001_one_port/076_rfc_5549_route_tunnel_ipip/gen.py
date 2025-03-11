@@ -36,19 +36,25 @@ write_pcap("002-send.pcap",
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=100)/IP(dst="1.0.0.1", src="10.0.1.2", ttl=64)/ICMP(),
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=100)/IP(dst="2.0.0.1", src="10.0.1.2", ttl=64)/ICMP(),
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:02")/Dot1Q(vlan=200)/IP(dst="1.0.0.1", src="10.0.2.2", ttl=64)/ICMP(),
-           Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:02")/Dot1Q(vlan=200)/IP(dst="2.0.0.1", src="10.0.2.2", ttl=64)/ICMP())
+           Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:02")/Dot1Q(vlan=200)/IP(dst="2.0.0.1", src="10.0.2.2", ttl=64)/ICMP(),
+           Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:02")/Dot1Q(vlan=200)/IPv6(dst="7777::1", src="4444::1", hlim=64)/ICMP())
 
 write_pcap("002-expect.pcap",
            Ether(dst="00:00:00:00:00:03", src="00:11:22:33:44:55")/Dot1Q(vlan=300)/IPv6(dst="4444::1", src="3333::1")/IP(dst="1.0.0.1", src="10.0.1.2", ttl=63)/ICMP(),
            Ether(dst="00:00:00:00:00:03", src="00:11:22:33:44:55")/Dot1Q(vlan=300)/IPv6(dst="5555::1", src="3333::1")/IP(dst="2.0.0.1", src="10.0.1.2", ttl=63)/ICMP(),
            Ether(dst="00:00:00:00:00:03", src="00:11:22:33:44:55")/Dot1Q(vlan=300)/IPv6(dst="4444::1", src="3333::1")/IP(dst="1.0.0.1", src="10.0.2.2", ttl=63)/ICMP(),
-           Ether(dst="00:00:00:00:00:03", src="00:11:22:33:44:55")/Dot1Q(vlan=300)/IPv6(dst="5555::1", src="3333::1")/IP(dst="2.0.0.1", src="10.0.2.2", ttl=63)/ICMP())
+           Ether(dst="00:00:00:00:00:03", src="00:11:22:33:44:55")/Dot1Q(vlan=300)/IPv6(dst="5555::1", src="3333::1")/IP(dst="2.0.0.1", src="10.0.2.2", ttl=63)/ICMP(),
+           Ether(dst="00:00:00:00:00:03", src="00:11:22:33:44:55")/Dot1Q(vlan=300)/IPv6(dst="5555::1", src="3333::1")/IPv6(dst="7777::1", src="4444::1", hlim=63)/ICMP())
 
 # No tunnel is established between local prefixes
 write_pcap("003-send.pcap",
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:02")/Dot1Q(vlan=200)/IP(dst="10.0.1.2", src="10.0.2.2", ttl=64)/ICMP(),
-           Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:03")/Dot1Q(vlan=100)/IP(dst="10.0.2.2", src="10.0.1.2", ttl=64)/ICMP())
+           Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:03")/Dot1Q(vlan=100)/IP(dst="10.0.2.2", src="10.0.1.2", ttl=64)/ICMP(),
+           Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:02")/Dot1Q(vlan=200)/IP(dst="10.0.1.1", src="10.0.2.2", ttl=64)/ICMP(),
+           Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:03")/Dot1Q(vlan=200)/IP(dst="10.0.2.1", src="10.0.2.2", ttl=64)/ICMP())
 
 write_pcap("003-expect.pcap",
            Ether(dst="00:00:00:00:00:01", src="00:11:22:33:44:55")/Dot1Q(vlan=100)/IP(dst="10.0.1.2", src="10.0.2.2", ttl=63)/ICMP(),
-           Ether(dst="00:00:00:00:00:02", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="10.0.2.2", src="10.0.1.2", ttl=63)/ICMP())
+           Ether(dst="00:00:00:00:00:02", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="10.0.2.2", src="10.0.1.2", ttl=63)/ICMP(),
+           Ether(dst="71:71:71:71:71:71", src="00:00:00:00:00:02")/Dot1Q(vlan=200)/IP(dst="10.0.1.1", src="10.0.2.2", ttl=64)/ICMP(),
+		   Ether(dst="71:71:71:71:71:71", src="00:00:00:00:00:03")/Dot1Q(vlan=200)/IP(dst="10.0.2.1", src="10.0.2.2", ttl=64)/ICMP())
