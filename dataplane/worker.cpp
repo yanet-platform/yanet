@@ -2728,11 +2728,12 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		uint32_t vtc_flow = 0;
 		uint16_t payload_len = 0;
 		uint32_t ipv4_src_addr;
+		uint16_t mpls_len = (is_ipip_tunnel ? 0 : sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE);
 		if (is_ipv4)
 		{
 			rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 			vtc_flow = rte_cpu_to_be_32((0x6 << 28) | (ipv4HeaderInner->type_of_service << 20)); ///< @todo: flow label
-			payload_len = rte_cpu_to_be_16((is_ipip_tunnel ? 0 : sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE) + rte_be_to_cpu_16(ipv4HeaderInner->total_length));
+			payload_len = rte_cpu_to_be_16(mpls_len + rte_be_to_cpu_16(ipv4HeaderInner->total_length));
 			payload_length = rte_be_to_cpu_16(ipv4HeaderInner->total_length);
 			ipv4_src_addr = ipv4HeaderInner->src_addr;
 		}
@@ -2740,12 +2741,12 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		{
 			rte_ipv6_hdr* ipv6HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
 			vtc_flow = ipv6HeaderInner->vtc_flow & rte_cpu_to_be_32(0xFFF00000);
-			payload_len = rte_cpu_to_be_16(sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE + sizeof(rte_ipv6_hdr) + rte_be_to_cpu_16(ipv6HeaderInner->payload_len));
+			payload_len = rte_cpu_to_be_16(mpls_len + sizeof(rte_ipv6_hdr) + rte_be_to_cpu_16(ipv6HeaderInner->payload_len));
 			payload_length = sizeof(rte_ipv6_hdr) + rte_be_to_cpu_16(ipv6HeaderInner->payload_len);
 		}
 
 		/// @todo: mpls_header_t
-		size_t size_mbuf = sizeof(rte_ipv6_hdr) + (is_ipip_tunnel ? 0 : sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE);
+		size_t size_mbuf = sizeof(rte_ipv6_hdr) + mpls_len;
 		rte_pktmbuf_prepend(mbuf, size_mbuf);
 		rte_memcpy(rte_pktmbuf_mtod(mbuf, char*),
 		           rte_pktmbuf_mtod_offset(mbuf, char*, size_mbuf),
@@ -2760,7 +2761,7 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 		ipv6Header->vtc_flow = vtc_flow;
 		ipv6Header->payload_len = payload_len;
 
-		ipv6Header->proto = (is_ipip_tunnel ? IPPROTO_IPIP : IPPROTO_UDP);
+		ipv6Header->proto = (is_ipip_tunnel ? (is_ipv4 ? IPPROTO_IPIP : IPPROTO_IPV6) : IPPROTO_UDP);
 		ipv6Header->hop_limits = 64;
 		rte_memcpy(ipv6Header->src_addr, route.ipv6AddressSource.bytes, 16);
 		rte_memcpy(ipv6Header->dst_addr, nexthop.nexthop_address.bytes, 16);
