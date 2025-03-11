@@ -775,6 +775,7 @@ void config_converter_t::processAcl()
 				}
 				else if (entry == "tunnel_ipip")
 				{
+					acl_rules_route_local(acl, nextModule.substr(0, nextModule.find(':')));
 					acl_rules_route_forward(acl, nextModule);
 				}
 				else
