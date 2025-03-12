@@ -198,12 +198,12 @@ public:
 		return address < second.address;
 	}
 
-	constexpr operator const std::array<uint8_t, 6> &() const
+	constexpr operator const std::array<uint8_t, 6>&() const
 	{
 		return address;
 	}
 
-	constexpr operator std::array<uint8_t, 6> &()
+	constexpr operator std::array<uint8_t, 6>&()
 	{
 		return address;
 	}
@@ -421,12 +421,12 @@ public:
 		return !memcmp(address.data(), second.address.data(), address.size());
 	}
 
-	constexpr operator const std::array<uint8_t, 16> &() const
+	constexpr operator const std::array<uint8_t, 16>&() const
 	{
 		return address;
 	}
 
-	constexpr operator std::array<uint8_t, 16> &()
+	constexpr operator std::array<uint8_t, 16>&()
 	{
 		return address;
 	}
@@ -611,12 +611,12 @@ public:
 		return !(address == second.address);
 	}
 
-	constexpr operator const std::variant<ipv4_address_t, ipv6_address_t> &() const
+	constexpr operator const std::variant<ipv4_address_t, ipv6_address_t>&() const
 	{
 		return address;
 	}
 
-	constexpr operator std::variant<ipv4_address_t, ipv6_address_t> &()
+	constexpr operator std::variant<ipv4_address_t, ipv6_address_t>&()
 	{
 		return address;
 	}
@@ -756,12 +756,12 @@ public:
 		return prefix > second.prefix;
 	}
 
-	constexpr operator const std::tuple<ipv4_address_t, uint8_t> &() const
+	constexpr operator const std::tuple<ipv4_address_t, uint8_t>&() const
 	{
 		return prefix;
 	}
 
-	constexpr operator std::tuple<ipv4_address_t, uint8_t> &()
+	constexpr operator std::tuple<ipv4_address_t, uint8_t>&()
 	{
 		return prefix;
 	}
@@ -971,12 +971,12 @@ public:
 		return prefix > second.prefix;
 	}
 
-	constexpr operator const std::tuple<ipv6_address_t, uint8_t> &() const
+	constexpr operator const std::tuple<ipv6_address_t, uint8_t>&() const
 	{
 		return prefix;
 	}
 
-	constexpr operator std::tuple<ipv6_address_t, uint8_t> &()
+	constexpr operator std::tuple<ipv6_address_t, uint8_t>&()
 	{
 		return prefix;
 	}
@@ -1252,12 +1252,12 @@ public:
 		return prefix == second.prefix;
 	}
 
-	constexpr operator const std::variant<ipv4_prefix_t, ipv6_prefix_t> &() const
+	constexpr operator const std::variant<ipv4_prefix_t, ipv6_prefix_t>&() const
 	{
 		return prefix;
 	}
 
-	constexpr operator std::variant<ipv4_prefix_t, ipv6_prefix_t> &()
+	constexpr operator std::variant<ipv4_prefix_t, ipv6_prefix_t>&()
 	{
 		return prefix;
 	}
@@ -1640,12 +1640,12 @@ public:
 		return value == second.value;
 	}
 
-	constexpr operator const std::array<uint32_t, 3> &() const
+	constexpr operator const std::array<uint32_t, 3>&() const
 	{
 		return value;
 	}
 
-	constexpr operator std::array<uint32_t, 3> &()
+	constexpr operator std::array<uint32_t, 3>&()
 	{
 		return value;
 	}
@@ -1688,12 +1688,12 @@ public:
 		insertHelper(args...);
 	}
 
-	operator const std::set<uint64_t> &() const
+	operator const std::set<uint64_t>&() const
 	{
 		return values;
 	}
 
-	operator std::set<uint64_t> &()
+	operator std::set<uint64_t>&()
 	{
 		return values;
 	}
@@ -1772,12 +1772,12 @@ public:
 		return range < second.range;
 	}
 
-	constexpr operator const std::tuple<uint64_t, uint64_t> &() const
+	constexpr operator const std::tuple<uint64_t, uint64_t>&() const
 	{
 		return range;
 	}
 
-	constexpr operator std::tuple<uint64_t, uint64_t> &()
+	constexpr operator std::tuple<uint64_t, uint64_t>&()
 	{
 		return range;
 	}

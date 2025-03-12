@@ -96,7 +96,7 @@ extern "C"
 };
 #else /* __cplusplus */
 
-//#define	YANET_DEBUG
+// #define	YANET_DEBUG
 
 #ifdef YANET_DEBUG
 #include <cstdio>

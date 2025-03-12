@@ -123,7 +123,7 @@ public:
 	/** dangerous
 	generation_shared current_shared() const
 	{
-		return generation_shared(&current_mutex, this);
+	        return generation_shared(&current_mutex, this);
 	}
 	*/
 
@@ -145,7 +145,7 @@ public:
 	/** dangerous
 	generation_unique next_unique()
 	{
-		return generation_unique(&next_mutex, this);
+	        return generation_unique(&next_mutex, this);
 	}
 	*/
 

@@ -207,7 +207,7 @@ public:
 	}
 };
 
-} //namespace acl
+} // namespace acl
 
 namespace std
 {

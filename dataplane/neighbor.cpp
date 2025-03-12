@@ -193,8 +193,7 @@ static void netlink_neighbor_dump(const std::function<void(const std::string&, c
 	close(nl_socket);
 }
 
-module::module() :
-        dataplane(nullptr)
+module::module() :dataplane(nullptr)
 {
 	memset(&stats, 0, sizeof(stats));
 }
