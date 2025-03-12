@@ -47,6 +47,7 @@ inline std::vector<bus_request_info> get_bus_requests(common::sdp::DataPlaneInSh
 	        {common::idp::requestType::update_vip_vport_proto, "update_vip_vport_proto"},
 	        {common::idp::requestType::version, "version"},
 	        {common::idp::requestType::get_shm_info, "get_shm_info"},
+	        {common::idp::requestType::hexdump_ring, "hexdump_ring"},
 	        {common::idp::requestType::get_shm_tsc_info, "get_shm_tsc_info"},
 	        {common::idp::requestType::set_shm_tsc_state, "set_shm_tsc_state"},
 	        {common::idp::requestType::dump_physical_port, "dump_physical_port"},

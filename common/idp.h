@@ -14,6 +14,7 @@
 #include "balancer.h"
 #include "common/actions.h"
 #include "config.h"
+#include "dataplane/config.h"
 #include "memory_manager.h"
 #include "neighbor.h"
 #include "result.h"
@@ -67,6 +68,8 @@ enum class requestType : uint32_t
 	update_vip_vport_proto,
 	version,
 	get_shm_info,
+	// TODO: I don not need this anymore, I need to make this into a cli to ask for pcap files, and to ask to switch mode of a pcap dumping
+	hexdump_ring,
 	get_shm_tsc_info,
 	set_shm_tsc_state,
 	dump_physical_port,
@@ -854,14 +857,33 @@ namespace get_shm_info
 {
 using dump_meta = std::tuple<std::string, ///< ring name
                              std::string, ///< dump tag
-                             unsigned int, ///< dump size
-                             unsigned int, ///< dump count
+                             tDataPlaneConfig::DumpConfig, ///< dump config
                              tCoreId, ///< core id
                              tSocketId, ///< socket id
                              key_t, /// ipc shm key
                              uint64_t>; /// offset
 
 using response = std::vector<dump_meta>;
+}
+
+namespace hexdump_ring
+{
+using request = std::string; // ring tag
+
+struct response
+{
+	std::string hexdumped_ring;
+
+	void pop(common::stream_in_t& stream)
+	{
+		stream.pop(hexdumped_ring);
+	}
+
+	void push(common::stream_out_t& stream) const
+	{
+		stream.push(hexdumped_ring);
+	}
+};
 }
 
 namespace get_shm_tsc_info
@@ -1000,6 +1022,7 @@ using request = std::tuple<requestType,
                                         nat64stateful_state::request,
                                         balancer_connection::request,
                                         debug_latch_update::request,
+                                        hexdump_ring::request,
                                         unrdup_vip_to_balancers::request,
                                         update_vip_vport_proto::request,
                                         dump_physical_port::request,
@@ -1008,6 +1031,9 @@ using request = std::tuple<requestType,
                                         neighbor_update_interfaces::request,
                                         memory_manager_update::request>>;
 
+// Oh no, this is so bad.. We can't have same types as a responces, i.e right now we can't have two
+// commands with std::string as responce. Need to refactor this whole thing.
+// We can just use structures, I guess..? Need to think about this more.
 using response = std::variant<std::tuple<>,
                               updateGlobalBase::response, ///< + others which have eResult as response
                               getGlobalBase::response,
@@ -1035,6 +1061,7 @@ using response = std::variant<std::tuple<>,
                               samples::response,
                               hitcount_dump::response,
                               get_shm_info::response,
+                              hexdump_ring::response,
                               get_shm_tsc_info::response,
                               neighbor_show::response,
                               neighbor_stats::response,

@@ -16,11 +16,16 @@
 
 #include <gmock/gmock.h>
 
+#include "PcapFileDevice.h"
 #include "autotest.h"
 #include "common.h"
 
+#include "common/define.h"
+#include "common/result.h"
 #include "common/sdpclient.h"
+#include "common/sdpcommon.h"
 #include "common/utils.h"
+#include "dataplane/dump_rings.h"
 
 #define MAX_PACK_LEN 16384
 #define SOCK_DEV_PREFIX "sock_dev:"
@@ -120,62 +125,80 @@ eResult tAutotest::initSockets()
 	return eResult::success;
 }
 
+eResult tAutotest::FillShmKeyMemoryMap(std::unordered_map<key_t, void*>& map)
+{
+	key_t ipc_key = 0;
+	int shm_id = 0;
+	void* shm_addr = nullptr;
+
+	for (const auto& shm_info : dataPlaneSharedMemory)
+	{
+		ipc_key = std::get<5>(shm_info);
+
+		if (map.find(ipc_key) != map.end())
+		{
+			// we already assigned an address for this key
+			continue;
+		}
+
+		shm_id = shmget(ipc_key, 0, 0);
+		if (shm_id == -1)
+		{
+			YANET_LOG_ERROR("shmget(%d, 0, 0) = %d\n", ipc_key, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		shm_addr = shmat(shm_id, nullptr, 0);
+		if (shm_addr == (void*)-1)
+		{
+			YANET_LOG_ERROR("shmat(%d, nullptr, 0) = %d\n", shm_id, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		map[ipc_key] = shm_addr;
+	}
+
+	// rawShmInfo is needed to flush shared memory,
+	// which is necessary to reset state in between tests
+	if (!map.empty())
+	{
+		struct shmid_ds shm_info;
+		if (shmctl(shm_id, IPC_STAT, &shm_info) == -1)
+		{
+			YANET_LOG_ERROR("shmctl(%d, IPC_STAT, &shm_info) = %d\n", shm_id, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		rawShmInfo = {shm_info.shm_segsz, shm_addr};
+	}
+
+	return eResult::success;
+}
+
 eResult tAutotest::initSharedMemory()
 {
 	dataPlaneSharedMemory = dataPlane.get_shm_info();
 
-	std::map<key_t, void*> shm_by_key;
-	key_t ipcKey = 0;
-	int shmid = 0;
-	void* shmaddr = nullptr;
+	// TODO: we need structures like abseli::flat_hash_map for such purposes.
+	// We do not need pointer/references stability here, so might as well
+	// save on space and time
+	std::unordered_map<key_t, void*> shm_by_key;
 
-	for (const auto& shmInfo : dataPlaneSharedMemory)
+	if (eResult res = FillShmKeyMemoryMap(shm_by_key); res != eResult::success)
 	{
-		ipcKey = std::get<6>(shmInfo);
-
-		shmid = shmget(ipcKey, 0, 0);
-		if (shmid == -1)
-		{
-			YANET_LOG_ERROR("shmget(%d, 0, 0) = %d\n", ipcKey, errno);
-			return eResult::errorInitSharedMemory;
-		}
-
-		shmaddr = shmat(shmid, nullptr, 0);
-		if (shmaddr == (void*)-1)
-		{
-			YANET_LOG_ERROR("shmat(%d, nullptr, 0) = %d\n", shmid, errno);
-			return eResult::errorInitSharedMemory;
-		}
-
-		if (auto it = shm_by_key.find(ipcKey); it == shm_by_key.end())
-		{
-			shm_by_key[ipcKey] = shmaddr;
-		}
+		return res;
 	}
 
-	if (shm_by_key.size() > 0)
+	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : dataPlaneSharedMemory)
 	{
-		struct shmid_ds shm_info;
-		if (shmctl(shmid, IPC_STAT, &shm_info) == -1)
-		{
-			YANET_LOG_ERROR("shmctl(%d, IPC_STAT, &shm_info) = %d\n", shmid, errno);
-			return eResult::errorInitSharedMemory;
-		}
+		GCC_BUG_UNUSED(dump_tag);
+		GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(socket_id);
 
-		rawShmInfo = {shm_info.shm_segsz, shmaddr};
-	}
+		auto memaddr = utils::ShiftBuffer(shm_by_key[ipc_key], offset);
 
-	for (const auto& shmInfo : dataPlaneSharedMemory)
-	{
-		std::string name = std::get<0>(shmInfo);
-		unsigned int unitSize = std::get<2>(shmInfo);
-		unsigned int unitsNumber = std::get<3>(shmInfo);
-		key_t ipcKey = std::get<6>(shmInfo);
-		uint64_t offset = std::get<7>(shmInfo);
-
-		void* shm = shm_by_key[ipcKey];
-		auto memaddr = (void*)((intptr_t)shm + offset);
-		dumpRings[name] = common::bufferring(memaddr, unitSize, unitsNumber);
+		// TODO: не линкуется??
+		dumpRings[ring_name] = dumprings::CreateSharedMemoryDumpRing(dump_config, memaddr);
 	}
 
 	return eResult::success;
@@ -235,8 +258,7 @@ void tAutotest::sendThread(std::string interfaceName,
 	                                 pcap_errbuf);
 	if (!pcap)
 	{
-		YANET_LOG_ERROR("error: pcap_open_offline(): %s\n", pcap_errbuf);
-		throw "";
+		YANET_THROW("error: pcap_open_offline(): ", pcap_errbuf);
 	}
 
 	pcap_pkthdr* header = nullptr;
@@ -270,8 +292,7 @@ void tAutotest::sendThread(std::string interfaceName,
 
 		if (writeIovCount(iface, iov, iov_count) < 0)
 		{
-			YANET_LOG_ERROR("error: write packet(): %s\n", strerror(errno));
-			throw "";
+			YANET_THROW("error: write packet(): ", strerror(errno));
 		}
 
 		packetsCount++;
@@ -328,8 +349,7 @@ static bool readPacket(int fd, pcap_pkthdr* header, u_char* data, Duration timel
 
 	if (hdr.data_length == 0)
 	{
-		YANET_LOG_ERROR("error: read size is 0\n");
-		throw "";
+		YANET_THROW("error: read size is 0");
 	}
 
 	if (!readTimeLimited(fd, data, hdr.data_length, time_to_give_up))
@@ -418,16 +438,14 @@ public:
 
 		if (!pcap)
 		{
-			YANET_LOG_ERROR("error: pcap_open_dead()\n");
-			throw "";
+			YANET_THROW("error: pcap_open_dead()");
 		}
 
 		dumper = pcap_dump_open(pcap, tmpFilePath.data());
 		if (!dumper)
 		{
 			pcap_close(pcap);
-			YANET_LOG_ERROR("error: pcap_dump_open()\n");
-			throw "";
+			YANET_THROW("error: pcap_dump_open()");
 		}
 	}
 
@@ -486,8 +504,7 @@ public:
 		pcap = pcap_open_offline(filename.c_str(), pcap_errbuf);
 		if (!pcap)
 		{
-			YANET_LOG_ERROR("error: pcap_open_offline(): %s\n", pcap_errbuf);
-			throw "";
+			YANET_THROW("error: pcap_open_offline(): ", pcap_errbuf);
 		}
 		memset(&header, 0, sizeof(struct pcap_pkthdr));
 		advance();
@@ -611,8 +628,7 @@ void tAutotest::recvThread(std::string interfaceName,
 		auto now = std::chrono::system_clock::now();
 		if (now > time_to_give_up)
 		{
-			YANET_LOG_ERROR("error[%s]: step time limit exceeded\n", interfaceName.data());
-			throw "";
+			YANET_THROW("error[", interfaceName, "]: step time limit exceeded");
 		}
 		if (!readPacket(iface, &tmp_pcap_packetHeader, buffer, time_to_give_up - now))
 		{
@@ -635,11 +651,7 @@ void tAutotest::recvThread(std::string interfaceName,
 			                packetsCount + 1,
 			                buf.str().data());
 
-			YANET_LOG_ERROR("pcap[%s]: %s\n",
-			                interfaceName.data(),
-			                pcapDumper.path().data());
-
-			throw "";
+			YANET_LOG_ERROR("pcap[%s]: %s\n", interfaceName.data(), pcapDumper.path().data());
 		}
 
 		if (dumpPackets)
@@ -737,8 +749,6 @@ void tAutotest::recvThread(std::string interfaceName,
 		YANET_LOG_ERROR("pcap[%s]: %s\n",
 		                interfaceName.data(),
 		                pcapDumper.path().data());
-
-		throw "";
 	}
 
 	unlink(pcapDumper.path().data());
@@ -962,7 +972,7 @@ bool tAutotest::step_sendPackets(const YAML::Node& yamlStep,
 
 	if (!success)
 	{
-		throw "";
+		YANET_THROW("");
 	}
 
 	return true;
@@ -1329,8 +1339,7 @@ void tAutotest::mainThread()
 				const auto result = controlPlane.loadConfig(request);
 				if (result != eResult::success)
 				{
-					YANET_LOG_ERROR("invalid config: eResult %d\n", static_cast<std::uint32_t>(result));
-					throw "";
+					YANET_THROW("invalid config: eResult ", common::result_to_c_str(result));
 				}
 				controlPlane.rib_flush();
 
@@ -1485,13 +1494,12 @@ void tAutotest::mainThread()
 				}
 				else
 				{
-					YANET_LOG_ERROR("unknown step\n");
-					throw "";
+					YANET_THROW("unknown step");
 				}
 
 				if (!result)
 				{
-					throw "";
+					YANET_THROW("");
 				}
 			}
 		}
@@ -1896,16 +1904,6 @@ bool tAutotest::step_cli_check(const YAML::Node& yamlStep)
 	return true;
 }
 
-common::bufferring::item_t* read_shm_packet(common::bufferring* buffer, uint64_t position)
-{
-	if (position >= buffer->ring->header.after)
-	{
-		return nullptr;
-	}
-	auto* item = (common::bufferring::item_t*)((uintptr_t)buffer->ring->memory + (position * buffer->unit_size));
-	return item;
-}
-
 bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
                                  const std::string& path)
 {
@@ -1916,86 +1914,108 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 		std::string expectFilePath = path + "/" + yamlDump["expect"].as<std::string>();
 		bool success = true;
 
-		common::bufferring* ring = nullptr;
-		{ /// searching memory ring by tag
-			auto it = dumpRings.find(tag);
-			if (it == dumpRings.end())
-			{
-				YANET_LOG_ERROR("dump [%s]: error: dump ring not found\n", tag.data());
-				throw "";
-			}
-			ring = &it->second;
+		/// searching memory ring by tag
+		auto it = dumpRings.find(tag);
+		if (it == dumpRings.end())
+		{
+			YANET_THROW("dump [", tag, "]: error: dump ring not found");
+		}
+		DumpRingBasePtr& ring = it->second;
+
+		// Open pcap file using PcapPlusPlus
+		pcpp::IFileReaderDevice* reader = pcpp::IFileReaderDevice::getReader(expectFilePath);
+		if (reader == nullptr)
+		{
+			YANET_THROW("dump [", tag, "]: error: cannot determine reader for file ", expectFilePath);
 		}
 
-		pcap_t* pcap = nullptr;
-		{ /// open pcap file with expected data
-			char pcap_errbuf[PCAP_ERRBUF_SIZE];
-			pcap = pcap_open_offline(expectFilePath.data(), pcap_errbuf);
-			if (!pcap)
-			{
-				YANET_LOG_ERROR("dump [%s]: error: pcap_open_offline(): %s\n", tag.data(), pcap_errbuf);
-				throw "";
-			}
+		if (!reader->open())
+		{
+			YANET_THROW("dump [", tag, "]: error: cannot open pcap file", expectFilePath);
 		}
 
-		struct pcap_pkthdr header;
-		const u_char* pcap_packet = nullptr;
-		common::bufferring::item_t* shm_packet = nullptr;
-		uint64_t position = 0;
+		pcpp::RawPacket expected_pkt;
+		pcpp::RawPacket obtained_pkt;
 
 		/// read packets from pcap and compare them with packets from memory ring
-		while ((pcap_packet = pcap_next(pcap, &header)))
+		while (true)
 		{
-			shm_packet = read_shm_packet(ring, position);
-			position++;
+			bool has_expected = reader->getNextPacket(expected_pkt);
+			bool has_obtained = ring->GetNextPacket(obtained_pkt);
 
-			if (shm_packet && header.len == shm_packet->header.size &&
-			    memcmp(shm_packet->memory, pcap_packet, header.len) == 0)
-			{ /// packets are the same
-				continue;
-			}
-
-			/// packets are different, so...
-			success = false;
-			YANET_LOG_ERROR("dump [%s]: error: wrong packet #%lu (%s)\n",
-			                tag.data(),
-			                position,
-			                expectFilePath.data());
-
-			if (dumpPackets && shm_packet)
-			{
-				YANET_LOG_DEBUG("dump [%s]: expected %u, got %u\n", tag.data(), header.len, shm_packet->header.size);
-				dumper.dump(pcap_packet, pcap_packet + shm_packet->header.size, shm_packet->memory, shm_packet->memory + header.len);
-			}
-		}
-
-		/// read the remaining packets from memory ring
-		for (;;)
-		{
-			shm_packet = read_shm_packet(ring, position);
-			if (!shm_packet)
+			// If both sources are out of packets, we are done
+			if (!has_expected && !has_obtained)
 			{
 				break;
 			}
-			position++;
 
+			if (has_expected && !has_obtained)
+			{
+				success = false;
+				YANET_LOG_ERROR("dump [%s]: error: missing packet #%u in shared memory\n",
+				                tag.data(),
+				                ring->CurrentReadPacketNum());
+				break;
+			}
+
+			if (!has_expected && has_obtained)
+			{
+				success = false;
+				YANET_LOG_ERROR(
+				        "dump [%s]: error: extra packet #%u in shared memory\n",
+				        tag.data(),
+				        ring->CurrentReadPacketNum() + 1);
+
+				if (dumpPackets)
+				{
+					YANET_LOG_DEBUG("dump [%s]: unexpected packet size %u bytes\n",
+					                tag.data(),
+					                obtained_pkt.getRawDataLen());
+					dumper.dump(nullptr,
+					            nullptr,
+					            obtained_pkt.getRawData(),
+					            obtained_pkt.getRawData() + obtained_pkt.getRawDataLen());
+				}
+				break;
+			}
+
+			// At this point, we have one expected packet and one obtained packet
+			if ((expected_pkt.getRawDataLen() == obtained_pkt.getRawDataLen()) &&
+			    (memcmp(expected_pkt.getRawData(), obtained_pkt.getRawData(), expected_pkt.getRawDataLen()) == 0))
+			{
+				continue;
+			}
+
+			// They differ
 			success = false;
+			YANET_LOG_ERROR("dump [%s]: error: packet #%u does not match (%s)\n",
+			                tag.data(),
+			                ring->CurrentReadPacketNum(),
+			                expectFilePath.data());
 
 			if (dumpPackets)
 			{
-				YANET_LOG_DEBUG("dump [%s]: unexpected %u\n", tag.data(), shm_packet->header.size);
-				dumper.dump(nullptr, nullptr, shm_packet->memory, shm_packet->memory + header.len);
+				YANET_LOG_DEBUG("dump [%s]: expected %u bytes, got %u bytes\n",
+				                tag.data(),
+				                expected_pkt.getRawDataLen(),
+				                obtained_pkt.getRawDataLen());
+
+				dumper.dump(expected_pkt.getRawData(),
+				            expected_pkt.getRawData() + expected_pkt.getRawDataLen(),
+				            obtained_pkt.getRawData(),
+				            obtained_pkt.getRawData() + obtained_pkt.getRawDataLen());
 			}
+
+			break;
 		}
 
-		YANET_LOG_DEBUG("dump [%s]: recv %lu packets\n", tag.data(), position);
+		YANET_LOG_DEBUG("dump [%s]: compared %u packets\n", tag.data(), ring->CurrentReadPacketNum());
 
-		pcap_close(pcap);
+		reader->close();
 
 		if (!success)
 		{
-			YANET_LOG_ERROR("dump [%s]: error: unknown packet (%s)\n", tag.data(), expectFilePath.data());
-			throw "";
+			YANET_THROW("dump [", tag, "]: error: packet comparison failed", expectFilePath);
 		}
 	}
 

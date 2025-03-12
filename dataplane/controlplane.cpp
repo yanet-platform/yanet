@@ -10,6 +10,7 @@
 #include <rte_malloc.h>
 
 #include "common.h"
+#include "common/utils.h"
 #include "common/version.h"
 #include "dataplane.h"
 #include "dataplane/worker_gc.h"
@@ -1025,6 +1026,7 @@ common::idp::version::response cControlPlane::version()
 	        version_custom()};
 }
 
+// FIXME: just return dataPlane->getShmInfo()
 common::idp::get_shm_info::response cControlPlane::get_shm_info()
 {
 	common::idp::get_shm_info::response response;
@@ -1032,6 +1034,76 @@ common::idp::get_shm_info::response cControlPlane::get_shm_info()
 	{
 		response.emplace_back(key);
 	}
+
+	return response;
+}
+
+// I won't need this..
+common::idp::hexdump_ring::response cControlPlane::hexdump_ring(const common::idp::hexdump_ring::request& request)
+{
+	common::idp::hexdump_ring::response response;
+#if 0
+	const std::string& requested_tag = request;
+
+	std::string combined_hexdump;
+
+	auto ring_id_it = dataPlane->tag_to_id.find(requested_tag);
+	if (ring_id_it == dataPlane->tag_to_id.end())
+	{
+		YANET_LOG_ERROR("Tag '%s' not found\n", requested_tag.c_str());
+		return response;
+	}
+	uint64_t ring_id = ring_id_it->second;
+
+	for (cWorker* worker : dataPlane->workers_vector)
+	{
+		auto ring = worker->dump_rings[ring_id];
+
+		auto addr = reinterpret_cast<char*>(ring.buffer.ring);
+
+		// Get the `after` counter to determine the end of valid data
+		uint64_t after = ring.buffer.ring->header.after;
+
+		// Calculate the size of the valid data to dump
+		size_t valid_data_size = sizeof(dumprings::ring_header_t) + after * ring.buffer.unit_size;
+
+		// Include worker-specific details in the hexdump
+		combined_hexdump += "Worker Core ID: " + std::to_string(worker->coreId) + "\n";
+		combined_hexdump += "After: " + std::to_string(after) + "\n";
+		combined_hexdump += utils::hexdump(std::string_view(addr, valid_data_size));
+		combined_hexdump += "\n";
+	}
+
+	response.hexdumped_ring = combined_hexdump;
+#endif
+
+#if 0
+	common::idp::get_shm_info::response shm_info = dataPlane->getShmInfo();
+
+	for (const auto& [name, tag, size, count, core_id, socket_id, shm_key, offset] : shm_info)
+	{
+		if (tag != requested_tag)
+			continue;
+
+		int shmid = shmget(shm_key, 0, 0);
+		if (shmid == -1)
+		{
+			YANET_LOG_ERROR("Error on shmget(%d, 0, 0) = %d\n", shm_key, errno);
+			return {};
+		}
+
+		void* shmaddr = shmat(shmid, nullptr, 0);
+		if (shmaddr == reinterpret_cast<void*>(-1))
+		{
+			YANET_LOG_ERROR("Error on shmat(%d, NULL, 0) = %d\n", shmid, errno);
+			return {};
+		}
+
+		auto addr = utils::ShiftBuffer<char*>(shmaddr, offset);
+	}
+
+	response.hexdumped_ring = //hexdump addr, size (what size) here;
+#endif
 
 	return response;
 }

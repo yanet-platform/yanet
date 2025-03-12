@@ -1,4 +1,8 @@
+#pragma once
+
+#include <cstddef>
 #include <cstdint>
+#include <rte_build_config.h>
 
 namespace common
 {
@@ -18,14 +22,44 @@ namespace common
 //   ring_header_t: "b" -- before              ... -- padding
 //                  "a" -- after
 //                  ... -- padding
-class bufferring
+struct PacketBufferRing
 {
-public:
-	bufferring() = default;
-	bufferring(void* memory, int unit_size, int units_number) :
-	        unit_size(unit_size),
-	        units_number(units_number), ring((ring_t*)memory)
+	PacketBufferRing() = default;
+
+	// static function, helps to get capacity in DumpRingRaw
+	static size_t GetCapacity(size_t ring_size, size_t item_count, size_t unit_size = 0)
 	{
+		if (unit_size == 0)
+		{
+			unit_size = sizeof(item_header_t) + ring_size;
+
+			if (unit_size % RTE_CACHE_LINE_SIZE != 0)
+			{
+				unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
+			}
+		}
+
+		size_t capacity = sizeof(ring_header_t) + unit_size * item_count;
+
+		if (capacity % RTE_CACHE_LINE_SIZE != 0)
+		{
+			capacity += RTE_CACHE_LINE_SIZE - capacity % RTE_CACHE_LINE_SIZE; /// round up
+		}
+
+		return capacity;
+	}
+
+	PacketBufferRing(void* memory, size_t ring_size, size_t item_count) :
+	        unit_size(sizeof(item_header_t) + ring_size), units_number(item_count)
+	{
+		if (unit_size % RTE_CACHE_LINE_SIZE != 0)
+		{
+			unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
+		}
+
+		capacity = GetCapacity(ring_size, item_count, unit_size);
+
+		ring = (ring_t*)memory;
 	}
 
 	struct ring_header_t
@@ -55,9 +89,9 @@ public:
 		uint8_t memory[];
 	};
 
-	int unit_size;
-	int units_number;
+	size_t unit_size;
+	size_t units_number;
+	size_t capacity;
 	ring_t* ring;
 };
-
 }
