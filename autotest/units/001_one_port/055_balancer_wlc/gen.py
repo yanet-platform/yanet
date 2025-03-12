@@ -22,9 +22,9 @@ def write_pcap(filename, *packetsList):
 
 
 packages1 = [Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:02") / Dot1Q(vlan=200) / IP(dst="10.1.0.55", src=f"1.{a_h}.{a_m}.{a_l}", ttl=64) / TCP(dport=443, sport=sport)
-             for sport in (12443, 12444) for a_h in range(2) for a_m in range(2) for a_l in range(4)]
+             for sport in (12443, 12444) for a_h in range(4) for a_m in range(2) for a_l in range(4)]
 packages2 = [Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:02") / Dot1Q(vlan=200) / IP(dst="10.1.0.55", src=f"1.{a_h}.{a_m}.{a_l}", ttl=64) / TCP(dport=443, sport=sport)
-             for sport in (11443, 11444) for a_h in range(2) for a_m in range(0, 2) for a_l in range(4)]
+             for sport in (11443, 11444) for a_h in range(4) for a_m in range(0, 2) for a_l in range(4)]
 packages3 = [Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:02") / Dot1Q(vlan=200) / IP(dst="10.1.0.55", src=f"1.{a_h}.{a_m}.{a_l}", ttl=64) / TCP(dport=443, sport=sport)
              for sport in (11443, 11444) for a_h in range(2) for a_m in range(2, 4) for a_l in range(4)]
 
