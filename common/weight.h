@@ -38,11 +38,7 @@ public:
 		}
 		else
 		{
-			uint32_t weight_total = 0;
-			for (const auto& weight : weights)
-			{
-				weight_total += weight;
-			}
+			uint32_t weight_total = std::accumulate(weights.begin(), weights.end(), uint32_t{});
 			if (size + weight_total > size_T)
 			{
 				YANET_LOG_WARNING("not enough weights\n");
