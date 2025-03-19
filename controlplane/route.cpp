@@ -1609,53 +1609,58 @@ void route_t::tunnel_value_remove(const uint32_t& value_id)
 	}
 }
 
+void route_t::AddRequestForEachSocket(common::idp::updateGlobalBase::request& globalbase,
+                                      uint32_t value_id,
+                                      common::globalBase::eNexthopType nexthop)
+{
+	controlPlane->forEachSocket([this, value_id, nexthop, &globalbase](const tSocketId& socket_id) {
+		tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
+		                                                      common::globalBase::InterfaceName(nexthop),
+		                                                      3, ///< @todo: DEFINE
+		                                                      0,
+		                                                      0,
+		                                                      1.00);
+
+		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
+		                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
+		                                                                                          socket_id,
+		                                                                                          nexthop,
+		                                                                                          {}));
+	});
+}
+
+void AddRequestInterface(
+        std::vector<route::tunnel_value_interface_t>& request_interface,
+        const route::generation_t& generation,
+        const ip_address_t& default_nexthop,
+        const ip_address_t& nexthop,
+        uint32_t label,
+        uint32_t peer_id,
+        uint32_t origin_as,
+        uint32_t weight)
+{
+	auto interface = generation.get_interface_by_neighbor(default_nexthop);
+	if (interface)
+	{
+		const auto& [interface_id, interface_name] = **interface;
+
+		request_interface.emplace_back(nexthop,
+		                               interface_id,
+		                               label,
+		                               interface_name,
+		                               peer_id,
+		                               origin_as,
+		                               weight,
+		                               default_nexthop);
+	}
+}
+
 void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globalbase,
                                    const route::generation_t& generation,
                                    const uint32_t& value_id,
                                    const route::tunnel_value_key_t& value_key)
 {
 	std::vector<route::tunnel_value_interface_t> request_interface;
-
-	auto request_default = [&generation,
-	                        &request_interface](
-	                               const auto& default_nexthop,
-	                               const ip_address_t& nexthop,
-	                               uint32_t label,
-	                               uint32_t peer_id,
-	                               uint32_t origin_as,
-	                               uint32_t weight) {
-		auto interface = generation.get_interface_by_neighbor(default_nexthop);
-		if (interface)
-		{
-			const auto& [interface_id, interface_name] = **interface;
-
-			request_interface.emplace_back(nexthop,
-			                               interface_id,
-			                               label,
-			                               interface_name,
-			                               peer_id,
-			                               origin_as,
-			                               weight,
-			                               default_nexthop);
-		}
-	};
-
-	auto request_for_each_socket = [this, &globalbase, value_id](common::globalBase::eNexthopType nexthop) {
-		controlPlane->forEachSocket([this, value_id, nexthop, &globalbase](const tSocketId& socket_id) {
-			tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
-			                                                      common::globalBase::InterfaceName(nexthop),
-			                                                      3, ///< @todo: DEFINE
-			                                                      0,
-			                                                      0,
-			                                                      1.00);
-
-			globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
-			                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
-			                                                                                          socket_id,
-			                                                                                          nexthop,
-			                                                                                          {}));
-		});
-	};
 
 	const auto& [vrf_priority, destination, fallback] = value_key;
 	GCC_BUG_UNUSED(vrf_priority); ///< @todo: VRF
@@ -1668,7 +1673,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		        {
 			        if (nexthop.is_default())
 			        {
-				        request_for_each_socket(common::globalBase::eNexthopType::controlPlane);
+				        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
 				        return true;
 			        }
 
@@ -1676,14 +1681,14 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 			        {
 				        for (const auto& default_nexthop : tunnel_defaults_v4)
 				        {
-					        request_default(default_nexthop, nexthop, label, peer_id, origin_as, weight);
+					        AddRequestInterface(request_interface, generation, default_nexthop, nexthop, label, peer_id, origin_as, weight);
 				        }
 			        }
 			        else
 			        {
 				        for (const auto& default_nexthop : tunnel_defaults_v6)
 				        {
-					        request_default(default_nexthop, nexthop, label, peer_id, origin_as, weight);
+					        AddRequestInterface(request_interface, generation, default_nexthop, nexthop, label, peer_id, origin_as, weight);
 				        }
 			        }
 		        }
@@ -1694,24 +1699,11 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		        {
 			        if (nexthop.is_default())
 			        {
-				        request_for_each_socket(common::globalBase::eNexthopType::controlPlane);
+				        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
 				        return true;
 			        }
 
-			        auto interface = generation.get_interface_by_neighbor(nexthop);
-			        if (interface)
-			        {
-				        const auto& [interface_id, interface_name] = **interface;
-
-				        request_interface.emplace_back(nexthop,
-				                                       interface_id,
-				                                       3, ///< @todo: DEFINE
-				                                       interface_name,
-				                                       0,
-				                                       0,
-				                                       1,
-				                                       nexthop);
-			        }
+			        AddRequestInterface(request_interface, generation, nexthop, nexthop, 3, 0, 0, 1);
 		        }
 		        return false;
 	        },
@@ -1729,7 +1721,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		        return false;
 	        },
 	        [&](uint32_t virtual_port_id) {
-		        request_for_each_socket(common::globalBase::eNexthopType::repeat);
+		        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::repeat);
 		        return true;
 	        },
 	        [&](route::tunnel_destination_default_t) {
@@ -1737,14 +1729,14 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		        {
 			        for (const auto& default_nexthop : tunnel_defaults_v4)
 			        {
-				        request_default(default_nexthop, default_nexthop, 3, 0, 0, 1);
+				        AddRequestInterface(request_interface, generation, default_nexthop, default_nexthop, 3, 0, 0, 1);
 			        }
 		        }
 		        else
 		        {
 			        for (const auto& default_nexthop : tunnel_defaults_v6)
 			        {
-				        request_default(default_nexthop, default_nexthop, 3, 0, 0, 1);
+				        AddRequestInterface(request_interface, generation, default_nexthop, default_nexthop, 3, 0, 0, 1);
 			        }
 		        }
 		        return false;
@@ -1766,7 +1758,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 
 	if (request_interface.empty())
 	{
-		request_for_each_socket(common::globalBase::eNexthopType::controlPlane);
+		AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
 		return;
 	}
 
