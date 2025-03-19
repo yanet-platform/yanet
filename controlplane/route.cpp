@@ -1780,7 +1780,9 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 	if (request_interface.size() > YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE)
 	{
 		/// @todo: stats
-
+		YANET_LOG_ERROR("YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE exceeded, truncated from %ld to %d",
+		                request_interface.size(),
+		                YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE);
 		request_interface.resize(YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE);
 	}
 
