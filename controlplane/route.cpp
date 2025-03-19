@@ -1615,6 +1615,30 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 {
 	std::vector<route::tunnel_value_interface_t> request_interface;
 
+	auto request_default = [&generation,
+	                        &request_interface](
+	                               const auto& default_nexthop,
+	                               const ip_address_t& nexthop,
+	                               uint32_t label,
+	                               uint32_t peer_id,
+	                               uint32_t origin_as,
+	                               uint32_t weight) {
+		auto interface = generation.get_interface_by_neighbor(default_nexthop);
+		if (interface)
+		{
+			const auto& [interface_id, interface_name] = **interface;
+
+			request_interface.emplace_back(nexthop,
+			                               interface_id,
+			                               label,
+			                               interface_name,
+			                               peer_id,
+			                               origin_as,
+			                               weight,
+			                               default_nexthop);
+		}
+	};
+
 	const auto& [vrf_priority, destination, fallback] = value_key;
 	GCC_BUG_UNUSED(vrf_priority); ///< @todo: VRF
 
@@ -1651,40 +1675,14 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 			{
 				for (const auto& default_nexthop : tunnel_defaults_v4)
 				{
-					auto interface = generation.get_interface_by_neighbor(default_nexthop);
-					if (interface)
-					{
-						const auto& [interface_id, interface_name] = **interface;
-
-						request_interface.emplace_back(nexthop,
-						                               interface_id,
-						                               label,
-						                               interface_name,
-						                               peer_id,
-						                               origin_as,
-						                               weight,
-						                               default_nexthop);
-					}
+					request_default(default_nexthop, nexthop, label, peer_id, origin_as, weight);
 				}
 			}
 			else
 			{
 				for (const auto& default_nexthop : tunnel_defaults_v6)
 				{
-					auto interface = generation.get_interface_by_neighbor(default_nexthop);
-					if (interface)
-					{
-						const auto& [interface_id, interface_name] = **interface;
-
-						request_interface.emplace_back(nexthop,
-						                               interface_id,
-						                               label,
-						                               interface_name,
-						                               peer_id,
-						                               origin_as,
-						                               weight,
-						                               default_nexthop);
-					}
+					request_default(default_nexthop, nexthop, label, peer_id, origin_as, weight);
 				}
 			}
 		}
@@ -1739,40 +1737,14 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		{
 			for (const auto& default_nexthop : tunnel_defaults_v4)
 			{
-				auto interface = generation.get_interface_by_neighbor(default_nexthop);
-				if (interface)
-				{
-					const auto& [interface_id, interface_name] = **interface;
-
-					request_interface.emplace_back(default_nexthop,
-					                               interface_id,
-					                               3, ///< @todo: DEFINE
-					                               interface_name,
-					                               0,
-					                               0,
-					                               1,
-					                               default_nexthop);
-				}
+				request_default(default_nexthop, default_nexthop, 3, 0, 0, 1);
 			}
 		}
 		else
 		{
 			for (const auto& default_nexthop : tunnel_defaults_v6)
 			{
-				auto interface = generation.get_interface_by_neighbor(default_nexthop);
-				if (interface)
-				{
-					const auto& [interface_id, interface_name] = **interface;
-
-					request_interface.emplace_back(default_nexthop,
-					                               interface_id,
-					                               3, ///< @todo: DEFINE
-					                               interface_name,
-					                               0,
-					                               0,
-					                               1,
-					                               default_nexthop);
-				}
+				request_default(default_nexthop, default_nexthop, 3, 0, 0, 1);
 			}
 		}
 	}
