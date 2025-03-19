@@ -1620,27 +1620,30 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 
 	tunnel_value_lookup[value_id].clear();
 
+	auto request_for_each_socket = [this, &globalbase, value_id](common::globalBase::eNexthopType nexthop) {
+		controlPlane->forEachSocket([this, value_id, nexthop, &globalbase](const tSocketId& socket_id) {
+			tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
+			                                                      common::globalBase::InterfaceName(nexthop),
+			                                                      3, ///< @todo: DEFINE
+			                                                      0,
+			                                                      0,
+			                                                      1.00);
+
+			globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
+			                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
+			                                                                                          socket_id,
+			                                                                                          nexthop,
+			                                                                                          {}));
+		});
+	};
+
 	if (const auto nexthops = std::get_if<route::tunnel_destination_interface_t>(&destination))
 	{
 		for (const auto& [nexthop, label, peer_id, origin_as, weight] : *nexthops)
 		{
 			if (nexthop.is_default())
 			{
-				controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
-					tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
-					                                                      "linux",
-					                                                      3, ///< @todo: DEFINE
-					                                                      0,
-					                                                      0,
-					                                                      1.00);
-
-					globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
-					                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
-					                                                                                          socket_id,
-					                                                                                          common::globalBase::eNexthopType::controlPlane,
-					                                                                                          {}));
-				});
-
+				request_for_each_socket(common::globalBase::eNexthopType::controlPlane);
 				return;
 			}
 
@@ -1692,21 +1695,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		{
 			if (nexthop.is_default())
 			{
-				controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
-					tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
-					                                                      "linux",
-					                                                      3, ///< @todo: DEFINE
-					                                                      0,
-					                                                      0,
-					                                                      1.00);
-
-					globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
-					                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
-					                                                                                          socket_id,
-					                                                                                          common::globalBase::eNexthopType::controlPlane,
-					                                                                                          {}));
-				});
-
+				request_for_each_socket(common::globalBase::eNexthopType::controlPlane);
 				return;
 			}
 
@@ -1741,21 +1730,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 	}
 	else if (const auto virtual_port_id = std::get_if<uint32_t>(&destination))
 	{
-		controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
-			tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
-			                                                      "repeat",
-			                                                      3, ///< @todo: DEFINE
-			                                                      0,
-			                                                      0,
-			                                                      1.00);
-
-			globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
-			                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
-			                                                                                          socket_id,
-			                                                                                          common::globalBase::eNexthopType::repeat,
-			                                                                                          {})); ///< @todo: VIRTUAL_PORT
-		});
-
+		request_for_each_socket(common::globalBase::eNexthopType::repeat);
 		return;
 	}
 	else if (std::get_if<route::tunnel_destination_default_t>(&destination))
@@ -1811,21 +1786,7 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 
 	if (request_interface.empty())
 	{
-		controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
-			tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
-			                                                      "linux",
-			                                                      3, ///< @todo: DEFINE
-			                                                      0,
-			                                                      0,
-			                                                      1.00);
-
-			globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
-			                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
-			                                                                                          socket_id,
-			                                                                                          common::globalBase::eNexthopType::controlPlane,
-			                                                                                          {}));
-		});
-
+		request_for_each_socket(common::globalBase::eNexthopType::controlPlane);
 		return;
 	}
 
