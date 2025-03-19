@@ -1,5 +1,6 @@
 #include "route.h"
 #include "common/icp.h"
+#include "common/utils.h"
 #include "controlplane.h"
 #include "controlplane/route.h"
 
@@ -1639,11 +1640,6 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		}
 	};
 
-	const auto& [vrf_priority, destination, fallback] = value_key;
-	GCC_BUG_UNUSED(vrf_priority); ///< @todo: VRF
-
-	tunnel_value_lookup[value_id].clear();
-
 	auto request_for_each_socket = [this, &globalbase, value_id](common::globalBase::eNexthopType nexthop) {
 		controlPlane->forEachSocket([this, value_id, nexthop, &globalbase](const tSocketId& socket_id) {
 			tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
@@ -1661,92 +1657,102 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		});
 	};
 
-	if (const auto nexthops = std::get_if<route::tunnel_destination_interface_t>(&destination))
-	{
-		for (const auto& [nexthop, label, peer_id, origin_as, weight] : *nexthops)
-		{
-			if (nexthop.is_default())
-			{
-				request_for_each_socket(common::globalBase::eNexthopType::controlPlane);
-				return;
-			}
+	const auto& [vrf_priority, destination, fallback] = value_key;
+	GCC_BUG_UNUSED(vrf_priority); ///< @todo: VRF
 
-			if (nexthop.is_ipv4())
-			{
-				for (const auto& default_nexthop : tunnel_defaults_v4)
-				{
-					request_default(default_nexthop, nexthop, label, peer_id, origin_as, weight);
-				}
-			}
-			else
-			{
-				for (const auto& default_nexthop : tunnel_defaults_v6)
-				{
-					request_default(default_nexthop, nexthop, label, peer_id, origin_as, weight);
-				}
-			}
-		}
-	}
-	else if (const auto nexthops = std::get_if<route::tunnel_destination_legacy_t>(&destination))
-	{
-		for (const auto& nexthop : *nexthops)
-		{
-			if (nexthop.is_default())
-			{
-				request_for_each_socket(common::globalBase::eNexthopType::controlPlane);
-				return;
-			}
+	tunnel_value_lookup[value_id].clear();
 
-			auto interface = generation.get_interface_by_neighbor(nexthop);
-			if (interface)
-			{
-				const auto& [interface_id, interface_name] = **interface;
+	const auto& visitor = utils::Visitor{
+	        [&](const route::tunnel_destination_interface_t& nexthops) {
+		        for (const auto& [nexthop, label, peer_id, origin_as, weight] : nexthops)
+		        {
+			        if (nexthop.is_default())
+			        {
+				        request_for_each_socket(common::globalBase::eNexthopType::controlPlane);
+				        return true;
+			        }
 
-				request_interface.emplace_back(nexthop,
-				                               interface_id,
-				                               3, ///< @todo: DEFINE
-				                               interface_name,
-				                               0,
-				                               0,
-				                               1,
-				                               nexthop);
-			}
-		}
-	}
-	else if (const auto directly_connected = std::get_if<route::directly_connected_destination_t>(&destination))
-	{
-		const auto& [interface_id, interface_name] = *directly_connected;
+			        if (nexthop.is_ipv4())
+			        {
+				        for (const auto& default_nexthop : tunnel_defaults_v4)
+				        {
+					        request_default(default_nexthop, nexthop, label, peer_id, origin_as, weight);
+				        }
+			        }
+			        else
+			        {
+				        for (const auto& default_nexthop : tunnel_defaults_v6)
+				        {
+					        request_default(default_nexthop, nexthop, label, peer_id, origin_as, weight);
+				        }
+			        }
+		        }
+		        return false;
+	        },
+	        [&](const route::tunnel_destination_legacy_t& nexthops) {
+		        for (const auto& nexthop : nexthops)
+		        {
+			        if (nexthop.is_default())
+			        {
+				        request_for_each_socket(common::globalBase::eNexthopType::controlPlane);
+				        return true;
+			        }
 
-		request_interface.emplace_back(ipv4_address_t(), ///< default
-		                               interface_id,
-		                               3, ///< @todo: DEFINE
-		                               interface_name,
-		                               0,
-		                               0,
-		                               1,
-		                               ipv4_address_t()); ///< default
-	}
-	else if (const auto virtual_port_id = std::get_if<uint32_t>(&destination))
+			        auto interface = generation.get_interface_by_neighbor(nexthop);
+			        if (interface)
+			        {
+				        const auto& [interface_id, interface_name] = **interface;
+
+				        request_interface.emplace_back(nexthop,
+				                                       interface_id,
+				                                       3, ///< @todo: DEFINE
+				                                       interface_name,
+				                                       0,
+				                                       0,
+				                                       1,
+				                                       nexthop);
+			        }
+		        }
+		        return false;
+	        },
+	        [&](const route::directly_connected_destination_t& directly_connected) {
+		        const auto& [interface_id, interface_name] = directly_connected;
+
+		        request_interface.emplace_back(ipv4_address_t(), ///< default
+		                                       interface_id,
+		                                       3, ///< @todo: DEFINE
+		                                       interface_name,
+		                                       0,
+		                                       0,
+		                                       1,
+		                                       ipv4_address_t()); ///< default
+		        return false;
+	        },
+	        [&](uint32_t virtual_port_id) {
+		        request_for_each_socket(common::globalBase::eNexthopType::repeat);
+		        return true;
+	        },
+	        [&](route::tunnel_destination_default_t) {
+		        if (fallback.is_ipv4())
+		        {
+			        for (const auto& default_nexthop : tunnel_defaults_v4)
+			        {
+				        request_default(default_nexthop, default_nexthop, 3, 0, 0, 1);
+			        }
+		        }
+		        else
+		        {
+			        for (const auto& default_nexthop : tunnel_defaults_v6)
+			        {
+				        request_default(default_nexthop, default_nexthop, 3, 0, 0, 1);
+			        }
+		        }
+		        return false;
+	        }};
+
+	if (bool finished = std::visit(visitor, destination); finished)
 	{
-		request_for_each_socket(common::globalBase::eNexthopType::repeat);
 		return;
-	}
-	else if (std::get_if<route::tunnel_destination_default_t>(&destination))
-	{
-		if (fallback.is_ipv4())
-		{
-			for (const auto& default_nexthop : tunnel_defaults_v4)
-			{
-				request_default(default_nexthop, default_nexthop, 3, 0, 0, 1);
-			}
-		}
-		else
-		{
-			for (const auto& default_nexthop : tunnel_defaults_v6)
-			{
-				request_default(default_nexthop, default_nexthop, 3, 0, 0, 1);
-			}
-		}
 	}
 
 	if (request_interface.size() > YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE)

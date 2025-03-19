@@ -46,5 +46,15 @@ inline std::vector<std::string> split(const std::string& str, char delimiter)
 	return split(std::string_view(str), delimiter);
 }
 
+// helper type for the variant visitor
+template<class... Ts>
+struct Visitor : Ts...
+{
+	using Ts::operator()...;
+};
+// explicit deduction guide (not needed as of C++20)
+template<class... Ts>
+Visitor(Ts...) -> Visitor<Ts...>;
+
 }
 // namespace utils
