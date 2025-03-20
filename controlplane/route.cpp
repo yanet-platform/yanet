@@ -1700,8 +1700,6 @@ std::vector<route::tunnel_value_interface_t> route_t::MakeTunnelValueRequestInte
 {
 	std::vector<route::tunnel_value_interface_t> request_interface;
 
-	tunnel_value_lookup[value_id].clear();
-
 	const auto& visitor = utils::Visitor{
 	        [&](const route::tunnel_destination_interface_t& nexthops) {
 		        for (const auto& [nexthop, label, peer_id, origin_as, weight] : nexthops)
@@ -1790,6 +1788,8 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		return;
 	}
 
+	tunnel_value_lookup[value_id].clear();
+
 	generation.for_each_socket([this,
 	                            &value_id,
 	                            &request_interface,
@@ -1803,64 +1803,47 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		std::vector<uint32_t> weights;
 		uint64_t weight_total = 0;
 
-		/// same numa
-		for (const auto& item : request_interface)
-		{
-			const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
-			GCC_BUG_UNUSED(egress_interface_name);
-
-			if (exist(interfaces, egress_interface_id))
+		auto collect = [&](auto filter) {
+			for (const auto& item : request_interface)
 			{
-				const auto counter_id = tunnel_counter.get_id({fallback.is_ipv4(), peer_id, nexthop, origin_as});
+				const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
 
-				uint16_t flags = 0;
-				if (neighbor_address.is_default())
+				if (filter(item))
 				{
-					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
+					const auto counter_id = tunnel_counter.get_id({fallback.is_ipv4(), peer_id, nexthop, origin_as});
+
+					uint16_t flags = 0;
+					if (neighbor_address.is_default())
+					{
+						flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
+					}
+
+					update_nexthops.emplace_back(egress_interface_id, counter_id, label, nexthop, neighbor_address, flags);
+					weights.emplace_back(weight);
+
+					tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
+					                                                      egress_interface_name,
+					                                                      label,
+					                                                      peer_id,
+					                                                      origin_as,
+					                                                      weight);
+
+					weight_total += weight;
 				}
-
-				update_nexthops.emplace_back(egress_interface_id, counter_id, label, nexthop, neighbor_address, flags);
-				weights.emplace_back(weight);
-
-				tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
-				                                                      egress_interface_name,
-				                                                      label,
-				                                                      peer_id,
-				                                                      origin_as,
-				                                                      weight);
-
-				weight_total += weight;
 			}
-		}
+		};
+
+		// same numa
+		collect([&](const route::tunnel_value_interface_t& e) {
+			return exist(interfaces, std::get<1>(e));
+		});
 
 		/// all numa
 		if (update_nexthops.empty())
 		{
-			for (const auto& item : request_interface)
-			{
-				const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
-				GCC_BUG_UNUSED(egress_interface_name);
-
-				const auto counter_id = tunnel_counter.get_id({fallback.is_ipv4(), peer_id, nexthop, origin_as});
-
-				uint16_t flags = 0;
-				if (neighbor_address.is_default())
-				{
-					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
-				}
-
-				update_nexthops.emplace_back(egress_interface_id, counter_id, label, nexthop, neighbor_address, flags);
-				weights.emplace_back(weight);
-
-				tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
-				                                                      egress_interface_name,
-				                                                      label,
-				                                                      peer_id,
-				                                                      origin_as,
-				                                                      weight);
-
-				weight_total += weight;
-			}
+			collect([](const route::tunnel_value_interface_t&) {
+				return true;
+			});
 		}
 
 		const auto& [weight_start, weight_size, weight_is_fallback] = tunnel_weights.insert(weights);
@@ -1875,7 +1858,6 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 
 		for (auto& [nexthop, egress_interface_name, label, peer_id, origin_as, weight_percent] : tunnel_value_lookup[value_id][socket_id])
 		{
-			GCC_BUG_UNUSED(socket_id);
 			GCC_BUG_UNUSED(nexthop);
 			GCC_BUG_UNUSED(egress_interface_name);
 			GCC_BUG_UNUSED(label);
