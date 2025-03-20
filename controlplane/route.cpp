@@ -1655,15 +1655,50 @@ void AddRequestInterface(
 	}
 }
 
-void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globalbase,
-                                   const route::generation_t& generation,
-                                   const uint32_t& value_id,
-                                   const route::tunnel_value_key_t& value_key)
+bool route_t::MakePerSocketRequest(
+        common::idp::updateGlobalBase::request& globalbase,
+        uint32_t value_id,
+        const route::tunnel_value_key_t& value_key)
+{
+	const auto& visitor = utils::Visitor{
+	        [&](const route::tunnel_destination_interface_t& nexthops) {
+		        for (const auto& nexthop : nexthops)
+		        {
+			        if (std::get<common::ip_address_t>(nexthop).is_default())
+			        {
+				        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
+				        return true;
+			        }
+		        }
+		        return false;
+	        },
+	        [&](const route::tunnel_destination_legacy_t& nexthops) {
+		        for (const auto& nexthop : nexthops)
+		        {
+			        if (nexthop.is_default())
+			        {
+				        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
+				        return true;
+			        }
+		        }
+		        return false;
+	        },
+	        [](const route::directly_connected_destination_t&) { return false; },
+	        [&](uint32_t virtual_port_id) {
+		        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::repeat);
+		        return true;
+	        },
+	        [](route::tunnel_destination_default_t) { return false; }};
+	return std::visit(visitor, std::get<route::tunnel_destination_t>(value_key));
+}
+
+std::vector<route::tunnel_value_interface_t> route_t::MakeTunnelValueRequestInterface(
+        common::idp::updateGlobalBase::request& globalbase,
+        const route::generation_t& generation,
+        uint32_t value_id,
+        const route::tunnel_value_key_t& value_key)
 {
 	std::vector<route::tunnel_value_interface_t> request_interface;
-
-	const auto& [vrf_priority, destination, fallback] = value_key;
-	GCC_BUG_UNUSED(vrf_priority); ///< @todo: VRF
 
 	tunnel_value_lookup[value_id].clear();
 
@@ -1671,12 +1706,6 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 	        [&](const route::tunnel_destination_interface_t& nexthops) {
 		        for (const auto& [nexthop, label, peer_id, origin_as, weight] : nexthops)
 		        {
-			        if (nexthop.is_default())
-			        {
-				        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
-				        return true;
-			        }
-
 			        if (nexthop.is_ipv4())
 			        {
 				        for (const auto& default_nexthop : tunnel_defaults_v4)
@@ -1692,20 +1721,12 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 				        }
 			        }
 		        }
-		        return false;
 	        },
 	        [&](const route::tunnel_destination_legacy_t& nexthops) {
 		        for (const auto& nexthop : nexthops)
 		        {
-			        if (nexthop.is_default())
-			        {
-				        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
-				        return true;
-			        }
-
 			        AddRequestInterface(request_interface, generation, nexthop, nexthop, 3, 0, 0, 1);
 		        }
-		        return false;
 	        },
 	        [&](const route::directly_connected_destination_t& directly_connected) {
 		        const auto& [interface_id, interface_name] = directly_connected;
@@ -1718,13 +1739,9 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		                                       0,
 		                                       1,
 		                                       ipv4_address_t()); ///< default
-		        return false;
 	        },
-	        [&](uint32_t virtual_port_id) {
-		        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::repeat);
-		        return true;
-	        },
-	        [&](route::tunnel_destination_default_t) {
+	        [](uint32_t virtual_port_id) {},
+	        [&, &fallback = std::get<common::ip_prefix_t>(value_key)](route::tunnel_destination_default_t) {
 		        if (fallback.is_ipv4())
 		        {
 			        for (const auto& default_nexthop : tunnel_defaults_v4)
@@ -1739,13 +1756,9 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 				        AddRequestInterface(request_interface, generation, default_nexthop, default_nexthop, 3, 0, 0, 1);
 			        }
 		        }
-		        return false;
 	        }};
 
-	if (bool finished = std::visit(visitor, destination); finished)
-	{
-		return;
-	}
+	std::visit(visitor, std::get<route::tunnel_destination_t>(value_key));
 
 	if (request_interface.size() > YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE)
 	{
@@ -1756,13 +1769,34 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 		request_interface.resize(YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE);
 	}
 
+	return request_interface;
+}
+
+void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globalbase,
+                                   const route::generation_t& generation,
+                                   const uint32_t& value_id,
+                                   const route::tunnel_value_key_t& value_key)
+{
+	if (MakePerSocketRequest(globalbase, value_id, value_key))
+	{
+		return;
+	}
+	std::vector<route::tunnel_value_interface_t> request_interface =
+	        MakeTunnelValueRequestInterface(globalbase, generation, value_id, value_key);
+
 	if (request_interface.empty())
 	{
 		AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
 		return;
 	}
 
-	generation.for_each_socket([this, &value_id, &request_interface, &fallback = fallback, &globalbase](const tSocketId& socket_id, const std::set<tInterfaceId>& interfaces) {
+	generation.for_each_socket([this,
+	                            &value_id,
+	                            &request_interface,
+	                            &fallback = std::get<common::ip_prefix_t>(value_key),
+	                            &globalbase](
+	                                   const tSocketId& socket_id,
+	                                   const std::set<tInterfaceId>& interfaces) {
 		common::idp::updateGlobalBase::route_tunnel_value_update::interface update_interface;
 		auto& [update_weight_start, update_weight_size, update_nexthops] = update_interface;
 
