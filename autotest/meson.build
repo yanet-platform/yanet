@@ -1,7 +1,12 @@
 sources = files('autotest.cpp',
-                'main.cpp')
+                'main.cpp',
+                '../dataplane/dump_rings.cpp', # maybe it's better to just put implementation in the .h file
+                )
+
+#Create some shared thing?? or just everything in .h file..?
 
 dependencies = []
+dependencies += libdpdk.get_variable('dpdk_dep')
 dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('yaml-cpp', static: true)
