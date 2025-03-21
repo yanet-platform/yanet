@@ -6,7 +6,7 @@
 #include "common/type.h"
 
 #include "config.h"
-#include "RawPacket.h"
+#include "pcap_shm_device.h"
 
 namespace dumprings
 {
@@ -67,6 +67,8 @@ public:
 
 class RingPcap : public RingBase
 {
+	pcpp::PcapShmWriterDevice dev_;
+
 public:
 	RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count);
 

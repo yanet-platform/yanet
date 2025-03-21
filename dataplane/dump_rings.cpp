@@ -4,6 +4,7 @@
 #include "common/utils.h"
 #include "metadata.h"
 
+#include "MBufRawPacket.h"
 #include <iostream>
 
 namespace dumprings
@@ -68,14 +69,53 @@ size_t RingRaw::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 	return PacketBufferRing::GetCapacity(max_pkt_size, pkt_count);
 }
 
-RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count)
+// TODO: use max_pkt_size as snaplen in pcap?
+// TODO: Don't know how yet, but we need to pass files amount. Let's do three by now.
+RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count) :
+        dev_(memory, GetCapacity(max_pkt_size, pkt_count), 3)
 {
-	// TODO: Implement
+	dev_.open();
 }
+
+/**
+ * @brief A complete copy of the PcapPlusPlus wrapper of the RawPacket class.
+ *
+ * This class allows initialization with an already-created mbuf, making it
+ * possible to safely pass the object to a Writer instance as the base class
+ * RawPacket. In the original `MBufRawPacket` class, the `setMBuf` method
+ * was protected, plus is requires to build PcapPlusPlus with DPDK support,
+ * which is unnecessary for such a small change.
+ */
+class MBufRawPacketCopy : public pcpp::RawPacket
+{
+	void SetMBuf(rte_mbuf* mbuf, timespec timestamp)
+	{
+		if (mbuf == nullptr)
+		{
+			std::cerr << "mbuf to set is nullptr" << std::endl;
+			return;
+		}
+
+		initWithRawData(rte_pktmbuf_mtod(mbuf, const uint8_t*), rte_pktmbuf_pkt_len(mbuf), timestamp, pcpp::LINKTYPE_ETHERNET);
+	}
+
+public:
+	MBufRawPacketCopy(rte_mbuf* mbuf, const timespec& timestamp) :
+	        RawPacket()
+	{
+		SetMBuf(mbuf, timestamp);
+	}
+};
 
 void RingPcap::Write(rte_mbuf* mbuf, [[maybe_unused]] common::globalBase::eFlowType flow_type, uint32_t time)
 {
-	// TODO: implement
+	timespec ts = {.tv_sec = time, .tv_nsec = 0};
+	MBufRawPacketCopy raw_packet(mbuf, ts);
+
+	// TODO: can I do this, or should I use time obtained from basePermanently.globalBaseAtomic->currentTime like I do now?
+	/* timespec_get(&ts, TIME_UTC); */
+
+	dev_.WritePacket(raw_packet);
 }
 
 bool RingPcap::GetPacket([[maybe_unused]] pcpp::RawPacket& raw_packet, [[maybe_unused]] unsigned pkt_number) const
@@ -86,8 +126,10 @@ bool RingPcap::GetPacket([[maybe_unused]] pcpp::RawPacket& raw_packet, [[maybe_u
 
 size_t RingPcap::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 {
-	// TODO: implement
-	return 0;
+	auto& file_hdr_size = pcpp::PcapShmWriterDevice::kPcapFileHeaderSize;
+	auto& pkt_hdr_size = pcpp::PcapShmWriterDevice::kPcapPacketHeaderSizeOnDisk;
+
+	return file_hdr_size + (pkt_hdr_size + max_pkt_size) * pkt_count;
 }
 
 size_t GetCapacity(const Config& config)
