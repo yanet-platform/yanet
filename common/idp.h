@@ -14,6 +14,7 @@
 #include "balancer.h"
 #include "common/actions.h"
 #include "config.h"
+#include "dataplane/config.h"
 #include "memory_manager.h"
 #include "neighbor.h"
 #include "result.h"
@@ -860,8 +861,7 @@ namespace get_shm_info
 {
 using dump_meta = std::tuple<std::string, ///< ring name
                              std::string, ///< dump tag
-                             unsigned int, ///< dump size
-                             unsigned int, ///< dump count
+                             tDataPlaneConfig::DumpConfig, ///< dump config
                              tCoreId, ///< core id
                              tSocketId, ///< socket id
                              key_t, /// ipc shm key
