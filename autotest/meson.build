@@ -1,6 +1,7 @@
 sources = files('autotest.cpp',
                 'main.cpp',
                 '../dataplane/dump_rings.cpp', # maybe it's better to just put implementation in the .h file
+                '../dataplane/pcap_shm_device.cpp' # maybe it's better to just put implementation in the .h file
                 )
 
 #Create some shared thing?? or just everything in .h file..?
