@@ -4,6 +4,8 @@
 #include "metadata.h"
 #include "worker.h"
 
+#include "dump_rings.h"
+
 namespace dataplane
 {
 
@@ -88,8 +90,11 @@ struct ActionDispatcher
 			return;
 		}
 
-		auto& ring = args.worker->dumpRings[ring_id];
-		ring.write(args.mbuf, flow.type);
+		cWorker* worker = args.worker;
+
+		// polymorphic, will execute either DumpRingRaw or DumpRingPcap method,
+		// likely to be devirtualized
+		worker->dump_rings[ring_id]->Write(args.mbuf, flow.type, worker->CurrentTime());
 	}
 
 	static void execute(const common::StateTimeoutAction& action, const Flow& flow, const ActionDispatcherArgs& args)
