@@ -1914,20 +1914,19 @@ bool tAutotest::step_cli_check(const YAML::Node& yamlStep)
 	return true;
 }
 
-common::PacketBufferRing::item_t* read_shm_packet(common::PacketBufferRing* buffer, uint64_t position)
+// External operator== for pcpp::RawPacket
+bool operator==(const pcpp::RawPacket& lhs, const pcpp::RawPacket& rhs)
 {
-	common::PacketBufferRing::ring_t* ring = buffer->ring;
-
-	if (position >= ring->header.after)
-	{
-		return nullptr;
-	}
-
-	return utils::ShiftBuffer<common::PacketBufferRing::item_t*>(ring->memory, position * buffer->unit_size);
+	return (lhs.getRawDataLen() == rhs.getRawDataLen()) &&
+	       (memcmp(lhs.getRawData(), rhs.getRawData(), lhs.getRawDataLen()) == 0);
 }
 
-bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
-                                 const std::string& path)
+bool operator!=(const pcpp::RawPacket& lhs, const pcpp::RawPacket& rhs)
+{
+	return !(lhs == rhs);
+}
+
+bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep, const std::string& path)
 {
 	TextDumper dumper;
 	for (const auto& yamlDump : yamlStep)
@@ -1936,20 +1935,14 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 		std::string expectFilePath = path + "/" + yamlDump["expect"].as<std::string>();
 		bool success = true;
 
-		common::PacketBufferRing* ring = nullptr;
-		{ /// searching memory ring by tag
-			auto it = dumpRings.find(tag);
-			if (it == dumpRings.end())
-			{
-				YANET_LOG_ERROR("dump [%s]: error: dump ring not found\n", tag.data());
-				throw "";
-			}
-			// TODO: THIS IS TEMPORARY for now.
-			// I want to test that the original logic is unchanged.
-			// Therefore we get the internal buffer with this crude way
-			// since I'm sure that DumpRing is RingRaw.
-			ring = &(static_cast<dumprings::RingRaw*>(it->second.get())->buffer_);
+		/// searching memory ring by tag
+		auto it = dumpRings.find(tag);
+		if (it == dumpRings.end())
+		{
+			YANET_LOG_ERROR("dump [%s]: error: dump ring not found\n", tag.data());
+			return false;
 		}
+		DumpRingBasePtr& ring = it->second;
 
 		// Open pcap file using PcapPlusPlus
 		pcpp::IFileReaderDevice* reader = pcpp::IFileReaderDevice::getReader(expectFilePath);
@@ -1965,68 +1958,87 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 			return false;
 		}
 
-		pcpp::RawPacket expected_pkt;
-		uint32_t pcap_packet_len = 0;
-		const u_char* pcap_packet = nullptr;
-		common::PacketBufferRing::item_t* shm_packet = nullptr;
-		uint64_t position = 0;
-
 		/// read packets from pcap and compare them with packets from memory ring
-		while (reader->getNextPacket(expected_pkt))
+		while (true)
 		{
-			shm_packet = read_shm_packet(ring, position);
-			position++;
+			pcpp::RawPacket expected_pkt;
+			pcpp::RawPacket obtained_pkt;
 
-			pcap_packet_len = expected_pkt.getRawDataLen();
-			pcap_packet = expected_pkt.getRawData();
+			bool has_expected = reader->getNextPacket(expected_pkt);
+			bool has_obtained = ring->GetNextPacket(obtained_pkt);
 
-			if (shm_packet && pcap_packet_len == shm_packet->header.size &&
-			    memcmp(shm_packet->memory, pcap_packet, pcap_packet_len) == 0)
-			{ /// packets are the same
+			// If both sources are out of packets, we are done
+			if (!has_expected && !has_obtained)
+			{
+				YANET_LOG_DEBUG("dump [%s]: No more packets to compare\n", tag.data());
+				break;
+			}
+
+			if (has_expected && !has_obtained)
+			{
+				success = false;
+				YANET_LOG_ERROR("dump [%s]: error: missing packet #%u in shared memory\n",
+				                tag.data(),
+				                ring->PacketsRead());
+				break;
+			}
+
+			if (!has_expected && has_obtained)
+			{
+				success = false;
+				YANET_LOG_ERROR("dump [%s]: error: extra packet #%u in shared memory\n",
+				                tag.data(),
+				                ring->PacketsRead());
+
+				if (dumpPackets)
+				{
+					YANET_LOG_DEBUG("dump [%s]: unexpected packet size %u bytes\n",
+					                tag.data(),
+					                obtained_pkt.getRawDataLen());
+					dumper.dump(nullptr,
+					            nullptr,
+					            obtained_pkt.getRawData(),
+					            obtained_pkt.getRawData() + obtained_pkt.getRawDataLen());
+				}
+				break;
+			}
+
+			// At this point, we have one expected packet and one obtained packet
+			if (expected_pkt == obtained_pkt)
+			{
+				YANET_LOG_DEBUG("dump [%s]: Packet #%u matches\n", tag.data(), ring->PacketsRead());
 				continue;
 			}
 
-			/// packets are different, so...
+			// They differ
 			success = false;
-			YANET_LOG_ERROR("dump [%s]: error: wrong packet #%lu (%s)\n",
+			YANET_LOG_ERROR("dump [%s]: error: packet #%u does not match (%s)\n",
 			                tag.data(),
-			                position,
+			                ring->PacketsRead(),
 			                expectFilePath.data());
-
-			if (dumpPackets && shm_packet)
-			{
-				YANET_LOG_DEBUG("dump [%s]: expected %u, got %u\n", tag.data(), pcap_packet_len, shm_packet->header.size);
-				dumper.dump(pcap_packet, pcap_packet + shm_packet->header.size, shm_packet->memory, shm_packet->memory + pcap_packet_len);
-			}
-		}
-
-		/// read the remaining packets from memory ring
-		for (;;)
-		{
-			shm_packet = read_shm_packet(ring, position);
-			if (!shm_packet)
-			{
-				break;
-			}
-			position++;
-
-			success = false;
 
 			if (dumpPackets)
 			{
-				YANET_LOG_DEBUG("dump [%s]: unexpected %u\n", tag.data(), shm_packet->header.size);
-				dumper.dump(nullptr, nullptr, shm_packet->memory, shm_packet->memory + pcap_packet_len);
+				YANET_LOG_DEBUG("dump [%s]: expected %u bytes, got %u bytes\n",
+				                tag.data(),
+				                expected_pkt.getRawDataLen(),
+				                obtained_pkt.getRawDataLen());
+
+				dumper.dump(expected_pkt.getRawData(),
+				            expected_pkt.getRawData() + expected_pkt.getRawDataLen(),
+				            obtained_pkt.getRawData(),
+				            obtained_pkt.getRawData() + obtained_pkt.getRawDataLen());
 			}
 		}
 
-		YANET_LOG_DEBUG("dump [%s]: recv %lu packets\n", tag.data(), position);
+		YANET_LOG_DEBUG("dump [%s]: compared %u packets\n", tag.data(), ring->PacketsRead());
 
 		reader->close();
 
 		if (!success)
 		{
-			YANET_LOG_ERROR("dump [%s]: error: unknown packet (%s)\n", tag.data(), expectFilePath.data());
-			throw "";
+			YANET_LOG_ERROR("dump [%s]: error: packet comparison failed\n", tag.data());
+			return success;
 		}
 	}
 
@@ -2038,6 +2050,12 @@ void tAutotest::fflushSharedMemory()
 	size_t size = std::get<0>(rawShmInfo);
 	void* memaddr = std::get<1>(rawShmInfo);
 	memset(memaddr, 0, size);
+
+	for (auto& [ring_str, ring] : dumpRings)
+	{
+		GCC_BUG_UNUSED(ring_str);
+		ring->Clean();
+	}
 }
 
 } // namespace autotest
