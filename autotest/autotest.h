@@ -12,6 +12,7 @@
 #include "common/idataplane.h"
 #include "common/result.h"
 #include "common/sdpcommon.h"
+#include "dataplane/dump_rings.h"
 
 namespace nAutotest
 {
@@ -72,7 +73,10 @@ protected:
 	bool step_dumpPackets(const YAML::Node& yamlStep, const std::string& path);
 
 	eResult initSockets();
+
+	eResult FillShmKeyMemoryMap(std::unordered_map<key_t, void*>& map);
 	eResult initSharedMemory();
+
 	void fflushSharedMemory();
 
 	bool step_memorize_counter_value(const YAML::Node& yamlStep);
@@ -107,7 +111,9 @@ protected:
 	        pcaps;
 
 	std::tuple<size_t, void*> rawShmInfo;
-	std::map<std::string, common::PacketBufferRing> dumpRings;
+
+	using DumpRingBasePtr = std::unique_ptr<dumprings::RingBase>;
+	std::map<std::string, DumpRingBasePtr> dumpRings;
 
 	std::vector<std::thread> threads;
 	volatile bool flagStop;
