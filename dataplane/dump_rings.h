@@ -27,6 +27,8 @@ public:
 
 	bool GetNextPacket(pcpp::RawPacket& raw_packet)
 	{
+		raw_packet.clear();
+
 		bool result = GetPacket(raw_packet, read_pkt_number);
 
 		if (result)
@@ -41,6 +43,11 @@ public:
 	[[nodiscard]] unsigned PacketsRead() const
 	{
 		return read_pkt_number;
+	}
+
+	void Clean()
+	{
+		read_pkt_number = 0;
 	}
 };
 
