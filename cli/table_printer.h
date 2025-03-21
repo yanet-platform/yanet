@@ -60,7 +60,7 @@ public:
 	/**
 	 * Insert values from a container as many rows
 	 *
-	 * Useful when we have a container of containers like the "responce"
+	 * Useful when we have a container of containers like the "response"
 	 * object obtained from controlplane
 	 */
 	template<typename Iterator, typename = typename std::iterator_traits<Iterator>::iterator_category>
