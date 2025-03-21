@@ -1951,30 +1951,37 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 			ring = &(static_cast<dumprings::RingRaw*>(it->second.get())->buffer_);
 		}
 
-		pcap_t* pcap = nullptr;
-		{ /// open pcap file with expected data
-			char pcap_errbuf[PCAP_ERRBUF_SIZE];
-			pcap = pcap_open_offline(expectFilePath.data(), pcap_errbuf);
-			if (!pcap)
-			{
-				YANET_LOG_ERROR("dump [%s]: error: pcap_open_offline(): %s\n", tag.data(), pcap_errbuf);
-				throw "";
-			}
+		// Open pcap file using PcapPlusPlus
+		pcpp::IFileReaderDevice* reader = pcpp::IFileReaderDevice::getReader(expectFilePath);
+		if (reader == nullptr)
+		{
+			YANET_LOG_ERROR("dump [%s]: error: cannot create pcap reader for file %s", tag.data(), expectFilePath.data());
+			return false;
 		}
 
-		struct pcap_pkthdr header;
+		if (!reader->open())
+		{
+			YANET_LOG_ERROR("dump [%s]: error: cannot open pcap file %s", tag.data(), expectFilePath.data());
+			return false;
+		}
+
+		pcpp::RawPacket expected_pkt;
+		uint32_t pcap_packet_len = 0;
 		const u_char* pcap_packet = nullptr;
 		common::PacketBufferRing::item_t* shm_packet = nullptr;
 		uint64_t position = 0;
 
 		/// read packets from pcap and compare them with packets from memory ring
-		while ((pcap_packet = pcap_next(pcap, &header)))
+		while (reader->getNextPacket(expected_pkt))
 		{
 			shm_packet = read_shm_packet(ring, position);
 			position++;
 
-			if (shm_packet && header.len == shm_packet->header.size &&
-			    memcmp(shm_packet->memory, pcap_packet, header.len) == 0)
+			pcap_packet_len = expected_pkt.getRawDataLen();
+			pcap_packet = expected_pkt.getRawData();
+
+			if (shm_packet && pcap_packet_len == shm_packet->header.size &&
+			    memcmp(shm_packet->memory, pcap_packet, pcap_packet_len) == 0)
 			{ /// packets are the same
 				continue;
 			}
@@ -1988,8 +1995,8 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 
 			if (dumpPackets && shm_packet)
 			{
-				YANET_LOG_DEBUG("dump [%s]: expected %u, got %u\n", tag.data(), header.len, shm_packet->header.size);
-				dumper.dump(pcap_packet, pcap_packet + shm_packet->header.size, shm_packet->memory, shm_packet->memory + header.len);
+				YANET_LOG_DEBUG("dump [%s]: expected %u, got %u\n", tag.data(), pcap_packet_len, shm_packet->header.size);
+				dumper.dump(pcap_packet, pcap_packet + shm_packet->header.size, shm_packet->memory, shm_packet->memory + pcap_packet_len);
 			}
 		}
 
@@ -2008,13 +2015,13 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 			if (dumpPackets)
 			{
 				YANET_LOG_DEBUG("dump [%s]: unexpected %u\n", tag.data(), shm_packet->header.size);
-				dumper.dump(nullptr, nullptr, shm_packet->memory, shm_packet->memory + header.len);
+				dumper.dump(nullptr, nullptr, shm_packet->memory, shm_packet->memory + pcap_packet_len);
 			}
 		}
 
 		YANET_LOG_DEBUG("dump [%s]: recv %lu packets\n", tag.data(), position);
 
-		pcap_close(pcap);
+		reader->close();
 
 		if (!success)
 		{
