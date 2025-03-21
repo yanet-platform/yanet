@@ -845,10 +845,11 @@ inline void shm_info()
 	interface::dataPlane dataplane;
 	const auto response = dataplane.get_shm_info();
 
+	// TODO: unravel inner structure somehow?
+	// think about it later.
 	FillAndPrintTable({"ring name",
 	                   "dump tag",
-	                   "dump size",
-	                   "dump count",
+	                   "dump config",
 	                   "core id",
 	                   "socket id",
 	                   "ipc key",
