@@ -15,9 +15,9 @@
 
 #include "base.h"
 #include "common.h"
+#include "dump_rings.h"
 #include "globalbase.h"
 #include "samples.h"
-#include "sharedmemory.h"
 
 namespace dataplane
 {
@@ -371,7 +371,8 @@ protected:
 	// will decrease with each new packet sent to slow worker, replenishes each N mseconds
 	int32_t packetsToSWNPRemainder;
 
-	sharedmemory::SharedMemoryDumpRing dumpRings[YANET_CONFIG_SHARED_RINGS_NUMBER];
+	using DumpRingBasePtr = std::unique_ptr<dumprings::RingBase>;
+	std::array<DumpRingBasePtr, YANET_CONFIG_SHARED_RINGS_NUMBER> dump_rings;
 
 	samples::Sampler sampler;
 

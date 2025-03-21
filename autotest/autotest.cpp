@@ -19,9 +19,12 @@
 #include "autotest.h"
 #include "common.h"
 
+#include "common/define.h"
+#include "common/result.h"
 #include "common/sdpclient.h"
 #include "common/sdpcommon.h"
 #include "common/utils.h"
+#include "dataplane/dump_rings.h"
 
 #define MAX_PACK_LEN 16384
 #define SOCK_DEV_PREFIX "sock_dev:"
@@ -121,62 +124,76 @@ eResult tAutotest::initSockets()
 	return eResult::success;
 }
 
+eResult tAutotest::FillShmKeyMemoryMap(std::unordered_map<key_t, void*>& map)
+{
+	key_t ipc_key = 0;
+	int shm_id = 0;
+	void* shm_addr = nullptr;
+
+	for (const auto& shm_info : dataPlaneSharedMemory)
+	{
+		ipc_key = std::get<5>(shm_info);
+
+		if (map.find(ipc_key) != map.end())
+		{
+			// we already assigned an address for this key
+			continue;
+		}
+
+		shm_id = shmget(ipc_key, 0, 0);
+		if (shm_id == -1)
+		{
+			YANET_LOG_ERROR("shmget(%d, 0, 0) = %d\n", ipc_key, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		shm_addr = shmat(shm_id, nullptr, 0);
+		if (shm_addr == (void*)-1)
+		{
+			YANET_LOG_ERROR("shmat(%d, nullptr, 0) = %d\n", shm_id, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		map[ipc_key] = shm_addr;
+	}
+
+	// rawShmInfo is needed to flush shared memory,
+	// which is necessary to reset state in between tests
+	if (!map.empty())
+	{
+		struct shmid_ds shm_info;
+		if (shmctl(shm_id, IPC_STAT, &shm_info) == -1)
+		{
+			YANET_LOG_ERROR("shmctl(%d, IPC_STAT, &shm_info) = %d\n", shm_id, errno);
+			return eResult::errorInitSharedMemory;
+		}
+
+		rawShmInfo = {shm_info.shm_segsz, shm_addr};
+	}
+
+	return eResult::success;
+}
+
 eResult tAutotest::initSharedMemory()
 {
 	dataPlaneSharedMemory = dataPlane.get_shm_info();
 
-	std::map<key_t, void*> shm_by_key;
-	key_t ipcKey = 0;
-	int shmid = 0;
-	void* shmaddr = nullptr;
+	std::unordered_map<key_t, void*> shm_by_key;
 
-	for (const auto& shmInfo : dataPlaneSharedMemory)
+	if (eResult res = FillShmKeyMemoryMap(shm_by_key); res != eResult::success)
 	{
-		ipcKey = std::get<6>(shmInfo);
-
-		shmid = shmget(ipcKey, 0, 0);
-		if (shmid == -1)
-		{
-			YANET_LOG_ERROR("shmget(%d, 0, 0) = %d\n", ipcKey, errno);
-			return eResult::errorInitSharedMemory;
-		}
-
-		shmaddr = shmat(shmid, nullptr, 0);
-		if (shmaddr == (void*)-1)
-		{
-			YANET_LOG_ERROR("shmat(%d, nullptr, 0) = %d\n", shmid, errno);
-			return eResult::errorInitSharedMemory;
-		}
-
-		if (auto it = shm_by_key.find(ipcKey); it == shm_by_key.end())
-		{
-			shm_by_key[ipcKey] = shmaddr;
-		}
+		return res;
 	}
 
-	if (shm_by_key.size() > 0)
+	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : dataPlaneSharedMemory)
 	{
-		struct shmid_ds shm_info;
-		if (shmctl(shmid, IPC_STAT, &shm_info) == -1)
-		{
-			YANET_LOG_ERROR("shmctl(%d, IPC_STAT, &shm_info) = %d\n", shmid, errno);
-			return eResult::errorInitSharedMemory;
-		}
+		GCC_BUG_UNUSED(dump_tag);
+		GCC_BUG_UNUSED(core_id);
+		GCC_BUG_UNUSED(socket_id);
 
-		rawShmInfo = {shm_info.shm_segsz, shmaddr};
-	}
+		auto memaddr = utils::ShiftBuffer(shm_by_key[ipc_key], offset);
 
-	for (const auto& shmInfo : dataPlaneSharedMemory)
-	{
-		std::string name = std::get<0>(shmInfo);
-		unsigned int unitSize = std::get<2>(shmInfo);
-		unsigned int unitsNumber = std::get<3>(shmInfo);
-		key_t ipcKey = std::get<6>(shmInfo);
-		uint64_t offset = std::get<7>(shmInfo);
-
-		void* shm = shm_by_key[ipcKey];
-		auto memaddr = (void*)((intptr_t)shm + offset);
-		dumpRings[name] = common::PacketBufferRing(memaddr, unitSize, unitsNumber);
+		dumpRings[ring_name] = dumprings::CreateSharedMemoryDumpRing(dump_config, memaddr);
 	}
 
 	return eResult::success;
@@ -1927,7 +1944,11 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep,
 				YANET_LOG_ERROR("dump [%s]: error: dump ring not found\n", tag.data());
 				throw "";
 			}
-			ring = &it->second;
+			// TODO: THIS IS TEMPORARY for now.
+			// I want to test that the original logic is unchanged.
+			// Therefore we get the internal buffer with this crude way
+			// since I'm sure that DumpRing is RingRaw.
+			ring = &(static_cast<dumprings::RingRaw*>(it->second.get())->buffer_);
 		}
 
 		pcap_t* pcap = nullptr;
