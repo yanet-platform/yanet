@@ -81,6 +81,10 @@ std::string to_string(const T& value, const config_t& config = {})
 
 		return oss.str();
 	}
+	else if constexpr (traits::has_ToString_v<T>)
+	{
+		return value.ToString();
+	}
 	else
 	{
 		static_assert(std::is_constructible_v<std::string, T>,
