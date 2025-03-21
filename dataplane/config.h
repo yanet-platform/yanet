@@ -2,7 +2,6 @@
 
 #include "common/define.h"
 #include "common/type.h"
-#include "rte_ethdev.h"
 #include <set>
 #include <string>
 
@@ -86,7 +85,6 @@ struct tDataPlaneConfig
 	bool useHugeMem = true;
 	bool use_kernel_interface = true;
 	bool interfaces_required = true;
-	uint64_t rssFlags = RTE_ETH_RSS_IP;
 	uint32_t SWNormalPriorityRateLimitPerWorker = 0;
 	uint32_t SWICMPOutRateLimit = 0;
 	uint32_t rateLimitDivisor = 1;
