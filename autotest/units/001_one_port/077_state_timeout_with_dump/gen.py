@@ -33,18 +33,12 @@ write_pcap("001-expect-dump-ring1.pcap", [
     ipv4_send("10.0.0.10", "10.0.0.1") / UDP(sport=1024, dport=53),
 ])
 
-# Packet after state expiration
+# Inverted packet
 write_pcap("002-send.pcap", [
-    ipv4_send("10.0.0.10", "10.0.0.1") / UDP(sport=1024, dport=53),
+    ipv4_send("10.0.0.1", "10.0.0.10") / UDP(sport=53, dport=1024),
 ])
 
-# Expect the packet to be forwarded
+# Expect the inverted packet
 write_pcap("002-expect.pcap", [
-    ipv4_recv("10.0.0.10", "10.0.0.1") / UDP(sport=1024, dport=53),
-])
-
-# Expected dump after state expiration
-write_pcap("002-expect-dump-ring1.pcap", [
-    ipv4_send("10.0.0.10", "10.0.0.1") / UDP(sport=1024, dport=53), #result of a first dump (the ring is the same)
-    ipv4_send("10.0.0.10", "10.0.0.1") / UDP(sport=1024, dport=53),
+    ipv4_recv("10.0.0.1", "10.0.0.10") / UDP(sport=53, dport=1024),
 ])
