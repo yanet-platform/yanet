@@ -16,6 +16,8 @@ datadir_option = get_option('datadir')
 
 compiler_args = []
 
+compiler_args += '-g'
+
 if get_option('buildtype').contains('release')
     compiler_args += '-Ofast'
 endif
