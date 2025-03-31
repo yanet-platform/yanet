@@ -1642,7 +1642,7 @@ inline void cWorker::acl_ingress_flow(rte_mbuf* mbuf,
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 	metadata->flow = flow;
 
-	if (flow != common::globalBase::eFlowType::route_local && is_expired_ttl(mbuf))
+	if (flow.type != common::globalBase::eFlowType::route_local && is_expired_ttl(mbuf))
 	{
 		rte_mbuf* new_mbuf = rte_pktmbuf_alloc(mempool);
 		yanet::icmp::CreatePackagePayload payload = yanet::icmp::CreateTimeExceededPackagePayload{
