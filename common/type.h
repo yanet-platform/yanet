@@ -2195,7 +2195,7 @@ public:
 		data.atomic = 0;
 	}
 
-	tFlow(eFlowType t) :
+	explicit tFlow(eFlowType t) :
 	        type(t),
 	        flags(0),
 	        counter_id(0)
