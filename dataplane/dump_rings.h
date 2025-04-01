@@ -105,7 +105,7 @@ class RingPcap : public RingBase
 	void Clean() override;
 
 public:
-	RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count);
+	RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count, size_t file_count);
 
 	~RingPcap() override = default;
 
