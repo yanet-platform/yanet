@@ -18,6 +18,8 @@ class RingBase
 	// Current packet number that we will read next
 	unsigned read_pkt_number = 0;
 
+	virtual void Clean() = 0;
+
 public:
 	virtual ~RingBase() = default;
 
@@ -45,9 +47,10 @@ public:
 		return read_pkt_number;
 	}
 
-	void Clean()
+	void Clear()
 	{
 		read_pkt_number = 0;
+		Clean();
 	}
 };
 
@@ -59,6 +62,12 @@ class RingRaw : public RingBase
 
 	PacketBufferRing buffer_;
 	ring_t* ring_;
+
+	void Clean() override
+	{
+		YANET_LOG_DEBUG("No need to clean raw dump ring, all of it's state "
+		                "is in shared memory which gets cleaned by default.");
+	};
 
 public:
 	RingRaw(void* memory, size_t max_pkt_size, size_t pkt_count);
@@ -75,6 +84,8 @@ public:
 class RingPcap : public RingBase
 {
 	pcpp::PcapShmWriterDevice dev_;
+
+	void Clean() override;
 
 public:
 	RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count);
