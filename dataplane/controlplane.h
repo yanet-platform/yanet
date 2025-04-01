@@ -50,6 +50,7 @@ public:
 	[[nodiscard]] common::slowworker::stats_t SlowWorkerStats() const;
 	common::idp::getSlowWorkerStats::response SlowWorkerStatsResponse();
 	eResult clearWorkerDumpRings();
+	eResult flushDumpRing(const common::idp::flushDumpRing::request& request);
 	common::idp::get_worker_gc_stats::response get_worker_gc_stats();
 	common::idp::get_dregress_counters::response get_dregress_counters();
 	common::idp::get_ports_stats::response get_ports_stats();

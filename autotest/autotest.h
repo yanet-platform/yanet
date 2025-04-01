@@ -113,7 +113,11 @@ protected:
 	std::tuple<size_t, void*> rawShmInfo;
 
 	using DumpRingBasePtr = std::unique_ptr<dumprings::RingBase>;
+	// DumpRing name to a DumpRing object
 	std::map<std::string, DumpRingBasePtr> dumpRings;
+
+	// DumpRing name to a dataplane DumpRing object description
+	std::map<std::string, tDataPlaneConfig::DumpRingDesc> dumpRingsDesc;
 
 	std::vector<std::thread> threads;
 	volatile bool flagStop;

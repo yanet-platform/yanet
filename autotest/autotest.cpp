@@ -187,13 +187,10 @@ eResult tAutotest::initSharedMemory()
 
 	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : dataPlaneSharedMemory)
 	{
-		GCC_BUG_UNUSED(dump_tag);
-		GCC_BUG_UNUSED(core_id);
-		GCC_BUG_UNUSED(socket_id);
-
 		void* memaddr = utils::ShiftBuffer(shm_by_key[ipc_key], offset);
 
 		dumpRings[ring_name] = dumprings::CreateSharedMemoryDumpRing(dump_config, memaddr);
+		dumpRingsDesc[ring_name] = {dump_tag, core_id, socket_id};
 	}
 
 	return eResult::success;
@@ -1943,6 +1940,9 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep, const std::string& 
 			return false;
 		}
 		DumpRingBasePtr& ring = it->second;
+
+		// Flush Dataplane's dump ring to make sure packets are up to date
+		dataPlane.flushDumpRing(dumpRingsDesc[tag]);
 
 		// Open pcap file using PcapPlusPlus
 		pcpp::IFileReaderDevice* reader = pcpp::IFileReaderDevice::getReader(expectFilePath);

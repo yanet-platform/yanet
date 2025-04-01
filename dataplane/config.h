@@ -64,6 +64,17 @@ struct tDataPlaneConfig
 		}
 	}
 
+	struct DumpRingDesc
+	{
+		// Denotes ring within a worker
+		std::string tag;
+		// Denotes a worker
+		tCoreId core_id;
+		tSocketId socket_id;
+
+		SERIALIZABLE(tag, core_id, socket_id);
+	};
+
 	/*
 	   DPDK ports used by `dataplane`.
 	   Each port has a name with which is exposed into host system
