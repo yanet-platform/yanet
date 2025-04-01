@@ -288,6 +288,21 @@ common::idp::getSlowWorkerStats::response cControlPlane::SlowWorkerStatsResponse
 	return response;
 }
 
+eResult cControlPlane::clearWorkerDumpRings()
+{
+	for (const cWorker* worker : dataPlane->workers_vector)
+	{
+		for (const auto& [tag, ring_cfg] : dataPlane->config.shared_memory)
+		{
+			GCC_BUG_UNUSED(ring_cfg);
+			YANET_LOG_DEBUG("Cleaning dataplane dump ring %s", tag.data());
+			worker->dump_rings[dataPlane->tag_to_id[tag]]->Clear();
+		}
+	}
+
+	return eResult::success;
+}
+
 common::idp::get_worker_gc_stats::response cControlPlane::get_worker_gc_stats()
 {
 	common::idp::get_worker_gc_stats::response response;
