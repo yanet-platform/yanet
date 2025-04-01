@@ -42,6 +42,7 @@ enum class requestType : uint32_t
 	getWorkerStats,
 	getSlowWorkerStats,
 	clearWorkerDumpRings,
+	flushDumpRing,
 	get_worker_gc_stats,
 	get_dregress_counters,
 	get_ports_stats,
@@ -642,6 +643,11 @@ using response = std::tuple<common::slowworker::stats_t,
                             std::vector<hashtable_gc>>;
 }
 
+namespace flushDumpRing
+{
+using request = tDataPlaneConfig::DumpRingDesc;
+}
+
 namespace get_worker_gc_stats
 {
 using response = std::map<tCoreId,
@@ -1002,6 +1008,7 @@ using request = std::tuple<requestType,
                                         getGlobalBase::request,
                                         getControlPlanePortStats::request,
                                         getWorkerStats::request,
+                                        flushDumpRing::request,
                                         lpm4LookupAddress::request,
                                         lpm6LookupAddress::request,
                                         nat64stateful_state::request,
