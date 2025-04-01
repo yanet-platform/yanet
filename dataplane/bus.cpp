@@ -229,6 +229,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::SlowWorkerStatsResponse, request);
 		}
+		else if (type == common::idp::requestType::clearWorkerDumpRings)
+		{
+			response = callWithResponse(&cControlPlane::clearWorkerDumpRings, request);
+		}
 		else if (type == common::idp::requestType::get_worker_gc_stats)
 		{
 			response = callWithResponse(&cControlPlane::get_worker_gc_stats, request);

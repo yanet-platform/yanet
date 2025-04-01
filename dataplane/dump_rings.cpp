@@ -77,6 +77,11 @@ RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count) :
 	dev_.open();
 }
 
+void RingPcap::Clean()
+{
+	dev_.Clean();
+}
+
 /**
  * @brief A complete copy of the PcapPlusPlus wrapper of the RawPacket class.
  *
