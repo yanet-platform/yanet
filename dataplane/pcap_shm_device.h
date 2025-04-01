@@ -171,6 +171,54 @@ class PcapShmWriterDevice : public IShmWriterDevice
 	 */
 	bool FillSegments();
 
+	/**
+	 * Structure representing the location of a packet within the segmented memory.
+	 *
+	 * Used to track where a specific packet is located across the ring buffer segments.
+	 * Used only for tests in "GetPacket" method
+	 */
+	struct PacketLocation
+	{
+		size_t segment_index; ///< Index of the segment containing the packet
+		size_t packet_offset; ///< Offset within the segment where the packet is located
+		size_t total_packets; ///< Total packets counted during location search
+		bool found; ///< Whether the packet was found
+	};
+
+	/**
+	 * @brief Locates which segment contains the requested packet number.
+	 *
+	 * @param[in] pkt_number The sequence number of the packet to find.
+	 * @return PacketLocation structure containing segment index and offset if found.
+	 */
+	[[nodiscard]] PacketLocation LocatePacketInSegments(unsigned pkt_number) const;
+
+	/**
+	 * @brief Counts the number of packets in a specific segment.
+	 *
+	 * @param[in] segment The segment to count packets in.
+	 * @return Number of packets in segment.
+	 */
+	[[nodiscard]] int CountPacketsInSegment(const SegmentInfo& segment) const;
+
+	/**
+	 * @brief Reads a packet from a specific segment and offset.
+	 *
+	 * @param[out] raw_packet The RawPacket to populate.
+	 * @param[in] location The location information of the packet to read.
+	 * @return True if packet was successfully read, false otherwise.
+	 */
+	bool ReadPacketFromSegment(RawPacket& raw_packet, const PacketLocation& location) const;
+
+	using PcapReaderPtr = std::unique_ptr<pcap_t, void (*)(pcap_t*)>;
+
+	/**
+	 * @brief Creates a pcap reader for a memory segment
+	 *
+	 * @return std::unique_ptr<pcap_t> owning pcap reader
+	 */
+	[[nodiscard]] PcapReaderPtr CreatePcapReader(const SegmentInfo& segment) const;
+
 public:
 	static constexpr size_t kPcapPacketHeaderSizeOnDisk = 16;
 	static constexpr size_t kPcapFileHeaderSize = 24;
@@ -207,6 +255,21 @@ public:
 	bool WritePacket(RawPacket const& packet) override;
 
 	bool WritePackets(RawPacketVector const& packets) override;
+
+	/**
+	 * @brief Retrieve a packet from the shared memory by its sequence number.
+	 *
+	 * This method is used only for tests, so we don't care too much about performance.
+	 *
+	 * Packets are stored in chronological order across segments, with the oldest packets
+	 * in the next segment after the current writing segment. This method locates and
+	 * reads the requested packet without interfering with the writer's state.
+	 *
+	 * @param[out] raw_packet The RawPacket to populate with the packet data.
+	 * @param[in] pkt_number The sequence number of the packet to retrieve (0 = oldest).
+	 * @return True if the packet was successfully retrieved, false otherwise.
+	 */
+	bool GetPacket(RawPacket& raw_packet, unsigned pkt_number) const;
 
 	/**
 	 * @brief Flush all pending writes to the shared memory segments.

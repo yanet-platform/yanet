@@ -123,10 +123,9 @@ void RingPcap::Write(rte_mbuf* mbuf, [[maybe_unused]] common::globalBase::eFlowT
 	dev_.WritePacket(raw_packet);
 }
 
-bool RingPcap::GetPacket([[maybe_unused]] pcpp::RawPacket& raw_packet, [[maybe_unused]] unsigned pkt_number) const
+bool RingPcap::GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const
 {
-	// TODO: implement
-	return false;
+	return dev_.GetPacket(raw_packet, pkt_number);
 }
 
 size_t RingPcap::GetCapacity(size_t max_pkt_size, size_t pkt_count)
