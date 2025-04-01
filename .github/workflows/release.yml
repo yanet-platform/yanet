@@ -21,11 +21,14 @@ jobs:
       - name: Define YANET version
         run: |
           YANET_VERSION=${{github.ref_name}}
-          YANET_SUBVERSIONS=(${YANET_VERSION//./ })
 
-          echo YANET_VERSION_MAJOR=${YANET_SUBVERSIONS[0]} >>$GITHUB_ENV
-          echo YANET_VERSION_MINOR=${YANET_SUBVERSIONS[1]} >>$GITHUB_ENV
-          echo YANET_VERSION_REVISION=${YANET_SUBVERSIONS[2]} >>$GITHUB_ENV
+          # Valudate YANET version from tag value
+          if [[ "${YANET_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            YANET_SUBVERSIONS=(${YANET_VERSION//./ })
+            echo YANET_VERSION_MAJOR=${YANET_SUBVERSIONS[0]} >>$GITHUB_ENV
+            echo YANET_VERSION_MINOR=${YANET_SUBVERSIONS[1]} >>$GITHUB_ENV
+            echo YANET_VERSION_REVISION=${YANET_SUBVERSIONS[2]} >>$GITHUB_ENV
+          fi
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
