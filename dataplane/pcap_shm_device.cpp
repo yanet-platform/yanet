@@ -308,6 +308,15 @@ void PcapShmWriterDevice::getStatistics(PcapStats& stats) const
 	stats.packetsDropByInterface = 0;
 }
 
+void PcapShmWriterDevice::Clean()
+{
+	num_of_packets_not_written_ = 0;
+	num_of_packets_written_ = 0;
+
+	close();
+	open();
+}
+
 IShmWriterDevice::IShmWriterDevice(void* shm_ptr, size_t shm_size) :
         IShmDevice(shm_ptr, shm_size) {}
 

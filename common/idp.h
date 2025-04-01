@@ -41,6 +41,7 @@ enum class requestType : uint32_t
 	getGlobalBase,
 	getWorkerStats,
 	getSlowWorkerStats,
+	clearWorkerDumpRings,
 	get_worker_gc_stats,
 	get_dregress_counters,
 	get_ports_stats,

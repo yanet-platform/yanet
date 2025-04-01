@@ -20,6 +20,7 @@ inline std::vector<bus_request_info> get_bus_requests(common::sdp::DataPlaneInSh
 	        {common::idp::requestType::getGlobalBase, "getGlobalBase"},
 	        {common::idp::requestType::getWorkerStats, "getWorkerStats"},
 	        {common::idp::requestType::getSlowWorkerStats, "getSlowWorkerStats"},
+	        {common::idp::requestType::clearWorkerDumpRings, "clearWorkerDumpRings"},
 	        {common::idp::requestType::get_worker_gc_stats, "get_worker_gc_stats"},
 	        {common::idp::requestType::get_dregress_counters, "get_dregress_counters"},
 	        {common::idp::requestType::get_ports_stats, "get_ports_stats"},
