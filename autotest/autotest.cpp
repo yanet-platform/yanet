@@ -191,7 +191,7 @@ eResult tAutotest::initSharedMemory()
 		GCC_BUG_UNUSED(core_id);
 		GCC_BUG_UNUSED(socket_id);
 
-		auto memaddr = utils::ShiftBuffer(shm_by_key[ipc_key], offset);
+		void* memaddr = utils::ShiftBuffer(shm_by_key[ipc_key], offset);
 
 		dumpRings[ring_name] = dumprings::CreateSharedMemoryDumpRing(dump_config, memaddr);
 	}
@@ -2054,8 +2054,9 @@ void tAutotest::fflushSharedMemory()
 	for (auto& [ring_str, ring] : dumpRings)
 	{
 		GCC_BUG_UNUSED(ring_str);
-		ring->Clean();
+		ring->Clear();
 	}
+	dataPlane.clearWorkerDumpRings();
 }
 
 } // namespace autotest

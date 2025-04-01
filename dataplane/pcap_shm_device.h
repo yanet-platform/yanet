@@ -219,6 +219,11 @@ public:
 	void close() override;
 
 	/**
+	 * @brief Clean internal state and reopen the device.
+	 */
+	void Clean();
+
+	/**
 	 * @brief Get statistics for packets written so far.
 	 *
 	 * @param[out] stats The PcapStats structure to fill.
