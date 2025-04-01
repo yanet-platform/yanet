@@ -129,7 +129,14 @@ size_t RingPcap::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 	auto& file_hdr_size = pcpp::PcapShmWriterDevice::kPcapFileHeaderSize;
 	auto& pkt_hdr_size = pcpp::PcapShmWriterDevice::kPcapPacketHeaderSizeOnDisk;
 
-	return file_hdr_size + (pkt_hdr_size + max_pkt_size) * pkt_count;
+	size_t capacity = file_hdr_size + (pkt_hdr_size + max_pkt_size) * pkt_count;
+
+	if (capacity % RTE_CACHE_LINE_SIZE != 0)
+	{
+		capacity += RTE_CACHE_LINE_SIZE - capacity % RTE_CACHE_LINE_SIZE; /// round up
+	}
+
+	return capacity;
 }
 
 size_t GetCapacity(const Config& config)
