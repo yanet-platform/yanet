@@ -27,6 +27,8 @@ public:
 
 	[[nodiscard]] virtual bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const = 0;
 
+	virtual void Flush() = 0;
+
 	bool GetNextPacket(pcpp::RawPacket& raw_packet)
 	{
 		raw_packet.clear();
@@ -79,6 +81,12 @@ public:
 	[[nodiscard]] bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const override;
 
 	static size_t GetCapacity(size_t max_pkt_size, size_t pkt_count);
+
+	void Flush() override
+	{
+		YANET_LOG_DEBUG("No need to flush raw dump ring, "
+		                "it does not use any buffers.");
+	};
 };
 
 class RingPcap : public RingBase
@@ -97,6 +105,8 @@ public:
 	[[nodiscard]] bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const override;
 
 	static size_t GetCapacity(size_t max_pkt_size, size_t pkt_count);
+
+	void Flush() override;
 };
 
 size_t GetCapacity(const Config& config);
