@@ -4,6 +4,7 @@
 #include <pcap/pcap.h>
 #include <vector>
 
+#include "common/define.h"
 #include "pcap_shm_device.h"
 
 // TODO: replace cerr with YANET_LOG
@@ -319,5 +320,128 @@ void PcapShmWriterDevice::Clean()
 
 IShmWriterDevice::IShmWriterDevice(void* shm_ptr, size_t shm_size) :
         IShmDevice(shm_ptr, shm_size) {}
+
+PcapShmWriterDevice::PcapReaderPtr PcapShmWriterDevice::CreatePcapReader(const SegmentInfo& segment) const
+{
+	FILE* segment_file = fmemopen(segment.start_ptr, segment.size, "r");
+	if (!segment_file)
+	{
+		YANET_LOG_ERROR("fmemopen failed for segment [%p, %zu]\n", segment.start_ptr, segment.size);
+		std::abort();
+	}
+
+	std::string errbuf(PCAP_ERRBUF_SIZE, '\0');
+
+	pcap_t* pcap_file =
+	        pcap_fopen_offline_with_tstamp_precision(
+	                segment_file, static_cast<int>(precision_), errbuf.data());
+	if (!pcap_file)
+	{
+		YANET_THROW(errbuf);
+	}
+
+	// pcap_close() also closes associated FILE pointer
+	auto desctructor = [](pcap_t* p) { if (p) pcap_close(p); };
+
+	return {pcap_file, desctructor};
+}
+
+int PcapShmWriterDevice::CountPacketsInSegment(const SegmentInfo& segment) const
+{
+	int packet_count = 0;
+	pcap_pkthdr* header = nullptr;
+	const u_char* packet_data = nullptr;
+
+	PcapReaderPtr pcap_reader = CreatePcapReader(segment);
+
+	while (pcap_next_ex(pcap_reader.get(), &header, &packet_data) == 1 && header->caplen > 0)
+	{
+		packet_count++;
+	}
+
+	return packet_count;
+}
+
+PcapShmWriterDevice::PacketLocation PcapShmWriterDevice::LocatePacketInSegments(unsigned pkt_number) const
+{
+	size_t total_packets = 0;
+	PacketLocation location = {0, 0, 0, false};
+
+	for (size_t i = 0; i < pcap_files_; ++i)
+	{
+		size_t segment_index = (current_segment_index_ + 1 + i) % pcap_files_;
+		int segment_packets = CountPacketsInSegment(segments_[segment_index]);
+
+		if (pkt_number < total_packets + segment_packets)
+		{
+			location.segment_index = segment_index;
+			location.packet_offset = pkt_number - total_packets;
+			location.total_packets = total_packets + segment_packets;
+			location.found = true;
+			return location;
+		}
+
+		total_packets += segment_packets;
+	}
+
+	location.total_packets = total_packets;
+	return location;
+}
+
+bool PcapShmWriterDevice::ReadPacketFromSegment(RawPacket& raw_packet, const PacketLocation& location) const
+{
+	PcapReaderPtr pcap_reader = CreatePcapReader(segments_[location.segment_index]);
+
+	pcap_pkthdr* header = nullptr;
+	const u_char* packet_data = nullptr;
+	size_t packets_skipped = 0;
+
+	while (true)
+	{
+		int result = pcap_next_ex(pcap_reader.get(), &header, &packet_data);
+
+		if (result == 1)
+		{
+			if (packets_skipped == location.packet_offset)
+			{
+				// This will set an internal flag to free data at destructor
+				raw_packet.reallocateData(header->caplen);
+
+				raw_packet.appendData(packet_data, header->caplen);
+				raw_packet.setPacketTimeStamp(header->ts);
+				return true;
+			}
+			packets_skipped++;
+		}
+		else if (result == -1)
+		{
+			std::cerr << "Error reading packet: " << pcap_geterr(pcap_reader.get()) << std::endl;
+			return false;
+		}
+		else if (result == -2)
+		{
+			std::cerr << "Reached end of segment unexpectedly" << std::endl;
+			return false;
+		}
+	}
+}
+
+bool PcapShmWriterDevice::GetPacket(RawPacket& raw_packet, unsigned pkt_number) const
+{
+	if (!m_DeviceOpened)
+	{
+		return false;
+	}
+
+	PacketLocation location = LocatePacketInSegments(pkt_number);
+	if (!location.found)
+	{
+		std::cerr << "Requested packet number " << pkt_number
+		          << " exceeds total available packets (" << location.total_packets << ")" << std::endl;
+		return false;
+	}
+
+	return ReadPacketFromSegment(raw_packet, location);
+}
 
 } // namespace pcpp
