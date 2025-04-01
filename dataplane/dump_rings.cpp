@@ -70,9 +70,8 @@ size_t RingRaw::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 }
 
 // TODO: use max_pkt_size as snaplen in pcap?
-// TODO: Don't know how yet, but we need to pass files amount. Let's do three by now.
-RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count) :
-        dev_(memory, GetCapacity(max_pkt_size, pkt_count), 3)
+RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count, size_t file_count) :
+        dev_(memory, GetCapacity(max_pkt_size, pkt_count), file_count)
 {
 	dev_.open();
 }
@@ -155,7 +154,8 @@ size_t RingPcap::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 
 size_t GetCapacity(const Config& config)
 {
-	const auto& [format, max_pkt_size, pkt_count] = config;
+	const auto& [format, max_pkt_size, pkt_count, file_count] = config;
+	GCC_BUG_UNUSED(file_count);
 
 	switch (format)
 	{
@@ -171,14 +171,14 @@ size_t GetCapacity(const Config& config)
 
 std::unique_ptr<RingBase> CreateSharedMemoryDumpRing(const Config& config, void* memory)
 {
-	const auto& [format, max_pkt_size, pkt_count] = config;
+	const auto& [format, max_pkt_size, pkt_count, file_count] = config;
 
 	switch (format)
 	{
 		case Format::kRaw:
 			return std::make_unique<RingRaw>(memory, max_pkt_size, pkt_count);
 		case Format::kPcap:
-			return std::make_unique<RingPcap>(memory, max_pkt_size, pkt_count);
+			return std::make_unique<RingPcap>(memory, max_pkt_size, pkt_count, file_count);
 		default:
 			YANET_THROW("Invalid dump format");
 			std::abort();
