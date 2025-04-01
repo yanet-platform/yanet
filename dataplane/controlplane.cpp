@@ -303,6 +303,30 @@ eResult cControlPlane::clearWorkerDumpRings()
 	return eResult::success;
 }
 
+eResult cControlPlane::flushDumpRing(const common::idp::flushDumpRing::request& request)
+{
+	const auto& [tag, ring_core_id, ring_socket_id] = request;
+
+	for (auto& [core_id, worker] : dataPlane->workers)
+	{
+		if (core_id != ring_core_id && worker->socketId != ring_socket_id)
+			continue;
+
+		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[tag]];
+
+		ring->Flush();
+		return eResult::success;
+	}
+
+	YANET_LOG_WARNING("Asked to flush DumpRing %s within Worker[core_id = %d, socket_id = %d], "
+	                  "but such ring was not found.",
+	                  tag.data(),
+	                  ring_core_id,
+	                  ring_socket_id);
+
+	return eResult::invalidId;
+}
+
 common::idp::get_worker_gc_stats::response cControlPlane::get_worker_gc_stats()
 {
 	common::idp::get_worker_gc_stats::response response;

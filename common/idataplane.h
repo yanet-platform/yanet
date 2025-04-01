@@ -60,6 +60,11 @@ public:
 		return get<common::idp::requestType::clearWorkerDumpRings, eResult>();
 	}
 
+	auto flushDumpRing(const common::idp::flushDumpRing::request& request) const
+	{
+		return get<common::idp::requestType::flushDumpRing, eResult>(request);
+	}
+
 	auto get_worker_gc_stats() const
 	{
 		return get<common::idp::requestType::get_worker_gc_stats, common::idp::get_worker_gc_stats::response>();

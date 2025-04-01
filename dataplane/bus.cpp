@@ -233,6 +233,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::clearWorkerDumpRings, request);
 		}
+		else if (type == common::idp::requestType::flushDumpRing)
+		{
+			response = callWithResponse(&cControlPlane::flushDumpRing, request);
+		}
 		else if (type == common::idp::requestType::get_worker_gc_stats)
 		{
 			response = callWithResponse(&cControlPlane::get_worker_gc_stats, request);
