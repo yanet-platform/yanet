@@ -170,6 +170,11 @@ public:
 		return get<common::idp::requestType::hitcount_dump, common::idp::hitcount_dump::response>();
 	}
 
+	auto tcpdump_ring(const common::idp::tcpdump_ring::request& request) const
+	{
+		return get<common::idp::requestType::tcpdump_ring, eResult>(request);
+	}
+
 	eResult debug_latch_update(const common::idp::debug_latch_update::request& request) const
 	{
 		return get<common::idp::requestType::debug_latch_update, common::idp::debug_latch_update::response>(request);
