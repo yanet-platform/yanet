@@ -321,6 +321,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::hitcount_dump, request);
 		}
+		else if (type == common::idp::requestType::tcpdump_ring)
+		{
+			response = callWithResponse(&cControlPlane::tcpdump_ring, request);
+		}
 		else if (type == common::idp::requestType::debug_latch_update)
 		{
 			response = callWithResponse(&cControlPlane::debug_latch_update, request);
