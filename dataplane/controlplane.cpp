@@ -319,7 +319,7 @@ eResult cControlPlane::flushDumpRing(const common::idp::flushDumpRing::request& 
 	}
 
 	YANET_LOG_WARNING("Asked to flush DumpRing %s within Worker[core_id = %d, socket_id = %d], "
-	                  "but such ring was not found.",
+	                  "but such ring was not found.\n",
 	                  tag.data(),
 	                  ring_core_id,
 	                  ring_socket_id);
@@ -815,6 +815,31 @@ common::idp::samples::response cControlPlane::samples()
 	}
 
 	return common::idp::samples::response(samples.begin(), samples.end());
+}
+
+eResult cControlPlane::tcpdump_ring(const common::idp::tcpdump_ring::request& request)
+{
+	const auto& [ring_desc, prefix, path] = request;
+
+	for (auto& [core_id, worker] : dataPlane->workers)
+	{
+		if (core_id != ring_desc.core_id && worker->socketId != ring_desc.socket_id)
+			continue;
+
+		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[ring_desc.tag]];
+
+		ring->DumpPcapFilesToDisk(prefix);
+		return eResult::success;
+	}
+
+	YANET_LOG_WARNING("Asked to create pcap files from DumpRing %s within "
+	                  "Worker[core_id = %d, socket_id = %d], "
+	                  "but such ring was not found.\n",
+	                  ring_desc.tag.data(),
+	                  ring_desc.core_id,
+	                  ring_desc.socket_id);
+
+	return eResult::invalidId;
 }
 
 common::idp::hitcount_dump::response cControlPlane::hitcount_dump()

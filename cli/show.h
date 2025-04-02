@@ -4,12 +4,14 @@
 #include <netdb.h>
 #include <unordered_map>
 
+#include "common/define.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
 #include "common/sdpclient.h"
 #include "common/tsc_deltas.h"
 #include "common/version.h"
 
+#include "dataplane/config.h"
 #include "helper.h"
 #include "table_printer.h"
 
@@ -725,6 +727,47 @@ inline void hitcount_dump(const std::string& source)
 	}
 
 	std::cout << "\n]\n";
+}
+
+inline void tcpdump_ring(const std::string& target_ring_name)
+{
+	if (target_ring_name.empty())
+	{
+		YANET_LOG_ERROR("Ring name should be specified\n");
+		return;
+	}
+
+	interface::dataPlane dataplane;
+	const auto& shm_info = dataplane.get_shm_info();
+
+	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : shm_info)
+	{
+		GCC_BUG_UNUSED(ipc_key);
+		GCC_BUG_UNUSED(offset);
+
+		if (target_ring_name != ring_name)
+			continue;
+
+		if (dump_config.format != tDataPlaneConfig::DumpFormat::kPcap)
+		{
+			YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but provided "
+			                "ring is not configured to pcap format. "
+			                "Double-check dataplane.conf \"sharedMemory\" section\n",
+			                target_ring_name.data());
+		}
+
+		eResult result = dataplane.tcpdump_ring({dump_tag, core_id, socket_id, "capture", "TODO: implement path"});
+
+		if (result != eResult::success)
+		{
+			YANET_LOG_ERROR("Something went wrong in dataplane on creating pcap files for ring %s",
+			                target_ring_name.data());
+		}
+		return;
+	}
+
+	YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but such ring was not found\n",
+	                target_ring_name.data());
 }
 
 inline void values()
