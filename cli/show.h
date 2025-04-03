@@ -729,7 +729,7 @@ inline void hitcount_dump(const std::string& source)
 	std::cout << "\n]\n";
 }
 
-inline void tcpdump_ring(const std::string& target_ring_name)
+inline void tcpdump_ring(const std::string& target_ring_name, std::optional<std::string> path)
 {
 	if (target_ring_name.empty())
 	{
@@ -756,7 +756,7 @@ inline void tcpdump_ring(const std::string& target_ring_name)
 			                target_ring_name.data());
 		}
 
-		eResult result = dataplane.tcpdump_ring({dump_tag, core_id, socket_id, "capture", "TODO: implement path"});
+		eResult result = dataplane.tcpdump_ring({dump_tag, core_id, socket_id, ring_name, path.value_or("./")});
 
 		if (result != eResult::success)
 		{
