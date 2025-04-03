@@ -128,9 +128,9 @@ void RingPcap::Flush()
 	dev_.Flush();
 }
 
-void RingPcap::DumpPcapFilesToDisk(std::string_view prefix)
+void RingPcap::DumpPcapFilesToDisk(std::string_view prefix, std::string_view path)
 {
-	dev_.DumpPcapFilesToDisk(prefix);
+	dev_.DumpPcapFilesToDisk(prefix, path);
 }
 
 bool RingPcap::GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const

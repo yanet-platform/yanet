@@ -828,7 +828,7 @@ eResult cControlPlane::tcpdump_ring(const common::idp::tcpdump_ring::request& re
 
 		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[ring_desc.tag]];
 
-		ring->DumpPcapFilesToDisk(prefix);
+		ring->DumpPcapFilesToDisk(prefix, path);
 		return eResult::success;
 	}
 
