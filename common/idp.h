@@ -949,7 +949,7 @@ struct RingAndPcapFile
 	                std::string pcap_file_prefix,
 	                std::string pcap_file_path) :
 	        ring_desc{std::move(tag), core_id, socket_id},
-	        prefix(std::move(pcap_file_path)),
+	        prefix(std::move(pcap_file_prefix)),
 	        path(std::move(pcap_file_path)) {}
 };
 
