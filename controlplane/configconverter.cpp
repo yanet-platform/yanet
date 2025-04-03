@@ -729,6 +729,16 @@ void config_converter_t::processDregress()
 	}
 }
 
+std::string ParseEntry(const std::string& nmodule)
+{
+	std::string entry;
+	if (auto pos = nmodule.find(':'); pos != std::string::npos)
+	{
+		entry = nmodule.substr(pos + 1);
+	}
+	return entry;
+}
+
 void config_converter_t::processAcl()
 {
 	for (auto& [moduleName, acl] : baseNext.acls)
@@ -759,7 +769,7 @@ void config_converter_t::processAcl()
 		for (const auto& nextModule : acl.nextModules)
 		{
 			const std::string nextModuleName = nextModule.substr(0, nextModule.find(':'));
-			const std::string entry = nextModule.substr(nextModule.find(':') + 1);
+			const std::string entry = ParseEntry(nextModule);
 
 			auto it = baseNext.moduleTypes.find(nextModuleName);
 			if (it == baseNext.moduleTypes.end())
