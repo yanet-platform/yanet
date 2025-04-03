@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <pcap/pcap.h>
@@ -89,14 +90,13 @@ PcapShmWriterDevice::~PcapShmWriterDevice()
 	PcapShmWriterDevice::close();
 }
 
-void PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_view filename_prefix)
+void PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_view prefix, std::string_view path)
 {
+	std::filesystem::path dir_path(path);
+
 	Flush();
 
 	size_t file_index = 1;
-	std::string filename;
-	// Allocate space for prefix + index + ".pcap"
-	filename.reserve(filename_prefix.size() + 10);
 
 	for (size_t i = 0; i < pcap_files_; ++i)
 	{
@@ -112,7 +112,7 @@ void PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_view filename_prefix)
 		long used = ftell(file);
 		if (used < 0)
 		{
-			std::cerr << "ftell failed on segment " << i << std::endl;
+			YANET_LOG_ERROR("ftell failed on segment %zu\n", i);
 			continue;
 		}
 
@@ -122,21 +122,23 @@ void PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_view filename_prefix)
 			continue;
 		}
 
-		filename = filename_prefix;
-		filename += std::to_string(file_index++) + ".pcap";
-		std::ofstream output_file(filename, std::ios::binary);
+		auto file_path = dir_path / (std::string(prefix) + "-" + std::to_string(file_index++) + ".pcap");
+
+		std::ofstream output_file(file_path, std::ios::binary);
 		if (!output_file)
 		{
-			std::cerr << "Failed to open " << filename << " for writing" << std::endl;
+			YANET_LOG_ERROR("Failed to open %s for writing\n", file_path.c_str());
 			continue;
 		}
 
 		output_file.write(reinterpret_cast<char*>(segments_[segment_index].start_ptr), used);
 		if (output_file.bad())
 		{
-			std::cerr << "Error writing to file " << filename << std::endl;
+			YANET_LOG_ERROR("Error writing to file %s\n", file_path.c_str());
 			continue;
 		}
+
+		YANET_LOG_INFO("Created file: %s\n", file_path.c_str());
 	}
 }
 
