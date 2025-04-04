@@ -151,12 +151,32 @@ class PcapShmWriterDevice : public IShmWriterDevice
 
 	std::vector<SegmentInfo> segments_;
 
+	/*
+	 * @brief Helper to create libpcap's packet header from PcapPlusPlus's raw packet.
+	 */
+	pcap_pkthdr CreatePacketHeader(const RawPacket& packet);
+
 	/**
 	 * @brief Rotate to the next segment if the current one doesn't have enough space.
 	 *
 	 * @return True if successful, false if fseek fails.
 	 */
 	bool RotateToNextSegment();
+
+	/**
+	 * @brief Ensures current segment has enough space for a new packet or rotates segment
+	 *
+	 * Performs two critical checks before packet writing:
+	 * 1. Validates the packet can fit in ANY segment by checking against the smallest segment size
+	 * 2. Checks if current segment has space, rotating to next segment if needed
+	 *
+	 * @see RotateToNextSegment()
+	 *
+	 * @param needed_size Total bytes required (pcap header + packet data)
+	 *
+	 * @return true if space is available (either existing or after successful rotation)
+	 */
+	bool EnsureSegmentCapacity(size_t needed_size);
 
 	/**
 	 * @brief Distribute the shared memory into multiple segments and initialize them as in-memory
