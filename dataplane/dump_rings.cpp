@@ -69,7 +69,6 @@ size_t RingRaw::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 	return PacketBufferRing::GetCapacity(max_pkt_size, pkt_count);
 }
 
-// TODO: use max_pkt_size as snaplen in pcap?
 RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count, size_t file_count) :
         dev_(memory, GetCapacity(max_pkt_size, pkt_count), file_count)
 {
