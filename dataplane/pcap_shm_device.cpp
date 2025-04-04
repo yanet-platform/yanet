@@ -77,11 +77,6 @@ PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t 
 	m_Precision_ = FileTimestampPrecision::Microseconds;
 #endif
 
-	// TODO: we should add this assert
-	/* if (m_SegmentSize <= kPcapFileHeaderSize + PCPP_MAX_PACKET_SIZE - 1) { */
-	/*     TMP_LOG("Segment too small to hold at least one full packet"); */
-	/*     throw("something"); */
-	/* } */
 }
 
 PcapShmWriterDevice::~PcapShmWriterDevice()
@@ -219,6 +214,25 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 
 	// kPcapPacketHeaderSizeOnDisk is different from sizeof(pcap_pkthdr)
 	size_t needed = kPcapPacketHeaderSizeOnDisk + pkt_hdr.caplen;
+
+	// HARD LIMIT CHECK: Packet is too large for any segment
+	//
+	// Segments are allocated nearly equally, but the last one may be larger if there’s
+	// a remainder (see FillSegments()). Since the next segment after rotation is not
+	// guaranteed to be the largest, we must ensure the packet fits in any segment.
+	//
+	// `segments_.front().size` represents the smallest possible segment size due to
+	// the way memory is divided.
+	size_t max_available = segments_.front().size - kPcapFileHeaderSize;
+	if (needed > max_available)
+	{
+		YANET_LOG_ERROR("Packet size %u (needed: %zu) exceeds max possible segment capacity %zu\n",
+		                pkt_hdr.caplen,
+		                needed,
+		                max_available);
+		++num_of_packets_not_written_;
+		return false;
+	}
 
 	FILE* file = segments_[current_segment_index_].file;
 	long used = ftell(file);
