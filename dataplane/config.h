@@ -33,10 +33,11 @@ struct tDataPlaneConfig
 		{
 		}
 
-		// TODO: temporary, adjust after we refactor cli?
 		[[nodiscard]] std::string ToString() const
 		{
-			return DumpFormatToString(format) + " " + std::to_string(size) + " " + std::to_string(count) + " " + std::to_string(pcap_files_count);
+			std::ostringstream oss;
+			oss << DumpFormatToString(format) << " " << size << " " << count << " " << pcap_files_count;
+			return oss.str();
 		}
 	};
 
