@@ -177,22 +177,8 @@ bool PcapShmWriterDevice::open()
 	return true;
 }
 
-bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
+pcap_pkthdr PcapShmWriterDevice::CreatePacketHeader(const RawPacket& packet)
 {
-	if (!m_DeviceOpened)
-	{
-		YANET_LOG_ERROR("Device not opened\n");
-		++num_of_packets_not_written_;
-		return false;
-	}
-
-	if (packet.getLinkLayerType() != link_layer_type_)
-	{
-		YANET_LOG_ERROR("Cannot write a packet with a different link layer type\n");
-		++num_of_packets_not_written_;
-		return false;
-	}
-
 	pcap_pkthdr pkt_hdr;
 	pkt_hdr.caplen = packet.getRawDataLen();
 	pkt_hdr.len = packet.getFrameLength();
@@ -212,30 +198,31 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 	TIMESPEC_TO_TIMEVAL(&pkt_hdr.ts, &packet_timestamp);
 #endif
 
-	// kPcapPacketHeaderSizeOnDisk is different from sizeof(pcap_pkthdr)
-	size_t needed = kPcapPacketHeaderSizeOnDisk + pkt_hdr.caplen;
+	return pkt_hdr;
+}
 
-	// HARD LIMIT CHECK: Packet is too large for any segment
-	//
+bool PcapShmWriterDevice::EnsureSegmentCapacity(size_t needed_size)
+{
+	// Check if packet fits in any segment.
 	// Segments are allocated nearly equally, but the last one may be larger if there’s
 	// a remainder (see FillSegments()). Since the next segment after rotation is not
 	// guaranteed to be the largest, we must ensure the packet fits in any segment.
 	//
 	// `segments_.front().size` represents the smallest possible segment size due to
 	// the way memory is divided.
-	size_t max_available = segments_.front().size - kPcapFileHeaderSize;
-	if (needed > max_available)
+	const size_t max_segment_capacity = segments_.front().size - kPcapFileHeaderSize;
+	if (needed_size > max_segment_capacity)
 	{
-		YANET_LOG_ERROR("Packet size %u (needed: %zu) exceeds max possible segment capacity %zu\n",
-		                pkt_hdr.caplen,
-		                needed,
-		                max_available);
+		YANET_LOG_WARNING("Packet size %zu exceeds max segment capacity %zu."
+		                  "Such packet cannot be written in any segment -- skipping it\n",
+		                  needed_size,
+		                  max_segment_capacity);
 		++num_of_packets_not_written_;
 		return false;
 	}
 
-	FILE* file = segments_[current_segment_index_].file;
-	long used = ftell(file);
+	// Check if current segment has space
+	long used = ftell(segments_[current_segment_index_].file);
 	if (used < 0)
 	{
 		YANET_LOG_ERROR("ftell failed on current segment\n");
@@ -244,7 +231,7 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 	}
 
 	size_t available = segments_[current_segment_index_].size - used;
-	if (needed > available)
+	if (available < needed_size)
 	{
 		if (!RotateToNextSegment())
 		{
@@ -252,7 +239,33 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 			++num_of_packets_not_written_;
 			return false;
 		}
-		file = segments_[current_segment_index_].file;
+	}
+	return true;
+}
+
+bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
+{
+	if (!m_DeviceOpened)
+	{
+		YANET_LOG_ERROR("Device not opened\n");
+		++num_of_packets_not_written_;
+		return false;
+	}
+
+	if (packet.getLinkLayerType() != link_layer_type_)
+	{
+		YANET_LOG_ERROR("Cannot write a packet with a different link layer type\n");
+		++num_of_packets_not_written_;
+		return false;
+	}
+
+	const pcap_pkthdr pkt_hdr = CreatePacketHeader(packet);
+
+	// kPcapPacketHeaderSizeOnDisk is different from sizeof(pcap_pkthdr)
+	size_t needed = kPcapPacketHeaderSizeOnDisk + pkt_hdr.caplen;
+	if (!EnsureSegmentCapacity(needed))
+	{
+		return false;
 	}
 
 	pcap_dump(reinterpret_cast<uint8_t*>(segments_[current_segment_index_].dumper), &pkt_hdr, packet.getRawData());
