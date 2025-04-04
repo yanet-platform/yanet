@@ -1,9 +1,30 @@
+dataplane_common_sources = files(
+    'dump_rings.cpp',
+    'pcap_shm_device.cpp'
+)
+
+dataplane_common_dependencies = []
+dataplane_common_dependencies += libdpdk.get_variable('dpdk_dep')
+dataplane_common_dependencies += libjson.get_variable('nlohmann_json_dep')
+dataplane_common_dependencies += pcapplusplus_deps
+
+dataplane_common_lib = static_library('dataplane_common',
+    dataplane_common_sources,
+    include_directories: yanet_rootdir,
+    dependencies: dataplane_common_dependencies
+)
+
+# Declare a dependency so it can be used in other subfolders
+dataplane_common_dep = declare_dependency(
+    link_with: dataplane_common_lib,
+    include_directories: yanet_rootdir,
+    dependencies: dataplane_common_dependencies
+)
+
 dependencies = []
-dependencies += libdpdk.get_variable('dpdk_dep')
-dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
-dependencies += pcapplusplus_deps
+dependencies += [dataplane_common_dep]
 
 sources = files('bus.cpp',
                 'controlplane.cpp',
@@ -20,8 +41,6 @@ sources = files('bus.cpp',
                 'memory_manager.cpp',
                 'neighbor.cpp',
                 'report.cpp',
-                'dump_rings.cpp',
-                'pcap_shm_device.cpp',
                 'slow_worker.cpp',
                 'sock_dev.cpp',
                 'worker.cpp',
