@@ -26,6 +26,8 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: Install CMake
+        run: apt-get update && apt-get install -y cmake
       - run: |
           meson setup -Dtarget=unittest build_unittest
           meson compile -C build_unittest
@@ -46,6 +48,8 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: Install CMake
+        run: apt-get update && apt-get install -y cmake
       - run: |
           meson setup --prefix=/target_autotest -Dtarget=autotest -Dstrip=true build_autotest
           meson compile -C build_autotest
@@ -67,6 +71,8 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: Install CMake
+        run: apt-get update && apt-get install -y cmake
       - run: |
           meson setup --prefix=/target -Dstrip=true build
           meson compile -C build
