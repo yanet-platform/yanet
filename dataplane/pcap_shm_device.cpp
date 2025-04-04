@@ -8,7 +8,6 @@
 #include "common/define.h"
 #include "pcap_shm_device.h"
 
-// TODO: replace cerr with YANET_LOG
 namespace pcpp
 {
 
@@ -38,14 +37,14 @@ bool PcapShmWriterDevice::FillSegments()
 		FILE* file = fmemopen(segments_[i].start_ptr, segments_[i].size, "w+");
 		if (!file)
 		{
-			std::cerr << "fmemopen failed for segment " << i << std::endl;
+			YANET_LOG_ERROR("fmemopen failed for segment %zu\n", i);
 			return false;
 		}
 
 		pcap_dumper_t* dumper = pcap_dump_fopen(m_PcapDescriptor.get(), file);
 		if (!dumper)
 		{
-			std::cerr << "pcap_dump_fopen failed for segment " << i << std::endl;
+			YANET_LOG_ERROR("pcap_dump_fopen failed for segment %zu\n", i);
 			fclose(file);
 			return false;
 		}
@@ -69,11 +68,11 @@ PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t 
 #else
 	if (nanosecondsPrecision)
 	{
-		std::cerr << "PcapPlusPlus was compiled without nano precision support which requires "
-		             "libpcap > 1.5.1. Please "
-		             "recompile PcapPlusPlus with nano precision support to use this feature. "
-		             "Using "
-		             "default microsecond precision.\n";
+		YANET_LOG_WARNING("PcapPlusPlus was compiled without nano precision support which requires "
+		                  "libpcap > 1.5.1. Please "
+		                  "recompile PcapPlusPlus with nano precision support to use this feature. "
+		                  "Using "
+		                  "default microsecond precision.\n");
 	}
 	m_Precision_ = FileTimestampPrecision::Microseconds;
 #endif
@@ -153,8 +152,8 @@ bool PcapShmWriterDevice::open()
 	{
 		case LINKTYPE_RAW:
 		case LINKTYPE_DLT_RAW2:
-			std::cerr << "The only Raw IP link type supported in libpcap/WinPcap/Npcap is "
-			             "LINKTYPE_DLT_RAW1, please use that instead\n";
+			YANET_LOG_ERROR("The only Raw IP link type supported in libpcap/WinPcap/Npcap is "
+			                "LINKTYPE_DLT_RAW1, please use that instead\n");
 			return false;
 		default:
 			break;
@@ -169,8 +168,7 @@ bool PcapShmWriterDevice::open()
 #endif
 	if (m_PcapDescriptor == nullptr)
 	{
-		std::cerr << "Error opening pcap descriptor: pcap_open_dead returned nullptr"
-		          << std::endl;
+		YANET_LOG_ERROR("Error opening pcap descriptor: pcap_open_dead returned nullptr\n");
 		return false;
 	}
 
@@ -188,14 +186,14 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 {
 	if (!m_DeviceOpened)
 	{
-		std::cerr << "Device not opened" << std::endl;
+		YANET_LOG_ERROR("Device not opened\n");
 		++num_of_packets_not_written_;
 		return false;
 	}
 
 	if (packet.getLinkLayerType() != link_layer_type_)
 	{
-		std::cerr << "Cannot write a packet with a different link layer type" << std::endl;
+		YANET_LOG_ERROR("Cannot write a packet with a different link layer type\n");
 		++num_of_packets_not_written_;
 		return false;
 	}
@@ -226,7 +224,7 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 	long used = ftell(file);
 	if (used < 0)
 	{
-		std::cerr << "ftell failed on current segment" << std::endl;
+		YANET_LOG_ERROR("ftell failed on current segment\n");
 		++num_of_packets_not_written_;
 		return false;
 	}
@@ -236,7 +234,7 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 	{
 		if (!RotateToNextSegment())
 		{
-			std::cerr << "fseek failed when rotating to next segment" << std::endl;
+			YANET_LOG_ERROR("fseek failed when rotating to next segment\n");
 			++num_of_packets_not_written_;
 			return false;
 		}
@@ -267,7 +265,7 @@ void PcapShmWriterDevice::Flush()
 	{
 		if (seg.dumper != nullptr && pcap_dump_flush(seg.dumper) == -1)
 		{
-			std::cerr << "Error while flushing the packets to shared memory" << std::endl;
+			YANET_LOG_ERROR("Error while flushing the packets to shared memory\n");
 		}
 	}
 
@@ -275,7 +273,7 @@ void PcapShmWriterDevice::Flush()
 	{
 		if (seg.file != nullptr && fflush(seg.file) == EOF)
 		{
-			std::cerr << "Error while flushing the packets to file" << std::endl;
+			YANET_LOG_ERROR("Error while flushing the packets to file\n");
 		}
 	}
 }
@@ -417,12 +415,12 @@ bool PcapShmWriterDevice::ReadPacketFromSegment(RawPacket& raw_packet, const Pac
 		}
 		else if (result == -1)
 		{
-			std::cerr << "Error reading packet: " << pcap_geterr(pcap_reader.get()) << std::endl;
+			YANET_LOG_ERROR("Error reading packet: %s\n", pcap_geterr(pcap_reader.get()));
 			return false;
 		}
 		else if (result == -2)
 		{
-			std::cerr << "Reached end of segment unexpectedly" << std::endl;
+			YANET_LOG_ERROR("Reached end of segment unexpectedly\n");
 			return false;
 		}
 	}
@@ -438,8 +436,9 @@ bool PcapShmWriterDevice::GetPacket(RawPacket& raw_packet, unsigned pkt_number) 
 	PacketLocation location = LocatePacketInSegments(pkt_number);
 	if (!location.found)
 	{
-		std::cerr << "Requested packet number " << pkt_number
-		          << " exceeds total available packets (" << location.total_packets << ")" << std::endl;
+		YANET_LOG_INFO("Requested packet number %d exceeds total available packets (%zu)\n",
+		               pkt_number + 1,
+		               location.total_packets);
 		return false;
 	}
 

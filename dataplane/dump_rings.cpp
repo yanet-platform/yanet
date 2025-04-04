@@ -96,7 +96,7 @@ class MBufRawPacketCopy : public pcpp::RawPacket
 	{
 		if (mbuf == nullptr)
 		{
-			std::cerr << "mbuf to set is nullptr" << std::endl;
+			YANET_LOG_ERROR("Cannot initialize MBufRawPacketCopy with null mbuf\n");
 			return;
 		}
 
