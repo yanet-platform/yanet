@@ -76,7 +76,6 @@ PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t 
 	}
 	m_Precision_ = FileTimestampPrecision::Microseconds;
 #endif
-
 }
 
 PcapShmWriterDevice::~PcapShmWriterDevice()
