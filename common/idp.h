@@ -14,6 +14,7 @@
 #include "balancer.h"
 #include "common/actions.h"
 #include "config.h"
+#include "dataplane/config.h"
 #include "memory_manager.h"
 #include "neighbor.h"
 #include "result.h"
@@ -40,6 +41,8 @@ enum class requestType : uint32_t
 	getGlobalBase,
 	getWorkerStats,
 	getSlowWorkerStats,
+	clearWorkerDumpRings,
+	flushDumpRing,
 	get_worker_gc_stats,
 	get_dregress_counters,
 	get_ports_stats,
@@ -62,6 +65,7 @@ enum class requestType : uint32_t
 	limits,
 	samples,
 	hitcount_dump,
+	tcpdump_ring,
 	debug_latch_update,
 	unrdup_vip_to_balancers,
 	update_vip_vport_proto,
@@ -640,6 +644,11 @@ using response = std::tuple<common::slowworker::stats_t,
                             std::vector<hashtable_gc>>;
 }
 
+namespace flushDumpRing
+{
+using request = tDataPlaneConfig::DumpRingDesc;
+}
+
 namespace get_worker_gc_stats
 {
 using response = std::map<tCoreId,
@@ -860,8 +869,7 @@ namespace get_shm_info
 {
 using dump_meta = std::tuple<std::string, ///< ring name
                              std::string, ///< dump tag
-                             unsigned int, ///< dump size
-                             unsigned int, ///< dump count
+                             tDataPlaneConfig::DumpConfig, ///< dump config
                              tCoreId, ///< core id
                              tSocketId, ///< socket id
                              key_t, /// ipc shm key
@@ -921,6 +929,31 @@ struct Data
 };
 
 using response = std::unordered_map<id, Data>;
+}
+
+namespace tcpdump_ring
+{
+struct RingAndPcapFile
+{
+	tDataPlaneConfig::DumpRingDesc ring_desc{};
+	std::string prefix{};
+	std::string path{};
+
+	SERIALIZABLE(ring_desc, prefix, path);
+
+	RingAndPcapFile() = default;
+
+	RingAndPcapFile(std::string tag,
+	                tCoreId core_id,
+	                tSocketId socket_id,
+	                std::string pcap_file_prefix,
+	                std::string pcap_file_path) :
+	        ring_desc{std::move(tag), core_id, socket_id},
+	        prefix(std::move(pcap_file_prefix)),
+	        path(std::move(pcap_file_path)) {}
+};
+
+using request = RingAndPcapFile;
 }
 
 namespace debug_latch_update
@@ -1001,6 +1034,7 @@ using request = std::tuple<requestType,
                                         getGlobalBase::request,
                                         getControlPlanePortStats::request,
                                         getWorkerStats::request,
+                                        flushDumpRing::request,
                                         lpm4LookupAddress::request,
                                         lpm6LookupAddress::request,
                                         nat64stateful_state::request,
@@ -1009,6 +1043,7 @@ using request = std::tuple<requestType,
                                         unrdup_vip_to_balancers::request,
                                         update_vip_vport_proto::request,
                                         dump_physical_port::request,
+                                        tcpdump_ring::request,
                                         neighbor_insert::request,
                                         neighbor_remove::request,
                                         neighbor_update_interfaces::request,

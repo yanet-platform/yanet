@@ -92,5 +92,16 @@ struct function
 	using args = decltype(pro_args(std::function{std::declval<T>()}));
 };
 
+template<typename T, typename = std::void_t<>>
+struct has_ToString : std::false_type
+{};
+
+template<typename T>
+struct has_ToString<T, std::void_t<decltype(std::declval<T>().ToString())>> : std::true_type
+{};
+
+template<typename T>
+inline constexpr bool has_ToString_v = has_ToString<T>::value;
+
 }
 // namespace utils
