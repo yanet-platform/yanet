@@ -22,7 +22,7 @@ RUN meson compile -C build_release
 RUN meson install -C build_release
 
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
