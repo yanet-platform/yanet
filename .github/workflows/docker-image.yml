@@ -8,7 +8,7 @@ on:
 
 jobs:
   formatting-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v3
       - name: Run clang-format style check
@@ -19,7 +19,7 @@ jobs:
 
   build-unittest:
     needs: formatting-check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: yanetplatform/builder-lite
     steps:
@@ -39,7 +39,7 @@ jobs:
 
   build-autotest:
     needs: formatting-check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: yanetplatform/builder-lite
     steps:
@@ -60,7 +60,7 @@ jobs:
 
   build:
     needs: formatting-check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: yanetplatform/builder-lite
     steps:
@@ -75,7 +75,7 @@ jobs:
   build-ubuntu1804:
     name: build (Ubuntu 18.04)
     needs: formatting-check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: yanetplatform/builder_ubuntu18.04-lite
     steps:
@@ -89,7 +89,7 @@ jobs:
 
   unittest:
     needs: build-unittest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: yanetplatform/builder-lite
     steps:
@@ -103,7 +103,7 @@ jobs:
   autotest-001_one_port:
     name: 001_one_port
     needs: build-autotest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container:
       image: yanetplatform/builder-lite
     steps:
@@ -122,6 +122,6 @@ jobs:
       - unittest
       - autotest-001_one_port
       - build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - run: echo deploy
