@@ -229,6 +229,14 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::SlowWorkerStatsResponse, request);
 		}
+		else if (type == common::idp::requestType::clearWorkerDumpRings)
+		{
+			response = callWithResponse(&cControlPlane::clearWorkerDumpRings, request);
+		}
+		else if (type == common::idp::requestType::flushDumpRing)
+		{
+			response = callWithResponse(&cControlPlane::flushDumpRing, request);
+		}
 		else if (type == common::idp::requestType::get_worker_gc_stats)
 		{
 			response = callWithResponse(&cControlPlane::get_worker_gc_stats, request);
@@ -312,6 +320,10 @@ void cBus::clientThread(int clientSocket)
 		else if (type == common::idp::requestType::hitcount_dump)
 		{
 			response = callWithResponse(&cControlPlane::hitcount_dump, request);
+		}
+		else if (type == common::idp::requestType::tcpdump_ring)
+		{
+			response = callWithResponse(&cControlPlane::tcpdump_ring, request);
 		}
 		else if (type == common::idp::requestType::debug_latch_update)
 		{

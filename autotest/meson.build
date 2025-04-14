@@ -1,12 +1,12 @@
-sources = files('autotest.cpp',
-                'main.cpp')
-
 dependencies = []
-dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('yaml-cpp', static: true)
-dependencies += dependency('libpcap', static: true)
 dependencies += dependency('gmock')
+dependencies += [dataplane_common_dep]
+
+sources = files('autotest.cpp',
+                'main.cpp',
+                )
 
 executable('yanet-autotest',
            sources,
