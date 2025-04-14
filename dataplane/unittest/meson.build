@@ -5,6 +5,7 @@ dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
 dependencies += dependency('gtest')
 dependencies += dependency('gtest_main')
+dependencies += libyanet_common_dep
 
 sources = files('unittest.cpp',
                 'ip_address.cpp',

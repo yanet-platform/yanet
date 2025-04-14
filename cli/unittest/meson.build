@@ -4,6 +4,7 @@ dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('threads')
 dependencies += dependency('gtest')
 dependencies += dependency('gtest_main')
+dependencies += libyanet_common_dep
 
 cli_sources = files()
 

@@ -65,21 +65,6 @@ libdpdk = subproject('dpdk', default_options: [
 
 libjson = subproject('json')
 
-if target_option.contains('buildenv')
-    subdir('libprotobuf')
-    subdir('libfwparser')
-    subdir('parser')
-    subdir_done()
-elif target_option.contains('unittest')
-    subdir('libprotobuf')
-    subdir('libfwparser')
-    subdir('dataplane/unittest')
-    subdir('controlplane/unittest')
-    subdir('cli/unittest')
-    subdir('common/unittest')
-    subdir_done()
-endif
-
 archs = ['corei7']
 yanet_configs = ['release']
 
@@ -96,11 +81,25 @@ if yanet_config_option.length() > 0
     yanet_configs = yanet_config_option
 endif
 
+subdir('common')
 subdir('libprotobuf')
 subdir('libfwparser')
+
+if target_option.contains('buildenv')
+    subdir('parser')
+    subdir_done()
+elif target_option.contains('unittest')
+    subdir('dataplane/unittest')
+    subdir('controlplane/unittest')
+    subdir('cli/unittest')
+    subdir('common/unittest')
+    subdir_done()
+endif
+
 subdir('dataplane')
 subdir('controlplane')
 subdir('cli')
+
 
 if target_option.contains('release')
     subdir('logger')

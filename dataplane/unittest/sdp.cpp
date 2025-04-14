@@ -1,7 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "../../common/idp.h"
-#include "../../common/sdpclient.h"
+#include <common/idp.h>
+#include <common/sdpclient.h>
+
 #include "../sdpserver.h"
 
 class TestBus

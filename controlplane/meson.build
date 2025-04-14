@@ -2,6 +2,7 @@ dependencies = []
 dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
+dependencies += libyanet_common_dep
 dependencies += libyanet_fwparser_dep
 dependencies += libyanet_protobuf_dep
 if get_option('custom_hash_structures')
