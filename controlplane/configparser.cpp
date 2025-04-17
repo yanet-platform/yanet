@@ -106,6 +106,10 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 				{
 					loadConfig_nat46clat(baseNext, id, moduleJson, rootFilePath, jsons);
 				}
+				else if (type == "proxy")
+				{
+					loadConfig_proxy(baseNext, id, moduleJson, rootFilePath, jsons);
+				}
 				else
 				{
 					throw error_result_t(eResult::invalidType, "unknown module type: " + type);
@@ -1098,6 +1102,187 @@ void config_parser_t::loadConfig_nat46clat(controlplane::base_t& baseNext,
 
 	nat46clat.next_module = moduleJson.value("nextModule", "");
 	nat46clat.nat46clat_id = nat46clat_id;
+}
+
+void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
+                                       const std::string& moduleId,
+                                       const nlohmann::json& moduleJson,
+                                       const std::string& rootFilePath,
+                                       const std::map<std::string, nlohmann::json>& jsons)
+{
+	proxy_id_t proxy_id = baseNext.proxies.size() + 1;
+
+	auto& proxy = baseNext.proxies[moduleId];
+
+	if (exist(moduleJson, "syn_type"))
+	{
+		std::string str_syn_type = moduleJson["syn_type"].get<std::string>();
+		std::optional<common::proxySynType> syn_type = common::to_proxy_type(str_syn_type);
+		if (syn_type.has_value())
+		{
+			proxy.syn_type = syn_type.value();
+		}
+		else
+		{
+			throw error_result_t(eResult::invalidType, "unknown syn_type: " + str_syn_type);
+		}
+		
+	}
+
+	if (exist(moduleJson, "local_pool"))
+	{
+		for (const auto& ipPrefixJson : moduleJson["local_pool"])
+		{
+			proxy.local_pool.emplace(ipPrefixJson.get<std::string>());
+		}
+	}
+	
+	proxy.max_local_addresses = moduleJson.value("max_local_addresses", YANET_PROXY_MAX_LOCAL_ADDRESSES);
+	proxy.mem_size_syn = moduleJson.value("mem_size_syn", YANET_PROXY_DEFAULT_MEM_SIZE_TABLE_SYN);
+	proxy.mem_size_connections = moduleJson.value("mem_size_connections", YANET_PROXY_DEFAULT_MEM_SIZE_TABLE_CONNECTIONS);
+	proxy.timeout_syn = moduleJson.value("timeout_syn", YANET_PROXY_DEFAULT_TIMEOUT_SYN);
+	proxy.timeout_connection = moduleJson.value("timeout_connection", YANET_PROXY_DEFAULT_TIMEOUT_CONNECTION);
+	proxy.timeout_fin = moduleJson.value("timeout_fin", YANET_PROXY_DEFAULT_TIMEOUT_CONNECTION_FIN);
+
+	if (exist(moduleJson, "services"))
+	{
+		loadConfig_proxy_services(baseNext,
+		                          proxy,
+		                          moduleJson["services"],
+		                          rootFilePath,
+		                          jsons);
+	}
+
+	proxy.proxy_id = proxy_id;
+	proxy.nextModule = moduleJson.value("nextModule", "");
+
+	// YANET_LOG_WARNING("loadConfig_proxy proxy_id=%d, syn_type=%s\n", proxy.proxy_id, controlplane::proxy::from_proxy_type(proxy.syn_type));
+	// YANET_LOG_WARNING("\tmax_local_addresses=%d, mem_size_syn=%d, mem_size_connections=%d, timeout_syn=%d, timeout_connection=%d, timeout_fin=%d\n",
+	// 	proxy.max_local_addresses, proxy.mem_size_syn, proxy.mem_size_connections, proxy.timeout_syn, proxy.timeout_connection, proxy.timeout_fin);
+	// for (const auto& local_prefix : proxy.local_pool)
+	// {
+	// 	YANET_LOG_WARNING("\tlocal prefix: %s\n", local_prefix.toString().c_str());
+	// }
+	// for (const auto& service : proxy.services)
+	// {
+	// 	YANET_LOG_WARNING("\tservice service_id=%d, name=%s, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d\n",
+	// 		service.service_id, service.service.c_str(), service.proxy_addr.toString().c_str(), service.proxy_port, service.service_addr.toString().c_str(), service.service_port);
+	// 	for (auto& prefix : service.blacklist)
+	// 	{
+	// 		YANET_LOG_WARNING("\t\tblacklist: %s\n", prefix.toString().c_str());
+	// 	}
+	// }
+}
+
+void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
+                                                controlplane::proxy::config_t& proxy,
+                                                const nlohmann::json& json,
+                                                const std::string& rootFilePath,
+                                                const std::map<std::string, nlohmann::json>& jsons)
+{
+	if (json.is_string())
+	{
+		std::string includePath = json;
+
+		if (includePath.find("/") != 0) ///< relative path
+		{
+			includePath = dirname(rootFilePath) + "/" + includePath;
+		}
+
+		if (exist(jsons, includePath))
+		{
+			loadConfig_proxy_services(baseNext,
+			                          proxy,
+			                          jsons.find(includePath)->second,
+			                          rootFilePath,
+			                          jsons);
+		}
+		else
+		{
+			std::ifstream includeFileStream(includePath);
+			if (!includeFileStream.is_open())
+			{
+				throw error_result_t(eResult::errorOpenFile, "can't open file " + includePath);
+			}
+			else
+			{
+				nlohmann::json includeJson = nlohmann::json::parse(includeFileStream, nullptr, false);
+				if (includeJson.is_discarded())
+				{
+					throw error_result_t(eResult::invalidConfigurationFile, "invalid json format");
+				}
+
+				loadConfig_proxy_services(baseNext,
+				                          proxy,
+				                          includeJson,
+				                          rootFilePath,
+				                          jsons);
+			}
+		}
+
+		return;
+	}
+
+
+	for (const auto& service_json : json)
+	{
+		if (baseNext.services_count >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "too many services");
+		}
+
+		controlplane::proxy::service_t service;
+		service.service_id = baseNext.proxy_services_count + 1;
+
+		std::vector<std::string> required_parameters = {"proxy_addr", "proxy_port", "service_addr", "service_port"};
+		for (const auto& parameter : required_parameters)
+		{
+			if (!exist(service_json, parameter))
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "parameter not found: " + parameter);
+			}
+		}
+
+		service.service = service_json.value("service", "");
+		service.proxy_addr = common::ip_address_t(service_json["proxy_addr"]);
+		service.proxy_port = service_json["proxy_port"];
+		service.service_addr = common::ip_address_t(service_json["service_addr"]);
+		service.service_port = service_json["service_port"];
+
+		if (exist(service_json, "blacklist"))
+		{
+			auto json_blacklist = service_json["blacklist"];
+			if (json_blacklist.is_string())
+			{
+				std::string includePath = json_blacklist;
+				if (includePath.find("/") != 0) ///< relative path
+				{
+					includePath = dirname(rootFilePath) + "/" + includePath;
+				}
+					std::ifstream includeFileStream(includePath);
+				if (!includeFileStream.is_open())
+				{
+					throw error_result_t(eResult::errorOpenFile, "can't open file " + includePath);
+				}
+				std::string prefix;
+				while (std::getline(includeFileStream, prefix))
+				{
+					service.blacklist.insert(common::ip_prefix_t(prefix));
+				}
+			}
+			else
+			{
+				for (const auto& prefix : json_blacklist)
+				{
+					service.blacklist.insert(common::ip_prefix_t(prefix));
+				}
+			}
+		}
+
+		proxy.services.push_back(std::move(service));
+
+		baseNext.proxy_services_count++;
+	}
 }
 
 void config_parser_t::loadConfig_acl(controlplane::base_t& baseNext,

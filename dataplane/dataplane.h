@@ -25,6 +25,7 @@
 #include "kernel_interface_handler.h"
 #include "memory_manager.h"
 #include "neighbor.h"
+#include "proxy.h"
 #include "report.h"
 #include "slow_worker.h"
 #include "type.h"
@@ -271,6 +272,7 @@ protected:
 	mutable std::mutex dpdk_mutex;
 
 	common::sdp::DataPlaneInSharedMemory sdp_data;
+	dataplane::proxy::TcpConnectionStore tcp_connection_store;
 
 public: ///< modules
 	cReport report;

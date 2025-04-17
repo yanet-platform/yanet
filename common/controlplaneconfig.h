@@ -310,4 +310,68 @@ public:
 
 }
 
+namespace proxy
+{
+
+class service_t
+{
+public:
+	service_t() = default;
+
+	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, service_addr, service_port, blacklist);
+
+public:
+	proxy_service_id_t service_id;
+	std::string service;
+    // "proto": "tcp",
+	common::ip_address_t proxy_addr;
+    tPortId proxy_port;
+    common::ip_address_t service_addr;
+    tPortId service_port;
+    std::set<common::ip_prefix_t> blacklist;
+
+	std::pair<common::ip_address_t, tPortId> Key() const
+	{
+		return {proxy_addr, proxy_port};
+	}
+};
+
+class config_t
+{
+public:
+	config_t() = default;
+
+	SERIALIZABLE(proxy_id, syn_type, services, local_pool, max_local_addresses, mem_size_syn, mem_size_connections, timeout_syn, timeout_connection, timeout_fin, nextModule, flow);
+
+public:
+	proxy_id_t proxy_id;
+
+	common::proxySynType syn_type{common::proxySynType::mixed};
+	uint32_t max_local_addresses;
+	uint32_t mem_size_syn;
+	uint32_t mem_size_connections;
+	
+	std::set<common::ip_prefix_t> local_pool;
+
+	std::vector<service_t> services;
+	
+	uint32_t timeout_syn;
+	uint32_t timeout_connection;
+	uint32_t timeout_fin;
+
+	std::string nextModule;
+	common::globalBase::tFlow flow;
+
+	std::map<std::pair<common::ip_address_t, tPortId>, const service_t*> BuildMapServices() const {
+		std::map<std::pair<common::ip_address_t, tPortId>, const service_t*> result;
+		for (const auto& service : services)
+		{
+			result[{service.proxy_addr, service.proxy_port}] = &service;
+		}
+		return result;
+	}
+};
+
+}
+
 }

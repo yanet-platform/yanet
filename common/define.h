@@ -103,6 +103,13 @@ extern LogPriority logPriority;
 #define YANET_BALANCER_PURE_L3 ((uint8_t)(1u << 2))
 #define YANET_BALANCER_PURE_ROUND_ROBIN ((uint8_t)(1u << 3))
 
+#define YANET_PROXY_MAX_LOCAL_ADDRESSES ((uint32_t)(65536))
+#define YANET_PROXY_DEFAULT_MEM_SIZE_TABLE_SYN ((uint32_t)(128))
+#define YANET_PROXY_DEFAULT_MEM_SIZE_TABLE_CONNECTIONS ((uint32_t)(128))
+#define YANET_PROXY_DEFAULT_TIMEOUT_SYN ((uint32_t)(2))
+#define YANET_PROXY_DEFAULT_TIMEOUT_CONNECTION ((uint32_t)(60))
+#define YANET_PROXY_DEFAULT_TIMEOUT_CONNECTION_FIN ((uint32_t)(15))
+
 #define CALCULATE_LOGICALPORT_ID(portId, vlanId) ((portId << 13) | ((vlanId & 0xFFF) << 1) | 1)
 
 #if __cpp_exceptions

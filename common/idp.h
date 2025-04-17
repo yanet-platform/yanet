@@ -134,6 +134,11 @@ enum class requestType : uint32_t
 	updateNat64statelessTranslation,
 	update_balancer,
 	update_balancer_services,
+        proxy_update,
+        proxy_remove,
+        proxy_add_local_pool,
+        proxy_service_update,
+        proxy_service_remove,
 	route_lpm_update,
 	route_value_update,
 	route_tunnel_lpm_update,
@@ -304,6 +309,40 @@ using request = std::tuple<
         std::vector<service>, ///< services
         std::vector<real>, ///< reals
         std::vector<balancer_real_id_t>>; ///< service real binding
+}
+
+namespace proxy_update
+{
+using request = std::tuple<proxy_id_t,
+                           common::proxySynType, ///< syn_type
+                           uint32_t, ///< max_local_addresses
+                           uint32_t, ///< mem_size_syn
+                           uint32_t, ///< mem_size_connections
+                           uint32_t, ///< timeout_syn
+                           uint32_t, ///< timeout_connection
+                           uint32_t, ///< timeout_fin
+                           common::globalBase::tFlow ///< Flow
+                           >;
+}
+
+namespace proxy_or_service_remove
+{
+using request = std::tuple<proxy_id_t>;
+}
+
+namespace proxy_add_local_pool
+{
+using request = std::tuple<proxy_id_t,
+                           common::ip_prefix_t>; ///< prefix
+}
+
+namespace proxy_service_update
+{
+using request = std::tuple<proxy_service_id_t,
+                           common::ip_address_t, ///< proxy_addr;
+                           tPortId, ///< proxy_port;
+                           common::ip_address_t, ///< service_addr;
+                           tPortId>; ///< service_port;
 }
 
 namespace update_early_decap_flags
@@ -530,6 +569,10 @@ using requestVariant = std::variant<std::tuple<>,
                                     tun64mappings_update::request,
                                     update_balancer::request,
                                     update_balancer_services::request,
+                                    proxy_update::request,
+                                    proxy_or_service_remove::request,
+                                    proxy_add_local_pool::request,
+                                    proxy_service_update::request,
                                     route_tunnel_weight_update::request,
                                     acl_network_ipv4_source::request, /// + acl_network_ipv4_destination, acl_network_ipv6_source, acl_network_ipv6_destination
                                     acl_network_ipv6_destination_ht::request,

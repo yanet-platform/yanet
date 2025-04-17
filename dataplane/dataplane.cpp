@@ -820,12 +820,14 @@ eResult cDataPlane::initGlobalBases()
 			{
 				return eResult::errorAllocatingMemory;
 			}
+			globalbase->SetTcpConnectionStore(&tcp_connection_store);
 
 			auto* globalbase_next = create_globalbase(socket_id);
 			if (!globalbase_next)
 			{
 				return eResult::errorAllocatingMemory;
 			}
+			globalbase_next->SetTcpConnectionStore(&tcp_connection_store);
 
 			globalBases[socket_id] = {globalbase,
 			                          globalbase_next};
@@ -895,6 +897,7 @@ eResult cDataPlane::initWorkers()
 		}
 
 		worker->SetBufferForCounters(sdp_data.workers[coreId].buffer, sdp_data.metadata_worker);
+		worker->SetTcpConnectionStore(&tcp_connection_store);
 
 		dataplane::base::permanently basePermanently;
 		{

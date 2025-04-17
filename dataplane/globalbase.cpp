@@ -480,6 +480,26 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		{
 			result = update_host_config(std::get<common::idp::updateGlobalBase::update_host_config::request>(data));
 		}
+		else if (type == common::idp::updateGlobalBase::requestType::proxy_update)
+		{
+			result = proxy_update(std::get<common::idp::updateGlobalBase::proxy_update::request>(data));
+		}
+		else if (type == common::idp::updateGlobalBase::requestType::proxy_remove)
+		{
+			result = proxy_remove(std::get<common::idp::updateGlobalBase::proxy_or_service_remove::request>(data));
+		}
+		else if (type == common::idp::updateGlobalBase::requestType::proxy_add_local_pool)
+		{
+			result = proxy_add_local_pool(std::get<common::idp::updateGlobalBase::proxy_add_local_pool::request>(data));
+		}
+		else if (type == common::idp::updateGlobalBase::requestType::proxy_service_update)
+		{
+			result = proxy_service_update(std::get<common::idp::updateGlobalBase::proxy_service_update::request>(data));
+		}
+		else if (type == common::idp::updateGlobalBase::requestType::proxy_service_remove)
+		{
+			result = proxy_service_remove(std::get<common::idp::updateGlobalBase::proxy_or_service_remove::request>(data));
+		}
 		else
 		{
 			YADECAP_LOG_ERROR("invalid request type\n");
@@ -595,6 +615,11 @@ eResult generation::get(const common::idp::getGlobalBase::request& request,
 	return eResult::success;
 }
 
+void generation::SetTcpConnectionStore(dataplane::proxy::TcpConnectionStore* store)
+{
+	tcp_connection_store = store;
+}
+
 eResult generation::clear()
 {
 	for (auto& logicalPort : logicalPorts)
@@ -632,12 +657,23 @@ eResult generation::clear()
 		balancer = dataplane::globalBase::balancer_t();
 	}
 
+	for (auto& proxy : proxies)
+	{
+		proxy = dataplane::globalBase::proxy_t();
+	}
+
+	for (auto& service : proxy_services)
+	{
+		service = dataplane::globalBase::proxy_service_t();
+	}
+
 	tun64_enabled = 0;
 	decap_enabled = 0;
 	nat64stateful_enabled = 0;
 	nat64stateless_enabled = 0;
 	nat46clat_enabled = 0;
 	balancer_enabled = 0;
+	proxy_enabled = 0;
 	acl_egress_enabled = 0;
 	sampler_enabled = 0;
 	serial = 0;
@@ -821,6 +857,22 @@ static bool checkFlow(const common::globalBase::tFlow& flow)
 	}
 	else if (flow.type == common::globalBase::eFlowType::controlPlane)
 	{
+	}
+	else if (flow.type == common::globalBase::eFlowType::proxy_client_syn ||
+	         flow.type == common::globalBase::eFlowType::proxy_client_ack ||
+			 flow.type == common::globalBase::eFlowType::proxy_server_syn_ack ||
+			 flow.type == common::globalBase::eFlowType::proxy_server_ack ||
+			 flow.type == common::globalBase::eFlowType::proxy_client_icmp)
+	{
+		if (flow.data.proxy.id >= YANET_CONFIG_PROXIES_SIZE)
+		{
+			return false;
+		}
+
+		if (flow.data.proxy.service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+		{
+			return false;
+		}
 	}
 	else
 	{
@@ -2583,4 +2635,97 @@ eResult generation::update_host_config(const common::idp::updateGlobalBase::upda
 	        show_real_address};
 
 	return result;
+}
+
+eResult generation::proxy_update(const common::idp::updateGlobalBase::proxy_update::request& request)
+{
+	auto [proxy_id, syn_type, max_local_addresses, mem_size_syn, mem_size_connections, timeout_syn, timeout_connection, timeout_fin, flow] = request;
+	// YANET_LOG_WARNING("proxy_update: proxy_id=%d, syn_type=%s, max_local_addresses=%d, mem_size_syn=%d, mem_size_connections=%d, timeout_syn=%d, timeout_connection=%d, timeout_fin=%d, flow=%s\n",
+	// 	proxy_id, from_proxy_type(syn_type), max_local_addresses, mem_size_syn, mem_size_connections, timeout_syn, timeout_connection, timeout_fin, flow.to_string().c_str());
+
+
+	if (proxy_id >= YANET_CONFIG_PROXIES_SIZE)
+	{
+		YADECAP_LOG_ERROR("invalid proxy_id: '%u'\n", proxy_id);
+		return eResult::invalidId;
+	}
+	if (flow.type != common::globalBase::eFlowType::route &&
+		flow.type != common::globalBase::eFlowType::controlPlane &&
+		flow.type != common::globalBase::eFlowType::drop)
+	{
+		YADECAP_LOG_ERROR("invalid flow\n");
+		return eResult::invalidFlow;
+	}
+	if (!checkFlow(flow))
+	{
+		YADECAP_LOG_ERROR("invalid flow\n");
+		return eResult::invalidFlow;
+	}
+
+	auto& proxy = proxies[proxy_id];
+
+	proxy.syn_type = syn_type;
+	proxy.max_local_addresses = max_local_addresses;
+	proxy.mem_size_syn = mem_size_syn;
+	proxy.mem_size_connections = mem_size_connections;
+	proxy.timeout_syn = timeout_syn;
+	proxy.timeout_connection = timeout_connection;
+	proxy.timeout_fin = timeout_fin;
+
+	proxy.flow = flow;
+
+	proxy_enabled = 1;
+
+	tcp_connection_store->proxy_update(proxy_id, proxy);
+
+	return eResult::success;
+}
+
+eResult generation::proxy_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request)
+{
+	auto [proxy_id] = request;
+	// YANET_LOG_WARNING("proxy_remove: proxy_id=%d\n", proxy_id);
+	tcp_connection_store->proxy_remove(proxy_id);
+	return eResult::success;
+}
+
+eResult generation::proxy_add_local_pool(const common::idp::updateGlobalBase::proxy_add_local_pool::request& request)
+{
+	auto [proxy_id, prefix] = request;
+	tcp_connection_store->proxy_add_local_pool(proxy_id, prefix);
+	// YANET_LOG_WARNING("proxy_add_local_pool proxy_id=%d, prefix=%s\n", proxy_id, prefix.toString().c_str());
+	return eResult::success;
+}
+
+eResult generation::proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request)
+{
+	auto [service_id, proxy_addr, proxy_port, service_addr, service_port] = request;
+	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d\n",
+	// 	service_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port);
+
+
+	if (service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+	{
+		YADECAP_LOG_ERROR("invalid proxy_service_id: '%u'\n", service_id);
+		return eResult::invalidId;
+	}
+
+	auto& service = proxy_services[service_id];
+
+	service.proxy_addr = ipv4_address_t::convert(proxy_addr.get_ipv4());
+	service.proxy_port = proxy_port;
+	service.service_addr = ipv4_address_t::convert(service_addr.get_ipv4());
+	service.service_port = service_port;
+
+	tcp_connection_store->proxy_service_update(service_id, service);
+
+	return eResult::success;
+}
+
+eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request)
+{
+	auto [service_id] = request;
+	// YANET_LOG_WARNING("proxy_service_remove: service_id=%d\n", service_id);
+	tcp_connection_store->proxy_service_remove(service_id);
+	return eResult::success;
 }

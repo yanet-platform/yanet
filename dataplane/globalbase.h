@@ -15,6 +15,7 @@
 #include "flat.h"
 #include "hashtable.h"
 #include "lpm.h"
+#include "proxy.h"
 #include "type.h"
 #include "updater.h"
 #include "vrf.h"
@@ -147,6 +148,7 @@ public:
 	eResult update(const common::idp::updateGlobalBase::request& request);
 	eResult updateBalancer(const common::idp::updateGlobalBaseBalancer::request& request);
 	eResult get(const common::idp::getGlobalBase::request& request, common::idp::getGlobalBase::globalBase& globalBaseResponse) const;
+	void SetTcpConnectionStore(dataplane::proxy::TcpConnectionStore* store);
 
 protected:
 	eResult clear();
@@ -192,6 +194,11 @@ protected:
 	eResult tsc_state_update(const common::idp::updateGlobalBase::tsc_state_update::request& request);
 	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 	eResult update_host_config(const common::idp::updateGlobalBase::update_host_config::request& request);
+	eResult proxy_update(const common::idp::updateGlobalBase::proxy_update::request& request);
+	eResult proxy_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request);
+	eResult proxy_add_local_pool(const common::idp::updateGlobalBase::proxy_add_local_pool::request& request);
+	eResult proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request);
+	eResult proxy_service_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request);
 
 	void evaluate_service_ring();
 	inline uint64_t count_real_connections(uint32_t counter_id);
@@ -240,6 +247,8 @@ public: ///< @todo
 	tNat64stateless nat64statelesses[CONFIG_YADECAP_NAT64STATELESSES_SIZE];
 	nat46clat_t nat46clats[YANET_CONFIG_NAT46CLATS_SIZE];
 	balancer_t balancers[YANET_CONFIG_BALANCERS_SIZE];
+	proxy_t proxies[YANET_CONFIG_PROXIES_SIZE];
+	proxy_service_t proxy_services[YANET_CONFIG_PROXY_SERVICES_SIZE];
 	dregress_t dregresses[CONFIG_YADECAP_DREGRESS_SIZE]; ///< @todo: slow global base
 	fw_state_sync_config_t fw_state_sync_configs[CONFIG_YADECAP_ACLS_SIZE];
 	tun64_t tun64tunnels[CONFIG_YADECAP_TUN64_SIZE];
@@ -254,6 +263,7 @@ public: ///< @todo
 	uint8_t sampler_enabled;
 	uint8_t tun64_enabled;
 	uint8_t early_decap_enabled;
+	uint8_t proxy_enabled;
 
 	uint32_t serial;
 
@@ -331,6 +341,8 @@ public: ///< @todo
 
 	bool tscs_active;
 	dataplane::perf::tsc_base_values tsc_base_values;
+
+	dataplane::proxy::TcpConnectionStore* tcp_connection_store;
 };
 
 }

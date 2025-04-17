@@ -30,6 +30,7 @@ eResult config_converter_t::process(uint32_t serial)
 		processTun64();
 		processBalancer();
 		processDregress();
+		processProxy();
 		processAcl();
 		processHostConfig();
 
@@ -311,6 +312,41 @@ void config_converter_t::convertToFlow(const std::string& nextModule,
 		else
 		{
 			flow.type = common::globalBase::eFlowType::balancer;
+		}
+	}
+	else if (moduleType == "proxy")
+	{
+		auto it = baseNext.proxies.find(moduleName);
+		if (it == baseNext.proxies.end())
+		{
+			throw error_result_t(eResult::invalidFlow, "invalid nextModule: " + nextModule);
+		}
+
+		flow.data.proxy.id = it->second.proxy_id;
+
+		if (entry == "client_syn")
+		{
+			flow.type = common::globalBase::eFlowType::proxy_client_syn;
+		}
+		else if (entry == "client_ack")
+		{
+			flow.type = common::globalBase::eFlowType::proxy_client_ack;
+		}
+		else if (entry == "server_syn_ack")
+		{
+			flow.type = common::globalBase::eFlowType::proxy_server_syn_ack;
+		}
+		else if (entry == "server_ack")
+		{
+			flow.type = common::globalBase::eFlowType::proxy_server_ack;
+		}
+		else if (entry == "client_icmp")
+		{
+			flow.type = common::globalBase::eFlowType::proxy_client_icmp;
+		}
+		else
+		{
+			throw error_result_t(eResult::invalidFlow, "invalid entry: " + entry);
 		}
 	}
 	else
@@ -697,6 +733,44 @@ void config_converter_t::processBalancer()
 
 	/// continue in balancer_t::compile()
 }
+	
+void config_converter_t::processProxy()
+{
+	for (auto& [moduleName, proxy] : baseNext.proxies)
+	{
+		GCC_BUG_UNUSED(moduleName);
+
+		if (proxy.proxy_id >= YANET_CONFIG_PROXIES_SIZE)
+		{
+			throw error_result_t(eResult::invalidProxyId, "invalid ProxyId: " + std::to_string(proxy.proxy_id));
+		}
+
+		convertToFlow(proxy.nextModule, proxy.flow);
+
+		if (proxy.flow.type != common::globalBase::eFlowType::route &&
+		    proxy.flow.type != common::globalBase::eFlowType::route_tunnel &&
+		    proxy.flow.type != common::globalBase::eFlowType::route_tunnel_ipip &&
+		    proxy.flow.type != common::globalBase::eFlowType::controlPlane &&
+		    proxy.flow.type != common::globalBase::eFlowType::drop)
+		{
+			throw error_result_t(eResult::invalidFlow, "invalid flow type for proxy: " + std::to_string(unsigned(proxy.flow.type)));
+		}
+
+		if (proxy.local_pool.empty() && !proxy.services.empty())
+		{
+			throw error_result_t(eResult::invalidFlow, "empty local pool for proxy");
+		}
+
+		for (const auto& service : proxy.services)
+		{
+			if (service.service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "too many services");
+			}
+		}
+	}
+	/// continue in proxy::compile()
+}
 
 void config_converter_t::processDregress()
 {
@@ -822,6 +896,10 @@ void config_converter_t::processAcl()
 				acl_rules_balancer(acl, nextModule);
 				acl_rules_balancer_icmp_reply(acl, nextModule);
 				acl_rules_balancer_icmp_forward(acl, nextModule);
+			}
+			else if (type == "proxy")
+			{
+				acl_rules_proxy(acl, nextModule);
 			}
 			else
 			{
@@ -1829,6 +1907,72 @@ void config_converter_t::acl_rules_balancer_icmp_forward(controlplane::base::acl
 			                                                         {{vip.get_ipv6(), 128}});
 
 			acl.nextModuleRules.emplace_back(rule_vip_dst, rule_icmpv6_forward, flow);
+		}
+	}
+}
+
+
+void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
+	const std::string& nextModule) const
+{
+	const auto& proxy = baseNext.proxies.at(nextModule);
+
+	for (const auto& service : proxy.services)
+	{
+		controlplane::base::acl_rule_network_ipv4_t client_rule_network({common::ipv4_prefix_default}, {common::ipv4_prefix_t(service.proxy_addr)});
+		controlplane::base::acl_rule_transport_tcp_t client_rule_transport{range_t{0x0000, 0xFFFF}, range_t{service.proxy_port}};
+		
+		for (const auto& prefix : service.blacklist)
+		{
+			// blacklist
+			common::globalBase::tFlow flow = convertToFlow("drop");
+			controlplane::base::acl_rule_network_ipv4_t blacklist_rule_network({common::ipv4_prefix_t(prefix)}, {common::ipv4_prefix_t(service.proxy_addr)});
+			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(blacklist_rule_network, client_rule_transport, flow));
+		}
+
+		{
+			// client_syn
+			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_syn");	
+			flow.data.proxy.service_id = service.service_id;
+			client_rule_transport.flags = {TCP_SYN_FLAG, TCP_ACK_FLAG};
+			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
+		}
+
+		{
+			// client_ack
+			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_ack");	
+			flow.data.proxy.service_id = service.service_id;
+			client_rule_transport.flags = {0, TCP_SYN_FLAG};
+			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
+		}
+
+		{
+			// client_icmp
+			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_icmp");	
+			flow.data.proxy.service_id = service.service_id;
+			ranges_t ping_types(values_t({ICMP_ECHO}));
+			ranges_t ping_codes(values_t({ICMP_ECHOREPLY}));
+			controlplane::base::acl_rule_transport_icmpv4_t rule_ping(ping_types, ping_codes);
+			acl.nextModuleRules.emplace_back(client_rule_network, rule_ping, flow);
+		}
+
+		controlplane::base::acl_rule_network_ipv4_t server_rule_network({common::ipv4_prefix_t(service.service_addr)}, {common::ipv4_prefix_default});
+		controlplane::base::acl_rule_transport_tcp_t server_rule_transport{range_t{service.service_port}, range_t{0x0000, 0xFFFF}};
+
+		{
+			// server_syn_ack
+			common::globalBase::tFlow flow = convertToFlow(nextModule, "server_syn_ack");	
+			flow.data.proxy.service_id = service.service_id;
+			server_rule_transport.flags = {TCP_SYN_FLAG | TCP_ACK_FLAG , 0};
+			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
+		}
+
+		{
+			// server_ack
+			common::globalBase::tFlow flow = convertToFlow(nextModule, "server_ack");	
+			flow.data.proxy.service_id = service.service_id;
+			server_rule_transport.flags = {TCP_ACK_FLAG, TCP_SYN_FLAG};
+			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
 		}
 	}
 }

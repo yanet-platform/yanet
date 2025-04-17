@@ -62,6 +62,7 @@ enum class result_e : uint32_t
 	missingRequiredOption,
 	invalidTun64Id,
 	errorInitSharedMemory,
+	invalidProxyId,
 };
 
 static constexpr const char* result_to_c_str(common::result_e e)
@@ -180,6 +181,8 @@ static constexpr const char* result_to_c_str(common::result_e e)
 			return "invalidTun64Id";
 		case result_e::errorInitSharedMemory:
 			return "errorInitSharedMemory";
+		case result_e::invalidProxyId:
+			return "invalidProxyId";
 	}
 
 	return "?";

@@ -16,6 +16,7 @@
 #include "base.h"
 #include "common.h"
 #include "globalbase.h"
+#include "proxy.h"
 #include "samples.h"
 #include "sharedmemory.h"
 
@@ -76,6 +77,7 @@ public:
 
 	static void FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata);
 	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorker& metadata);
+	void SetTcpConnectionStore(dataplane::proxy::TcpConnectionStore* store);
 
 	[[nodiscard]] const dataplane::base::generation& current_base() const { return bases[localBaseId & 1]; }
 
@@ -189,6 +191,19 @@ protected:
 	inline void balancer_ipv6_source(rte_ipv6_hdr* header, const ipv6_address_t& balancer, const dataplane::globalBase::balancer_service_t& service, const rte_ipv4_hdr* ipv4HeaderInner, const rte_ipv6_hdr* ipv6HeaderInner);
 	inline void balancer_ipv4_source(rte_ipv4_hdr* header, const ipv4_address_t& balancer, const dataplane::globalBase::balancer_service_t& service);
 	inline void balancer_touch_state(rte_mbuf* mbuf, dataplane::metadata* metadata, dataplane::globalBase::balancer_state_value_t* value);
+
+	/// proxy
+	inline void proxy_client_syn_entry(rte_mbuf* mbuf);
+	inline void proxy_client_syn_handle();
+	inline void proxy_client_ack_entry(rte_mbuf* mbuf);
+	inline void proxy_client_ack_handle();
+	inline void proxy_server_syn_ack_entry(rte_mbuf* mbuf);
+	inline void proxy_server_syn_ack_handle();
+	inline void proxy_server_ack_entry(rte_mbuf* mbuf);
+	inline void proxy_server_ack_handle();
+	inline void proxy_client_icmp_entry(rte_mbuf* mbuf);
+	inline void proxy_client_icmp_handle();
+	inline void proxy_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 
 	/// fw state
 	using FlowFromState = std::optional<common::globalBase::tFlow>;
@@ -345,6 +360,11 @@ protected:
 	worker::tStack<> balancer_icmp_forward_stack;
 	worker::tStack<> acl_egress_stack4;
 	worker::tStack<> acl_egress_stack6;
+	worker::tStack<> proxy_client_syn_stack;
+	worker::tStack<> proxy_client_ack_stack;
+	worker::tStack<> proxy_server_syn_ack_stack;
+	worker::tStack<> proxy_server_ack_stack;
+	worker::tStack<> proxy_client_icmp_stack;
 	worker::tStack<128> controlPlane_stack; ///< to_linux + ingress_state + egress_state + nap
 
 	worker::tStack<> after_early_decap_stack4;
@@ -390,4 +410,5 @@ protected:
 	YADECAP_CACHE_ALIGNED(align3);
 
 	dataplane::base::generation bases[2];
+	dataplane::proxy::TcpConnectionStore* tcp_connection_store;
 };

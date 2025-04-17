@@ -22,6 +22,7 @@
 #include "module.h"
 #include "nat46clat.h"
 #include "nat64stateful.h"
+#include "proxy.h"
 #include "route.h"
 #include "tun64.h"
 #include "type.h"
@@ -177,6 +178,7 @@ protected:
 	dregress_t dregress;
 	route_t route;
 	balancer_t balancer;
+	proxy_t proxy;
 	tun64_t tun64;
 	fqdn_t fqdn;
 	durations_t durations;

@@ -39,6 +39,8 @@ using balancer_id_t = uint32_t;
 using balancer_service_id_t = uint32_t;
 using balancer_real_id_t = uint32_t;
 using tun64_id_t = uint32_t;
+using proxy_id_t = uint32_t;
+using proxy_service_id_t = uint32_t;
 using coreId = uint32_t;
 using socketId = uint32_t;
 using counterId = uint32_t;
@@ -53,6 +55,52 @@ enum class eDscpMarkType : uint8_t
 	onlyDefault,
 	always,
 };
+
+enum class proxySynType : uint8_t
+{
+	only_table,
+	syn_cookie,
+	mixed,
+};
+
+[[maybe_unused]] static std::optional<common::proxySynType> to_proxy_type(const std::string& string)
+{
+	if (string == "only_table")
+	{
+		return common::proxySynType::only_table;
+	}
+	else if (string == "syn_cookie")
+	{
+		return common::proxySynType::syn_cookie;
+	}
+	else if (string == "mixed")
+	{
+		return common::proxySynType::mixed;
+	}
+
+	return std::nullopt;
+}
+
+[[maybe_unused]] constexpr const char* from_proxy_type(const common::proxySynType& proto)
+{
+	switch (proto)
+	{
+		case common::proxySynType::only_table:
+		{
+			return "only_table";
+		}
+		case common::proxySynType::syn_cookie:
+		{
+			return "syn_cookie";
+		}
+		case common::proxySynType::mixed:
+		{
+			return "mixed";
+		}
+	}
+
+	return "unknown";
+}
 
 template<typename type_t,
          type_t default_value = 0>
@@ -2041,6 +2089,11 @@ enum class eFlowType : uint8_t
 	balancer_fragment,
 	nat46clat_lan,
 	nat46clat_wan,
+	proxy_client_syn,
+	proxy_client_ack,
+	proxy_server_syn_ack,
+	proxy_server_ack,
+	proxy_client_icmp,
 };
 
 inline const char* eFlowType_toString(eFlowType t)
@@ -2129,6 +2182,16 @@ inline const char* eFlowType_toString(eFlowType t)
 			return "nat46clat_lan";
 		case eFlowType::nat46clat_wan:
 			return "nat46clat_wan";
+		case eFlowType::proxy_client_syn:
+			return "proxy_client_syn";
+		case eFlowType::proxy_client_ack:
+			return "proxy_client_ack";
+		case eFlowType::proxy_server_syn_ack:
+			return "proxy_server_syn_ack";
+		case eFlowType::proxy_server_ack:
+			return "proxy_server_ack";
+		case eFlowType::proxy_client_icmp:
+			return "proxy_client_icmp";
 	}
 
 	return "unknown";
@@ -2170,6 +2233,12 @@ union tFlowData
 		balancer_id_t id : 8;
 		balancer_service_id_t service_id : 24;
 	} balancer;
+
+	struct
+	{
+		proxy_id_t id : 8;
+		proxy_service_id_t service_id : 24;
+	} proxy;
 
 	struct
 	{

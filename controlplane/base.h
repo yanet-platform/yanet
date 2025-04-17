@@ -426,6 +426,7 @@ public:
 	balancer_service_id_t services_count{};
 	balancer_real_id_t reals_count{};
 	tun64_id_t tun64MappingsCount{};
+	proxy_service_id_t proxy_services_count{};
 	std::map<tInterfaceId, std::string> interfaceNames; ///< @todo: per route
 	std::map<tSocketId, std::set<tInterfaceId>> socket_interfaces; ///< @todo: per route
 
@@ -438,6 +439,7 @@ public:
 	std::map<std::string, base::acl_t> acls;
 	std::map<std::string, dregress::config_t> dregresses;
 	std::map<std::string, balancer::config_t> balancers;
+	std::map<std::string, proxy::config_t> proxies;
 	std::map<std::string, tun64::config_t> tunnels;
 	std::vector<std::vector<uint32_t>> ids_map;
 	std::map<uint32_t, std::vector<acl::rule_info_t>> rules;

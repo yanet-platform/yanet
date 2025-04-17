@@ -376,6 +376,27 @@ struct balancer_t
 	common::globalBase::tFlow flow;
 };
 
+struct proxy_t
+{
+	common::proxySynType syn_type{common::proxySynType::mixed};
+	uint32_t max_local_addresses;
+	uint32_t mem_size_syn;
+	uint32_t mem_size_connections;
+	uint32_t timeout_syn;
+	uint32_t timeout_connection;
+	uint32_t timeout_fin;
+
+	common::globalBase::tFlow flow;
+};
+
+struct proxy_service_t
+{
+	ipv4_address_t proxy_addr;
+	tPortId proxy_port;
+	ipv4_address_t service_addr;
+	tPortId service_port;
+};
+
 struct dregress_t
 {
 	/// @todo: uint8_t enabled;

@@ -252,6 +252,11 @@ private:
 			                obj.balancer_handle,
 			                obj.balancer_icmp_reply_handle,
 			                obj.balancer_icmp_forward_handle,
+							obj.proxy_client_syn_handle,
+							obj.proxy_client_ack_handle,
+							obj.proxy_server_syn_ack_handle,
+							obj.proxy_server_ack_handle,
+							obj.proxy_client_icmp_handle,
 			                obj.route_tunnel_handle4,
 			                obj.route_tunnel_handle6,
 			                obj.acl_egress_handle4,
@@ -281,6 +286,11 @@ private:
 
 		CountersArray balancer_icmp_reply_handle{};
 		CountersArray balancer_icmp_forward_handle{};
+		CountersArray proxy_client_syn_handle{};
+		CountersArray proxy_client_ack_handle{};
+		CountersArray proxy_server_syn_ack_handle{};
+		CountersArray proxy_server_ack_handle{};
+		CountersArray proxy_client_icmp_handle{};
 		CountersArray route_tunnel_handle4{};
 		CountersArray route_tunnel_handle6{};
 		CountersArray acl_egress_handle4{};

@@ -41,6 +41,7 @@ protected:
 	void processTun64();
 	void processBalancer();
 	void processDregress();
+	void processProxy();
 	void processAcl();
 	void processHostConfig();
 	void buildAcl();
@@ -68,6 +69,7 @@ protected:
 	void acl_rules_early_decap(controlplane::base::acl_t& acl) const;
 	void acl_rules_balancer_icmp_reply(controlplane::base::acl_t& acl, const std::string& nextModule) const;
 	void acl_rules_balancer_icmp_forward(controlplane::base::acl_t& acl, const std::string& nextModule) const;
+	void acl_rules_proxy(controlplane::base::acl_t& acl, const std::string& nextModule) const;
 
 private:
 	cControlPlane* controlplane_ptr;
