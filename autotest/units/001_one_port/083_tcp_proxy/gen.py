@@ -62,7 +62,7 @@ START_CLIENT_SEQ = 1000
 
 def get_proxy_header():
 	proxy_signature = "\x0D\x0A\x0D\x0A\x00\x0D\x0A\x51\x55\x49\x54\x0A"
-	return proxy_signature.encode() + "\x22\x11\x00\x0c".encode() +\
+	return proxy_signature.encode() + "\x21\x11\x00\x0c".encode() +\
 		int(ipaddress.ip_address(IP_CLIENT1)).to_bytes(4, 'big') +\
 		int(ipaddress.ip_address(IP_PROXY_EXT)).to_bytes(4, 'big') +\
 		PORT_CLIENT.to_bytes(2, 'big') + PORT_PROXY_EXT.to_bytes(2, 'big')
@@ -96,11 +96,11 @@ def packet_proxy_server(dt, ttl=63, raw='', tcp_options=[]):
 	(seq, ack, flags) = parse_dt(dt, START_CLIENT_SEQ, 3000)
 	return Ether(dst=MAC_SERVER, src=MAC_PROXY)/Dot1Q(vlan=200)/IP(dst=IP_SERVER, src=IP_PROXY_INT, ttl=ttl)/TCP(dport=PORT_SERVER, sport=1025, flags=flags, seq=seq, ack=ack, options=tcp_options)/Raw(raw)
 
-def CC(dt1, dt2, tcp_options=[]):
-	return (packet_client_proxy(dt1, tcp_options=tcp_options),	packet_proxy_client(dt2, ttl=63, window=0))
+def CC(dt1, dt2, tcp_options=[], tcp_options_answer=[]):
+	return (packet_client_proxy(dt1, tcp_options=tcp_options),	packet_proxy_client(dt2, ttl=63, window=0, tcp_options=tcp_options_answer))
 
-def CS(dt1, dt2, raw='', raw_res='', tcp_options=[], ttl=63):
-	return (packet_client_proxy(dt1, raw=raw),	packet_proxy_server(dt2, raw=raw_res, tcp_options=tcp_options, ttl=ttl))
+def CS(dt1, dt2, raw='', raw_res='', tcp_options=[], tcp_options_forward=[], ttl=63):
+	return (packet_client_proxy(dt1, raw=raw, tcp_options=tcp_options),	packet_proxy_server(dt2, raw=raw_res, tcp_options=tcp_options_forward, ttl=ttl))
 
 def SC(dt1, dt2, raw='', raw_res='', tcp_options=[]):
 	return (packet_server_proxy(dt1, raw=raw),	packet_proxy_client(dt2, ttl=62, raw=raw_res, tcp_options=tcp_options))
@@ -108,14 +108,16 @@ def SC(dt1, dt2, raw='', raw_res='', tcp_options=[]):
 def SS(dt1, dt2, raw='', raw_res='', tcp_options=[]):
 	return (packet_server_proxy(dt1, raw=raw, tcp_options=tcp_options),	packet_proxy_server(dt2, raw=raw_res))
 
-tcp_options_client = options=[("MSS", 1460), ("SAckOK", ''), ("Timestamp", (2983139994, 0)), ("NOP", ''), ('WScale', 5)]
-tcp_options_server = options=[("MSS", 1000), ("SAckOK", ''), ("Timestamp", (1234567890, 2983139994)), ("NOP", ''), ('WScale', 3)]
+tcp_options_client = options = [("MSS", 1460), ("SAckOK", ''), ("Timestamp", (2983139994, 0)), ('WScale', 5), ("NOP", '')]
+tcp_options_answer_to_client = [("MSS", 1000), ("SAckOK", ''), ("Timestamp", (1234567, 2983139994)), ('WScale', 3), ("NOP", '')]
+tcp_options_server = options = [("MSS", 1000), ("SAckOK", ''), ("Timestamp", (1234567890, 2983139994)), ("NOP", ''), ('WScale', 3)]
+tcp_options_server_to_client = options = [("Timestamp", (1234567890, 2983139994)), ("NOP", ''), ("NOP", '')]
 
 data = [
-	CC((0, 0, 'S'),  (0, 1, 'SA'), tcp_options=tcp_options_client),							# 1
-	CS((1, 1, 'A'),  (-len_pr, 0, 'S'), tcp_options=tcp_options_client),					# 2
-	SS((0, 1-len_pr, 'AS'), (1, 1, 'A'), raw_res=pr, tcp_options=tcp_options_server),		# 3
-	SC((1, 1, 'A'), (1, 1, 'A'), tcp_options=tcp_options_server),							# 4 - data from server?!
+	CC((0, 0, 'S'),  (0, 1, 'SA'), tcp_options=tcp_options_client, tcp_options_answer=tcp_options_answer_to_client),							# 1
+	CS((1, 1, 'A'),  (-len_pr, 0, 'S'), tcp_options=[("Timestamp", (1, 2))], tcp_options_forward=tcp_options_client),					# 2
+	SS((0, 1-len_pr, 'AS'), (1-len_pr, 1, 'A'), raw_res=pr, tcp_options=tcp_options_server),		# 3
+	SC((1, 1, 'A'), (1, 1, 'A'), tcp_options=tcp_options_server_to_client),							# 4 - data from server?!
 	CS((1 + len_dc, 1, 'A'), (1 + len_dc, 1, 'A'), raw=dc, raw_res=dc, ttl=62),				# 5
 	SC((1 + len_ds, 1 + len_dc, 'A'), (1 + len_ds, 1 + len_dc, 'A'), raw=ds, raw_res=ds),	# 6
 	# CS((1, 1, 'A'),  (1, 1, 'A'), raw=dc, raw_res=dc),			# 4

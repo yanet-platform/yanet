@@ -1,13 +1,44 @@
 #pragma once
 
+#include "local_pool.h"
 #include "type.h"
 
 #include <mutex>
+
+#define TCPOPT_NOP		1	/* Padding */
+#define TCPOPT_EOL		0	/* End of options */
+#define TCPOPT_MSS		2	/* Segment size negotiating */
+#define TCPOPT_WINDOW		3	/* Window scaling */
+#define TCPOPT_SACK_PERM        4       /* SACK Permitted */
+#define TCPOPT_SACK             5       /* SACK Block */
+#define TCPOPT_TIMESTAMP	8	/* Better RTT estimations/PAWS */
+#define TCPOPT_MD5SIG		19	/* MD5 Signature (RFC2385) */
+#define TCPOPT_AO		29	/* Authentication Option (RFC5925) */
+#define TCPOPT_MPTCP		30	/* Multipath TCP (RFC6824) */
+#define TCPOPT_FASTOPEN		34	/* Fast open (RFC7413) */
+#define TCPOPT_EXP		254	/* Experimental */
 
 #define MAX_SIZE_TCP_OPTIONS 20
 
 namespace dataplane::proxy
 {
+
+struct TcpOptions
+{
+    uint32_t timestamp_value;
+    uint32_t timestamp_echo;
+    uint16_t mss;
+    uint8_t sack;
+    uint8_t window_scaling;
+
+    bool Read(uint8_t* data, uint32_t len);
+    uint32_t Write(uint8_t* data) const;
+
+    std::string DebugInfo() const;
+
+private:
+    bool CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected);
+};    
 
 extern const uint8_t PROXY_V2_SIGNATURE[12];
 
@@ -85,8 +116,9 @@ struct ActionClientOnAckNewServerConnection
     uint32_t local_addr;
     uint16_t local_port;
     uint32_t seq;
-    uint8_t tcp_options[MAX_SIZE_TCP_OPTIONS];
-	size_t tcp_options_size;
+    // uint8_t tcp_options[MAX_SIZE_TCP_OPTIONS];
+	// size_t tcp_options_size;
+    TcpOptions tcp_options;
 };
 
 struct ActionClientOnAckForward
@@ -138,8 +170,9 @@ struct SynConnectionInfo
 {
     uint32_t recv_seq;
     uint32_t sent_seq;
-    size_t tcp_options_size;
-    uint8_t tcp_options[MAX_SIZE_TCP_OPTIONS];
+    // size_t tcp_options_size;
+    // uint8_t tcp_options[MAX_SIZE_TCP_OPTIONS];
+    TcpOptions tcp_options;
     // todo: time
 };
 
@@ -161,16 +194,6 @@ struct ConnectionInfo
     uint32_t shift_seq;
 };
 
-class LocalPool
-{
-public:
-    void Add(proxy_id_t proxy_id, const common::ip_prefix_t& prefix);
-    std::optional<std::pair<uint32_t, uint16_t>> Allocate(proxy_id_t proxy_id, proxy_service_id_t service_id);
-
-private:
-    common::ip_prefix_t prefix_;
-};
-
 class SynFromClients
 {
 public:
@@ -179,8 +202,7 @@ public:
 	                                                 uint32_t src_addr,
 	                                                 uint16_t src_port,
 	                                                 uint32_t seq,
-	                                                 uint8_t* tcp_options,
-	                                                 size_t tcp_options_size);
+                                                     TcpOptions&tcp_options);
 
     SynConnectionInfo* FindConnection(connection_key key);
 
@@ -207,8 +229,7 @@ public:
 	                                             uint32_t src_addr,
 	                                             uint16_t src_port,
 	                                             uint32_t seq,
-	                                             uint8_t* tcp_options,
-                                                 size_t tcp_options_size);
+	                                             TcpOptions&tcp_options);
 
     ActionClientOnAckResult ActionClientOnAck(proxy_id_t proxy_id,
 	                                      proxy_service_id_t service_id,

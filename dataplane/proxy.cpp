@@ -1,11 +1,147 @@
 #include "proxy.h"
 
 #include <rte_tcp.h>
+#include <sstream>
 
 namespace dataplane::proxy
 {
 
 const uint8_t PROXY_V2_SIGNATURE[12] = {0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A};
+
+bool TcpOptions::Read(uint8_t* data, uint32_t len)
+{
+    uint32_t index = 0;
+    while (index < len)
+    {
+        switch (data[index])
+        {
+        case TCPOPT_MSS:
+            if (!CheckSize(index, len, data, 4)) {
+                return false;
+            }
+            mss = rte_be_to_cpu_16(*((uint16_t*)(data + index + 2)));
+            index += 4;
+            break;
+
+        case TCPOPT_SACK_PERM:
+            if (!CheckSize(index, len, data, 2)) {
+                return false;
+            }
+            sack = 1;
+
+            index += 2;
+            break;
+
+        case TCPOPT_TIMESTAMP:
+            if (!CheckSize(index, len, data, 10)) {
+                return false;
+            }
+
+            timestamp_value = rte_be_to_cpu_32(*((uint32_t*)(data + index + 2)));
+            timestamp_echo = rte_be_to_cpu_32(*((uint32_t*)(data + index + 6)));
+
+            index += 10;
+            break;
+
+        case TCPOPT_NOP:
+            index++;
+            break;
+
+        case TCPOPT_EOL:
+            return true;
+
+        case TCPOPT_WINDOW:
+            if (!CheckSize(index, len, data, 3)) {
+                return false;
+            }
+
+            window_scaling = data[index + 2];
+            
+            index += 3;
+            break;
+        
+        default:
+            // unknown option
+            return false;
+            break;
+        }
+    }
+    return true;
+}
+
+uint32_t TcpOptions::Write(uint8_t* data) const
+{
+    uint32_t len = 0;
+    
+    if (mss != 0)
+    {
+        data[len] = TCPOPT_MSS;
+        data[len + 1] = 4;
+        *((uint16_t*)(data + len + 2)) = rte_cpu_to_be_16(mss);
+        len += 4;
+    }
+
+    if (sack != 0)
+    {
+        data[len] = TCPOPT_SACK_PERM;
+        data[len + 1] = 2;
+        len += 2;
+    }
+
+    if (timestamp_value != 0 || timestamp_echo != 0)
+    {
+        data[len] = TCPOPT_TIMESTAMP;
+        data[len + 1] = 10;
+        *((uint32_t*)(data + len + 2)) = rte_cpu_to_be_32(timestamp_value);
+        *((uint32_t*)(data + len + 6)) = rte_cpu_to_be_32(timestamp_echo);
+        len += 10;
+    }
+
+    if (window_scaling != 0)
+    {
+        data[len] = TCPOPT_WINDOW;
+        data[len + 1] = 3;
+        data[len + 2] = window_scaling;
+        len += 3;
+    }
+
+    while ((len % 4) != 0)
+    {
+        data[len++] = TCPOPT_NOP;
+    }
+
+    return len;
+}
+
+bool TcpOptions::CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected)
+{
+    return (index + expected <= len) && (data[index + 1] == expected);
+}
+
+std::string TcpOptions::DebugInfo() const
+{
+    std::stringstream ss;
+    
+    ss << "MSS: " << mss;
+    
+    if (sack != 0)
+    {
+        ss << ", SACK";
+    }
+    
+    if (timestamp_value != 0 || timestamp_echo != 0)
+    {
+        ss << ", timestamps: [" << timestamp_value << "," << timestamp_echo << "]";
+    }
+
+    if (window_scaling != 0)
+    {
+        ss << ", win scale: " << uint32_t(window_scaling);
+    }
+
+    return ss.str();
+}
+
 
 // Update
 
@@ -23,7 +159,11 @@ void TcpConnectionStore::proxy_remove(proxy_id_t proxy_id)
 void TcpConnectionStore::proxy_add_local_pool(proxy_id_t proxy_id, const common::ip_prefix_t& prefix)
 {
     YANET_LOG_WARNING("proxy_add_local_pool proxy_id=%d, prefix=%s\n", proxy_id, prefix.toString().c_str());
-    local_pool_.Add(proxy_id, prefix);
+    ipv4_prefix_t prefix_pool;
+    prefix_pool.address = ipv4_address_t::convert(prefix.get_ipv4().address());
+    prefix_pool.address.address = rte_cpu_to_be_32(prefix_pool.address.address);
+    prefix_pool.mask = prefix.mask();
+    local_pool_.Add(proxy_id, prefix_pool);
 }
 
 void TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service)
@@ -45,10 +185,9 @@ std::optional<AcceptClientSyn> TcpConnectionStore::ActionClientOnSyn(proxy_id_t 
                                                                      uint32_t src_addr,
                                                                      uint16_t src_port,
                                                                      uint32_t seq,
-                                                                     uint8_t* tcp_options,
-                                                                     size_t tcp_options_size)
+                                                                     TcpOptions&tcp_options)
 {
-    return table_syn_.ActionClientOnSyn(proxy_id, service_id, src_addr, src_port, seq, tcp_options, tcp_options_size);
+    return table_syn_.ActionClientOnSyn(proxy_id, service_id, src_addr, src_port, seq, tcp_options);
 }
 
 ActionClientOnAckResult TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_id,
@@ -79,8 +218,9 @@ ActionClientOnAckResult TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_i
         new_server_connection.local_addr = std::get<0>(*local);
         new_server_connection.local_port = std::get<1>(*local);
         new_server_connection.seq = add_cpu_32(syn_info->recv_seq, -int(sizeof(proxy_v2_ipv4_hdr)));
-        new_server_connection.tcp_options_size = syn_info->tcp_options_size;
-        memcpy(new_server_connection.tcp_options, syn_info->tcp_options, syn_info->tcp_options_size);
+        new_server_connection.tcp_options = syn_info->tcp_options;
+        // new_server_connection.tcp_options_size = syn_info->tcp_options_size;
+        // memcpy(new_server_connection.tcp_options, syn_info->tcp_options, syn_info->tcp_options_size);
 
         // Add to connections_
         ConnectionInfo& connection_info = connections_[{service_id, src_addr, src_port}];
@@ -147,7 +287,7 @@ ActionServerOnSynAckResult TcpConnectionStore::ActionServerOnSynAck(proxy_id_t p
     result.src_addr = std::get<1>(iter_con->first);
     result.src_port = std::get<2>(iter_con->first);
     result.ack = add_cpu_32(seq, 1);
-    result.seq = add_cpu_32(ack, sizeof(proxy_v2_ipv4_hdr));
+    result.seq = ack;
 
     return result;
 }
@@ -189,8 +329,17 @@ ActionServerOnAckResult TcpConnectionStore::ActionServerOnAck(proxy_id_t proxy_i
         forward_result.dst_port = std::get<2>(iter_con->first);
         forward_result.seq = add_cpu_32(seq, iter_con->second.shift_seq);
         forward_result.ack = ack;
-        forward_result.tcp_options_size = iter_con->second.tcp_options_size;
-        memcpy(forward_result.tcp_options, iter_con->second.tcp_options, iter_con->second.tcp_options_size);
+
+        TcpOptions tcp_options;
+        memset(&tcp_options, 0, sizeof(tcp_options));
+        tcp_options.Read(iter_con->second.tcp_options, iter_con->second.tcp_options_size);
+        tcp_options.sack = false;
+        tcp_options.mss = 0;
+        tcp_options.window_scaling = 0;
+
+        // forward_result.tcp_options_size = iter_con->second.tcp_options_size;
+        // memcpy(forward_result.tcp_options, iter_con->second.tcp_options, iter_con->second.tcp_options_size);
+        forward_result.tcp_options_size = tcp_options.Write(forward_result.tcp_options);
 
         return forward_result;
     }
@@ -212,8 +361,7 @@ std::optional<AcceptClientSyn> SynFromClients::ActionClientOnSyn(proxy_id_t prox
                                                                  uint32_t src_addr,
                                                                  uint16_t src_port,
                                                                  uint32_t seq,
-                                                                 uint8_t* tcp_options,
-                                                                 size_t tcp_options_size)
+                                                                 TcpOptions&tcp_options)
 {
     std::lock_guard guard(mutex_);
 
@@ -222,15 +370,24 @@ std::optional<AcceptClientSyn> SynFromClients::ActionClientOnSyn(proxy_id_t prox
     SynConnectionInfo& info = connections_[{service_id, src_addr, src_port}];
     info.recv_seq = seq;
     info.sent_seq = sent_seq;
+    info.tcp_options = tcp_options;
 
-    if (tcp_options_size < sizeof(rte_tcp_hdr) || tcp_options_size > sizeof(rte_tcp_hdr) + MAX_SIZE_TCP_OPTIONS)
+    // if (tcp_options_size < sizeof(rte_tcp_hdr) || tcp_options_size > sizeof(rte_tcp_hdr) + MAX_SIZE_TCP_OPTIONS)
+    // {
+    //     info.tcp_options_size = 0;
+    // }
+    // else
+    // {
+    //     info.tcp_options_size = tcp_options_size - sizeof(rte_tcp_hdr);
+    //     memcpy(info.tcp_options, tcp_options + sizeof(rte_tcp_hdr), info.tcp_options_size);
+    // }
+
+    tcp_options.window_scaling = 3;
+    tcp_options.mss = 1000;
+    if (tcp_options.timestamp_value != 0)
     {
-        info.tcp_options_size = 0;
-    }
-    else
-    {
-        info.tcp_options_size = tcp_options_size - sizeof(rte_tcp_hdr);
-        memcpy(info.tcp_options, tcp_options + sizeof(rte_tcp_hdr), info.tcp_options_size);
+        tcp_options.timestamp_echo = tcp_options.timestamp_value;
+        tcp_options.timestamp_value = 1234567;
     }
     
 	return AcceptClientSyn{sent_seq, add_cpu_32(seq, 1)};
@@ -247,18 +404,5 @@ SynConnectionInfo* SynFromClients::FindConnection(connection_key key)
     return &iter->second;
 }
 
-
-
-void LocalPool::Add(proxy_id_t proxy_id, const common::ip_prefix_t& prefix)
-{
-    prefix_ = prefix;
-}
-
-std::optional<std::pair<uint32_t, uint16_t>> LocalPool::Allocate(proxy_id_t proxy_id, proxy_service_id_t service_id)
-{
-    common::ipv4_address_t address = prefix_.get_ipv4().address();
-    uint32_t value = uint32_t(address);
-    return std::make_pair(rte_cpu_to_be_32(value), rte_cpu_to_be_16(1025));
-}
 
 }
