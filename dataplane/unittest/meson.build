@@ -6,16 +6,19 @@ dependencies += dependency('threads')
 dependencies += dependency('gtest')
 dependencies += dependency('gtest_main')
 
+dataplane_sources = files('../local_pool.cpp')
+
 sources = files('unittest.cpp',
                 'ip_address.cpp',
                 'hashtable.cpp',
-                'sdp.cpp')
+                'sdp.cpp',
+                'local_pool.cpp')
 
 arch = 'corei7'
 cpp_args_append = ['-march=' + arch]
 
 unittest = executable('yanet-dataplane-unittest',
-                      sources,
+                      [dataplane_sources, sources],
                       include_directories: yanet_rootdir,
                       dependencies: dependencies,
                       cpp_args: cpp_args_append,
