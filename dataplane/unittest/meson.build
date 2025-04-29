@@ -6,13 +6,15 @@ dependencies += dependency('threads')
 dependencies += dependency('gtest')
 dependencies += dependency('gtest_main')
 
-dataplane_sources = files('../local_pool.cpp')
+dataplane_sources = files('../local_pool.cpp',
+                          '../syncookies.cpp')
 
 sources = files('unittest.cpp',
                 'ip_address.cpp',
                 'hashtable.cpp',
                 'sdp.cpp',
-                'local_pool.cpp')
+                'local_pool.cpp',
+                'syncookies.cpp')
 
 arch = 'corei7'
 cpp_args_append = ['-march=' + arch]
