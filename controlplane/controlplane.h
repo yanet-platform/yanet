@@ -154,6 +154,7 @@ protected:
 	friend class balancer_t;
 	friend class tun64_t;
 	friend class config_converter_t;
+	friend class proxy_t;
 
 	volatile bool flagStop;
 

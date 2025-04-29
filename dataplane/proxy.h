@@ -2,6 +2,7 @@
 
 #include "local_pool.h"
 #include "type.h"
+#include "common/idp.h"
 
 #include <mutex>
 
@@ -206,6 +207,8 @@ public:
 
     SynConnectionInfo* FindConnection(connection_key key);
 
+    common::idp::proxy_syn::response GetSyn(std::optional<proxy_service_id_t> service_id);
+
 private:
     
 
@@ -222,6 +225,10 @@ public:
     void proxy_add_local_pool(proxy_id_t proxy_id, const common::ip_prefix_t& prefix);
     void proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service);
     void proxy_service_remove(proxy_service_id_t service_id);
+
+    // Info
+    common::idp::proxy_connections::response GetConnections(std::optional<proxy_service_id_t> service_id);
+    common::idp::proxy_syn::response GetSyn(std::optional<proxy_service_id_t> service_id);
 
     // Action from worker
     std::optional<AcceptClientSyn> ActionClientOnSyn(proxy_id_t proxy_id,
@@ -254,7 +261,7 @@ public:
 	                                      uint32_t seq,
 	                                      uint32_t ack);
 
-    private:
+private:
     std::mutex mutex_;
     SynFromClients table_syn_;
     LocalPool local_pool_;

@@ -395,6 +395,7 @@ struct proxy_service_t
 	tPortId proxy_port;
 	ipv4_address_t service_addr;
 	tPortId service_port;
+	tCounterId counter_id;
 };
 
 struct dregress_t

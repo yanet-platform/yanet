@@ -57,3 +57,20 @@ enum class module_counter : tCounterId
 };
 
 }
+
+namespace proxy
+{
+
+enum class service_counter : tCounterId
+{
+	packets_in,
+	bytes_in,
+	packets_out,
+	bytes_out,
+	syn_count,
+	ping_count,
+	connections_count,
+	size
+};
+
+}

@@ -154,6 +154,11 @@ public:
 		return get<common::icp::requestType::balancer_announce, common::icp::balancer_announce::response>();
 	}
 
+	auto proxy_services() const
+	{
+		return get<common::icp::requestType::proxy_services, common::icp::proxy_services::response>();
+	}
+
 	auto acl_unwind(const common::icp::acl_unwind::request& request) const
 	{
 		return get<common::icp::requestType::acl_unwind, common::icp::acl_unwind::response>(request);

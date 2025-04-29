@@ -990,6 +990,18 @@ common::idp::balancer_real_connections::response cControlPlane::balancer_real_co
 	return response;
 }
 
+common::idp::proxy_connections::response cControlPlane::proxy_connections(const common::idp::proxy_connections::request& request)
+{
+	auto [service_id] = request;
+	return dataPlane->tcp_connection_store.GetConnections(service_id);
+}
+
+common::idp::proxy_syn::response cControlPlane::proxy_syn(const common::idp::proxy_syn::request& request)
+{
+	auto [service_id] = request;
+	return dataPlane->tcp_connection_store.GetSyn(service_id);
+}
+
 eResult cControlPlane::unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request)
 {
 	return vip_to_balancers.apply([&](auto& vtb) {

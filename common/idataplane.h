@@ -145,6 +145,16 @@ public:
 		return get<common::idp::requestType::balancer_real_connections, common::idp::balancer_real_connections::response>();
 	}
 
+	auto proxy_connections(const common::idp::proxy_connections::request& request) const
+	{
+		return get<common::idp::requestType::proxy_connections, common::idp::proxy_connections::response>(request);
+	}
+
+	auto proxy_syn(const common::idp::proxy_syn::request& request) const
+	{
+		return get<common::idp::requestType::proxy_syn, common::idp::proxy_syn::response>(request);
+	}
+
 	auto limits() const
 	{
 		return get<common::idp::requestType::limits, common::idp::limits::response>();

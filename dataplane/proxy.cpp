@@ -178,6 +178,32 @@ void TcpConnectionStore::proxy_service_remove(proxy_service_id_t service_id)
     YANET_LOG_WARNING("proxy_service_remove: service_id=%d\n", service_id);
 }
 
+// Info
+
+common::idp::proxy_connections::response TcpConnectionStore::GetConnections(std::optional<proxy_service_id_t> service_id)
+{
+    common::idp::proxy_connections::response response;
+    std::lock_guard guard(mutex_);
+
+    for (const auto& [key, info] : connections_)
+    {
+        auto [service, src_addr, src_port] = key;
+        if (service_id.has_value() && *service_id != service)
+        {
+            continue;
+        }
+
+        response.emplace_back(service, src_addr, src_port, info.local_addr, info.local_port, static_cast<uint16_t>(info.state));
+    }
+
+    return response;
+}
+
+common::idp::proxy_syn::response TcpConnectionStore::GetSyn(std::optional<proxy_service_id_t> service_id)
+{
+    return table_syn_.GetSyn(service_id);
+}
+
 
 // Action from worker
 std::optional<AcceptClientSyn> TcpConnectionStore::ActionClientOnSyn(proxy_id_t proxy_id,
@@ -404,5 +430,23 @@ SynConnectionInfo* SynFromClients::FindConnection(connection_key key)
     return &iter->second;
 }
 
+common::idp::proxy_syn::response SynFromClients::GetSyn(std::optional<proxy_service_id_t> service_id)
+{
+    common::idp::proxy_syn::response response;
+    std::lock_guard guard(mutex_);
+
+    for (const auto& iter : connections_)
+    {
+        auto [service, src_addr, src_port] = iter.first;
+        if (service_id.has_value() && *service_id != service)
+        {
+            continue;
+        }
+
+        response.emplace_back(service, src_addr, src_port);
+    }
+
+    return response;
+}
 
 }

@@ -17,6 +17,7 @@
 #include "nat46clat.h"
 #include "nat64stateful.h"
 #include "neighbor.h"
+#include "proxy.h"
 #include "rib.h"
 #include "route.h"
 #include "show.h"
@@ -72,6 +73,9 @@ std::vector<std::tuple<std::string,
                     {"balancer real disable", "[module] [virtual_ip] [proto] [virtual_port] [real_ip] [real_port]", [](const auto& args) { Call(balancer::real::disable, args); }},
                     {"balancer real flush", "", [](const auto& args) { Call(balancer::real::flush, args); }},
                     {"balancer announce", "", [](const auto& args) { Call(balancer::announce, args); }},
+                    {"proxy services", "", [](const auto& args) { Call(proxy::services, args); }},
+                    {"proxy connections", "<service_id>", [](const auto& args) { Call(proxy::connections, args); }},
+                    {"proxy syn", "<service_id>", [](const auto& args) { Call(proxy::syn, args); }},
                     {"route", "", [](const auto& args) { Call(route::summary, args); }},
                     {"route interface", "", [](const auto& args) { Call(route::interface, args); }},
                     {"route lookup", "[module] [ip_address]", [](const auto& args) { Call(route::lookup, args); }},

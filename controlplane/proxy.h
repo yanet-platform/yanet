@@ -6,14 +6,18 @@
 #include "type.h"
 
 #include "common/controlplaneconfig.h"
+#include "common/counters.h"
 #include "common/generation.h"
 #include "common/icp.h"
 #include "common/idataplane.h"
+#include "libprotobuf/controlplane.pb.h"
 
 #include <queue>
 
 namespace proxy
 {
+
+using service_counter_key_t = proxy_service_id_t;
 
 class generation_config_t
 {
@@ -63,7 +67,7 @@ private:
     std::queue<ValueType> ids_;
 };
 
-class proxy_t : public module_t
+class proxy_t : public module_t, common::icp_proto::BalancerService
 {
 public:
     proxy_t() = default;
@@ -91,8 +95,14 @@ protected:
     void AddRequestUpdateProxy(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::config_t& config);
     void AddRequestUpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, proxy_service_id_t service_id, const controlplane::proxy::service_t& config);
 
+    void counters_gc_thread();
+
+    common::icp::proxy_services::response proxy_services() const;
+
     std::map<std::string, proxy_id_t> modules;
     std::map<std::pair<common::ip_address_t, tPortId>, proxy_service_id_t> services;
     IdAssigner<proxy_id_t> proxy_assigner{YANET_CONFIG_PROXIES_SIZE};
     IdAssigner<proxy_service_id_t> services_assigner{YANET_CONFIG_PROXY_SERVICES_SIZE};
+
+    counter_t<proxy::service_counter_key_t, (size_t)proxy::service_counter::size> service_counters;
 };

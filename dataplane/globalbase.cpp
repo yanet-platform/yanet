@@ -2699,14 +2699,19 @@ eResult generation::proxy_add_local_pool(const common::idp::updateGlobalBase::pr
 
 eResult generation::proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request)
 {
-	auto [service_id, proxy_addr, proxy_port, service_addr, service_port] = request;
-	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d\n",
-	// 	service_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port);
+	auto [service_id, counter_id, proxy_addr, proxy_port, service_addr, service_port] = request;
+	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, counter_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d\n",
+	// 	service_id, counter_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port);
 
 
 	if (service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
 	{
 		YADECAP_LOG_ERROR("invalid proxy_service_id: '%u'\n", service_id);
+		return eResult::invalidId;
+	}
+	if (counter_id + (tCounterId)::proxy::service_counter::size > YANET_CONFIG_COUNTERS_SIZE)
+	{
+		YADECAP_LOG_ERROR("invalid counter_id: '%u'\n", counter_id);
 		return eResult::invalidId;
 	}
 
@@ -2716,6 +2721,7 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.proxy_port = proxy_port;
 	service.service_addr = ipv4_address_t::convert(service_addr.get_ipv4());
 	service.service_port = service_port;
+	service.counter_id = counter_id;
 
 	tcp_connection_store->proxy_service_update(service_id, service);
 

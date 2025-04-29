@@ -3,6 +3,18 @@
 
 eResult proxy_t::init()
 {
+    service_counters.init(&controlPlane->counter_manager);
+
+    controlPlane->register_command(common::icp::requestType::proxy_services, [this]() {
+		return proxy_services();
+	});
+
+    controlPlane->register_service(this);
+
+    funcThreads.emplace_back([this]() {
+		counters_gc_thread();
+	});
+
 	return eResult::success;
 }
 
@@ -97,11 +109,13 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
         }
     }
 
+    service_counters.allocate();
 	compile(globalbase, generations_config.next());
 }
 
 void proxy_t::reload_after()
 {
+    service_counters.release();
 	generations_config.switch_generation();
 	generations_config.next_unlock();
 }
@@ -109,6 +123,17 @@ void proxy_t::reload_after()
 void proxy_t::compile(common::idp::updateGlobalBase::request& globalbase,
                       proxy::generation_config_t& generation_config)
 {
+    for (auto& [requestType, request] : globalbase)
+    {
+        if (requestType == common::idp::updateGlobalBase::requestType::proxy_service_update)
+        {
+            auto& request_update = std::get<common::idp::updateGlobalBase::proxy_service_update::request>(request);
+            proxy_service_id_t service_id = std::get<0>(request_update);
+            tCounterId counter_id = service_counters.get_id(service_id);
+            std::get<1>(request_update) = counter_id;
+            // YANET_LOG_WARNING("For service %d counter id: %d\n", service_id, counter_id);
+        }
+    }
 }
 
 std::optional<proxy_id_t> proxy_t::AddModule(common::idp::updateGlobalBase::request& globalbase, const std::string& module_name, const controlplane::proxy::config_t& config)
@@ -174,6 +199,7 @@ void proxy_t::AddService(common::idp::updateGlobalBase::request& globalbase, pro
         YANET_LOG_ERROR("Can't assign id for service: %s\n", service.service.c_str());
         return;
     }
+    service_counters.insert(*service_id);
     services[service.Key()] = *service_id;
     // YANET_LOG_WARNING("SERVICE add: %s:%d, IDs=%d to IDp=%d\n", service.proxy_addr.toString().c_str(), service.proxy_port, *service_id, proxy_id);
     AddRequestUpdateService(globalbase, proxy_id, *service_id, service);
@@ -203,6 +229,8 @@ void proxy_t::RemoveService(common::idp::updateGlobalBase::request& globalbase, 
     }
     proxy_service_id_t service_id = iter->second;
 
+    service_counters.remove(service_id);
+
     services.erase(service.Key());
     services_assigner.Free(service_id);
     // YANET_LOG_WARNING("SERVICE remove: %s:%d, ID=%d\n", service.proxy_addr.toString().c_str(), service.proxy_port, service_id);
@@ -228,8 +256,62 @@ void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& gl
 {
 	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_service_update,
 	                        common::idp::updateGlobalBase::proxy_service_update::request{service_id,
+	                                                                                     0,
 	                                                                                     config.proxy_addr,
 	                                                                                     config.proxy_port,
 	                                                                                     config.service_addr,
 	                                                                                     config.service_port});
+}
+
+void proxy_t::counters_gc_thread()
+{
+	while (!flagStop)
+	{
+		service_counters.gc();
+
+		std::this_thread::sleep_for(std::chrono::seconds(3));
+	}
+}
+
+common::icp::proxy_services::response proxy_t::proxy_services() const
+{
+	common::icp::proxy_services::response response;
+
+	generations_config.current_lock();
+	std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
+	generations_config.current_unlock();
+
+	const auto counters = service_counters.get_counters();
+
+	for (auto& [module, config] : config_proxies)
+	{
+		for (controlplane::proxy::service_t& service : config.services)
+		{
+            proxy_service_id_t service_id = service.service_id;
+            std::string service_name = service.service;
+            uint64_t packets_in = 0;
+            uint64_t bytes_in = 0;
+            uint64_t packets_out = 0;
+            uint64_t bytes_out = 0;
+            uint64_t syn_count = 0;
+            uint64_t ping_count = 0;
+            uint64_t connections_count = 0;
+
+			auto it = counters.find(service_id);
+			if (it != counters.end())
+			{
+                packets_in = (it->second)[(tCounterId)proxy::service_counter::packets_in];
+                bytes_in = (it->second)[(tCounterId)proxy::service_counter::bytes_in];
+                packets_out = (it->second)[(tCounterId)proxy::service_counter::packets_out];
+                bytes_out = (it->second)[(tCounterId)proxy::service_counter::bytes_out];
+                syn_count = (it->second)[(tCounterId)proxy::service_counter::syn_count];
+                ping_count = (it->second)[(tCounterId)proxy::service_counter::ping_count];
+                connections_count = (it->second)[(tCounterId)proxy::service_counter::connections_count];
+			}
+
+            response.emplace_back(service_id, service_name, packets_in, bytes_in, packets_out, bytes_out, syn_count, ping_count, connections_count);
+		}
+	}
+
+	return response;
 }

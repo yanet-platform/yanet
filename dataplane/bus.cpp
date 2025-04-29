@@ -305,6 +305,14 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::balancer_real_connections, request);
 		}
+		else if (type == common::idp::requestType::proxy_connections)
+		{
+			response = callWithResponse(&cControlPlane::proxy_connections, request);
+		}
+		else if (type == common::idp::requestType::proxy_syn)
+		{
+			response = callWithResponse(&cControlPlane::proxy_syn, request);
+		}
 		else if (type == common::idp::requestType::samples)
 		{
 			response = callWithResponse(&cControlPlane::samples, request);

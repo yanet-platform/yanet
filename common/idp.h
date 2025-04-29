@@ -80,6 +80,8 @@ enum class requestType : uint32_t
 	neighbor_stats,
 	memory_manager_update,
 	memory_manager_stats,
+        proxy_connections,
+        proxy_syn,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -339,6 +341,7 @@ using request = std::tuple<proxy_id_t,
 namespace proxy_service_update
 {
 using request = std::tuple<proxy_service_id_t,
+                           tCounterId, ///< counter id;
                            common::ip_address_t, ///< proxy_addr;
                            tPortId, ///< proxy_port;
                            common::ip_address_t, ///< service_addr;
@@ -821,6 +824,31 @@ using state = std::tuple<uint32_t, ///< nat64stateful_id
 using response = std::vector<state>;
 }
 
+namespace proxy_connections
+{
+using request = std::tuple<std::optional<proxy_service_id_t>>; ///< proxy_service_id
+
+using connection = std::tuple<proxy_service_id_t, ///< proxy_service_id
+                              uint32_t, ///< src_addr
+                              uint16_t, ///< src_port
+                              uint32_t, ///< local_addr
+                              uint16_t, ///< local_port
+                              uint16_t>; ///< state
+
+using response = std::vector<connection>;
+}
+
+namespace proxy_syn
+{
+using request = std::tuple<std::optional<proxy_service_id_t>>; ///< proxy_service_id
+
+using connection = std::tuple<proxy_service_id_t, ///< proxy_service_id
+                              uint32_t, ///< src_addr
+                              uint16_t>; ///< src_port
+
+using response = std::vector<connection>;        
+}
+
 namespace balancer_connection
 {
 using connection = std::tuple<common::ip_address_t, ///< client_ip
@@ -1087,5 +1115,7 @@ using response = std::variant<std::tuple<>,
                               get_shm_tsc_info::response,
                               neighbor_show::response,
                               neighbor_stats::response,
-                              memory_manager_stats::response>;
+                              memory_manager_stats::response,
+                              proxy_connections::response,
+                              proxy_syn::response>;
 }
