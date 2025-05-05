@@ -9,7 +9,7 @@ void LocalPool::Add(proxy_id_t proxy_id, const ipv4_prefix_t& prefix)
     prefixes_[proxy_id].push_back(prefix);
 }
 
-std::optional<std::pair<uint32_t, tPortId>> LocalPool::Allocate(proxy_id_t proxy_id, proxy_service_id_t service_id)
+std::optional<std::pair<uint32_t, tPortId>> LocalPool::Allocate(proxy_id_t proxy_id, proxy_service_id_t service_id, uint32_t client_addr, tPortId client_port)
 {
     std::lock_guard<std::mutex> lock(mutex_);
     bool queue_exists = connection_queues_.find(service_id) != connection_queues_.end();
@@ -29,6 +29,8 @@ std::optional<std::pair<uint32_t, tPortId>> LocalPool::Allocate(proxy_id_t proxy
     ConnectionInfo info = connection_queues_[service_id].front();
     connection_queues_[service_id].pop();
 
+    local_to_clients_[{rte_cpu_to_be_32(info.address), rte_cpu_to_be_16(info.port)}] = {client_addr, client_port};
+
     return std::make_pair(rte_cpu_to_be_32(info.address), rte_cpu_to_be_16(info.port));
 }
 
@@ -37,6 +39,7 @@ void LocalPool::Free(proxy_service_id_t service_id, uint32_t address, tPortId po
     std::lock_guard<std::mutex> lock(mutex_);
     connection_queues_[service_id].push(ConnectionInfo{address, port});
 }
+
 std::queue<LocalPool::ConnectionInfo> LocalPool::make_connection_queue(proxy_id_t proxy_id)
 {
 	std::queue<ConnectionInfo> queue;
@@ -49,4 +52,16 @@ std::queue<LocalPool::ConnectionInfo> LocalPool::make_connection_queue(proxy_id_
     }
     return queue;
 }
+
+std::optional<std::pair<uint32_t, tPortId>> LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto iter = local_to_clients_.find({local_addr, local_port});
+    if (iter == local_to_clients_.end())
+    {
+        return std::nullopt;
+    }
+    return iter->second;
+}
+
 }

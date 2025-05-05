@@ -1,3 +1,4 @@
+#include "common/config.h"
 #include "syncookies.h"
 
 #include "rte_hash_crc.h"
@@ -6,6 +7,30 @@
 
 namespace dataplane::proxy
 {
+
+static uint32_t const mss_tab_values_[] = { 536, 1300, 1440, 1460 };
+
+uint32_t SynCookies::MssToTable(uint32_t mss)
+{
+    uint32_t result = 0;
+    for (uint32_t index = 1; index < 4; index++)
+    {
+        if (mss_tab_values_[index] <= mss)
+        {
+            result = index;
+        }
+        else
+        {
+            break;
+        }
+    }
+    return result;
+}
+
+uint32_t SynCookies::MssFromTable(uint32_t table_value)
+{
+    return mss_tab_values_[table_value];
+}
 
 SynCookies::SynCookies() 
     : keys_{}, current_key_(1),
@@ -48,6 +73,11 @@ void SynCookies::UpdateKeys()
 {
     current_key_ = 3 - current_key_; // switch between 1 and 2
     keys_[current_key_] = dist_(gen_);
+    
+#ifdef CONFIG_YADECAP_AUTOTEST
+    YANET_LOG_WARNING("SynCookies::UpdateKeys, set key=0\n");
+    keys_[current_key_] = 0;
+#endif
 }
 
 uint32_t SynCookies::cookie_hash(uint32_t saddr, uint32_t daddr,

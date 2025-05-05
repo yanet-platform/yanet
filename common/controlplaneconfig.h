@@ -318,7 +318,7 @@ class service_t
 public:
 	service_t() = default;
 
-	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, service_addr, service_port, blacklist);
+	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, service_addr, service_port, blacklist, proxy_header, size_syn_table, use_sack, mss, winscale);
 
 public:
 	proxy_service_id_t service_id;
@@ -329,6 +329,11 @@ public:
     common::ip_address_t service_addr;
     tPortId service_port;
     std::set<common::ip_prefix_t> blacklist;
+	bool proxy_header;
+	uint32_t size_syn_table;
+	bool use_sack;
+	uint32_t mss;
+	uint32_t winscale;
 
 	std::pair<common::ip_address_t, tPortId> Key() const
 	{

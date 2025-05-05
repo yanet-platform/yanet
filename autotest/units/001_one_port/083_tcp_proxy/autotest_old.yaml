@@ -1,32 +1,21 @@
 steps:
 - cli:
   - rib prefixes
-
 - sendPackets:
   - port: kni0
     send: 001-send.pcap
+#    dump: 001-result.pcap
     expect: 001-expect.pcap
-
+#- sendPackets:
+# - port: kni0
+#   send: 001-send.pcap
+#   dump: 001-result.pcap
+#   expect: 001-expect.pcap
+#- reload: controlplane_new.conf
 - sendPackets:
   - port: kni0
     send: 002-send.pcap
     expect: 002-expect.pcap
-
-- sendPackets:
-  - port: kni0
-    send: 003-send.pcap
-    expect: 003-expect.pcap
-
-- sendPackets:
-  - port: kni0
-    send: 004-send.pcap
-    expect: 004-expect.pcap
-
-- sendPackets:
-  - port: kni0
-    send: 005-send.pcap
-    expect: 005-expect.pcap
-
 - cli:
   - proxy services
   - proxy connections

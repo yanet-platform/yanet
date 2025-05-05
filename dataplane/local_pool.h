@@ -12,7 +12,8 @@ class LocalPool
 {
 public:
     void Add(proxy_id_t proxy_id, const ipv4_prefix_t& prefix);
-    std::optional<std::pair<uint32_t, tPortId>> Allocate(proxy_id_t proxy_id, proxy_service_id_t service_id);
+    std::optional<std::pair<uint32_t, tPortId>> Allocate(proxy_id_t proxy_id, proxy_service_id_t service_id, uint32_t client_addr, tPortId client_port);
+    std::optional<std::pair<uint32_t, tPortId>> FindClientByLocal(uint32_t local_addr, tPortId local_port);
     void Free(proxy_service_id_t service_id, uint32_t address, tPortId port);
 
 private:
@@ -28,6 +29,8 @@ private:
         tPortId port;
     };
     std::unordered_map<proxy_service_id_t, std::queue<ConnectionInfo>> connection_queues_;
+
+    std::map<std::pair<uint32_t, tPortId>, std::pair<uint32_t, tPortId>> local_to_clients_;
 
     std::queue<ConnectionInfo> make_connection_queue(proxy_id_t proxy_id);
 };

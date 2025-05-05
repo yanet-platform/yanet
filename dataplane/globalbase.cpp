@@ -2699,9 +2699,9 @@ eResult generation::proxy_add_local_pool(const common::idp::updateGlobalBase::pr
 
 eResult generation::proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request)
 {
-	auto [service_id, counter_id, proxy_addr, proxy_port, service_addr, service_port] = request;
-	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, counter_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d\n",
-	// 	service_id, counter_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port);
+	auto [service_id, counter_id, proxy_addr, proxy_port, service_addr, service_port, proxy_header, size_syn_table, use_sack, mss, winscale] = request;
+	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, counter_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d, proxy_header=%d, size_syn_table=%d\n",
+	// 	service_id, counter_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port, proxy_header, size_syn_table);
 
 
 	if (service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
@@ -2722,6 +2722,11 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.service_addr = ipv4_address_t::convert(service_addr.get_ipv4());
 	service.service_port = service_port;
 	service.counter_id = counter_id;
+	service.proxy_header = proxy_header;
+	service.size_syn_table = size_syn_table;
+	service.use_sack = use_sack;
+	service.mss = mss;
+	service.winscale = winscale;
 
 	tcp_connection_store->proxy_service_update(service_id, service);
 

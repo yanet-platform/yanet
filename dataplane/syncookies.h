@@ -50,6 +50,10 @@ public:
         };
     }
 
+    static uint32_t MssToTable(uint32_t mss);
+
+    static uint32_t MssFromTable(uint32_t table_value);
+
 private:
     uint32_t keys_[3];
     uint32_t current_key_ = 0;

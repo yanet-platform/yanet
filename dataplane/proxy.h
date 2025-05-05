@@ -2,6 +2,7 @@
 
 #include "local_pool.h"
 #include "type.h"
+#include "syncookies.h"
 #include "common/idp.h"
 
 #include <mutex>
@@ -106,47 +107,75 @@ inline uint32_t add_cpu_32(uint32_t value, int32_t added)
     return rte_cpu_to_be_32(rte_be_to_cpu_32(value) + added);
 }
 
-struct AcceptClientSyn
-{
-    uint32_t seq;
-    uint32_t ack;
-};
+void FillProxyHeader(proxy_v2_ipv4_hdr* proxy_header, uint32_t src_addr, tPortId src_port, uint32_t dst_addr, tPortId dst_port);
 
-struct ActionClientOnAckNewServerConnection
-{
-    uint32_t local_addr;
-    uint16_t local_port;
-    uint32_t seq;
-    // uint8_t tcp_options[MAX_SIZE_TCP_OPTIONS];
-	// size_t tcp_options_size;
-    TcpOptions tcp_options;
-};
-
-struct ActionClientOnAckForward
-{
-    uint32_t local_addr;
-    uint16_t local_port;
-    uint32_t shift_ack;
-};
+// ----------------------------------------------------------------------------
 
 struct ActionDrop
 {
     uint32_t counter_id;
 };
 
-using ActionClientOnAckResult = std::variant<ActionClientOnAckNewServerConnection, ActionClientOnAckForward, ActionDrop>;
+// Client Syn
 
-struct ActionServerOnSynAckSentProxyHeader
+struct ActionClientOnSyn_SynToServer
 {
-    uint32_t src_addr;
-    uint16_t src_port;
+    uint32_t seq;
+    uint32_t local_addr;
+    uint16_t local_port;
+};
+
+struct ActionClientOnSyn_SynAckToClient
+{
     uint32_t seq;
     uint32_t ack;
 };
 
-using ActionServerOnSynAckResult = std::variant<ActionServerOnSynAckSentProxyHeader, ActionDrop>;
+using ActionClientOnSyn_Result = std::variant<ActionClientOnSyn_SynToServer, ActionClientOnSyn_SynAckToClient, ActionDrop>;
 
-struct ActionServerOnAckForwardFirst
+// Client Ack
+
+struct ActionClientOnAck_NewServerConnection
+{
+    uint32_t local_addr;
+    uint16_t local_port;
+    uint32_t seq;
+    TcpOptions tcp_options;
+};
+
+struct ActionClientOnAck_Forward
+{
+    uint32_t local_addr;
+    uint16_t local_port;
+    uint32_t shift_seq;
+    uint32_t shift_ack;
+    bool add_proxy_header;
+};
+
+using ActionClientOnAck_Result = std::variant<ActionClientOnAck_NewServerConnection, ActionClientOnAck_Forward, ActionDrop>;
+
+// Server Syn+Ack
+
+struct ActionServerOnSynAck_SynAckToClient
+{
+    uint32_t ack;
+    uint32_t client_addr;
+    uint16_t client_port;
+};
+
+struct ActionServerOnSynAck_AckToClient
+{
+    uint32_t client_addr;
+    uint16_t client_port;
+    uint32_t seq;
+    uint32_t ack;
+};
+
+using ActionServerOnSynAck_Result = std::variant<ActionServerOnSynAck_SynAckToClient, ActionServerOnSynAck_AckToClient, ActionDrop>;
+
+// Server Ack
+
+struct ActionServerOnAck_ForwardFirst
 {
     uint32_t dst_addr;
     uint16_t dst_port;
@@ -156,25 +185,25 @@ struct ActionServerOnAckForwardFirst
     uint8_t tcp_options[MAX_SIZE_TCP_OPTIONS];
 };
 
-struct ActionServerOnAckForward
+struct ActionServerOnAck_Forward
 {
     uint32_t dst_addr;
     uint16_t dst_port;
     uint32_t shift_seq;
 };
 
-using ActionServerOnAckResult = std::variant<ActionServerOnAckForwardFirst, ActionServerOnAckForward, ActionDrop>;
+using ActionServerOnAck_Result = std::variant<ActionServerOnAck_ForwardFirst, ActionServerOnAck_Forward, ActionDrop>;
+
+// ----------------------------------------------------------------------------
 
 using connection_key = std::tuple<proxy_service_id_t, uint32_t, uint16_t>;  // service_id, src_addr, src_port
 
 struct SynConnectionInfo
 {
     uint32_t recv_seq;
-    uint32_t sent_seq;
-    // size_t tcp_options_size;
-    // uint8_t tcp_options[MAX_SIZE_TCP_OPTIONS];
-    TcpOptions tcp_options;
-    // todo: time
+    uint32_t local_addr;
+    tPortId local_port;
+    // todo: time, answer from server?
 };
 
 enum ConnectionState
@@ -189,32 +218,38 @@ struct ConnectionInfo
     uint32_t local_addr;
     uint16_t local_port;
     ConnectionState state;
-    size_t tcp_options_size;
-    uint8_t tcp_options[MAX_SIZE_TCP_OPTIONS];
     uint32_t sent_seq;
-    uint32_t shift_seq;
+    uint32_t shift_server;
 };
 
 class SynFromClients
 {
 public:
-	std::optional<AcceptClientSyn> ActionClientOnSyn(proxy_id_t proxy_id,
-	                                                 proxy_service_id_t service_id,
-	                                                 uint32_t src_addr,
-	                                                 uint16_t src_port,
-	                                                 uint32_t seq,
-                                                     TcpOptions&tcp_options);
+    void SetConfig(proxy_service_id_t service_id, uint32_t size_syn_table);
+    bool TryInsertClient(connection_key key);
+    void Free(connection_key key);
+    void UpdateInfo(connection_key key, uint32_t local_addr, tPortId local_port, uint32_t seq);
 
     SynConnectionInfo* FindConnection(connection_key key);
 
     common::idp::proxy_syn::response GetSyn(std::optional<proxy_service_id_t> service_id);
 
 private:
-    
-
     std::mutex mutex_;
     std::map<connection_key, SynConnectionInfo> connections_;
+    std::map<proxy_service_id_t, uint32_t> configs_;
 };
+
+
+struct ServiceInfo
+{
+	bool proxy_header;
+	uint32_t size_syn_table;
+    bool use_sack;
+	uint32_t mss;
+	uint32_t winscale;
+};
+
 
 class TcpConnectionStore
 {
@@ -231,42 +266,44 @@ public:
     common::idp::proxy_syn::response GetSyn(std::optional<proxy_service_id_t> service_id);
 
     // Action from worker
-    std::optional<AcceptClientSyn> ActionClientOnSyn(proxy_id_t proxy_id,
+    ActionClientOnSyn_Result ActionClientOnSyn(proxy_id_t proxy_id,
+	                                       proxy_service_id_t service_id,
+	                                       uint32_t src_addr,
+	                                       uint16_t src_port,
+	                                       uint32_t seq,
+	                                       TcpOptions& tcp_options);
+
+    ActionClientOnAck_Result ActionClientOnAck(proxy_id_t proxy_id,
+	                                       proxy_service_id_t service_id,
+	                                       uint32_t src_addr,
+	                                       uint16_t src_port,
+	                                       uint32_t seq,
+	                                       uint32_t ack);
+
+    ActionServerOnSynAck_Result ActionServerOnSynAck(proxy_id_t proxy_id,
 	                                             proxy_service_id_t service_id,
-	                                             uint32_t src_addr,
-	                                             uint16_t src_port,
+	                                             uint32_t dst_addr,
+	                                             uint16_t dst_port,
 	                                             uint32_t seq,
-	                                             TcpOptions&tcp_options);
+	                                             uint32_t ack,
+	                                             uint8_t* tcp_options,
+	                                             size_t tcp_options_size);
 
-    ActionClientOnAckResult ActionClientOnAck(proxy_id_t proxy_id,
-	                                      proxy_service_id_t service_id,
-	                                      uint32_t src_addr,
-	                                      uint16_t src_port,
-	                                      uint32_t seq,
-	                                      uint32_t ack);
-
-    ActionServerOnSynAckResult ActionServerOnSynAck(proxy_id_t proxy_id,
-	                                            proxy_service_id_t service_id,
-	                                            uint32_t dst_addr,
-	                                            uint16_t dst_port,
-	                                            uint32_t seq,
-	                                            uint32_t ack,
-	                                            uint8_t* tcp_options,
-	                                            size_t tcp_options_size);
-
-    ActionServerOnAckResult ActionServerOnAck(proxy_id_t proxy_id,
-	                                      proxy_service_id_t service_id,
-	                                      uint32_t dst_addr,
-	                                      uint16_t dst_port,
-	                                      uint32_t seq,
-	                                      uint32_t ack);
+    ActionServerOnAck_Result ActionServerOnAck(proxy_id_t proxy_id,
+	                                       proxy_service_id_t service_id,
+	                                       uint32_t dst_addr,
+	                                       uint16_t dst_port,
+	                                       uint32_t seq,
+	                                       uint32_t ack);
 
 private:
     std::mutex mutex_;
     SynFromClients table_syn_;
     LocalPool local_pool_;
     std::map<connection_key, ConnectionInfo> connections_;
-    std::map<connection_key, connection_key> server_connections_;
+    SynCookies syn_cookies_;
+
+    ServiceInfo services_info_[YANET_CONFIG_PROXY_SERVICES_SIZE];
 };
 
 }
