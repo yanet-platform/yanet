@@ -72,21 +72,6 @@ jobs:
           meson compile -C build
       - run: meson install -C build
 
-  build-ubuntu1804:
-    name: build (Ubuntu 18.04)
-    needs: formatting-check
-    runs-on: ubuntu-24.04
-    container:
-      image: yanetplatform/builder_ubuntu18.04-lite
-    steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: recursive
-      - run: |
-          meson setup --prefix=/target -Dstrip=true build
-          meson compile -C build
-      - run: meson install -C build
-
   unittest:
     needs: build-unittest
     runs-on: ubuntu-24.04

@@ -4,7 +4,7 @@ Hardware:
 - Memory: 64G
 
 Software:
-- OS: Ubuntu 18.04
+- OS: Ubuntu 22.04
 - git
 - gcc or clang
 - DPDK v22.11.2
