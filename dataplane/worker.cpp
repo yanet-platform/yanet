@@ -6187,18 +6187,12 @@ inline void cWorker::proxy_client_syn_handle()
 		}
 		else if (const auto syn_ack_to_client = std::get_if<dataplane::proxy::ActionClientOnSyn_SynAckToClient>(&action))
 		{
-			uint8_t buf_tcp_options[MAX_SIZE_TCP_OPTIONS];
-			uint16_t tcp_options_len_new = tcp_options.Write(buf_tcp_options);
-
-			uint16_t tcp_options_len = tcp_header_len - sizeof(rte_tcp_hdr);	// todo
-			mbuf->data_len += tcp_options_len_new - tcp_options_len;
-			mbuf->pkt_len += tcp_options_len_new - tcp_options_len;
+			tcp_options.Write(mbuf);
 
 			rte_be32_t tmp = ipv4Header->src_addr;
 			ipv4Header->src_addr = ipv4Header->dst_addr;
 			ipv4Header->dst_addr = tmp;
 			ipv4Header->time_to_live = 64;
-			ipv4Header->total_length = dataplane::proxy::add_cpu_16(ipv4Header->total_length, tcp_options_len_new - tcp_options_len);
 			ipv4Header->hdr_checksum = 0;
 			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
 
@@ -6210,12 +6204,6 @@ inline void cWorker::proxy_client_syn_handle()
 			uint16_t tmp_port = tcp_header->src_port;
 			tcp_header->src_port = tcp_header->dst_port;
 			tcp_header->dst_port = tmp_port;
-			tcp_header->data_off = (sizeof(rte_tcp_hdr) + tcp_options_len_new) << 2;
-
-			if (tcp_options_len_new != 0)
-			{
-				memcpy((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), buf_tcp_options, tcp_options_len_new);
-			}
 
 			tcp_header->cksum = 0;
 			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
@@ -6289,15 +6277,11 @@ inline void cWorker::proxy_client_ack_handle()
 			new_server_connection->tcp_options.timestamp_value = tcp_options_original.timestamp_value;
 
 			// uint8_t buf_tcp_options[MAX_SIZE_TCP_OPTIONS];
-			uint8_t* buf_tcp_options = rte_pktmbuf_mtod_offset(mbuf, uint8_t*, metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
-			uint16_t tcp_options_size = new_server_connection->tcp_options.Write(buf_tcp_options);
+			new_server_connection->tcp_options.Write(mbuf);
 
-			uint16_t tcp_options_len = tcp_header_len - sizeof(rte_tcp_hdr);	// todo
-			
 			ipv4Header->dst_addr = service.service_addr.address;
 			ipv4Header->src_addr = new_server_connection->local_addr;
 			ipv4Header->time_to_live = 64;
-			ipv4Header->total_length = dataplane::proxy::add_cpu_16(ipv4Header->total_length, tcp_options_size - tcp_options_len);
 			ipv4Header->hdr_checksum = 0;
 			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
 
@@ -6306,16 +6290,12 @@ inline void cWorker::proxy_client_ack_handle()
 			tcp_header->tcp_flags = TCP_SYN_FLAG;
 			tcp_header->src_port = new_server_connection->local_port;
 			tcp_header->dst_port = rte_cpu_to_be_16(service.service_port);
-			tcp_header->data_off = (sizeof(rte_tcp_hdr) + tcp_options_size) << 2;
 
 			// uint8_t* buf_tcp_options = rte_pktmbuf_mtod_offset(mbuf, uint8_t*, metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
 			// memcpy(buf_tcp_options, new_server_connection->tcp_options, new_server_connection->tcp_options_size);
 
 			tcp_header->cksum = 0;
 			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-
-			mbuf->data_len += tcp_options_size - tcp_options_len;
-			mbuf->pkt_len += tcp_options_size - tcp_options_len;
 
 			proxy_flow(mbuf, proxy.flow);
 		}
@@ -6440,14 +6420,10 @@ inline void cWorker::proxy_server_syn_ack_handle()
 			tcp_options.sack = false;
 			tcp_options.mss = 0;
 
-			uint16_t tcp_options_len = tcp_header_len - sizeof(rte_tcp_hdr);	// todo
-
-			uint8_t buf_tcp_options[MAX_SIZE_TCP_OPTIONS];
-			uint16_t tcp_options_len_new = tcp_options.Write(buf_tcp_options);
+			tcp_options.Write(mbuf);
 
 			ipv4Header->src_addr = service.proxy_addr.address;	// todo
 			ipv4Header->dst_addr = ack_to_client->client_addr;
-			ipv4Header->total_length = dataplane::proxy::add_cpu_16(ipv4Header->total_length, tcp_options_len_new - tcp_options_len);
 			ipv4Header->hdr_checksum = 0;
 			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
 
@@ -6457,18 +6433,8 @@ inline void cWorker::proxy_server_syn_ack_handle()
 			tcp_header->dst_port = ack_to_client->client_port;
 			tcp_header->tcp_flags = TCP_ACK_FLAG;
 
-			tcp_header->data_off = (sizeof(rte_tcp_hdr) + tcp_options_len_new) << 2;
-
-			if (tcp_options_len_new != 0)
-			{
-				memcpy((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), buf_tcp_options, tcp_options_len_new);
-			}
-
 			tcp_header->cksum = 0;
 			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-
-			mbuf->data_len += tcp_options_len_new - tcp_options_len;
-			mbuf->pkt_len += tcp_options_len_new - tcp_options_len;
 
 			proxy_flow(mbuf, proxy.flow);
 		}

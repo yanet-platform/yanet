@@ -34,7 +34,7 @@ struct TcpOptions
     uint8_t window_scaling;
 
     bool Read(uint8_t* data, uint32_t len);
-    uint32_t Write(uint8_t* data) const;
+    uint32_t Write(rte_mbuf* mbuf) const;
 
     std::string DebugInfo() const;
 

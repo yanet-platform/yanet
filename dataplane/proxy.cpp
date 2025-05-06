@@ -2,6 +2,8 @@
 
 #include <rte_tcp.h>
 #include <sstream>
+#include "metadata.h"
+#include "common.h"
 
 namespace dataplane::proxy
 {
@@ -69,8 +71,15 @@ bool TcpOptions::Read(uint8_t* data, uint32_t len)
     return true;
 }
 
-uint32_t TcpOptions::Write(uint8_t* data) const
+uint32_t TcpOptions::Write(rte_mbuf* mbuf) const
 {
+    dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+    rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+    rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+    size_t tcp_header_len_old = (tcp_header->data_off >> 4) << 2;
+    uint16_t tcp_data_len = rte_be_to_cpu_16(ipv4_header->total_length) - rte_ipv4_hdr_len(ipv4_header) - tcp_header_len_old;
+
+    uint8_t* data = (uint8_t*)tcp_header + sizeof(rte_tcp_hdr);
     uint32_t len = 0;
     
     if (mss != 0)
@@ -109,6 +118,14 @@ uint32_t TcpOptions::Write(uint8_t* data) const
     {
         data[len++] = TCPOPT_NOP;
     }
+
+    tcp_header->data_off = ((sizeof(rte_tcp_hdr) + len) >> 2) << 4;
+    
+    uint16_t total_length = rte_ipv4_hdr_len(ipv4_header) + sizeof(rte_tcp_hdr) + len + tcp_data_len;
+    ipv4_header->total_length = rte_cpu_to_be_16(total_length);
+
+    mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + total_length;
+    mbuf->pkt_len = mbuf->data_len;
 
     return len;
 }
