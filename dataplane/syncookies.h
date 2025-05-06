@@ -26,9 +26,11 @@ public:
         uint32_t mss;
         uint32_t sack;
         uint32_t wscale;
+        uint32_t ecn;
 
         constexpr bool operator==(const TCPOptions& other) const {
-            return mss == other.mss && sack == other.sack && wscale == other.wscale;
+            return mss == other.mss && sack == other.sack && 
+                    wscale == other.wscale && ecn == other.ecn;
         }
 
         constexpr bool operator!=(const TCPOptions& other) const {
@@ -39,14 +41,16 @@ public:
     static uint32_t PackData(TCPOptions options) {
         return ((options.mss << MSS_OFFSET) & MSS_MASK) |
             ((options.sack << SACK_OFFSET) & SACK_MASK) | 
-            ((options.wscale << WSCALE_OFFSET) & WSCALE_MASK);
+            ((options.wscale << WSCALE_OFFSET) & WSCALE_MASK) |
+            ((options.ecn << ECN_OFFSET) & ECN_MASK);
     }
 
     static TCPOptions UnpackData(uint32_t data) {
         return {
             .mss = (data & MSS_MASK) >> MSS_OFFSET,
             .sack = (data & SACK_MASK) >> SACK_OFFSET,
-            .wscale = (data & WSCALE_MASK) >> WSCALE_OFFSET
+            .wscale = (data & WSCALE_MASK) >> WSCALE_OFFSET,
+            .ecn = (data & ECN_MASK) >> ECN_OFFSET
         };
     }
 
@@ -68,16 +72,19 @@ private:
     static constexpr uint32_t MSS_BITS     = 2;
     static constexpr uint32_t SACK_BITS    = 1;
     static constexpr uint32_t WSCALE_BITS  = 4;
+    static constexpr uint32_t ECN_BITS     = 1;
 
     static constexpr uint32_t MSS_OFFSET    = 0;
     static constexpr uint32_t SACK_OFFSET   = MSS_OFFSET + MSS_BITS;
     static constexpr uint32_t WSCALE_OFFSET = SACK_OFFSET + SACK_BITS;
+    static constexpr uint32_t ECN_OFFSET    = WSCALE_OFFSET + WSCALE_BITS;
 
     static constexpr uint32_t MSS_MASK     = ((1 << MSS_BITS) - 1) << MSS_OFFSET;
     static constexpr uint32_t SACK_MASK    = ((1 << SACK_BITS) - 1) << SACK_OFFSET;
     static constexpr uint32_t WSCALE_MASK  = ((1 << WSCALE_BITS) - 1) << WSCALE_OFFSET;
+    static constexpr uint32_t ECN_MASK     = ((1 << ECN_BITS) - 1) << ECN_OFFSET;
     
-    static constexpr uint32_t DATA_MASK = WSCALE_MASK | SACK_MASK | MSS_MASK;
+    static constexpr uint32_t DATA_MASK = WSCALE_MASK | SACK_MASK | MSS_MASK | ECN_MASK;
 
     uint32_t cookie_hash(uint32_t saddr, uint32_t daddr,
                         uint16_t sport, uint16_t dport,

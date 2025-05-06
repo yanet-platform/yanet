@@ -40,8 +40,8 @@ SynCookies::SynCookies()
 }
 
 uint32_t SynCookies::GetCookie(uint32_t saddr, uint32_t daddr,
-                                                    uint16_t sport, uint16_t dport,
-                                                    uint32_t sseq, uint32_t data)
+                                uint16_t sport, uint16_t dport,
+                                uint32_t sseq, uint32_t data)
 {
     uint32_t cookie = cookie_hash(saddr, daddr, sport, dport, 0) + sseq +
                     (current_key_ << COOKIE_BITS) +

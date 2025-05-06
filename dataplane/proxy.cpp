@@ -261,7 +261,7 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_id_t proxy_
     tcp_options.sack &= services_info_[service_id].use_sack;
     tcp_options.mss = std::min(tcp_options.mss, (uint16_t)services_info_[service_id].mss);
 
-    uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack, tcp_options.window_scaling});
+    uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack, tcp_options.window_scaling, 0}); // ecn
     uint32_t cookie = syn_cookies_.GetCookie(src_addr, 0, src_port, 0, seq, cookie_data); // dst_addr, dst_port
     YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, seq);
 
