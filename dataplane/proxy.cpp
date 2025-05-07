@@ -29,9 +29,21 @@ bool TcpOptions::Read(uint8_t* data, uint32_t len)
             if (!CheckSize(index, len, data, 2)) {
                 return false;
             }
-            sack = 1;
+            sack_permitted = 1;
 
             index += 2;
+            break;
+
+        case TCPOPT_SACK:
+            if (!CheckSize(index, len, data, 10) || unlikely(num_sacks == MAX_SACK_BLOCKS)) {
+                return false;
+            }
+
+            sacks[num_sacks].first = rte_be_to_cpu_32(*((uint32_t*)(data + index + 2)));
+            sacks[num_sacks].last = rte_be_to_cpu_32(*((uint32_t*)(data + index + 6)));
+            num_sacks++;
+
+            index += 10;
             break;
 
         case TCPOPT_TIMESTAMP:
@@ -90,11 +102,20 @@ uint32_t TcpOptions::Write(rte_mbuf* mbuf) const
         len += 4;
     }
 
-    if (sack != 0)
+    if (sack_permitted != 0)
     {
         data[len] = TCPOPT_SACK_PERM;
         data[len + 1] = 2;
         len += 2;
+    }
+
+    for (int i = 0; i < num_sacks; i++)
+    {
+        data[len] = TCPOPT_SACK;
+        data[len + 1] = 10;
+        *((uint32_t*)(data + len + 2)) = rte_cpu_to_be_32(sacks[i].first);
+        *((uint32_t*)(data + len + 6)) = rte_cpu_to_be_32(sacks[i].last);
+        len += 10;
     }
 
     if (timestamp_value != 0 || timestamp_echo != 0)
@@ -141,7 +162,7 @@ std::string TcpOptions::DebugInfo() const
     
     ss << "MSS: " << mss;
     
-    if (sack != 0)
+    if (sack_permitted != 0)
     {
         ss << ", SACK";
     }
@@ -275,10 +296,10 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_id_t proxy_
     // return table_syn_.ActionClientOnSyn(proxy_id, service_id, src_addr, src_port, seq, tcp_options);
     // YANET_LOG_ERROR("We need syn-cookie!\n");
 
-    tcp_options.sack &= services_info_[service_id].use_sack;
+    tcp_options.sack_permitted &= services_info_[service_id].use_sack;
     tcp_options.mss = std::min(tcp_options.mss, (uint16_t)services_info_[service_id].mss);
 
-    uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack, tcp_options.window_scaling, 0}); // ecn
+    uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack_permitted, tcp_options.window_scaling, 0}); // ecn
     uint32_t cookie = syn_cookies_.GetCookie(src_addr, 0, src_port, 0, seq, cookie_data); // dst_addr, dst_port
     YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, seq);
 
@@ -364,7 +385,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_
 
         TcpOptions tcp_options;
         tcp_options.mss = SynCookies::MssFromTable(options.mss);
-        tcp_options.sack = options.sack;
+        tcp_options.sack_permitted = options.sack;
         tcp_options.window_scaling = options.wscale;
 
         new_server_connection.tcp_options = tcp_options;

@@ -6241,6 +6241,7 @@ inline void cWorker::proxy_client_ack_handle()
 
 		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 		rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+		size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
 		
 		YANET_LOG_WARNING("proxy_client_ack_handle %s:%d -> %s:%d\n",
 				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->src_port),
@@ -6249,6 +6250,10 @@ inline void cWorker::proxy_client_ack_handle()
 		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
 		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_in] += mbuf->pkt_len;
 
+		dataplane::proxy::TcpOptions tcp_options;
+		memset(&tcp_options, 0, sizeof(tcp_options));
+		tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+		YANET_LOG_WARNING("\ttcp options: %s\n", tcp_options.DebugInfo().c_str());
 		dataplane::proxy::ActionClientOnAck_Result action = tcp_connection_store->ActionClientOnAck(metadata->flow.data.proxy.id,
 		                                                                                            metadata->flow.data.proxy.service_id,
 		                                                                                            ipv4Header->src_addr,
@@ -6268,13 +6273,8 @@ inline void cWorker::proxy_client_ack_handle()
 				common::ipv4_address_t(rte_cpu_to_be_32(new_server_connection->local_addr)).toString().c_str(),
 				rte_cpu_to_be_16(new_server_connection->local_port), rte_cpu_to_be_32(new_server_connection->seq), new_server_connection->tcp_options.DebugInfo().c_str());
 
-			uint16_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
-
 			// read time from tcp options
-			dataplane::proxy::TcpOptions tcp_options_original;
-			memset(&tcp_options_original, 0, sizeof(tcp_options_original));
-			tcp_options_original.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
-			new_server_connection->tcp_options.timestamp_value = tcp_options_original.timestamp_value;
+			new_server_connection->tcp_options.timestamp_value = tcp_options.timestamp_value;
 
 			// uint8_t buf_tcp_options[MAX_SIZE_TCP_OPTIONS];
 			new_server_connection->tcp_options.Write(mbuf);
@@ -6307,17 +6307,25 @@ inline void cWorker::proxy_client_ack_handle()
 				rte_cpu_to_be_32(tcp_header->recv_ack), forward_to_server->shift_seq,
 				forward_to_server->shift_ack, forward_to_server->add_proxy_header);
 
+			for (int i = 0; i < tcp_options.num_sacks; i++)
+			{
+				tcp_options.sacks[i].first = dataplane::proxy::add_cpu_32(tcp_options.sacks[i].first, forward_to_server->shift_ack);
+				tcp_options.sacks[i].last = dataplane::proxy::add_cpu_32(tcp_options.sacks[i].last, forward_to_server->shift_ack);
+			}
+			uint32_t tcp_options_len_new = tcp_options.Write(mbuf);
+			tcp_header_len = sizeof(rte_tcp_hdr) + tcp_options_len_new;
+
 			if (forward_to_server->add_proxy_header)
 			{
 				constexpr uint16_t size_proxy_header = sizeof(dataplane::proxy::proxy_v2_ipv4_hdr);
 
-				uint16_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
-				dataplane::proxy::proxy_v2_ipv4_hdr* proxy_header = rte_pktmbuf_mtod_offset(mbuf, dataplane::proxy::proxy_v2_ipv4_hdr*, metadata->transport_headerOffset + tcp_header_len);
+				dataplane::proxy::proxy_v2_ipv4_hdr* proxy_header = 
+					rte_pktmbuf_mtod_offset(mbuf, dataplane::proxy::proxy_v2_ipv4_hdr*, metadata->transport_headerOffset + tcp_header_len);
 				uint16_t size_data = rte_be_to_cpu_16(ipv4Header->total_length) - rte_ipv4_hdr_len(ipv4Header) - tcp_header_len;
 				if (size_data != 0)
 				{
 					// YANET_LOG_WARNING("\t\tmem_cpy size_data=%d\n", size_data);
-					memcpy((uint8_t*)proxy_header + size_proxy_header, proxy_header, size_data);
+					memmove((uint8_t*)proxy_header + size_proxy_header, proxy_header, size_data); // using intermediate buffer impacts performance
 				}
 				
 				uint16_t ipv4_total_length = rte_ipv4_hdr_len(ipv4Header) + tcp_header_len + size_proxy_header + size_data;
@@ -6421,7 +6429,7 @@ inline void cWorker::proxy_server_syn_ack_handle()
 			dataplane::proxy::TcpOptions tcp_options;
 			memset(&tcp_options, 0, sizeof(tcp_options));
 			tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
-			tcp_options.sack = false;
+			tcp_options.sack_permitted = false;
 			tcp_options.mss = 0;
 
 			tcp_options.Write(mbuf);

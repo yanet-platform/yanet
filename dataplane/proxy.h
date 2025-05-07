@@ -20,7 +20,9 @@
 #define TCPOPT_FASTOPEN		34	/* Fast open (RFC7413) */
 #define TCPOPT_EXP		254	/* Experimental */
 
-#define MAX_SIZE_TCP_OPTIONS 20
+#define MAX_SIZE_TCP_OPTIONS 40
+
+#define MAX_SACK_BLOCKS 4
 
 namespace dataplane::proxy
 {
@@ -30,8 +32,13 @@ struct TcpOptions
     uint32_t timestamp_value;
     uint32_t timestamp_echo;
     uint16_t mss;
-    uint8_t sack;
+    uint8_t sack_permitted;
     uint8_t window_scaling;
+    struct SAck {
+        uint32_t first;
+        uint32_t last;
+    } sacks[MAX_SACK_BLOCKS];
+    uint8_t num_sacks;
 
     bool Read(uint8_t* data, uint32_t len);
     uint32_t Write(rte_mbuf* mbuf) const;
