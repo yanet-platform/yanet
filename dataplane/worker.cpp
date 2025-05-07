@@ -6311,17 +6311,21 @@ inline void cWorker::proxy_client_ack_handle()
 			{
 				constexpr uint16_t size_proxy_header = sizeof(dataplane::proxy::proxy_v2_ipv4_hdr);
 
-				dataplane::proxy::proxy_v2_ipv4_hdr* proxy_header = rte_pktmbuf_mtod_offset(mbuf, dataplane::proxy::proxy_v2_ipv4_hdr*, metadata->transport_headerOffset + ((tcp_header->data_off >> 4) << 2));
-				uint16_t size_data = rte_be_to_cpu_16(ipv4Header->total_length) - sizeof(rte_ipv4_hdr) - ((tcp_header->data_off >> 4) << 2);
+				uint16_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+				dataplane::proxy::proxy_v2_ipv4_hdr* proxy_header = rte_pktmbuf_mtod_offset(mbuf, dataplane::proxy::proxy_v2_ipv4_hdr*, metadata->transport_headerOffset + tcp_header_len);
+				uint16_t size_data = rte_be_to_cpu_16(ipv4Header->total_length) - rte_ipv4_hdr_len(ipv4Header) - tcp_header_len;
 				if (size_data != 0)
 				{
 					// YANET_LOG_WARNING("\t\tmem_cpy size_data=%d\n", size_data);
 					memcpy((uint8_t*)proxy_header + size_proxy_header, proxy_header, size_data);
 				}
+				
+				uint16_t ipv4_total_length = rte_ipv4_hdr_len(ipv4Header) + tcp_header_len + size_proxy_header + size_data;
+				ipv4Header->total_length = rte_cpu_to_be_16(ipv4_total_length);
 
-				mbuf->data_len += size_proxy_header;
-				mbuf->pkt_len += size_proxy_header;
-				ipv4Header->total_length = dataplane::proxy::add_cpu_16(ipv4Header->total_length, size_proxy_header);
+				mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + ipv4_total_length;
+				mbuf->pkt_len = mbuf->data_len;
+
 				dataplane::proxy::FillProxyHeader(proxy_header, ipv4Header->src_addr, tcp_header->src_port, service.proxy_addr.address, rte_cpu_to_be_16(service.proxy_port));
 			}
 
@@ -6499,30 +6503,31 @@ inline void cWorker::proxy_server_ack_handle()
 				rte_cpu_to_be_16(forward_first->dst_port), rte_cpu_to_be_32(forward_first->seq), forward_first->tcp_options_size);
 
 			uint16_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
-			uint16_t tcp_options_len = tcp_header_len - sizeof(rte_tcp_hdr);	// todo
+			uint16_t tcp_data_len = rte_be_to_cpu_16(ipv4Header->total_length) - rte_ipv4_hdr_len(ipv4Header) - tcp_header_len;
+			uint16_t ipv4_total_length = rte_ipv4_hdr_len(ipv4Header) + sizeof(rte_tcp_hdr) + forward_first->tcp_options_size + tcp_data_len;
 			
 			ipv4Header->dst_addr = forward_first->dst_addr;
 			ipv4Header->src_addr = service.proxy_addr.address;
 			// ipv4Header->time_to_live = 64;
-			ipv4Header->total_length = dataplane::proxy::add_cpu_16(ipv4Header->total_length, forward_first->tcp_options_size - tcp_options_len);
+			ipv4Header->total_length = rte_cpu_to_be_16(ipv4_total_length);
 			ipv4Header->hdr_checksum = 0;
 			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
-
+			
 			tcp_header->sent_seq = forward_first->seq;
 			tcp_header->recv_ack = forward_first->ack;
 			// tcp_header->tcp_flags = TCP_SYN_FLAG;
 			tcp_header->src_port = rte_cpu_to_be_16(service.proxy_port);
 			tcp_header->dst_port = forward_first->dst_port;
-			tcp_header->data_off = (sizeof(rte_tcp_hdr) + forward_first->tcp_options_size) << 2;
+			tcp_header->data_off = ((sizeof(rte_tcp_hdr) + forward_first->tcp_options_size) >> 2) << 4;
 
 			uint8_t* buf_tcp_options = rte_pktmbuf_mtod_offset(mbuf, uint8_t*, metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
 			memcpy(buf_tcp_options, forward_first->tcp_options, forward_first->tcp_options_size);
 
 			tcp_header->cksum = 0;
 			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-
-			mbuf->data_len += forward_first->tcp_options_size - tcp_options_len;
-			mbuf->pkt_len += forward_first->tcp_options_size - tcp_options_len;
+			
+			mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + ipv4_total_length;
+			mbuf->pkt_len = mbuf->data_len;
 
 			proxy_flow(mbuf, proxy.flow);
 		}
