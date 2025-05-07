@@ -58,12 +58,17 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+      - name: Docker meta announcer
+        id: meta-announcer
+        uses: docker/metadata-action@v5
+        with:
+          images: yanetplatform/yanet-announcer
       - name: Build and push Docker image for yanet-announcer
-        id: push
+        id: push-announcer
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
         with:
           file: ./image/yanet-announcer/Dockerfile
           push: true
-          tags: yanetplatform/yanet-announcer:${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-announcer.outputs.tags }}
+          labels: ${{ steps.meta-announcer.outputs.labels }}
 
