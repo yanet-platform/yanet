@@ -2808,7 +2808,7 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 	{
 		uint32_t vtc_flow = 0;
 		uint16_t payload_len = 0;
-		uint32_t ipv4_src_addr;
+		uint32_t ipv4_src_addr = {};
 		uint16_t mpls_len = (is_ipip_tunnel ? 0 : sizeof(rte_udp_hdr) + YADECAP_MPLS_HEADER_SIZE);
 		if (is_ipv4)
 		{
