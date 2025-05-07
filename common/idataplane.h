@@ -55,6 +55,16 @@ public:
 		return get<common::idp::requestType::getSlowWorkerStats, common::idp::getSlowWorkerStats::response>();
 	}
 
+	auto clearWorkerDumpRings() const
+	{
+		return get<common::idp::requestType::clearWorkerDumpRings, eResult>();
+	}
+
+	auto flushDumpRing(const common::idp::flushDumpRing::request& request) const
+	{
+		return get<common::idp::requestType::flushDumpRing, eResult>(request);
+	}
+
 	auto get_worker_gc_stats() const
 	{
 		return get<common::idp::requestType::get_worker_gc_stats, common::idp::get_worker_gc_stats::response>();
@@ -158,6 +168,11 @@ public:
 	auto hitcount_dump() const
 	{
 		return get<common::idp::requestType::hitcount_dump, common::idp::hitcount_dump::response>();
+	}
+
+	auto tcpdump_ring(const common::idp::tcpdump_ring::request& request) const
+	{
+		return get<common::idp::requestType::tcpdump_ring, eResult>(request);
 	}
 
 	eResult debug_latch_update(const common::idp::debug_latch_update::request& request) const
