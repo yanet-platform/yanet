@@ -413,7 +413,7 @@ class PcapDumper
 {
 public:
 	PcapDumper(std::string path, int capsize = MAX_PACK_LEN) :
-	        tmpFilePath(std::move(path)), pcap(pcap_open_dead(DLT_EN10MB, capsize))
+	        tmpFilePath(path + "XXXXXX.pcap"), pcap(pcap_open_dead(DLT_EN10MB, capsize))
 	{
 
 		if (!pcap)
@@ -422,7 +422,11 @@ public:
 			throw "";
 		}
 
-		dumper = pcap_dump_open(pcap, tmpFilePath.data());
+		int tmpfd = mkstemps(tmpFilePath.data(), 5);
+		if (tmpfd < 0)
+			throw "";
+
+		dumper = pcap_dump_fopen(pcap, fdopen(tmpfd, "w"));
 		if (!dumper)
 		{
 			pcap_close(pcap);
@@ -448,7 +452,7 @@ public:
 	}
 
 private:
-	const std::string tmpFilePath;
+	std::string tmpFilePath;
 	pcap_t* pcap;
 	pcap_dumper_t* dumper;
 };
@@ -583,7 +587,7 @@ void tAutotest::recvThread(std::string interfaceName,
                            std::vector<std::string> expectFilePaths,
                            Duration timelimit)
 {
-	PcapDumper pcapDumper(std::tmpnam(nullptr) + std::string(".pcap"));
+	PcapDumper pcapDumper("/tmp/yanet");
 
 	std::vector<pcap_expectation> expect_pcaps;
 	for (const auto& expectFilePath : expectFilePaths)
