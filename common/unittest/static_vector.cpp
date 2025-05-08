@@ -1,7 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "../static_vector.h"
+#include "common/static_vector.h"
 
 namespace
 {

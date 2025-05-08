@@ -1,5 +1,6 @@
 dependencies = []
 dependencies += libjson.get_variable('nlohmann_json_dep')
+dependencies += libyanet_common_dep
 
 flex_token = custom_target('flex_token.l',
                            input: 'token.l',
