@@ -135,7 +135,8 @@ void cBus::clientThread(int clientSocket)
 			YANET_LOG_DEBUG("reading %lu bytes message\n", messageSize);
 		}
 		buffer.resize(messageSize);
-		if (common::recvAll(clientSocket, (char*)buffer.data(), buffer.size()))
+		int passed_fd = -1;
+		if (common::recvMsgAll(clientSocket, buffer.data(), buffer.size(), passed_fd))
 		{
 			stats.errors[(uint32_t)common::idp::errorType::busRead]++;
 			break;
@@ -282,9 +283,18 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::hitcount_dump, request);
 		}
-		else if (type == common::idp::requestType::tcpdump_ring)
+		else if (type == common::idp::requestType::tcpdump)
 		{
-			response = callWithResponse(&cControlPlane::tcpdump_ring, request);
+			if (passed_fd < 0)
+			{
+				YANET_LOG_ERROR("Expected file descriptor for tcpdump but none passed\n");
+				response = eResult::errorSocket;
+			}
+			else
+			{
+				response = callWithResponse(&cControlPlane::tcpdump, request, passed_fd);
+				close(passed_fd);
+			}
 		}
 		else if (type == common::idp::requestType::debug_latch_update)
 		{

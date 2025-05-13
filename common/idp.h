@@ -65,7 +65,7 @@ enum class requestType : uint32_t
 	limits,
 	samples,
 	hitcount_dump,
-	tcpdump_ring,
+	tcpdump,
 	debug_latch_update,
 	unrdup_vip_to_balancers,
 	update_vip_vport_proto,
@@ -931,29 +931,27 @@ struct Data
 using response = std::unordered_map<id, Data>;
 }
 
-namespace tcpdump_ring
+namespace tcpdump
 {
-struct RingAndPcapFile
+struct RingAndDumpInfo
 {
 	tDataPlaneConfig::DumpRingDesc ring_desc{};
-	std::string prefix{};
-	std::string path{};
+	// Whether the ring being dumped is the first
+	bool first{};
 
-	SERIALIZABLE(ring_desc, prefix, path);
+	SERIALIZABLE(ring_desc, first);
 
-	RingAndPcapFile() = default;
+	RingAndDumpInfo() = default;
 
-	RingAndPcapFile(std::string tag,
+	RingAndDumpInfo(std::string tag,
 	                tCoreId core_id,
 	                tSocketId socket_id,
-	                std::string pcap_file_prefix,
-	                std::string pcap_file_path) :
-	        ring_desc{std::move(tag), core_id, socket_id},
-	        prefix(std::move(pcap_file_prefix)),
-	        path(std::move(pcap_file_path)) {}
+	                bool first) :
+	        ring_desc{std::move(tag), core_id, socket_id}, first(first) {}
 };
 
-using request = RingAndPcapFile;
+using request = RingAndDumpInfo;
+using response = ssize_t;
 }
 
 namespace debug_latch_update
@@ -1043,7 +1041,7 @@ using request = std::tuple<requestType,
                                         unrdup_vip_to_balancers::request,
                                         update_vip_vport_proto::request,
                                         dump_physical_port::request,
-                                        tcpdump_ring::request,
+                                        tcpdump::request,
                                         neighbor_insert::request,
                                         neighbor_remove::request,
                                         neighbor_update_interfaces::request,
@@ -1075,6 +1073,7 @@ using response = std::variant<std::tuple<>,
                               limits::response,
                               samples::response,
                               hitcount_dump::response,
+                              tcpdump::response,
                               get_shm_info::response,
                               get_shm_tsc_info::response,
                               neighbor_show::response,
