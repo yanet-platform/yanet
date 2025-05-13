@@ -51,6 +51,12 @@ protected:
 		return (controlPlane->*function)(std::get<TArg>(std::get<1>(request)));
 	}
 
+	template<typename TResult, typename TArg>
+	TResult callWithResponse(TResult (cControlPlane::*function)(const TArg&, int), const common::idp::request& request, int fd)
+	{
+		return (controlPlane->*function)(std::get<TArg>(std::get<1>(request)), fd);
+	}
+
 protected:
 	friend class cReport;
 
