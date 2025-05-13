@@ -117,6 +117,69 @@ static int send(int clientSocket, Req&& request)
 	}
 }
 
+template<class Req>
+int send_with_fd(int clientSocket, const Req& request, int fd_to_send)
+{
+	uint64_t messageSize = 0;
+	std::vector<char> buf;
+
+	if constexpr (std::is_convertible_v<Req&, ::google::protobuf::Message&&>)
+	{
+#if GOOGLE_PROTOBUF_VERSION < 3001000
+		messageSize = request.ByteSize();
+#else
+		messageSize = request.ByteSizeLong();
+#endif
+		buf.resize(messageSize);
+		if (!request.SerializeToArray(buf.data(), messageSize))
+		{
+			return EBADMSG;
+		}
+	}
+	else
+	{
+		common::stream_out_t stream;
+		stream.push(request);
+		const auto& tmp = stream.getBuffer();
+		messageSize = tmp.size();
+		buf.assign(tmp.begin(), tmp.end());
+	}
+
+	// Send messageSize as with regular `send<>`
+	if (int err = sendAll(clientSocket, (const char*)&messageSize, sizeof(messageSize)))
+		return err;
+
+	// iovec describes an array of buffers to be sent; here, a single message.
+	struct iovec iov;
+	iov.iov_base = buf.data();
+	iov.iov_len = buf.size();
+
+	// msghdr describes the full message including iovec and control data.
+	char cmsg_buf[CMSG_SPACE(sizeof(int))] = {};
+	struct msghdr msg = {};
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+
+	if (fd_to_send >= 0)
+	{
+		msg.msg_control = cmsg_buf;
+		msg.msg_controllen = sizeof(cmsg_buf);
+
+		struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_RIGHTS; // Indicates passing of file descriptors.
+		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+		memcpy(CMSG_DATA(cmsg), &fd_to_send, sizeof(int));
+	}
+
+	// Send message buffer with fd attached
+	ssize_t ret = sendmsg(clientSocket, &msg, MSG_NOSIGNAL);
+	if (ret < 0)
+		return errno;
+
+	return 0;
+}
+
 template<class Resp>
 static inline Resp recv(int clientSocket) // unsafe
 {
@@ -168,6 +231,16 @@ static inline Resp sendAndRecv(int clientSocket, Req&& request)
 	if (auto err = send(clientSocket, std::move(request)); err != 0)
 	{
 		throw std::string("send(): ") + strerror(err);
+	}
+	return recv<Resp>(clientSocket);
+}
+
+template<class Resp, class Req>
+inline Resp send_and_recv_with_fd(int clientSocket, const Req& request, int fd_to_send)
+{
+	if (auto err = send_with_fd(clientSocket, request, fd_to_send); err != 0)
+	{
+		throw std::string("send_with_fd(): ") + strerror(err);
 	}
 	return recv<Resp>(clientSocket);
 }

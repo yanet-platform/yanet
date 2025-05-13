@@ -174,10 +174,39 @@ void cBus::clientThread(int clientSocket)
 			YANET_LOG_DEBUG("reading %lu bytes message\n", messageSize);
 		}
 		buffer.resize(messageSize);
-		if (!recvAll(clientSocket, (char*)buffer.data(), buffer.size()))
+
+		// Setup for potential FD receiving
+		struct iovec iov;
+		iov.iov_base = buffer.data();
+		iov.iov_len = buffer.size();
+
+		// This buffer holds the ancillary data, potentially including a passed FD
+		char cmsg_buf[CMSG_SPACE(sizeof(int))] = {};
+		struct msghdr msg = {};
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+		msg.msg_control = cmsg_buf;
+		msg.msg_controllen = sizeof(cmsg_buf);
+
+		// Instead of recvAll, use recvmsg to receive both message data and possible FD
+		ssize_t n = recvmsg(clientSocket, &msg, MSG_NOSIGNAL);
+		if (n <= 0)
 		{
 			stats.errors[(uint32_t)common::idp::errorType::busRead]++;
 			break;
+		}
+
+		// Try to extract a FD if present
+		int passed_fd = -1;
+		for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+		     cmsg != nullptr;
+		     cmsg = CMSG_NXTHDR(&msg, cmsg))
+		{
+			if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS)
+			{
+				memcpy(&passed_fd, CMSG_DATA(cmsg), sizeof(int));
+				break;
+			}
 		}
 
 		common::idp::request request;
@@ -321,9 +350,18 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::hitcount_dump, request);
 		}
-		else if (type == common::idp::requestType::tcpdump_ring)
+		else if (type == common::idp::requestType::tcpdump)
 		{
-			response = callWithResponse(&cControlPlane::tcpdump_ring, request);
+			if (passed_fd < 0)
+			{
+				YANET_LOG_ERROR("Expected file descriptor for tcpdump but none passed\n");
+				response = eResult::errorSocket;
+			}
+			else
+			{
+				response = callWithResponse(&cControlPlane::tcpdump, request, passed_fd);
+				close(passed_fd);
+			}
 		}
 		else if (type == common::idp::requestType::debug_latch_update)
 		{
