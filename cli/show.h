@@ -729,45 +729,108 @@ inline void hitcount_dump(const std::string& source)
 	std::cout << "\n]\n";
 }
 
-inline void tcpdump_ring(const std::string& target_ring_name, std::optional<std::string> path)
+/**
+ * @brief Streams the contents of a dataplane dump ring as a PCAP file to stdout.
+ *
+ * This function communicates with the dataplane process, requesting a dump of a given ring in PCAP format.
+ * The dataplane writes the PCAP data to a pipe (created by this function) and returns the number of bytes written.
+ * The function then copies exactly that many bytes from the pipe to stdout.
+ *
+ * @note
+ *   - Do **not** mix any other output (e.g. logging, progress) to stdout, as this will corrupt the PCAP stream!
+ *   - Typical usage: `yanet-cli tcpdump RING_NAME | tcpdump -r -` or redirect to a file.
+ *   - If the ring is not found, or not configured for PCAP mode, an error is logged to stderr.
+ *     (FIXME: YANET_LOG_ERROR actually logs to stdout for some reason)
+ *
+ * @param[in] target_dump_tag The dump ring tag to request from the dataplane.
+ */
+inline void tcpdump(const std::string& target_dump_tag)
 {
-	if (target_ring_name.empty())
+	if (target_dump_tag.empty())
 	{
-		YANET_LOG_ERROR("Ring name should be specified\n");
+		YANET_LOG_ERROR("Ring tag should be specified\n");
 		return;
 	}
 
 	interface::dataPlane dataplane;
 	const auto& shm_info = dataplane.get_shm_info();
+	bool first_ring = true;
+
+	std::cout.flush();
 
 	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : shm_info)
 	{
 		GCC_BUG_UNUSED(ipc_key);
 		GCC_BUG_UNUSED(offset);
+		GCC_BUG_UNUSED(ring_name);
 
-		if (target_ring_name != ring_name)
+		if (target_dump_tag != dump_tag)
 			continue;
 
 		if (dump_config.format != tDataPlaneConfig::DumpFormat::kPcap)
 		{
-			YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but provided "
+			YANET_LOG_ERROR("Asked to dump pcap files for dump tag %s, but provided "
 			                "ring is not configured to pcap format. "
 			                "Double-check dataplane.conf \"sharedMemory\" section\n",
-			                target_ring_name.data());
+			                target_dump_tag.data());
+			return;
 		}
 
-		eResult result = dataplane.tcpdump_ring({dump_tag, core_id, socket_id, ring_name, path.value_or("./")});
-
-		if (result != eResult::success)
+		// --- NEW PIPE SECTION ---
+		int fds[2];
+		if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0)
 		{
-			YANET_LOG_ERROR("Something went wrong in dataplane on creating pcap files for ring %s",
-			                target_ring_name.data());
+			YANET_LOG_ERROR("socketpair failed: %s\n", strerror(errno));
+			return;
 		}
-		return;
+
+		ssize_t bytes_to_copy = dataplane.tcpdump({dump_tag, core_id, socket_id, first_ring}, fds[1]);
+		close(fds[1]); // CLI only uses fds[0]
+
+		if (bytes_to_copy < 0)
+		{
+			YANET_LOG_ERROR("Something went wrong in dataplane on dumping pcap files for ring %s",
+			                target_dump_tag.data());
+			close(fds[0]);
+			return;
+		}
+		// Fast path: if empty, skip
+		if (bytes_to_copy == 0)
+		{
+			close(fds[0]);
+			first_ring = false;
+			continue;
+		}
+
+		// --- FAST COPY: READ bytes_to_copy FROM FD AND STREAM ---
+		char buf[128 * 1024];
+		ssize_t total = 0;
+		while (total < bytes_to_copy)
+		{
+			ssize_t want = std::min<ssize_t>(bytes_to_copy - total, sizeof(buf));
+			ssize_t n = read(fds[0], buf, want);
+			if (n <= 0)
+			{
+				YANET_LOG_ERROR("Short/failed read from dataplane dump pipe\n");
+				break;
+			}
+			ssize_t wr = write(STDOUT_FILENO, buf, n);
+			if (wr != n)
+			{
+				YANET_LOG_ERROR("Failed to write to stdout\n");
+				break;
+			}
+			total += n;
+		}
+		close(fds[0]);
+		first_ring = false;
 	}
 
-	YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but such ring was not found\n",
-	                target_ring_name.data());
+	if (first_ring)
+	{
+		YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but such ring was not found\n",
+		                target_dump_tag.data());
+	}
 }
 
 inline void values()
