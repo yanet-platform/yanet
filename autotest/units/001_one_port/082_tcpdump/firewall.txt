@@ -1,0 +1,3 @@
+add dump ring1 ip from any to any
+add allow udp from 10.0.0.0/24 to any 53
+add deny ip from any to any
