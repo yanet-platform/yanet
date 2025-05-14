@@ -1,6 +1,7 @@
 dependencies = []
 dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('threads')
+dependencies += libyanet_common_dep
 
 sources = files('libyabird.cpp')
 

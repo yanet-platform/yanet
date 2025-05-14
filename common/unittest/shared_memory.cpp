@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "../shared_memory.h"
+#include <common/shared_memory.h>
 
 void TestForSize(void* buffer_writer, void* buffer_reader, size_t size, size_t size_reader)
 {
