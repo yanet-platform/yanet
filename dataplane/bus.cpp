@@ -6,6 +6,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "common/sendrecv.h"
 #include "common/stream.h"
 
 #include "bus.h"
@@ -70,46 +71,6 @@ void cBus::SetBufferForCounters(const common::sdp::DataPlaneInSharedMemory& sdp_
 	stats.durations = durations;
 }
 
-static bool recvAll(int clientSocket,
-                    char* buffer,
-                    uint64_t size)
-{
-	uint64_t totalRecv = 0;
-
-	while (totalRecv < size)
-	{
-		int ret = recv(clientSocket, buffer + totalRecv, size - totalRecv, MSG_NOSIGNAL);
-		if (ret <= 0)
-		{
-			return false;
-		}
-
-		totalRecv += ret;
-	}
-
-	return true;
-}
-
-static bool sendAll(int clientSocket,
-                    const char* buffer,
-                    uint64_t bufferSize)
-{
-	uint64_t totalSend = 0;
-
-	while (totalSend < bufferSize)
-	{
-		int ret = send(clientSocket, buffer + totalSend, bufferSize - totalSend, MSG_NOSIGNAL);
-		if (ret <= 0)
-		{
-			return false;
-		}
-
-		totalSend += ret;
-	}
-
-	return true;
-}
-
 void cBus::mainLoop()
 {
 	sockaddr_un address;
@@ -161,7 +122,7 @@ void cBus::clientThread(int clientSocket)
 	for (;;)
 	{
 		uint64_t messageSize = 0;
-		if (!recvAll(clientSocket, (char*)&messageSize, sizeof(messageSize)))
+		if (common::recvAll(clientSocket, (char*)&messageSize, sizeof(messageSize)))
 		{
 			stats.errors[(uint32_t)common::idp::errorType::busRead]++;
 			break;
@@ -450,8 +411,8 @@ void cBus::clientThread(int clientSocket)
 		stream.push(response);
 
 		messageSize = stream.getBuffer().size();
-		if ((!sendAll(clientSocket, (const char*)&messageSize, sizeof(messageSize))) ||
-		    (!sendAll(clientSocket, (const char*)stream.getBuffer().data(), messageSize)))
+		if ((common::sendAll(clientSocket, (const char*)&messageSize, sizeof(messageSize))) ||
+		    (common::sendAll(clientSocket, (const char*)stream.getBuffer().data(), messageSize)))
 		{
 			stats.errors[(uint32_t)common::idp::errorType::busWrite]++;
 			break;
