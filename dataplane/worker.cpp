@@ -6160,8 +6160,7 @@ inline void cWorker::proxy_client_syn_handle()
 		memset(&tcp_options, 0, sizeof(tcp_options));
 		tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
 		YANET_LOG_WARNING("\ttcp options: %s\n", tcp_options.DebugInfo().c_str());
-		dataplane::proxy::ActionClientOnSyn_Result action = tcp_connection_store->ActionClientOnSyn(metadata->flow.data.proxy.id,
-		                                                                                            metadata->flow.data.proxy.service_id,
+		dataplane::proxy::ActionClientOnSyn_Result action = tcp_connection_store->ActionClientOnSyn(metadata->flow.data.proxy.service_id,
 																									service,
 																									current_time,
 		                                                                                            ipv4Header->src_addr,
@@ -6260,8 +6259,7 @@ inline void cWorker::proxy_client_ack_handle()
 		memset(&tcp_options, 0, sizeof(tcp_options));
 		tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
 		YANET_LOG_WARNING("\ttcp options: %s\n", tcp_options.DebugInfo().c_str());
-		dataplane::proxy::ActionClientOnAck_Result action = tcp_connection_store->ActionClientOnAck(metadata->flow.data.proxy.id,
-		                                                                                            metadata->flow.data.proxy.service_id,
+		dataplane::proxy::ActionClientOnAck_Result action = tcp_connection_store->ActionClientOnAck(metadata->flow.data.proxy.service_id,
 																									service,
 																									current_time,
 		                                                                                            ipv4Header->src_addr,
@@ -6397,8 +6395,7 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		(void)proxy;
 
 		size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
-		dataplane::proxy::ActionServerOnSynAck_Result action = tcp_connection_store->ActionServerOnSynAck(metadata->flow.data.proxy.id,
-		                                                                                                 metadata->flow.data.proxy.service_id,
+		dataplane::proxy::ActionServerOnSynAck_Result action = tcp_connection_store->ActionServerOnSynAck(metadata->flow.data.proxy.service_id,
 																										 service,
 																										 current_time,
 		                                                                                                 ipv4Header->dst_addr,
@@ -6497,8 +6494,7 @@ inline void cWorker::proxy_server_ack_handle()
 
 		(void)proxy;
 
-		dataplane::proxy::ActionServerOnAck_Result action = tcp_connection_store->ActionServerOnAck(metadata->flow.data.proxy.id,
-		                                                                                           metadata->flow.data.proxy.service_id,
+		dataplane::proxy::ActionServerOnAck_Result action = tcp_connection_store->ActionServerOnAck(metadata->flow.data.proxy.service_id,
 																								   service,
 		                                                                                           ipv4Header->dst_addr,
 		                                                                                           tcp_header->dst_port,

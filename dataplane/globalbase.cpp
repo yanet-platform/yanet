@@ -2691,8 +2691,8 @@ eResult generation::proxy_remove(const common::idp::updateGlobalBase::proxy_or_s
 
 eResult generation::proxy_add_local_pool(const common::idp::updateGlobalBase::proxy_add_local_pool::request& request)
 {
-	auto [proxy_id, prefix] = request;
-	tcp_connection_store->proxy_add_local_pool(proxy_id, prefix);
+	auto [service_id, prefix] = request;
+	tcp_connection_store->proxy_add_local_pool(service_id, prefix);
 	// YANET_LOG_WARNING("proxy_add_local_pool proxy_id=%d, prefix=%s\n", proxy_id, prefix.toString().c_str());
 	return eResult::success;
 }
@@ -2728,9 +2728,7 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.mss = mss;
 	service.winscale = winscale;
 
-	tcp_connection_store->proxy_service_update(service_id, service, &dataPlane->memory_manager);
-
-	return eResult::success;
+	return tcp_connection_store->proxy_service_update(service_id, service, &dataPlane->memory_manager);
 }
 
 eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request)

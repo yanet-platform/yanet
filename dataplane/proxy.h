@@ -233,7 +233,7 @@ public:
     // Update
     void proxy_update(proxy_id_t proxy_id, const dataplane::globalBase::proxy_t& proxy);
     void proxy_remove(proxy_id_t proxy_id);
-    void proxy_add_local_pool(proxy_id_t proxy_id, const common::ip_prefix_t& prefix);
+    void proxy_add_local_pool(proxy_service_id_t service_id, const common::ip_prefix_t& prefix);
     eResult proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager);
     void proxy_service_remove(proxy_service_id_t service_id);
 
@@ -242,8 +242,7 @@ public:
     common::idp::proxy_syn::response GetSyn(std::optional<proxy_service_id_t> service_id);
 
     // Action from worker
-    ActionClientOnSyn_Result ActionClientOnSyn(proxy_id_t proxy_id,
-	                                       proxy_service_id_t service_id,
+    ActionClientOnSyn_Result ActionClientOnSyn(proxy_service_id_t service_id,
                                            const dataplane::globalBase::proxy_service_t& service,
                                            uint32_t current_time,
 	                                       uint32_t src_addr,
@@ -251,8 +250,7 @@ public:
 	                                       uint32_t seq,
 	                                       TcpOptions& tcp_options);
 
-    ActionClientOnAck_Result ActionClientOnAck(proxy_id_t proxy_id,
-	                                       proxy_service_id_t service_id,
+    ActionClientOnAck_Result ActionClientOnAck(proxy_service_id_t service_id,
                                            const dataplane::globalBase::proxy_service_t& service,
                                            uint32_t current_time,
 	                                       uint32_t src_addr,
@@ -260,8 +258,7 @@ public:
 	                                       uint32_t seq,
 	                                       uint32_t ack);
 
-    ActionServerOnSynAck_Result ActionServerOnSynAck(proxy_id_t proxy_id,
-	                                             proxy_service_id_t service_id,
+    ActionServerOnSynAck_Result ActionServerOnSynAck(proxy_service_id_t service_id,
                                                  const dataplane::globalBase::proxy_service_t& service,
                                                  uint32_t current_time,
 	                                             uint32_t dst_addr,
@@ -271,8 +268,7 @@ public:
 	                                             uint8_t* tcp_options,
 	                                             size_t tcp_options_size);
 
-    ActionServerOnAck_Result ActionServerOnAck(proxy_id_t proxy_id,
-	                                       proxy_service_id_t service_id,
+    ActionServerOnAck_Result ActionServerOnAck(proxy_service_id_t service_id,
                                            const dataplane::globalBase::proxy_service_t& service,
 	                                       uint32_t dst_addr,
 	                                       uint16_t dst_port,
@@ -283,7 +279,7 @@ public:
 
 private:
     std::mutex mutex_;
-    LocalPool local_pool_;
+    LocalPool local_pools_[YANET_CONFIG_PROXY_SERVICES_SIZE];
     std::map<connection_key, ConnectionInfo> connections_;
     SynCookies syn_cookies_;
 

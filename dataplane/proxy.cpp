@@ -212,14 +212,14 @@ void TcpConnectionStore::proxy_remove(proxy_id_t proxy_id)
     YANET_LOG_WARNING("proxy_remove: proxy_id=%d\n", proxy_id);
 }
 
-void TcpConnectionStore::proxy_add_local_pool(proxy_id_t proxy_id, const common::ip_prefix_t& prefix)
+void TcpConnectionStore::proxy_add_local_pool(proxy_service_id_t service_id, const common::ip_prefix_t& prefix)
 {
-    YANET_LOG_WARNING("proxy_add_local_pool proxy_id=%d, prefix=%s\n", proxy_id, prefix.toString().c_str());
+    YANET_LOG_WARNING("proxy_add_local_pool service_id=%d, prefix=%s\n", service_id, prefix.toString().c_str());
     ipv4_prefix_t prefix_pool;
     prefix_pool.address = ipv4_address_t::convert(prefix.get_ipv4().address());
     prefix_pool.address.address = rte_cpu_to_be_32(prefix_pool.address.address);
     prefix_pool.mask = prefix.mask();
-    local_pool_.Add(proxy_id, prefix_pool);
+    local_pools_[service_id].Add(prefix_pool);
 }
 
 eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager)
@@ -231,6 +231,11 @@ eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, 
     std::lock_guard guard(mutex_);
 
     if (!syn_connections_[service_id].Initialize(service_id, service.size_syn_table, memory_manager))
+    {
+        return eResult::errorAllocatingMemory;
+    }
+
+    if (!local_pools_[service_id].Init(service_id, memory_manager))
     {
         return eResult::errorAllocatingMemory;
     }
@@ -286,8 +291,7 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(std::optional<proxy_
 
 
 // Action from worker
-ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_id_t proxy_id,
-                                                               proxy_service_id_t service_id,
+ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
                                                                const dataplane::globalBase::proxy_service_t& service,
                                                                uint32_t current_time,
                                                                uint32_t src_addr,
@@ -310,7 +314,7 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_id_t proxy_
     else if (result_insert_syn == SynInsertResult::new_record)
     {
         YANET_LOG_WARNING("\tSynInsertResult::new_record\n");
-        std::optional<std::pair<uint32_t, tPortId>> local = local_pool_.Allocate(proxy_id, service_id, src_addr, src_port);
+        std::optional<std::pair<uint32_t, tPortId>> local = local_pools_[service_id].Allocate(src_addr, src_port);
         if (local.has_value())
         {
             YANET_LOG_WARNING("\tlocal.has_value\n");
@@ -342,8 +346,7 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_id_t proxy_
     return ActionClientOnSyn_SynAckToClient{rte_cpu_to_be_32(cookie), add_cpu_32(seq, 1)};
 }
 
-ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_id,
-                                                               proxy_service_id_t service_id,
+ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                                                                const dataplane::globalBase::proxy_service_t& service,
                                                                uint32_t current_time,
                                                                uint32_t src_addr,
@@ -391,7 +394,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_
         YANET_LOG_WARNING("\tmss=%d, sack=%d, wscale=%d\n", SynCookies::MssFromTable(options.mss), options.sack, options.wscale);
 
         // get from local
-        auto local = local_pool_.Allocate(proxy_id, service_id, src_addr, src_port);
+        auto local = local_pools_[service_id].Allocate(src_addr, src_port);
         if (!local.has_value())
         {
             YANET_LOG_WARNING("\tcan't allocate in local pool\n");
@@ -447,8 +450,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_
     }
 }
 
-ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_id_t proxy_id,
-                                                                     proxy_service_id_t service_id,
+ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_service_id_t service_id,
                                                                      const dataplane::globalBase::proxy_service_t& service,
                                                                      uint32_t current_time,
                                                                      uint32_t dst_addr,
@@ -459,7 +461,7 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_id_t 
                                                                      size_t tcp_options_size)
 {
     // find in local pool
-    std::optional<std::pair<uint32_t, tPortId>> client_info = local_pool_.FindClientByLocal(dst_addr, dst_port);
+    std::optional<std::pair<uint32_t, tPortId>> client_info = local_pools_[service_id].FindClientByLocal(dst_addr, dst_port);
     if (!client_info.has_value())
     {
         YANET_LOG_ERROR("Not found in local connections\n");
@@ -499,8 +501,7 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_id_t 
 	    .ack = (service.proxy_header ? add_cpu_32(ack, int(sizeof(proxy_v2_ipv4_hdr))) : ack) };
 }
 
-ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_id_t proxy_id,
-                                                               proxy_service_id_t service_id,
+ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_service_id_t service_id,
                                                                const dataplane::globalBase::proxy_service_t& service,
                                                                uint32_t dst_addr,
                                                                uint16_t dst_port,
@@ -510,7 +511,7 @@ ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_id_t proxy_
     std::lock_guard guard(mutex_);
 
     // find in local
-    std::optional<std::pair<uint32_t, tPortId>> client_info = local_pool_.FindClientByLocal(dst_addr, dst_port);
+    std::optional<std::pair<uint32_t, tPortId>> client_info = local_pools_[service_id].FindClientByLocal(dst_addr, dst_port);
     if (!client_info.has_value())
     {
         YANET_LOG_ERROR("Not found in local connections");
