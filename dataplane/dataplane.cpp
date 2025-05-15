@@ -1414,6 +1414,8 @@ void cDataPlane::timestamp_thread()
 				globalbase_atomic->currentTime = current_time;
 			}
 
+			tcp_connection_store.currentTime = current_time;
+
 			prev_time = current_time;
 		}
 

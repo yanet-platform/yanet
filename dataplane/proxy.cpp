@@ -216,21 +216,20 @@ void TcpConnectionStore::proxy_add_local_pool(proxy_id_t proxy_id, const common:
     local_pool_.Add(proxy_id, prefix_pool);
 }
 
-void TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service)
+eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager)
 {
     YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, service=%s:%d, proxy_header=%d, size_syn_table=%d\n",
         service_id, common::ipv4_address_t(rte_cpu_to_be_32(service.proxy_addr.address)).toString().c_str(), service.proxy_port,
         common::ipv4_address_t(rte_cpu_to_be_32(service.service_addr.address)).toString().c_str(), service.service_port, service.proxy_header, service.size_syn_table);
 
     std::lock_guard guard(mutex_);
-    services_info_[service_id].proxy_header = service.proxy_header;
-    services_info_[service_id].size_syn_table = service.size_syn_table;
-    
-    services_info_[service_id].use_sack = service.use_sack;
-    services_info_[service_id].mss = service.mss;
-    services_info_[service_id].winscale = service.winscale;
 
-    table_syn_.SetConfig(service_id, service.size_syn_table);
+    if (!syn_connections_[service_id].Initialize(service_id, service.size_syn_table, memory_manager))
+    {
+        return eResult::errorAllocatingMemory;
+    }
+
+    return eResult::success;
 }
 
 void TcpConnectionStore::proxy_service_remove(proxy_service_id_t service_id)
@@ -261,49 +260,76 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(std:
 
 common::idp::proxy_syn::response TcpConnectionStore::GetSyn(std::optional<proxy_service_id_t> service_id)
 {
-    return table_syn_.GetSyn(service_id);
+    common::idp::proxy_syn::response response;
+    uint32_t current_time = currentTime;
+    
+    if (!service_id.has_value())
+    {
+        for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+        {
+            syn_connections_[index].GetSyn(index, current_time, response);
+        }
+    }
+    else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    {
+        syn_connections_[*service_id].GetSyn(*service_id, current_time, response);
+    }
+
+    return response;
 }
 
 
 // Action from worker
 ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_id_t proxy_id,
                                                                proxy_service_id_t service_id,
+                                                               const dataplane::globalBase::proxy_service_t& service,
+                                                               uint32_t current_time,
                                                                uint32_t src_addr,
                                                                uint16_t src_port,
                                                                uint32_t seq,
                                                                TcpOptions& tcp_options)
 {
-    std::lock_guard guard(mutex_);
+    SynOperationData operation_data;
+    SynInsertResult result_insert_syn = syn_connections_[service_id].TryInsertClient(src_addr, src_port, seq, current_time, operation_data);
 
-    // syn - retransmit ????
-
-    if (table_syn_.TryInsertClient({service_id, src_addr, src_port}))
+    if (result_insert_syn == SynInsertResult::exists)
     {
+        YANET_LOG_WARNING("\tSynInsertResult::exists\n");
+        if (service.proxy_header)
+        {
+            seq = add_cpu_32(seq, -int(sizeof(proxy_v2_ipv4_hdr)));
+        }
+        return ActionClientOnSyn_SynToServer{seq, operation_data.local_addr, operation_data.local_port};
+    }
+    else if (result_insert_syn == SynInsertResult::new_record)
+    {
+        YANET_LOG_WARNING("\tSynInsertResult::new_record\n");
         std::optional<std::pair<uint32_t, tPortId>> local = local_pool_.Allocate(proxy_id, service_id, src_addr, src_port);
         if (local.has_value())
         {
-            auto [local_addr, local_port] = *local;
-            table_syn_.UpdateInfo({service_id, src_addr, src_port}, local_addr, local_port, seq);
-            if (services_info_[service_id].proxy_header)
+            YANET_LOG_WARNING("\tlocal.has_value\n");
+            operation_data.local_addr = std::get<0>(*local);
+            operation_data.local_port = std::get<1>(*local);
+            syn_connections_[service_id].UpdateLocal(src_addr, src_port, current_time, operation_data);
+            if (service.proxy_header)
             {
                 seq = add_cpu_32(seq, -int(sizeof(proxy_v2_ipv4_hdr)));
             }
-            return ActionClientOnSyn_SynToServer{seq, local_addr, local_port};
+            return ActionClientOnSyn_SynToServer{seq, operation_data.local_addr, operation_data.local_port};
         }
-        table_syn_.Free({service_id, src_addr, src_port});
+        syn_connections_[service_id].Remove(src_addr, src_port, current_time, operation_data);
     }
 
-    // return table_syn_.ActionClientOnSyn(proxy_id, service_id, src_addr, src_port, seq, tcp_options);
-    // YANET_LOG_ERROR("We need syn-cookie!\n");
+    std::lock_guard guard(mutex_);
 
-    tcp_options.sack_permitted &= services_info_[service_id].use_sack;
-    tcp_options.mss = std::min(tcp_options.mss, (uint16_t)services_info_[service_id].mss);
+    tcp_options.sack_permitted &= service.use_sack;
+    tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
 
     uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack_permitted, tcp_options.window_scaling, 0}); // ecn
-    uint32_t cookie = syn_cookies_.GetCookie(src_addr, 0, src_port, 0, seq, cookie_data); // dst_addr, dst_port
+    uint32_t cookie = syn_cookies_.GetCookie(src_addr, service.service_addr.address, src_port, service.service_port, seq, cookie_data); // dst_addr, dst_port
     YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, seq);
 
-    tcp_options.window_scaling = services_info_[service_id].winscale;
+    tcp_options.window_scaling = service.winscale;
     tcp_options.timestamp_echo = tcp_options.timestamp_value;
     tcp_options.timestamp_value = 1;
 
@@ -312,6 +338,8 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_id_t proxy_
 
 ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_id,
                                                                proxy_service_id_t service_id,
+                                                               const dataplane::globalBase::proxy_service_t& service,
+                                                               uint32_t current_time,
                                                                uint32_t src_addr,
                                                                uint16_t src_port,
                                                                uint32_t seq,
@@ -322,24 +350,20 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_
     if (iter_con == connections_.end())
     {
         // new connection
-        SynConnectionInfo* syn_info = table_syn_.FindConnection({service_id, src_addr, src_port});
-        if (syn_info != nullptr)
+        SynOperationData operation_data;
+        if (syn_connections_[service_id].SearchAndRemove(src_addr, src_port, current_time, operation_data))
         {
-            // Try add to connections, can fail !!!!
+            // todo - Try add to connections, can fail !!!!
             ConnectionInfo& con_info = connections_[{service_id, src_addr, src_port}];
-            con_info.local_addr = syn_info->local_addr;
-            con_info.local_port = syn_info->local_port;
+            con_info.local_addr = operation_data.local_addr;
+            con_info.local_port = operation_data.local_port;
             con_info.shift_server = 0;
             con_info.state = ConnectionState::ESTABLISHED;
 
-            // Remove from syns
-            table_syn_.Free({service_id, src_addr, src_port});
-
-
             ActionClientOnAck_Forward result;
-            result.local_addr = syn_info->local_addr;
-            result.local_port = syn_info->local_port;
-            result.add_proxy_header = services_info_[service_id].proxy_header;
+            result.local_addr = operation_data.local_addr;
+            result.local_port = operation_data.local_port;
+            result.add_proxy_header = service.proxy_header;
             result.shift_ack = 0;
             result.shift_seq = (result.add_proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0);
 
@@ -348,7 +372,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_
         
         // try check cookie
         uint32_t cookie_data;
-        uint32_t result = syn_cookies_.CheckCookie(rte_cpu_to_be_32(ack) - 1, src_addr, 0, src_port, 0, add_cpu_32(seq, -1)); // dst_addr, dst_port
+        uint32_t result = syn_cookies_.CheckCookie(rte_cpu_to_be_32(ack) - 1, src_addr, service.service_addr.address, src_port, service.service_port, add_cpu_32(seq, -1)); // dst_addr, dst_port
         YANET_LOG_WARNING("\tresult=%d, cookie_data=%d, ack=%u, seq=%u\n", result, cookie_data, ack, seq);
 
         if (result == 0)
@@ -381,7 +405,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_
         ActionClientOnAck_NewServerConnection new_server_connection;
         new_server_connection.local_addr = std::get<0>(*local);
         new_server_connection.local_port = std::get<1>(*local);
-        new_server_connection.seq = add_cpu_32(seq, -1 + (services_info_[service_id].proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0));
+        new_server_connection.seq = add_cpu_32(seq, -1 + (service.proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0));
 
         TcpOptions tcp_options;
         tcp_options.mss = SynCookies::MssFromTable(options.mss);
@@ -406,7 +430,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_
         {
             YANET_LOG_WARNING("\t\t\tchange state from SENT_PROXY_HEADER -> ESTABLISHED\n");
             iter_con->second.state = ConnectionState::ESTABLISHED;
-            result.add_proxy_header = services_info_[service_id].proxy_header;
+            result.add_proxy_header = service.proxy_header;
             if (result.add_proxy_header)
             {
                 result.shift_seq = -int(sizeof(proxy_v2_ipv4_hdr));
@@ -419,6 +443,8 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_
 
 ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_id_t proxy_id,
                                                                      proxy_service_id_t service_id,
+                                                                     const dataplane::globalBase::proxy_service_t& service,
+                                                                     uint32_t current_time,
                                                                      uint32_t dst_addr,
                                                                      uint16_t dst_port,
                                                                      uint32_t seq,
@@ -430,16 +456,15 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_id_t 
     std::optional<std::pair<uint32_t, tPortId>> client_info = local_pool_.FindClientByLocal(dst_addr, dst_port);
     if (!client_info.has_value())
     {
-        YANET_LOG_ERROR("Not found in local connections");
+        YANET_LOG_ERROR("Not found in local connections\n");
         return ActionDrop{0};
     }
     auto [client_addr, client_port] = *client_info;
 
     // find in syn or conncetions
-    SynConnectionInfo* syn_info = table_syn_.FindConnection({service_id, client_addr, client_port});
-    if (syn_info != nullptr)
+    if (syn_connections_[service_id].UpdateTimeFromServerAnswer(client_addr, client_port, current_time))
     {
-        if (services_info_[service_id].proxy_header)
+        if (service.proxy_header)
         {
             ack = add_cpu_32(ack, int(sizeof(proxy_v2_ipv4_hdr)));
         }
@@ -465,11 +490,12 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_id_t 
 	    .client_addr = client_addr,
 	    .client_port = client_port,
 	    .seq = rte_cpu_to_be_32(iter_con->second.sent_seq + 1),
-	    .ack = (services_info_[service_id].proxy_header ? add_cpu_32(ack, int(sizeof(proxy_v2_ipv4_hdr))) : ack) };
+	    .ack = (service.proxy_header ? add_cpu_32(ack, int(sizeof(proxy_v2_ipv4_hdr))) : ack) };
 }
 
 ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_id_t proxy_id,
                                                                proxy_service_id_t service_id,
+                                                               const dataplane::globalBase::proxy_service_t& service,
                                                                uint32_t dst_addr,
                                                                uint16_t dst_port,
                                                                uint32_t seq,
@@ -511,64 +537,6 @@ ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_id_t proxy_
         forward.shift_seq = iter_con->second.shift_server;
         return forward;
     }
-}
-
-
-
-void SynFromClients::SetConfig(proxy_service_id_t service_id, uint32_t size_syn_table)
-{
-    configs_[service_id] = size_syn_table;
-}
-
-bool SynFromClients::TryInsertClient(connection_key key)
-{
-    return configs_[std::get<0>(key)] != 0;
-}
-
-void SynFromClients::Free(connection_key key)
-{
-    std::lock_guard guard(mutex_);
-    connections_.erase(key);
-}
-
-void SynFromClients::UpdateInfo(connection_key key, uint32_t local_addr, tPortId local_port, uint32_t seq)
-{
-    std::lock_guard guard(mutex_);
-    SynConnectionInfo connection_info;
-    connection_info.recv_seq = seq;
-    connection_info.local_addr = local_addr;
-    connection_info.local_port = local_port;
-    connections_[key] = connection_info;
-}
-
-SynConnectionInfo* SynFromClients::FindConnection(connection_key key)
-{
-    std::lock_guard guard(mutex_);
-    auto iter = connections_.find(key);
-    if (iter == connections_.end())
-    {
-        return nullptr;
-    }
-    return &iter->second;
-}
-
-common::idp::proxy_syn::response SynFromClients::GetSyn(std::optional<proxy_service_id_t> service_id)
-{
-    common::idp::proxy_syn::response response;
-    std::lock_guard guard(mutex_);
-
-    for (const auto& iter : connections_)
-    {
-        auto [service, src_addr, src_port] = iter.first;
-        if (service_id.has_value() && *service_id != service)
-        {
-            continue;
-        }
-
-        response.emplace_back(service, src_addr, src_port);
-    }
-
-    return response;
 }
 
 }

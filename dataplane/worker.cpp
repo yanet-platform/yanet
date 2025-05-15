@@ -6131,6 +6131,8 @@ inline void cWorker::proxy_client_syn_handle()
 		return;
 	}
 
+	uint32_t current_time = CurrentTime();
+
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < proxy_client_syn_stack.mbufsCount;
 	     mbuf_i++)
@@ -6160,6 +6162,8 @@ inline void cWorker::proxy_client_syn_handle()
 		YANET_LOG_WARNING("\ttcp options: %s\n", tcp_options.DebugInfo().c_str());
 		dataplane::proxy::ActionClientOnSyn_Result action = tcp_connection_store->ActionClientOnSyn(metadata->flow.data.proxy.id,
 		                                                                                            metadata->flow.data.proxy.service_id,
+																									service,
+																									current_time,
 		                                                                                            ipv4Header->src_addr,
 		                                                                                            tcp_header->src_port,
 		                                                                                            tcp_header->sent_seq,
@@ -6229,6 +6233,8 @@ inline void cWorker::proxy_client_ack_handle()
 		return;
 	}
 
+	uint32_t current_time = CurrentTime();
+
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < proxy_client_ack_stack.mbufsCount;
 	     mbuf_i++)
@@ -6256,6 +6262,8 @@ inline void cWorker::proxy_client_ack_handle()
 		YANET_LOG_WARNING("\ttcp options: %s\n", tcp_options.DebugInfo().c_str());
 		dataplane::proxy::ActionClientOnAck_Result action = tcp_connection_store->ActionClientOnAck(metadata->flow.data.proxy.id,
 		                                                                                            metadata->flow.data.proxy.service_id,
+																									service,
+																									current_time,
 		                                                                                            ipv4Header->src_addr,
 		                                                                                            tcp_header->src_port,
 		                                                                                            tcp_header->sent_seq,
@@ -6370,6 +6378,8 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		return;
 	}
 
+	uint32_t current_time = CurrentTime();
+
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < proxy_server_syn_ack_stack.mbufsCount;
 	     mbuf_i++)
@@ -6395,6 +6405,8 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
 		dataplane::proxy::ActionServerOnSynAck_Result action = tcp_connection_store->ActionServerOnSynAck(metadata->flow.data.proxy.id,
 		                                                                                                 metadata->flow.data.proxy.service_id,
+																										 service,
+																										 current_time,
 		                                                                                                 ipv4Header->dst_addr,
 		                                                                                                 tcp_header->dst_port,
 		                                                                                                 tcp_header->sent_seq,
@@ -6493,6 +6505,7 @@ inline void cWorker::proxy_server_ack_handle()
 
 		dataplane::proxy::ActionServerOnAck_Result action = tcp_connection_store->ActionServerOnAck(metadata->flow.data.proxy.id,
 		                                                                                           metadata->flow.data.proxy.service_id,
+																								   service,
 		                                                                                           ipv4Header->dst_addr,
 		                                                                                           tcp_header->dst_port,
 		                                                                                           tcp_header->sent_seq,

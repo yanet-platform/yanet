@@ -2728,7 +2728,7 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.mss = mss;
 	service.winscale = winscale;
 
-	tcp_connection_store->proxy_service_update(service_id, service);
+	tcp_connection_store->proxy_service_update(service_id, service, &dataPlane->memory_manager);
 
 	return eResult::success;
 }

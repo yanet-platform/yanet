@@ -1,0 +1,13 @@
+steps:
+- cli:
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+- cli:
+  - proxy services
+  - proxy connections
+  - proxy syn

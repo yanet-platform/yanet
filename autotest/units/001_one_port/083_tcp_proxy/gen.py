@@ -104,7 +104,7 @@ WriteTest("001", data_type1)
 
 # 002 - type 2 - no proxy, sec
 
-SYN_COOKIE2 = 0xc2b15ef1
+SYN_COOKIE2 = 0x09857553
 
 data_type2 = [
 	(
@@ -154,24 +154,26 @@ WriteTest("003", data_type3)
 
 # 004 - type 4 - proxy, sec
 
+SYN_COOKIE3 = 0x794fb723
+
 data_type4 = [
 	(
 		FromClient(IP_SERVER4, START_CLIENT_SEQ, 0, 'S', options=options_client_syn), 
-		ToClient(IP_SERVER4, SYN_COOKIE2, START_CLIENT_SEQ + 1, 'AS', window=0, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (1, 2983139994)), ('WScale', 9), ("NOP", '')])
+		ToClient(IP_SERVER4, SYN_COOKIE3, START_CLIENT_SEQ + 1, 'AS', window=0, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (1, 2983139994)), ('WScale', 9), ("NOP", '')])
 	), (
-		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE2 + 1, 'A', options=[("Timestamp", (12345, 54321))]),
+		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE3 + 1, 'A', options=[("Timestamp", (12345, 54321))]),
 		ToServer(IP_SERVER4, START_CLIENT_SEQ - len_pr, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (12345, 0)), ('WScale', 5), ("NOP", '')])
 	), (
 		FromServer(IP_SERVER4, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (33333, 12345)), ('WScale', 9), ("NOP", '')]),
-		ToClient(IP_SERVER4, SYN_COOKIE2 + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (33333, 12345)), ('WScale', 9), ("NOP", ''), ("NOP", ''), ("NOP", '')])
+		ToClient(IP_SERVER4, SYN_COOKIE3 + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (33333, 12345)), ('WScale', 9), ("NOP", ''), ("NOP", ''), ("NOP", '')])
 	),
 	(
-		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE2 + 1, 'A', raw=data_client1),
+		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE3 + 1, 'A', raw=data_client1),
 		ToServer(IP_SERVER4, START_CLIENT_SEQ + 1 - len_pr, START_SERVER_SEQ + 1, 'A', raw=get_proxy_header(IP_SERVER4) + data_client1.encode())
 	),
 	(
 		FromServer(IP_SERVER4, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
-		ToClient(IP_SERVER4, SYN_COOKIE2 + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
+		ToClient(IP_SERVER4, SYN_COOKIE3 + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
 	),
 ]
 

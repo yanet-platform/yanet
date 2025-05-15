@@ -1,6 +1,8 @@
 #pragma once
 
+#include "memory_manager.h"
 #include "local_pool.h"
+#include "proxy_syn.h"
 #include "type.h"
 #include "syncookies.h"
 #include "common/idp.h"
@@ -229,35 +231,6 @@ struct ConnectionInfo
     uint32_t shift_server;
 };
 
-class SynFromClients
-{
-public:
-    void SetConfig(proxy_service_id_t service_id, uint32_t size_syn_table);
-    bool TryInsertClient(connection_key key);
-    void Free(connection_key key);
-    void UpdateInfo(connection_key key, uint32_t local_addr, tPortId local_port, uint32_t seq);
-
-    SynConnectionInfo* FindConnection(connection_key key);
-
-    common::idp::proxy_syn::response GetSyn(std::optional<proxy_service_id_t> service_id);
-
-private:
-    std::mutex mutex_;
-    std::map<connection_key, SynConnectionInfo> connections_;
-    std::map<proxy_service_id_t, uint32_t> configs_;
-};
-
-
-struct ServiceInfo
-{
-	bool proxy_header;
-	uint32_t size_syn_table;
-    bool use_sack;
-	uint32_t mss;
-	uint32_t winscale;
-};
-
-
 class TcpConnectionStore
 {
 public:
@@ -265,7 +238,7 @@ public:
     void proxy_update(proxy_id_t proxy_id, const dataplane::globalBase::proxy_t& proxy);
     void proxy_remove(proxy_id_t proxy_id);
     void proxy_add_local_pool(proxy_id_t proxy_id, const common::ip_prefix_t& prefix);
-    void proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service);
+    eResult proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager);
     void proxy_service_remove(proxy_service_id_t service_id);
 
     // Info
@@ -275,6 +248,8 @@ public:
     // Action from worker
     ActionClientOnSyn_Result ActionClientOnSyn(proxy_id_t proxy_id,
 	                                       proxy_service_id_t service_id,
+                                           const dataplane::globalBase::proxy_service_t& service,
+                                           uint32_t current_time,
 	                                       uint32_t src_addr,
 	                                       uint16_t src_port,
 	                                       uint32_t seq,
@@ -282,6 +257,8 @@ public:
 
     ActionClientOnAck_Result ActionClientOnAck(proxy_id_t proxy_id,
 	                                       proxy_service_id_t service_id,
+                                           const dataplane::globalBase::proxy_service_t& service,
+                                           uint32_t current_time,
 	                                       uint32_t src_addr,
 	                                       uint16_t src_port,
 	                                       uint32_t seq,
@@ -289,6 +266,8 @@ public:
 
     ActionServerOnSynAck_Result ActionServerOnSynAck(proxy_id_t proxy_id,
 	                                             proxy_service_id_t service_id,
+                                                 const dataplane::globalBase::proxy_service_t& service,
+                                                 uint32_t current_time,
 	                                             uint32_t dst_addr,
 	                                             uint16_t dst_port,
 	                                             uint32_t seq,
@@ -298,19 +277,21 @@ public:
 
     ActionServerOnAck_Result ActionServerOnAck(proxy_id_t proxy_id,
 	                                       proxy_service_id_t service_id,
+                                           const dataplane::globalBase::proxy_service_t& service,
 	                                       uint32_t dst_addr,
 	                                       uint16_t dst_port,
 	                                       uint32_t seq,
 	                                       uint32_t ack);
+                                           
+    uint32_t currentTime;   // todo
 
 private:
     std::mutex mutex_;
-    SynFromClients table_syn_;
     LocalPool local_pool_;
     std::map<connection_key, ConnectionInfo> connections_;
     SynCookies syn_cookies_;
 
-    ServiceInfo services_info_[YANET_CONFIG_PROXY_SERVICES_SIZE];
+    ServiceSynConnections syn_connections_[YANET_CONFIG_PROXY_SERVICES_SIZE];
 };
 
 }
