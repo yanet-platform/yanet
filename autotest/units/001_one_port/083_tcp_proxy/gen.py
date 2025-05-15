@@ -174,7 +174,7 @@ data_type4 = [
 	),
 	( # Packet#3 out of order
 		FromServer(IP_SERVER4, START_SERVER_SEQ + 1 + len(data_server1)*2, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
-		ToClient(IP_SERVER4, SYN_COOKIE2 + 1 + len(data_server1)*2, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
+		ToClient(IP_SERVER4, SYN_COOKIE3 + 1 + len(data_server1)*2, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
 	),
 	( # Packet#1
 		FromServer(IP_SERVER4, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
@@ -185,19 +185,19 @@ data_type4 = [
 	# 	ToClient(IP_SERVER4, SYN_COOKIE2 + 1 + len(data_server1), START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
 	# ),
 	( # Ack Packet#1, SAck Packet#3
-		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), SYN_COOKIE2 + 1 + len(data_server1), 'A', options=[("SAck", (SYN_COOKIE2 + 1 + len(data_server1)*2, SYN_COOKIE2 + 1 + len(data_server1)*3))], raw=data_client1),
+		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), SYN_COOKIE3 + 1 + len(data_server1), 'A', options=[("SAck", (SYN_COOKIE3 + 1 + len(data_server1)*2, SYN_COOKIE3 + 1 + len(data_server1)*3))], raw=data_client1),
 		ToServer(IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), START_SERVER_SEQ + 1 + len(data_server1), 'A', options=[("SAck", (START_SERVER_SEQ + 1 + len(data_server1)*2, START_SERVER_SEQ + 1 + len(data_server1)*3))], raw=data_client1)
 	),
 	( # Packet#5 out of order
 		FromServer(IP_SERVER4, START_SERVER_SEQ + 1 + len(data_server1)*4, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
-		ToClient(IP_SERVER4, SYN_COOKIE2 + 1 + len(data_server1)*4, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
+		ToClient(IP_SERVER4, SYN_COOKIE3 + 1 + len(data_server1)*4, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
 	),
 	# ( # Packet#4 Lost
 	# 	FromServer(IP_SERVER4, START_SERVER_SEQ + 1 + len(data_server1)*3, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
-	# 	ToClient(IP_SERVER4, SYN_COOKIE2 + 1 + len(data_server1)*3, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
+	# 	ToClient(IP_SERVER4, SYN_COOKIE3 + 1 + len(data_server1)*3, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
 	# ),
 	( # Duplicate Ack Packet#1, SAck Packet#5 and Packet#3
-		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), SYN_COOKIE2 + 1 + len(data_server1), 'A', options=[("SAck", (SYN_COOKIE2 + 1 + len(data_server1)*4, SYN_COOKIE2 + 1 + len(data_server1)*5)), ("SAck",(SYN_COOKIE2 + 1 + len(data_server1)*2, SYN_COOKIE2 + 1 + len(data_server1)*3))], raw=data_client2),
+		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), SYN_COOKIE3 + 1 + len(data_server1), 'A', options=[("SAck", (SYN_COOKIE3 + 1 + len(data_server1)*4, SYN_COOKIE3 + 1 + len(data_server1)*5)), ("SAck",(SYN_COOKIE3 + 1 + len(data_server1)*2, SYN_COOKIE3 + 1 + len(data_server1)*3))], raw=data_client2),
 		ToServer(IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), START_SERVER_SEQ + 1 + len(data_server1), 'A', options=[("SAck", (START_SERVER_SEQ + 1 + len(data_server1)*4, START_SERVER_SEQ + 1 + len(data_server1)*5)), ("SAck", (START_SERVER_SEQ + 1 + len(data_server1)*2 , START_SERVER_SEQ + 1 + len(data_server1)*3))], raw=data_client2)
 	),
 ]
