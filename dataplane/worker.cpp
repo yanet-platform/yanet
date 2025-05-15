@@ -6315,13 +6315,7 @@ inline void cWorker::proxy_client_ack_handle()
 				rte_cpu_to_be_32(tcp_header->recv_ack), forward_to_server->shift_seq,
 				forward_to_server->shift_ack, forward_to_server->add_proxy_header);
 
-			for (int i = 0; i < tcp_options.num_sacks; i++)
-			{
-				tcp_options.sacks[i].first = dataplane::proxy::add_cpu_32(tcp_options.sacks[i].first, forward_to_server->shift_ack);
-				tcp_options.sacks[i].last = dataplane::proxy::add_cpu_32(tcp_options.sacks[i].last, forward_to_server->shift_ack);
-			}
-			uint32_t tcp_options_len_new = tcp_options.Write(mbuf);
-			tcp_header_len = sizeof(rte_tcp_hdr) + tcp_options_len_new;
+			dataplane::proxy::ShiftSAcks(tcp_header, forward_to_server->shift_ack);
 
 			if (forward_to_server->add_proxy_header)
 			{

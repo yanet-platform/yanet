@@ -1,6 +1,5 @@
 #include "proxy.h"
 
-#include <rte_tcp.h>
 #include <sstream>
 #include "metadata.h"
 #include "common.h"
@@ -32,18 +31,6 @@ bool TcpOptions::Read(uint8_t* data, uint32_t len)
             sack_permitted = 1;
 
             index += 2;
-            break;
-
-        case TCPOPT_SACK:
-            if (!CheckSize(index, len, data, 10) || unlikely(num_sacks == MAX_SACK_BLOCKS)) {
-                return false;
-            }
-
-            sacks[num_sacks].first = rte_be_to_cpu_32(*((uint32_t*)(data + index + 2)));
-            sacks[num_sacks].last = rte_be_to_cpu_32(*((uint32_t*)(data + index + 6)));
-            num_sacks++;
-
-            index += 10;
             break;
 
         case TCPOPT_TIMESTAMP:
@@ -109,15 +96,6 @@ uint32_t TcpOptions::Write(rte_mbuf* mbuf) const
         len += 2;
     }
 
-    for (int i = 0; i < num_sacks; i++)
-    {
-        data[len] = TCPOPT_SACK;
-        data[len + 1] = 10;
-        *((uint32_t*)(data + len + 2)) = rte_cpu_to_be_32(sacks[i].first);
-        *((uint32_t*)(data + len + 6)) = rte_cpu_to_be_32(sacks[i].last);
-        len += 10;
-    }
-
     if (timestamp_value != 0 || timestamp_echo != 0)
     {
         data[len] = TCPOPT_TIMESTAMP;
@@ -178,6 +156,34 @@ std::string TcpOptions::DebugInfo() const
     }
 
     return ss.str();
+}
+
+void ShiftSAcks(rte_tcp_hdr* tcp_header, uint32_t shift)
+{
+    size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+    uint8_t* options = (uint8_t*)tcp_header + sizeof(rte_tcp_hdr);
+    uint32_t len = tcp_header_len - sizeof(rte_tcp_hdr);
+
+    uint32_t index = 0;
+    while (index < len)
+    {
+        switch (options[index])
+        {
+        case TCPOPT_SACK:
+            *((uint32_t*)(options + index + 2)) = dataplane::proxy::add_cpu_32(*((uint32_t*)(options + index + 2)), shift);
+            *((uint32_t*)(options + index + 6)) = dataplane::proxy::add_cpu_32(*((uint32_t*)(options + index + 6)), shift);
+            index += 10;
+            break;
+        case TCPOPT_TIMESTAMP:
+            index += 10;
+            break;
+        case TCPOPT_NOP:
+            index++;
+            break;
+        case TCPOPT_EOL:
+            return;
+        }
+    }
 }
 
 void FillProxyHeader(proxy_v2_ipv4_hdr* proxy_header, uint32_t src_addr, tPortId src_port, uint32_t dst_addr, tPortId dst_port)

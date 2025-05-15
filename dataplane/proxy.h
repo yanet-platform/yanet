@@ -1,6 +1,7 @@
 #pragma once
 
 #include "memory_manager.h"
+#include <rte_tcp.h>
 #include "local_pool.h"
 #include "proxy_syn.h"
 #include "type.h"
@@ -24,8 +25,6 @@
 
 #define MAX_SIZE_TCP_OPTIONS 40
 
-#define MAX_SACK_BLOCKS 4
-
 namespace dataplane::proxy
 {
 
@@ -36,11 +35,6 @@ struct TcpOptions
     uint16_t mss;
     uint8_t sack_permitted;
     uint8_t window_scaling;
-    struct SAck {
-        uint32_t first;
-        uint32_t last;
-    } sacks[MAX_SACK_BLOCKS];
-    uint8_t num_sacks;
 
     bool Read(uint8_t* data, uint32_t len);
     uint32_t Write(rte_mbuf* mbuf) const;
@@ -50,6 +44,8 @@ struct TcpOptions
 private:
     bool CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected);
 };    
+
+void ShiftSAcks(rte_tcp_hdr* tcp_header, uint32_t shift);
 
 extern const uint8_t PROXY_V2_SIGNATURE[12];
 
