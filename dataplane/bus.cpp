@@ -136,38 +136,11 @@ void cBus::clientThread(int clientSocket)
 		}
 		buffer.resize(messageSize);
 
-		// Setup for potential FD receiving
-		struct iovec iov;
-		iov.iov_base = buffer.data();
-		iov.iov_len = buffer.size();
-
-		// This buffer holds the ancillary data, potentially including a passed FD
-		char cmsg_buf[CMSG_SPACE(sizeof(int))] = {};
-		struct msghdr msg = {};
-		msg.msg_iov = &iov;
-		msg.msg_iovlen = 1;
-		msg.msg_control = cmsg_buf;
-		msg.msg_controllen = sizeof(cmsg_buf);
-
-		// Instead of recvAll, use recvmsg to receive both message data and possible FD
-		ssize_t n = recvmsg(clientSocket, &msg, MSG_NOSIGNAL);
-		if (n <= 0)
+		int passed_fd = -1;
+		if (common::recvMsgAll(clientSocket, buffer.data(), buffer.size(), passed_fd))
 		{
 			stats.errors[(uint32_t)common::idp::errorType::busRead]++;
 			break;
-		}
-
-		// Try to extract a FD if present
-		int passed_fd = -1;
-		for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
-		     cmsg != nullptr;
-		     cmsg = CMSG_NXTHDR(&msg, cmsg))
-		{
-			if (cmsg->cmsg_level == SOL_SOCKET && cmsg->cmsg_type == SCM_RIGHTS)
-			{
-				memcpy(&passed_fd, CMSG_DATA(cmsg), sizeof(int));
-				break;
-			}
 		}
 
 		common::idp::request request;
