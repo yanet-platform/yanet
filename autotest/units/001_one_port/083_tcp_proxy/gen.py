@@ -182,7 +182,7 @@ data_type4 = [
 	),
 	# ( # Packet#2 Lost
 	# 	FromServer(IP_SERVER4, START_SERVER_SEQ + 1 + len(data_server1), START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
-	# 	ToClient(IP_SERVER4, SYN_COOKIE2 + 1 + len(data_server1), START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
+	# 	ToClient(IP_SERVER4, SYN_COOKIE3 + 1 + len(data_server1), START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
 	# ),
 	( # Ack Packet#1, SAck Packet#3
 		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), SYN_COOKIE3 + 1 + len(data_server1), 'A', options=[("SAck", (SYN_COOKIE3 + 1 + len(data_server1)*2, SYN_COOKIE3 + 1 + len(data_server1)*3))], raw=data_client1),
