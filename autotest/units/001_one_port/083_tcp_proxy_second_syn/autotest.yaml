@@ -11,3 +11,8 @@ steps:
   - proxy services
   - proxy connections
   - proxy syn
+
+- sleep: 5
+
+- cli:
+  - proxy syn

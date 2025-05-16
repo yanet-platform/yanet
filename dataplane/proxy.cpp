@@ -268,6 +268,17 @@ void TcpConnectionStore::proxy_service_remove(proxy_service_id_t service_id)
     YANET_LOG_WARNING("proxy_service_remove: service_id=%d\n", service_id);
 }
 
+void TcpConnectionStore::CollectGarbage(uint32_t current_time)
+{
+    YANET_LOG_WARNING("TcpConnectionStore::CollectGarbage: current_time=%d\n", current_time);
+    std::lock_guard guard(mutex_);
+    for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+    {
+        syn_connections_[index].CollectGarbage(current_time, local_pools_[index]);
+        service_connections_[index].CollectGarbage(current_time, local_pools_[index]);
+    }
+}
+
 // Info
 
 common::idp::proxy_connections::response TcpConnectionStore::GetConnections(std::optional<proxy_service_id_t> service_id)
@@ -678,6 +689,28 @@ bool ServiceConnections::Find(uint32_t addr, uint16_t port, uint32_t current_tim
 void ServiceConnections::GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response)
 {
 
+}
+
+void ServiceConnections::CollectGarbage(uint32_t current_time, LocalPool& local_pool)
+{
+    for (uint32_t index = 0; index < number_buckets_; index++)
+    {
+        ConnectionBucket& bucket = buckets_[index];
+        bucket.Lock();
+        for (uint32_t i = 0; i < ConnectionBucket::bucket_size; i++)
+        {
+            OneConnection& connection = bucket.connections[i];
+            if (connection.IsExpired(current_time))
+            {
+                uint32_t addr;
+                uint16_t port;
+                UnpackKeyConnection(connection.client, addr, port);
+                local_pool.Free(addr, port);
+                connection.Clear();
+            }
+        }
+        bucket.Unlock();
+    }
 }
 
 }

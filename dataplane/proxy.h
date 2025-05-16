@@ -242,6 +242,8 @@ public:
 
     void GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response);
 
+    void CollectGarbage(uint32_t current_time, LocalPool& local_pool);
+
 private:
 private:
     ConnectionBucket* buckets_ = nullptr;
@@ -258,6 +260,8 @@ public:
     void proxy_add_local_pool(proxy_service_id_t service_id, const common::ip_prefix_t& prefix);
     eResult proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager);
     void proxy_service_remove(proxy_service_id_t service_id);
+
+    void CollectGarbage(uint32_t current_time);
 
     // Info
     common::idp::proxy_connections::response GetConnections(std::optional<proxy_service_id_t> service_id);

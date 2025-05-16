@@ -2,6 +2,7 @@
 
 #include "memory_manager.h"
 #include "type.h"
+#include "local_pool.h"
 
 #include <mutex>
 
@@ -17,6 +18,7 @@ struct OneSynConnection
     bool server_answer; // was received answer from server
     
     void Clear();
+    bool IsExpired(uint32_t current_time);
 };
 
 struct SynBucket
@@ -56,6 +58,8 @@ public:
     bool SearchAndRemove(uint32_t addr, uint16_t port, uint32_t current_time, SynOperationData& operation_data);
     bool UpdateTimeFromServerAnswer(uint32_t addr, uint16_t port, uint32_t current_time);
     void GetSyn(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_syn::response& response);
+
+    void CollectGarbage(uint32_t current_time, LocalPool& local_pool);
 
 private:
     SynBucket* buckets_ = nullptr;

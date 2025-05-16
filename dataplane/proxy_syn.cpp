@@ -191,6 +191,27 @@ void ServiceSynConnections::GetSyn(proxy_service_id_t service_id, uint32_t curre
     }
 }
 
+void ServiceSynConnections::CollectGarbage(uint32_t current_time, LocalPool& local_pool)
+{
+    for (uint32_t bucket_index = 0; bucket_index < number_buckets_; bucket_index++)
+    {
+        SynBucket& bucket = buckets_[bucket_index];
+        std::lock_guard<std::mutex> guard(bucket.mutex);
+        for (uint32_t index = 0; index < SynBucket::bucket_size; index++)
+        {
+            OneSynConnection& connection = bucket.connections[index];
+            if (connection.IsExpired(current_time))
+            {
+                uint32_t src_addr;
+                uint16_t src_port;
+                UnpackKeyConnection(connection.client, src_addr, src_port);
+                local_pool.Free(src_addr, src_port);
+                connection.Clear();
+            }
+        }
+    }
+}
+
 SynBucket::SynBucket()
 {
     // YANET_LOG_WARNING("SynBucket::SynBucket()\n");
@@ -206,6 +227,11 @@ void OneSynConnection::Clear()
     last_time = 0;
     server_answer = false;
     local = 0;
+}
+
+bool OneSynConnection::IsExpired(uint32_t current_time)
+{
+    return last_time + TIMEOUT_SYN < current_time;
 }
 
 }
