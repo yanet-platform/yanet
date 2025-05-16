@@ -263,6 +263,8 @@ public:
 
     void CollectGarbage(uint32_t current_time);
 
+    void UpdateSynCookieKeys();
+
     // Info
     common::idp::proxy_connections::response GetConnections(std::optional<proxy_service_id_t> service_id);
     common::idp::proxy_syn::response GetSyn(std::optional<proxy_service_id_t> service_id);

@@ -1483,9 +1483,18 @@ void cDataPlane::start()
 	bus.run();
 
 	threads.emplace_back([this]() {
-		for (;;) {
+		for (;;)
+		{
 			tcp_connection_store.CollectGarbage(current_time);
 			std::this_thread::sleep_for(std::chrono::seconds(1));
+		}
+	});
+
+	threads.emplace_back([this]() {
+		for (;;)
+		{
+			tcp_connection_store.UpdateSynCookieKeys();
+			std::this_thread::sleep_for(std::chrono::seconds(30));
 		}
 	});
 

@@ -279,6 +279,13 @@ void TcpConnectionStore::CollectGarbage(uint32_t current_time)
     }
 }
 
+void TcpConnectionStore::UpdateSynCookieKeys()
+{
+    YANET_LOG_WARNING("TcpConnectionStore::UpdateSynCookieKeys\n");
+    std::lock_guard guard(mutex_);
+    syn_cookies_.UpdateKeys();
+}
+
 // Info
 
 common::idp::proxy_connections::response TcpConnectionStore::GetConnections(std::optional<proxy_service_id_t> service_id)
