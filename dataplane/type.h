@@ -397,6 +397,7 @@ struct proxy_service_t
 	tPortId service_port;
 	tCounterId counter_id;
 	bool proxy_header;
+	uint32_t size_connections_table;
 	uint32_t size_syn_table;
 	bool use_sack;
 	uint32_t mss;

@@ -4,8 +4,21 @@
 #include "metadata.h"
 #include "common.h"
 
+#define TIMEOUT_ACK 3 // todo
+
 namespace dataplane::proxy
 {
+
+inline uint64_t KeyConnection(uint32_t addr, tPortId port)
+{
+    return (((uint64_t)addr) << 16) | (uint64_t)port;
+}
+
+inline void UnpackKeyConnection(uint64_t key, uint32_t& addr, uint16_t& port)
+{
+    port = key & 0xffff;
+    addr = key >> 16;
+}
 
 const uint8_t PROXY_V2_SIGNATURE[12] = {0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A};
 
@@ -224,14 +237,21 @@ void TcpConnectionStore::proxy_add_local_pool(proxy_id_t proxy_id, const common:
 
 eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager)
 {
-    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, service=%s:%d, proxy_header=%d, size_syn_table=%d\n",
+    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, service=%s:%d, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
         service_id, common::ipv4_address_t(rte_cpu_to_be_32(service.proxy_addr.address)).toString().c_str(), service.proxy_port,
-        common::ipv4_address_t(rte_cpu_to_be_32(service.service_addr.address)).toString().c_str(), service.service_port, service.proxy_header, service.size_syn_table);
+        common::ipv4_address_t(rte_cpu_to_be_32(service.service_addr.address)).toString().c_str(), service.service_port, service.proxy_header, service.size_connections_table, service.size_syn_table);
 
     std::lock_guard guard(mutex_);
 
+    if (!service_connections_[service_id].Initialize(service_id, service.size_connections_table, memory_manager))
+    {
+        YANET_LOG_ERROR("Error initialization TcpProxy.ServiceConnections, service: %d\n", service_id);
+        return eResult::errorAllocatingMemory;
+    }
+
     if (!syn_connections_[service_id].Initialize(service_id, service.size_syn_table, memory_manager))
     {
+        YANET_LOG_ERROR("Error initialization TcpProxy.SynConnections, service: %d\n", service_id);
         return eResult::errorAllocatingMemory;
     }
 
@@ -248,18 +268,22 @@ void TcpConnectionStore::proxy_service_remove(proxy_service_id_t service_id)
 common::idp::proxy_connections::response TcpConnectionStore::GetConnections(std::optional<proxy_service_id_t> service_id)
 {
     common::idp::proxy_connections::response response;
+    uint32_t current_time = currentTime;
     std::lock_guard guard(mutex_);
 
-    for (const auto& [key, info] : connections_)
+    if (!service_id.has_value())
     {
-        auto [service, src_addr, src_port] = key;
-        if (service_id.has_value() && *service_id != service)
+        for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
         {
-            continue;
+            service_connections_[index].GetConnections(index, current_time, response);
         }
-
-        response.emplace_back(service, src_addr, src_port, info.local_addr, info.local_port, static_cast<uint16_t>(info.state));
     }
+    else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    {
+        service_connections_[*service_id].GetConnections(*service_id, current_time, response);
+    }
+
+    // response.emplace_back(service, src_addr, src_port, info.local_addr, info.local_port, static_cast<uint16_t>(info.state));
 
     return response;
 }
@@ -268,6 +292,7 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(std::optional<proxy_
 {
     common::idp::proxy_syn::response response;
     uint32_t current_time = currentTime;
+    std::lock_guard guard(mutex_);
     
     if (!service_id.has_value())
     {
@@ -326,8 +351,6 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_id_t proxy_
         syn_connections_[service_id].Remove(src_addr, src_port, current_time, operation_data);
     }
 
-    std::lock_guard guard(mutex_);
-
     tcp_options.sack_permitted &= service.use_sack;
     tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
 
@@ -351,100 +374,105 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_id_t proxy_
                                                                uint32_t seq,
                                                                uint32_t ack)
 {
-    std::lock_guard guard(mutex_);
-    auto iter_con = connections_.find({service_id, src_addr, src_port});
-    if (iter_con == connections_.end())
-    {
-        // new connection
-        SynOperationData operation_data;
-        if (syn_connections_[service_id].SearchAndRemove(src_addr, src_port, current_time, operation_data))
-        {
-            // todo - Try add to connections, can fail !!!!
-            ConnectionInfo& con_info = connections_[{service_id, src_addr, src_port}];
-            con_info.local_addr = operation_data.local_addr;
-            con_info.local_port = operation_data.local_port;
-            con_info.shift_server = 0;
-            con_info.state = ConnectionState::ESTABLISHED;
-
-            ActionClientOnAck_Forward result;
-            result.local_addr = operation_data.local_addr;
-            result.local_port = operation_data.local_port;
-            result.add_proxy_header = service.proxy_header;
-            result.shift_ack = 0;
-            result.shift_seq = (result.add_proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0);
-
-            return result;            
-        }
-        
-        // try check cookie
-        uint32_t cookie_data;
-        uint32_t result = syn_cookies_.CheckCookie(rte_cpu_to_be_32(ack) - 1, src_addr, service.service_addr.address, src_port, service.service_port, add_cpu_32(seq, -1)); // dst_addr, dst_port
-        YANET_LOG_WARNING("\tresult=%d, cookie_data=%d, ack=%u, seq=%u\n", result, cookie_data, ack, seq);
-
-        if (result == 0)
-        {
-            YANET_LOG_WARNING("\tcookie check error\n");
-            return ActionDrop{0};
-        }
-
-        SynCookies::TCPOptions options = SynCookies::UnpackData(result);
-        YANET_LOG_WARNING("\tmss=%d, sack=%d, wscale=%d\n", SynCookies::MssFromTable(options.mss), options.sack, options.wscale);
-
-        // get from local
-        auto local = local_pool_.Allocate(proxy_id, service_id, src_addr, src_port);
-        if (!local.has_value())
-        {
-            YANET_LOG_WARNING("\tcan't allocate in local pool\n");
-            return ActionDrop{1};
-        }
-
-        // try add to connections
-        // can fail!
-
-        // Add to connections_
-        ConnectionInfo& connection_info = connections_[{service_id, src_addr, src_port}];
-        connection_info.local_addr = std::get<0>(*local);
-        connection_info.local_port = std::get<1>(*local);
-        connection_info.state = ConnectionState::SENT_SYN_SERVER;
-        connection_info.sent_seq = rte_cpu_to_be_32(ack) - 1;
-
-        ActionClientOnAck_NewServerConnection new_server_connection;
-        new_server_connection.local_addr = std::get<0>(*local);
-        new_server_connection.local_port = std::get<1>(*local);
-        new_server_connection.seq = add_cpu_32(seq, -1 + (service.proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0));
-
-        TcpOptions tcp_options;
-        tcp_options.mss = SynCookies::MssFromTable(options.mss);
-        tcp_options.sack_permitted = options.sack;
-        tcp_options.window_scaling = options.wscale;
-
-        new_server_connection.tcp_options = tcp_options;
-
-        return new_server_connection;
-
-    }
-    else
+    OneConnection* connection;
+    ConnectionBucket* bucket;
+    if (service_connections_[service_id].Find(src_addr, src_port, current_time, false, &connection, &bucket))
     {
         ActionClientOnAck_Forward result;
-        result.local_addr = iter_con->second.local_addr;
-        result.local_port = iter_con->second.local_port;
+        UnpackKeyConnection(connection->local, result.local_addr, result.local_port);
         result.add_proxy_header = false;
-        result.shift_ack = -iter_con->second.shift_server;
+        result.shift_ack = -connection->shift_server;
         result.shift_seq = 0;
 
-        if (iter_con->second.state == ConnectionState::SENT_PROXY_HEADER)
+        if (connection->state == ConnectionState::SENT_PROXY_HEADER)
         {
             YANET_LOG_WARNING("\t\t\tchange state from SENT_PROXY_HEADER -> ESTABLISHED\n");
-            iter_con->second.state = ConnectionState::ESTABLISHED;
+            connection->state = ConnectionState::ESTABLISHED;
             result.add_proxy_header = service.proxy_header;
             if (result.add_proxy_header)
             {
                 result.shift_seq = -int(sizeof(proxy_v2_ipv4_hdr));
             }
         }
+        bucket->Unlock();
 
         return result;
     }
+
+    // new connection
+    SynOperationData operation_data;
+    if (syn_connections_[service_id].SearchAndRemove(src_addr, src_port, current_time, operation_data))
+    {
+        // todo - Try add to connections, can fail !!!!
+        if (!service_connections_[service_id].Find(src_addr, src_port, current_time, true, &connection, &bucket))
+        {
+            YANET_LOG_WARNING("failed insert to connections\n");
+            return ActionDrop{0};
+        }
+        connection->local = KeyConnection(operation_data.local_addr, operation_data.local_port);
+        connection->shift_server = 0;
+        connection->state = ConnectionState::ESTABLISHED;
+        bucket->Unlock();
+
+        ActionClientOnAck_Forward result;
+        result.local_addr = operation_data.local_addr;
+        result.local_port = operation_data.local_port;
+        result.add_proxy_header = service.proxy_header;
+        result.shift_ack = 0;
+        result.shift_seq = (result.add_proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0);
+
+        return result;            
+    }
+    
+    // try check cookie
+    uint32_t cookie_data;
+    uint32_t result = syn_cookies_.CheckCookie(rte_cpu_to_be_32(ack) - 1, src_addr, service.service_addr.address, src_port, service.service_port, add_cpu_32(seq, -1)); // dst_addr, dst_port
+    YANET_LOG_WARNING("\tresult=%d, cookie_data=%d, ack=%u, seq=%u\n", result, cookie_data, ack, seq);
+
+    if (result == 0)
+    {
+        YANET_LOG_WARNING("\tcookie check error\n");
+        return ActionDrop{0};
+    }
+
+    SynCookies::TCPOptions options = SynCookies::UnpackData(result);
+    YANET_LOG_WARNING("\tmss=%d, sack=%d, wscale=%d\n", SynCookies::MssFromTable(options.mss), options.sack, options.wscale);
+
+    // get from local
+    auto local = local_pool_.Allocate(proxy_id, service_id, src_addr, src_port);
+    if (!local.has_value())
+    {
+        YANET_LOG_WARNING("\tcan't allocate in local pool\n");
+        return ActionDrop{1};
+    }
+
+    // try add to connections
+    // can fail!
+
+    // Add to connections
+    if (!service_connections_[service_id].Find(src_addr, src_port, current_time, true, &connection, &bucket))
+    {
+        YANET_LOG_WARNING("failed insert to connections\n");
+        return ActionDrop{0};
+    }
+    connection->local = KeyConnection(std::get<0>(*local), std::get<1>(*local));
+    connection->state = ConnectionState::SENT_SYN_SERVER;
+    connection->sent_seq = rte_cpu_to_be_32(ack) - 1;
+    bucket->Unlock();
+
+    ActionClientOnAck_NewServerConnection new_server_connection;
+    new_server_connection.local_addr = std::get<0>(*local);
+    new_server_connection.local_port = std::get<1>(*local);
+    new_server_connection.seq = add_cpu_32(seq, -1 + (service.proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0));
+
+    TcpOptions tcp_options;
+    tcp_options.mss = SynCookies::MssFromTable(options.mss);
+    tcp_options.sack_permitted = options.sack;
+    tcp_options.window_scaling = options.wscale;
+
+    new_server_connection.tcp_options = tcp_options;
+
+    return new_server_connection;
 }
 
 ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_id_t proxy_id,
@@ -477,38 +505,37 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_id_t 
         return ActionServerOnSynAck_SynAckToClient{ack, client_addr, client_port};
     }
 
-    std::lock_guard guard(mutex_);
-
-    // find in connections_
-    auto iter_con = connections_.find({service_id, client_addr, client_port});
-    if (iter_con == connections_.end())
+    // find in connections
+    OneConnection* connection;
+    ConnectionBucket* bucket;
+    if (!service_connections_[service_id].Find(client_addr, client_port, current_time, false, &connection, &bucket))
     {
-        YANET_LOG_WARNING("not found in connections_\n");
+        YANET_LOG_WARNING("not found in connections\n");
         return ActionDrop{0};
     }
 
-    // iter_con->second.shift_server = iter_con->second.sent_seq + (iter_con->second.state == ConnectionState::ESTABLISHED ? 1 : 0) - rte_be_to_cpu_32(seq);
-    iter_con->second.shift_server = iter_con->second.sent_seq - rte_be_to_cpu_32(seq);
-    iter_con->second.state = ConnectionState::SENT_PROXY_HEADER;
-    YANET_LOG_WARNING("\t\tshift_seq=%u\n", iter_con->second.shift_server);
+    connection->shift_server = connection->sent_seq - rte_be_to_cpu_32(seq);
+    connection->state = ConnectionState::SENT_PROXY_HEADER;
+    YANET_LOG_WARNING("\t\tshift_seq=%u\n", connection->shift_server);
+    uint32_t sent_seq = connection->sent_seq;
+    bucket->Unlock();
 
     return ActionServerOnSynAck_AckToClient{
 	    .client_addr = client_addr,
 	    .client_port = client_port,
-	    .seq = rte_cpu_to_be_32(iter_con->second.sent_seq + 1),
+	    .seq = rte_cpu_to_be_32(sent_seq + 1),
 	    .ack = (service.proxy_header ? add_cpu_32(ack, int(sizeof(proxy_v2_ipv4_hdr))) : ack) };
 }
 
 ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_id_t proxy_id,
                                                                proxy_service_id_t service_id,
                                                                const dataplane::globalBase::proxy_service_t& service,
+                                                               uint32_t current_time,
                                                                uint32_t dst_addr,
                                                                uint16_t dst_port,
                                                                uint32_t seq,
                                                                uint32_t ack)
 {
-    std::lock_guard guard(mutex_);
-
     // find in local
     std::optional<std::pair<uint32_t, tPortId>> client_info = local_pool_.FindClientByLocal(dst_addr, dst_port);
     if (!client_info.has_value())
@@ -519,16 +546,18 @@ ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_id_t proxy_
     auto [client_addr, client_port] = *client_info;
 
 
-    // find in connections_
-    auto iter_con = connections_.find({service_id, client_addr, client_port});
-    if (iter_con == connections_.end())
+    // find in connections
+    OneConnection* connection;
+    ConnectionBucket* bucket;
+    if (!service_connections_[service_id].Find(client_addr, client_port, current_time, false, &connection, &bucket))
     {
-        YANET_LOG_WARNING("not found in connections_\n");
+        YANET_LOG_WARNING("not found in connections\n");
         return ActionDrop{0};
     }
 
-    if (iter_con->second.state == ConnectionState::SENT_PROXY_HEADER)
+    if (connection->state == ConnectionState::SENT_PROXY_HEADER)
     {
+        bucket->Unlock();
         YANET_LOG_ERROR("unimplemented\n");
         return ActionDrop{0};
 
@@ -540,9 +569,114 @@ ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_id_t proxy_
         ActionServerOnAck_Forward forward;
         forward.dst_addr = client_addr;
         forward.dst_port = client_port;
-        forward.shift_seq = iter_con->second.shift_server;
+        forward.shift_seq = connection->shift_server;
+        bucket->Unlock();        
         return forward;
     }
+}
+
+// Connections
+
+
+void OneConnection::Clear()
+{
+    last_time = 0;
+    local = 0;
+}
+
+bool OneConnection::IsExpired(uint32_t current_time)
+{
+    return last_time + TIMEOUT_ACK < current_time;
+}
+
+ConnectionBucket::ConnectionBucket()
+{
+    for (uint32_t index = 0; index < bucket_size; index++)
+    {
+        connections[index].Clear();
+    }
+}
+
+bool ServiceConnections::Initialize(proxy_service_id_t service_id, uint32_t number_buckets, dataplane::memory_manager* memory_manager)
+{
+    if (initialized_)
+    {
+        return true;
+    }
+
+    size_t mem_size = number_buckets * sizeof(ConnectionBucket);
+    YANET_LOG_WARNING("ServiceConnections::Initialize number_buckets=%d, mem_size=%ld\n", number_buckets, mem_size);
+
+    tSocketId socket_id = 0; // todo !!!
+    std::string name = "tcp_proxy.connections." + std::to_string(service_id);
+    buckets_ = memory_manager->create_static_array<ConnectionBucket>(name.data(), number_buckets, socket_id);
+    if (buckets_ == nullptr)
+    {
+        return false;
+    }
+
+    number_buckets_ = number_buckets;
+    initialized_ = true;
+    return true;
+}
+
+void ConnectionBucket::Lock()
+{
+    mutex.lock();
+}
+
+void ConnectionBucket::Unlock()
+{
+    mutex.unlock();
+}
+
+bool ServiceConnections::Find(uint32_t addr, uint16_t port, uint32_t current_time, bool create, OneConnection** connection, ConnectionBucket** bucket)
+{
+    if (number_buckets_ == 0)
+    {
+        return false;
+    }
+
+    uint64_t key = KeyConnection(addr, port);
+    uint32_t bucket_index = key & (number_buckets_ - 1);
+    uint32_t record_index = ConnectionBucket::bucket_size;
+    *bucket = &buckets_[bucket_index];
+    (*bucket)->Lock();
+
+    for (uint32_t index = 0; index < ConnectionBucket::bucket_size; index++)
+    {
+        *connection = &(*bucket)->connections[index];
+        if (!(*connection)->IsExpired(current_time))    // todo - check time = 0
+        {
+            // time ok
+            if ((*connection)->client == key)
+            {
+                return true;
+            }
+        }
+        else if ((*connection)->local == 0 && record_index == ConnectionBucket::bucket_size)
+        {
+            record_index = index;
+        }
+    }
+
+    if (!create || record_index == ConnectionBucket::bucket_size)
+    {
+        (*bucket)->Unlock();
+        return false;
+    }
+
+    *connection = &(*bucket)->connections[record_index];
+    (*connection)->Clear();
+    (*connection)->client = key;
+    (*connection)->last_time = current_time;
+
+    return true;
+}
+
+void ServiceConnections::GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response)
+{
+
 }
 
 }

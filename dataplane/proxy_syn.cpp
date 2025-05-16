@@ -25,7 +25,7 @@ bool ServiceSynConnections::Initialize(proxy_service_id_t service_id, uint32_t n
     else if (number_buckets == 0)
     {
         number_buckets_ = 0;
-        return 0;
+        return true;
     }
 
     size_t mem_size = number_buckets * sizeof(SynBucket);

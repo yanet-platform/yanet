@@ -1249,6 +1249,7 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 		service.service_addr = common::ip_address_t(service_json["service_addr"]);
 		service.service_port = service_json["service_port"];
 		service.proxy_header = service_json.value("proxy_header", true);
+		service.size_connections_table = service_json["size_connections_table"];	// todo - check power 2
 		service.size_syn_table = service_json.value("size_syn_table", 0);
 		service.use_sack = service_json.value("use_sack", true);
 		service.mss = service_json.value("mss", 1462);

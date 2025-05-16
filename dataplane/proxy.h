@@ -201,16 +201,6 @@ using ActionServerOnAck_Result = std::variant<ActionServerOnAck_ForwardFirst, Ac
 
 // ----------------------------------------------------------------------------
 
-using connection_key = std::tuple<proxy_service_id_t, uint32_t, uint16_t>;  // service_id, src_addr, src_port
-
-struct SynConnectionInfo
-{
-    uint32_t recv_seq;
-    uint32_t local_addr;
-    tPortId local_port;
-    // todo: time, answer from server?
-};
-
 enum ConnectionState
 {
     SENT_SYN_SERVER,
@@ -218,13 +208,45 @@ enum ConnectionState
     ESTABLISHED
 };
 
-struct ConnectionInfo
+struct OneConnection
 {
-    uint32_t local_addr;
-    uint16_t local_port;
+    uint64_t client;    // client ip + port
+    uint64_t local;     // local ip + port
+    uint32_t last_time; // time of last packet
     ConnectionState state;
     uint32_t sent_seq;
     uint32_t shift_server;
+        
+    void Clear();
+    bool IsExpired(uint32_t current_time);
+};
+
+struct ConnectionBucket
+{
+    static constexpr uint32_t bucket_size = 16;
+
+    OneConnection connections[bucket_size];
+    std::mutex mutex;
+
+    ConnectionBucket();
+    void Lock();
+    void Unlock();
+};
+
+class ServiceConnections
+{
+public:
+    bool Initialize(proxy_service_id_t service_id, uint32_t number_buckets, dataplane::memory_manager* memory_manager);
+
+    bool Find(uint32_t addr, uint16_t port, uint32_t current_time, bool create, OneConnection** connection, ConnectionBucket** bucket);
+
+    void GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response);
+
+private:
+private:
+    ConnectionBucket* buckets_ = nullptr;
+    uint32_t number_buckets_ = 0;
+    bool initialized_ = false;
 };
 
 class TcpConnectionStore
@@ -274,6 +296,7 @@ public:
     ActionServerOnAck_Result ActionServerOnAck(proxy_id_t proxy_id,
 	                                       proxy_service_id_t service_id,
                                            const dataplane::globalBase::proxy_service_t& service,
+                                           uint32_t current_time,
 	                                       uint32_t dst_addr,
 	                                       uint16_t dst_port,
 	                                       uint32_t seq,
@@ -284,9 +307,9 @@ public:
 private:
     std::mutex mutex_;
     LocalPool local_pool_;
-    std::map<connection_key, ConnectionInfo> connections_;
     SynCookies syn_cookies_;
 
+    ServiceConnections service_connections_[YANET_CONFIG_PROXY_SERVICES_SIZE];
     ServiceSynConnections syn_connections_[YANET_CONFIG_PROXY_SERVICES_SIZE];
 };
 

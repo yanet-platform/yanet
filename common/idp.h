@@ -347,6 +347,7 @@ using request = std::tuple<proxy_service_id_t,
                            common::ip_address_t, ///< service_addr;
                            tPortId, ///< service_port;
                            bool, ///< proxy_header;
+                           uint32_t, ///< size_connections_table;
                            uint32_t, ///< size_syn_table;
                            bool, ///< use_sack;
                            uint32_t, ///< mss;

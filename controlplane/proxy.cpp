@@ -262,6 +262,7 @@ void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& gl
 	                                                                                     config.service_addr,
 	                                                                                     config.service_port,
                                                                                          config.proxy_header,
+                                                                                         config.size_connections_table,
                                                                                          config.size_syn_table,
                                                                                          config.use_sack,
                                                                                          config.mss,
