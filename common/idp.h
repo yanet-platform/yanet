@@ -334,7 +334,7 @@ using request = std::tuple<proxy_id_t>;
 
 namespace proxy_add_local_pool
 {
-using request = std::tuple<proxy_id_t,
+using request = std::tuple<proxy_service_id_t,
                            common::ip_prefix_t>; ///< prefix
 }
 

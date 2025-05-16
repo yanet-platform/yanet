@@ -55,12 +55,12 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
             std::optional<proxy_id_t> proxy_id = AddModule(globalbase, module_name, config);
             if (proxy_id.has_value())
             {
-                for (const auto& prefix : config.local_pool)
-                {
-                    AddPrefixToPool(globalbase, *proxy_id, prefix);
-                }
                 for (const auto& service : config.services)
                 {
+                    for (const auto& prefix : config.local_pool)
+                    {
+                        AddPrefixToPool(globalbase, service.service_id, prefix);
+                    }
                     AddService(globalbase, *proxy_id, service);
                 }
             }
@@ -73,16 +73,10 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
             {
                 continue;
             }
-            for (const auto& prefix : config.local_pool)
-            {
-                if (iter_prev->second.local_pool.count(prefix) == 0)
-                {
-                    AddPrefixToPool(globalbase, *proxy_id, prefix);
-                }
-            }
 
             auto services_prev = iter_prev->second.BuildMapServices();
             auto services_next = config.BuildMapServices();
+
             // remove old services
             for (auto iter_serv_prev : services_prev)
             {
@@ -94,6 +88,13 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
 
             for (auto iter_serv_next : services_next)
             {
+                for (const auto& prefix : config.local_pool)
+                {
+                    if (iter_prev->second.local_pool.count(prefix) == 0)
+                    {
+                        AddPrefixToPool(globalbase, iter_serv_next.second->service_id, prefix);
+                    }
+                }
                 auto iter_serv_prev = services_prev.find(iter_serv_next.first);
                 if (iter_serv_prev == services_prev.end())
                 {
@@ -184,11 +185,11 @@ std::optional<proxy_id_t> proxy_t::RemoveModule(common::idp::updateGlobalBase::r
     return proxy_id;
 }
 
-void proxy_t::AddPrefixToPool(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const common::ip_prefix_t& prefix)
+void proxy_t::AddPrefixToPool(common::idp::updateGlobalBase::request& globalbase, proxy_service_id_t service_id, const common::ip_prefix_t& prefix)
 {
     // YANET_LOG_WARNING("LOCAL_POOL add: %s to ID=%d\n", prefix.toString().c_str(), proxy_id);
     globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_add_local_pool,
-        common::idp::updateGlobalBase::proxy_add_local_pool::request{proxy_id, prefix});
+        common::idp::updateGlobalBase::proxy_add_local_pool::request{service_id, prefix});
 }
 
 void proxy_t::AddService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service)

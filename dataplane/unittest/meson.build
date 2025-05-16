@@ -7,7 +7,8 @@ dependencies += dependency('gtest')
 dependencies += dependency('gtest_main')
 
 dataplane_sources = files('../local_pool.cpp',
-                          '../syncookies.cpp')
+                          '../syncookies.cpp',
+                          '../memory_manager.cpp')
 
 sources = files('unittest.cpp',
                 'ip_address.cpp',
