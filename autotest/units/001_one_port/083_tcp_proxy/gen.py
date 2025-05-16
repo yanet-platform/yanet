@@ -105,7 +105,7 @@ WriteTest("001", data_type1)
 
 # 002 - type 2 - no proxy, sec
 
-SYN_COOKIE2 = 0x09857553
+SYN_COOKIE2 = 0x08857553
 
 data_type2 = [
 	(
@@ -155,7 +155,7 @@ WriteTest("003", data_type3)
 
 # 004 - type 4 - proxy, sec, sack
 
-SYN_COOKIE3 = 0x794fb723
+SYN_COOKIE3 = 0x784fb723
 
 data_type4 = [
 	(

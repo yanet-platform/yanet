@@ -4,7 +4,7 @@
 #include "metadata.h"
 #include "common.h"
 
-#define TIMEOUT_ACK 3 // todo
+#define TIMEOUT_ACK 10 // todo
 
 namespace dataplane::proxy
 {
@@ -305,8 +305,6 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(std:
     {
         service_connections_[*service_id].GetConnections(*service_id, current_time, response);
     }
-
-    // response.emplace_back(service, src_addr, src_port, info.local_addr, info.local_port, static_cast<uint16_t>(info.state));
 
     return response;
 }
@@ -695,7 +693,25 @@ bool ServiceConnections::Find(uint32_t addr, uint16_t port, uint32_t current_tim
 
 void ServiceConnections::GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response)
 {
+    for (uint32_t index = 0; index < number_buckets_; index++)
+    {
+        ConnectionBucket& bucket = buckets_[index];
+        bucket.Lock();
+        for (uint32_t i = 0; i < ConnectionBucket::bucket_size; i++)
+        {
+            OneConnection& connection = bucket.connections[i];
+            if (connection.local != 0 && !connection.IsExpired(current_time))
+            {
+                uint32_t src_addr, local_addr;
+                uint16_t src_port, local_port;
+                UnpackKeyConnection(connection.client, src_addr, src_port);
+                UnpackKeyConnection(connection.local, local_addr, local_port);
+                response.emplace_back(service_id, src_addr, src_port, local_addr, local_port, static_cast<uint16_t>(connection.state));
+            }
+        }
+        bucket.Unlock();
 
+    }
 }
 
 void ServiceConnections::CollectGarbage(uint32_t current_time, LocalPool& local_pool)
