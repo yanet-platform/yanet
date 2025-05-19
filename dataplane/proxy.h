@@ -276,7 +276,7 @@ public:
 	                                       uint32_t src_addr,
 	                                       uint16_t src_port,
 	                                       uint32_t seq,
-	                                       TcpOptions& tcp_options);
+	                                       const TcpOptions& tcp_options);
 
     ActionClientOnAck_Result ActionClientOnAck(proxy_service_id_t service_id,
                                            const dataplane::globalBase::proxy_service_t& service,

@@ -6159,6 +6159,9 @@ inline void cWorker::proxy_client_syn_handle()
 		dataplane::proxy::TcpOptions tcp_options;
 		memset(&tcp_options, 0, sizeof(tcp_options));
 		tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+		tcp_options.sack_permitted &= service.use_sack;
+		tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
+
 		YANET_LOG_WARNING("\ttcp options: %s\n", tcp_options.DebugInfo().c_str());
 		dataplane::proxy::ActionClientOnSyn_Result action = tcp_connection_store->ActionClientOnSyn(metadata->flow.data.proxy.service_id,
 																									service,
@@ -6190,6 +6193,13 @@ inline void cWorker::proxy_client_syn_handle()
 		}
 		else if (const auto syn_ack_to_client = std::get_if<dataplane::proxy::ActionClientOnSyn_SynAckToClient>(&action))
 		{
+			tcp_options.window_scaling = service.winscale;
+			tcp_options.timestamp_echo = tcp_options.timestamp_value;
+			tcp_options.timestamp_value = 1;
+			if (service.proxy_header)
+			{
+				tcp_options.mss -= int(sizeof(dataplane::proxy::proxy_v2_ipv4_hdr));
+			}
 			tcp_options.Write(mbuf);
 
 			rte_be32_t tmp = ipv4Header->src_addr;
@@ -6395,6 +6405,10 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		(void)proxy;
 
 		size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+		dataplane::proxy::TcpOptions tcp_options;
+		memset(&tcp_options, 0, sizeof(tcp_options));
+		tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+
 		dataplane::proxy::ActionServerOnSynAck_Result action = tcp_connection_store->ActionServerOnSynAck(metadata->flow.data.proxy.service_id,
 																										 service,
 																										 current_time,
@@ -6413,6 +6427,12 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		}
 		else if (const auto syn_ack_to_client = std::get_if<dataplane::proxy::ActionServerOnSynAck_SynAckToClient>(&action))
 		{
+			if (service.proxy_header)
+			{
+				tcp_options.mss -= int(sizeof(dataplane::proxy::proxy_v2_ipv4_hdr));
+				tcp_options.Write(mbuf);
+			}
+
 			ipv4Header->src_addr = service.proxy_addr.address;	// todo
 			ipv4Header->dst_addr = syn_ack_to_client->client_addr;
 			ipv4Header->hdr_checksum = 0;
@@ -6426,15 +6446,10 @@ inline void cWorker::proxy_server_syn_ack_handle()
 
 			proxy_flow(mbuf, proxy.flow);
 		}
-
 		else if (const auto ack_to_client = std::get_if<dataplane::proxy::ActionServerOnSynAck_AckToClient>(&action))
 		{
-			dataplane::proxy::TcpOptions tcp_options;
-			memset(&tcp_options, 0, sizeof(tcp_options));
-			tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
 			tcp_options.sack_permitted = false;
 			tcp_options.mss = 0;
-
 			tcp_options.Write(mbuf);
 
 			ipv4Header->src_addr = service.proxy_addr.address;	// todo

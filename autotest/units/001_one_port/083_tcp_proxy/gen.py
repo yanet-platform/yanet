@@ -79,6 +79,8 @@ data_server2 = 'server second'
 options_client_syn = [("MSS", 1460), ("SAckOK", ''), ("Timestamp", (2983139994, 0)), ('WScale', 5), ("NOP", '')]
 options_client_ack = [("Timestamp", (1, 2)), ("NOP", ''), ("NOP", '')]
 options_server_syn = [("MSS", 1260), ("SAckOK", ''), ("Timestamp", (123456789, 2983139994)), ('WScale', 3), ("NOP", '')]
+options_server_syn_proxy = [("MSS", 1260-len_pr), ("SAckOK", ''), ("Timestamp", (123456789, 2983139994)), ('WScale', 3), ("NOP", '')]
+
 
 # 001 - type 1 - no proxy, no sec
 
@@ -138,7 +140,7 @@ data_type3 = [
 		ToServer(IP_SERVER3, START_CLIENT_SEQ - len_pr, 0, 'S', options=options_client_syn)
 	), (
 		FromServer(IP_SERVER3, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'AS', options=options_server_syn),
-		ToClient(IP_SERVER3, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn)
+		ToClient(IP_SERVER3, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn_proxy)
 	), (
 		FromClient(IP_SERVER3, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack), 
 		ToServer(IP_SERVER3, START_CLIENT_SEQ + 1 - len_pr, START_SERVER_SEQ + 1, 'A', raw=get_proxy_header(IP_SERVER3) + data_client1.encode(), options=options_client_ack)
@@ -160,7 +162,7 @@ SYN_COOKIE3 = 0x784fb723
 data_type4 = [
 	(
 		FromClient(IP_SERVER4, START_CLIENT_SEQ, 0, 'S', options=options_client_syn), 
-		ToClient(IP_SERVER4, SYN_COOKIE3, START_CLIENT_SEQ + 1, 'AS', window=0, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (1, 2983139994)), ('WScale', 9), ("NOP", '')])
+		ToClient(IP_SERVER4, SYN_COOKIE3, START_CLIENT_SEQ + 1, 'AS', window=0, options=[("MSS", 1300-len_pr), ("SAckOK", ''), ("Timestamp", (1, 2983139994)), ('WScale', 9), ("NOP", '')])
 	), (
 		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE3 + 1, 'A', options=[("Timestamp", (12345, 54321))]),
 		ToServer(IP_SERVER4, START_CLIENT_SEQ - len_pr, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (12345, 0)), ('WScale', 5), ("NOP", '')])

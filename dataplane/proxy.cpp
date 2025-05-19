@@ -338,7 +338,7 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_service_id_
                                                                uint32_t src_addr,
                                                                uint16_t src_port,
                                                                uint32_t seq,
-                                                               TcpOptions& tcp_options)
+                                                               const TcpOptions& tcp_options)
 {
     SynOperationData operation_data;
     SynInsertResult result_insert_syn = syn_connections_[service_id].TryInsertClient(src_addr, src_port, seq, current_time, operation_data);
@@ -371,16 +371,9 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_service_id_
         syn_connections_[service_id].Remove(src_addr, src_port, current_time, operation_data);
     }
 
-    tcp_options.sack_permitted &= service.use_sack;
-    tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
-
     uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack_permitted, tcp_options.window_scaling, 0}); // ecn
     uint32_t cookie = syn_cookies_.GetCookie(src_addr, service.service_addr.address, src_port, service.service_port, seq, cookie_data); // dst_addr, dst_port
     YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, seq);
-
-    tcp_options.window_scaling = service.winscale;
-    tcp_options.timestamp_echo = tcp_options.timestamp_value;
-    tcp_options.timestamp_value = 1;
 
     return ActionClientOnSyn_SynAckToClient{rte_cpu_to_be_32(cookie), add_cpu_32(seq, 1)};
 }
@@ -513,7 +506,7 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_servi
     }
     auto [client_addr, client_port] = *client_info;
 
-    // find in syn or conncetions
+    // find in syn or conneсtions
     if (syn_connections_[service_id].UpdateTimeFromServerAnswer(client_addr, client_port, current_time))
     {
         if (service.proxy_header)
