@@ -32,13 +32,6 @@ struct SynBucket
     SynBucket();
 };
 
-enum class SynInsertResult : uint8_t
-{
-	new_record = 0,
-    exists = 1,
-	overflow
-};
-
 struct SynOperationData
 {
     uint32_t bucket_index;
@@ -52,14 +45,38 @@ class ServiceSynConnections
 {
 public:
     bool Initialize(proxy_service_id_t service_id, uint32_t number_buckets, dataplane::memory_manager* memory_manager);
-    SynInsertResult TryInsertClient(uint32_t addr, uint16_t port, uint32_t seq, uint32_t current_time, SynOperationData& operation_data);
-    void UpdateLocal(uint32_t addr, uint16_t port, uint32_t current_time, const SynOperationData& operation_data);   // todo - error result
-    void Remove(uint32_t addr, uint16_t port, uint32_t current_time, const SynOperationData& operation_data);   // todo - error result
-    bool SearchAndRemove(uint32_t addr, uint16_t port, uint32_t current_time, SynOperationData& operation_data);
-    bool UpdateTimeFromServerAnswer(uint32_t addr, uint16_t port, uint32_t current_time);
+    bool TryInsert(uint32_t client_addr, uint16_t client_port,
+                uint32_t local_addr, uint16_t local_port,
+                uint32_t seq, uint32_t current_time);
     void GetSyn(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_syn::response& response);
 
     void CollectGarbage(uint32_t current_time, LocalPool& local_pool);
+
+private:
+    struct _Pointer {
+        SynBucket* bucket;
+        OneSynConnection* connection;
+
+        _Pointer(SynBucket* bucket, OneSynConnection* conn) : bucket(bucket), connection(conn) {
+            if (bucket) bucket->mutex.lock();
+        }
+        ~_Pointer() {
+            if (bucket) bucket->mutex.unlock();
+        }
+
+        operator bool() const {
+            return bucket != nullptr && connection != nullptr;
+        }
+
+        bool operator==(const _Pointer& other) const {
+            return bucket == other.bucket && connection == other.connection;
+        }
+    };
+    
+public:
+    using Pointer = std::shared_ptr<_Pointer>;
+    Pointer FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time);
+    void Remove(Pointer ptr);   // todo - error result
 
 private:
     SynBucket* buckets_ = nullptr;

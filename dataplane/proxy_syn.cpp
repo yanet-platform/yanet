@@ -44,131 +44,83 @@ bool ServiceSynConnections::Initialize(proxy_service_id_t service_id, uint32_t n
     return true;    
 }
 
-SynInsertResult ServiceSynConnections::TryInsertClient(uint32_t addr, uint16_t port, uint32_t seq, uint32_t current_time, SynOperationData& operation_data)
+bool ServiceSynConnections::TryInsert(uint32_t client_addr, uint16_t client_port,
+                                        uint32_t local_addr, uint16_t local_port,
+                                        uint32_t seq, uint32_t current_time)
 {
     if (number_buckets_ == 0)
     {
-        return SynInsertResult::overflow;
+        return false;
     }
 
-    uint64_t key = KeyConnection(addr, port);
-    operation_data.bucket_index = key & (number_buckets_ - 1);
-    operation_data.record_index = SynBucket::bucket_size;
-    SynBucket& bucket = buckets_[operation_data.bucket_index];
+    uint64_t key = KeyConnection(client_addr, client_port);
+    uint32_t bucket_index = key & (number_buckets_ - 1);
+    uint32_t record_index = SynBucket::bucket_size;
+    SynBucket& bucket = buckets_[bucket_index];
 
     std::lock_guard<std::mutex> guard(bucket.mutex);
     for (uint32_t index = 0; index < SynBucket::bucket_size; index++)
     {
-        if (bucket.connections[index].last_time + TIMEOUT_SYN >= current_time)
+        if (!bucket.connections[index].IsExpired(current_time))
         {
             // time ok
             if (bucket.connections[index].client == key)
             {
-                operation_data.record_index = index;
-                UnpackKeyConnection(bucket.connections[index].local, operation_data.local_addr, operation_data.local_port);
-                operation_data.recv_seq = bucket.connections[index].recv_seq;
-                bucket.connections[index].last_time = current_time;
-                bucket.connections[index].recv_seq = seq;
-                return SynInsertResult::exists;
+                return true;
             }
         }
-        else if (bucket.connections[index].local == 0 && operation_data.record_index == SynBucket::bucket_size)
+        else if (bucket.connections[index].local == 0 && record_index == SynBucket::bucket_size)
         {
-            operation_data.record_index = index;
+            record_index = index;
         }
     }
 
-    if (operation_data.record_index == SynBucket::bucket_size)
-    {
-        return SynInsertResult::overflow;
-    }
-
-    bucket.connections[operation_data.record_index].client = key;
-    bucket.connections[operation_data.record_index].last_time = current_time;
-    bucket.connections[operation_data.record_index].recv_seq = seq;
-    return SynInsertResult::new_record;
-}
-
-void ServiceSynConnections::UpdateLocal(uint32_t addr, uint16_t port, uint32_t current_time, const SynOperationData& operation_data)
-{
-    SynBucket& bucket = buckets_[operation_data.bucket_index];
-    OneSynConnection& connection = bucket.connections[operation_data.record_index];
-
-    std::lock_guard<std::mutex> guard(bucket.mutex);
-    if (connection.client == KeyConnection(addr, port) && connection.last_time + TIMEOUT_SYN >= current_time)
-    {
-        connection.local = KeyConnection(operation_data.local_addr, operation_data.local_port);
-    }
-    else
-    {
-        YANET_LOG_ERROR("UpdateLocal bad record\n");
-    }
-}
-
-void ServiceSynConnections::Remove(uint32_t addr, uint16_t port, uint32_t current_time, const SynOperationData& operation_data)
-{
-    SynBucket& bucket = buckets_[operation_data.bucket_index];
-    OneSynConnection& connection = bucket.connections[operation_data.record_index];
-
-    std::lock_guard<std::mutex> guard(bucket.mutex);
-    if (connection.client == KeyConnection(addr, port) && connection.last_time + TIMEOUT_SYN >= current_time)
-    {
-        connection.Clear();
-    }
-    else
-    {
-        YANET_LOG_ERROR("Remove bad record\n");
-    }
-}
-
-bool ServiceSynConnections::UpdateTimeFromServerAnswer(uint32_t addr, uint16_t port, uint32_t current_time)
-{
-    if (number_buckets_ == 0)
+    if (record_index == SynBucket::bucket_size)
     {
         return false;
     }
 
-    uint64_t key = KeyConnection(addr, port);
-    SynBucket& bucket = buckets_[key & (number_buckets_ - 1)];
-
-    std::lock_guard<std::mutex> guard(bucket.mutex);
-    for (uint32_t index = 0; index < SynBucket::bucket_size; index++)
-    {
-        OneSynConnection& connection = bucket.connections[index];
-        if (connection.last_time + TIMEOUT_SYN >= current_time && connection.client == key)
-        {
-            connection.last_time = current_time;
-            connection.server_answer = true;
-            return true;
-        }
-    }
-
-    return false;
+    bucket.connections[record_index].client = key;
+    bucket.connections[record_index].local = KeyConnection(local_addr, local_port);
+    bucket.connections[record_index].last_time = current_time;
+    bucket.connections[record_index].recv_seq = seq;
+    return true;
 }
 
-bool ServiceSynConnections::SearchAndRemove(uint32_t addr, uint16_t port, uint32_t current_time, SynOperationData& operation_data)
+ServiceSynConnections::Pointer ServiceSynConnections::FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time)
 {
     if (number_buckets_ == 0)
     {
-        return false;
+        return Pointer{};
     }
 
     uint64_t key = KeyConnection(addr, port);
-    SynBucket& bucket = buckets_[key & (number_buckets_ - 1)];
+    SynBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
 
-    std::lock_guard<std::mutex> guard(bucket.mutex);
+    bucket->mutex.lock();
     for (uint32_t index = 0; index < SynBucket::bucket_size; index++)
     {
-        OneSynConnection& connection = bucket.connections[index];
-        if (connection.last_time + TIMEOUT_SYN >= current_time && connection.client == key && connection.server_answer) // todo - check seq
+        OneSynConnection* connection = &bucket->connections[index];
+        if (key == connection->client && !connection->IsExpired(current_time))
         {
-            UnpackKeyConnection(connection.local, operation_data.local_addr, operation_data.local_port);
-            connection.Clear();
-            return true;
+            connection->last_time = current_time;
+            bucket->mutex.unlock();
+            return std::make_shared<_Pointer>(bucket, connection);
         }
     }
 
-    return false;
+    bucket->mutex.unlock();
+    return Pointer{};
+}
+
+void ServiceSynConnections::Remove(Pointer ptr)
+{
+    if (number_buckets_ == 0 || !ptr)
+    {
+        return;
+    }
+
+    ptr->connection->Clear();
 }
 
 void ServiceSynConnections::GetSyn(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_syn::response& response)

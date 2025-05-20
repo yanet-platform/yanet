@@ -340,36 +340,33 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_service_id_
                                                                uint32_t seq,
                                                                const TcpOptions& tcp_options)
 {
-    SynOperationData operation_data;
-    SynInsertResult result_insert_syn = syn_connections_[service_id].TryInsertClient(src_addr, src_port, seq, current_time, operation_data);
-
-    if (result_insert_syn == SynInsertResult::exists)
+    auto syn_ptr = syn_connections_[service_id].FindAndLock(src_addr, src_port, current_time);
+    if (syn_ptr)
     {
-        YANET_LOG_WARNING("\tSynInsertResult::exists\n");
+        YANET_LOG_WARNING("\tSyn Exists\n");
         if (service.proxy_header)
         {
             seq = add_cpu_32(seq, -int(sizeof(proxy_v2_ipv4_hdr)));
         }
-        return ActionClientOnSyn_SynToServer{seq, operation_data.local_addr, operation_data.local_port};
+        uint32_t local_addr;
+        uint16_t local_port;
+        UnpackKeyConnection(syn_ptr->connection->local, local_addr, local_port);
+        return ActionClientOnSyn_SynToServer{seq, local_addr, local_port};
     }
-    else if (result_insert_syn == SynInsertResult::new_record)
+
+    std::optional<std::pair<uint32_t, tPortId>> local = local_pools_[service_id].Allocate(src_addr, src_port);
+    if (local.has_value() && 
+        syn_connections_[service_id].TryInsert(src_addr, src_port, local->first, local->second, seq, current_time))
     {
-        YANET_LOG_WARNING("\tSynInsertResult::new_record\n");
-        std::optional<std::pair<uint32_t, tPortId>> local = local_pools_[service_id].Allocate(src_addr, src_port);
-        if (local.has_value())
+        YANET_LOG_WARNING("\tSyn New Record\n");
+        if (service.proxy_header)
         {
-            YANET_LOG_WARNING("\tlocal.has_value\n");
-            operation_data.local_addr = std::get<0>(*local);
-            operation_data.local_port = std::get<1>(*local);
-            syn_connections_[service_id].UpdateLocal(src_addr, src_port, current_time, operation_data);
-            if (service.proxy_header)
-            {
-                seq = add_cpu_32(seq, -int(sizeof(proxy_v2_ipv4_hdr)));
-            }
-            return ActionClientOnSyn_SynToServer{seq, operation_data.local_addr, operation_data.local_port};
+            seq = add_cpu_32(seq, -int(sizeof(proxy_v2_ipv4_hdr)));
         }
-        syn_connections_[service_id].Remove(src_addr, src_port, current_time, operation_data);
+        return ActionClientOnSyn_SynToServer{seq, local->first, local->second};
     }
+
+    local_pools_[service_id].Free(local->first, local->second);
 
     uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack_permitted, tcp_options.window_scaling, 0}); // ecn
     uint32_t cookie = syn_cookies_.GetCookie(src_addr, service.service_addr.address, src_port, service.service_port, seq, cookie_data); // dst_addr, dst_port
@@ -412,8 +409,8 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
     }
 
     // new connection
-    SynOperationData operation_data;
-    if (syn_connections_[service_id].SearchAndRemove(src_addr, src_port, current_time, operation_data))
+    auto syn_ptr = syn_connections_[service_id].FindAndLock(src_addr, src_port, current_time);
+    if (syn_ptr)
     {
         // todo - Try add to connections, can fail !!!!
         if (!service_connections_[service_id].Find(src_addr, src_port, current_time, true, &connection, &bucket))
@@ -421,17 +418,22 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
             YANET_LOG_WARNING("failed insert to connections\n");
             return ActionDrop{0};
         }
-        connection->local = KeyConnection(operation_data.local_addr, operation_data.local_port);
+        connection->local = syn_ptr->connection->local;
         connection->shift_server = 0;
         connection->state = ConnectionState::ESTABLISHED;
         bucket->Unlock();
 
+        uint32_t local_addr;
+        uint16_t local_port;
+        UnpackKeyConnection(connection->local, local_addr, local_port);
         ActionClientOnAck_Forward result;
-        result.local_addr = operation_data.local_addr;
-        result.local_port = operation_data.local_port;
+        result.local_addr = local_addr;
+        result.local_port = local_port;
         result.add_proxy_header = service.proxy_header;
         result.shift_ack = 0;
         result.shift_seq = (result.add_proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0);
+        
+        syn_ptr->connection->Clear();
 
         return result;            
     }
@@ -507,8 +509,11 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_servi
     auto [client_addr, client_port] = *client_info;
 
     // find in syn or conneсtions
-    if (syn_connections_[service_id].UpdateTimeFromServerAnswer(client_addr, client_port, current_time))
+    auto syn_ptr = syn_connections_[service_id].FindAndLock(client_addr, client_port, current_time);
+    if (syn_ptr)
     {
+        syn_ptr->connection->server_answer = true;
+        syn_ptr->connection->last_time = current_time;
         if (service.proxy_header)
         {
             ack = add_cpu_32(ack, int(sizeof(proxy_v2_ipv4_hdr)));
