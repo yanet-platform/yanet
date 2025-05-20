@@ -87,11 +87,11 @@ bool ServiceSynConnections::TryInsert(uint32_t client_addr, uint16_t client_port
     return true;
 }
 
-ServiceSynConnections::Pointer ServiceSynConnections::FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time)
+ServiceSynConnections::LockPointer ServiceSynConnections::FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time)
 {
     if (number_buckets_ == 0)
     {
-        return Pointer{};
+        return LockPointer{};
     }
 
     uint64_t key = KeyConnection(addr, port);
@@ -105,15 +105,15 @@ ServiceSynConnections::Pointer ServiceSynConnections::FindAndLock(uint32_t addr,
         {
             connection->last_time = current_time;
             bucket->mutex.unlock();
-            return std::make_shared<_Pointer>(bucket, connection);
+            return std::make_shared<_LockPointer>(bucket, connection);
         }
     }
 
     bucket->mutex.unlock();
-    return Pointer{};
+    return LockPointer{};
 }
 
-void ServiceSynConnections::Remove(Pointer ptr)
+void ServiceSynConnections::Remove(LockPointer ptr)
 {
     if (number_buckets_ == 0 || !ptr)
     {

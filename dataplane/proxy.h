@@ -238,13 +238,35 @@ class ServiceConnections
 public:
     bool Initialize(proxy_service_id_t service_id, uint32_t number_buckets, dataplane::memory_manager* memory_manager);
 
-    bool Find(uint32_t addr, uint16_t port, uint32_t current_time, bool create, OneConnection** connection, ConnectionBucket** bucket);
-
     void GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response);
 
     void CollectGarbage(uint32_t current_time, LocalPool& local_pool);
 
 private:
+    struct _LockPointer {
+        ConnectionBucket* bucket;
+        OneConnection* connection;
+
+        _LockPointer(ConnectionBucket* bucket, OneConnection* conn) : bucket(bucket), connection(conn) {
+            if (bucket) bucket->mutex.lock();
+        }
+        ~_LockPointer() {
+            if (bucket) bucket->mutex.unlock();
+        }
+
+        operator bool() const {
+            return bucket != nullptr && connection != nullptr;
+        }
+
+        bool operator==(const _LockPointer& other) const {
+            return bucket == other.bucket && connection == other.connection;
+        }
+    };
+
+public:
+    using LockPointer = std::shared_ptr<_LockPointer>;
+    LockPointer FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time, bool create);
+
 private:
     ConnectionBucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;

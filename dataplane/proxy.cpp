@@ -383,27 +383,25 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
                                                                uint32_t seq,
                                                                uint32_t ack)
 {
-    OneConnection* connection;
-    ConnectionBucket* bucket;
-    if (service_connections_[service_id].Find(src_addr, src_port, current_time, false, &connection, &bucket))
+    auto conn_ptr = service_connections_[service_id].FindAndLock(src_addr, src_port, current_time, false);
+    if (conn_ptr)
     {
         ActionClientOnAck_Forward result;
-        UnpackKeyConnection(connection->local, result.local_addr, result.local_port);
+        UnpackKeyConnection(conn_ptr->connection->local, result.local_addr, result.local_port);
         result.add_proxy_header = false;
-        result.shift_ack = -connection->shift_server;
+        result.shift_ack = -conn_ptr->connection->shift_server;
         result.shift_seq = 0;
 
-        if (connection->state == ConnectionState::SENT_PROXY_HEADER)
+        if (conn_ptr->connection->state == ConnectionState::SENT_PROXY_HEADER)
         {
             YANET_LOG_WARNING("\t\t\tchange state from SENT_PROXY_HEADER -> ESTABLISHED\n");
-            connection->state = ConnectionState::ESTABLISHED;
+            conn_ptr->connection->state = ConnectionState::ESTABLISHED;
             result.add_proxy_header = service.proxy_header;
             if (result.add_proxy_header)
             {
                 result.shift_seq = -int(sizeof(proxy_v2_ipv4_hdr));
             }
         }
-        bucket->Unlock();
 
         return result;
     }
@@ -412,20 +410,22 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
     auto syn_ptr = syn_connections_[service_id].FindAndLock(src_addr, src_port, current_time);
     if (syn_ptr)
     {
-        // todo - Try add to connections, can fail !!!!
-        if (!service_connections_[service_id].Find(src_addr, src_port, current_time, true, &connection, &bucket))
-        {
-            YANET_LOG_WARNING("failed insert to connections\n");
-            return ActionDrop{0};
-        }
-        connection->local = syn_ptr->connection->local;
-        connection->shift_server = 0;
-        connection->state = ConnectionState::ESTABLISHED;
-        bucket->Unlock();
-
         uint32_t local_addr;
         uint16_t local_port;
-        UnpackKeyConnection(connection->local, local_addr, local_port);
+        // todo - Try add to connections, can fail !!!!
+        {
+            auto conn_ptr = service_connections_[service_id].FindAndLock(src_addr, src_port, current_time, true);
+            if (!conn_ptr)
+            {
+                YANET_LOG_WARNING("failed insert to connections\n");
+                return ActionDrop{0};
+            }
+            conn_ptr->connection->local = syn_ptr->connection->local;
+            conn_ptr->connection->shift_server = 0;
+            conn_ptr->connection->state = ConnectionState::ESTABLISHED;
+            UnpackKeyConnection(conn_ptr->connection->local, local_addr, local_port);
+        }   
+
         ActionClientOnAck_Forward result;
         result.local_addr = local_addr;
         result.local_port = local_port;
@@ -464,15 +464,18 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
     // can fail!
 
     // Add to connections
-    if (!service_connections_[service_id].Find(src_addr, src_port, current_time, true, &connection, &bucket))
     {
-        YANET_LOG_WARNING("failed insert to connections\n");
-        return ActionDrop{0};
+        auto conn_ptr = service_connections_[service_id].FindAndLock(src_addr, src_port, current_time, true);
+        if (!conn_ptr)
+        {
+            YANET_LOG_WARNING("failed insert to connections\n");
+            local_pools_[service_id].Free(local->first, local->second);
+            return ActionDrop{0};
+        }
+        conn_ptr->connection->local = KeyConnection(std::get<0>(*local), std::get<1>(*local));
+        conn_ptr->connection->state = ConnectionState::SENT_SYN_SERVER;
+        conn_ptr->connection->sent_seq = rte_cpu_to_be_32(ack) - 1;
     }
-    connection->local = KeyConnection(std::get<0>(*local), std::get<1>(*local));
-    connection->state = ConnectionState::SENT_SYN_SERVER;
-    connection->sent_seq = rte_cpu_to_be_32(ack) - 1;
-    bucket->Unlock();
 
     ActionClientOnAck_NewServerConnection new_server_connection;
     new_server_connection.local_addr = std::get<0>(*local);
@@ -522,19 +525,17 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_servi
     }
 
     // find in connections
-    OneConnection* connection;
-    ConnectionBucket* bucket;
-    if (!service_connections_[service_id].Find(client_addr, client_port, current_time, false, &connection, &bucket))
+    auto conn_ptr = service_connections_[service_id].FindAndLock(client_addr, client_port, current_time, false);
+    if (!conn_ptr)
     {
         YANET_LOG_WARNING("not found in connections\n");
         return ActionDrop{0};
     }
 
-    connection->shift_server = connection->sent_seq - rte_be_to_cpu_32(seq);
-    connection->state = ConnectionState::SENT_PROXY_HEADER;
-    YANET_LOG_WARNING("\t\tshift_seq=%u\n", connection->shift_server);
-    uint32_t sent_seq = connection->sent_seq;
-    bucket->Unlock();
+    conn_ptr->connection->shift_server = conn_ptr->connection->sent_seq - rte_be_to_cpu_32(seq);
+    conn_ptr->connection->state = ConnectionState::SENT_PROXY_HEADER;
+    YANET_LOG_WARNING("\t\tshift_seq=%u\n", conn_ptr->connection->shift_server);
+    uint32_t sent_seq = conn_ptr->connection->sent_seq;
 
     return ActionServerOnSynAck_AckToClient{
 	    .client_addr = client_addr,
@@ -562,30 +563,25 @@ ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_service_id_
 
 
     // find in connections
-    OneConnection* connection;
-    ConnectionBucket* bucket;
-    if (!service_connections_[service_id].Find(client_addr, client_port, current_time, false, &connection, &bucket))
+    auto conn_ptr = service_connections_[service_id].FindAndLock(client_addr, client_port, current_time, false);
+    if (!conn_ptr)
     {
         YANET_LOG_WARNING("not found in connections\n");
         return ActionDrop{0};
     }
 
-    if (connection->state == ConnectionState::SENT_PROXY_HEADER)
+    if (conn_ptr->connection->state == ConnectionState::SENT_PROXY_HEADER)
     {
-        bucket->Unlock();
         YANET_LOG_ERROR("unimplemented\n");
         return ActionDrop{0};
-
     }
     else
     {
         // state == ESTABLISHED
-        
         ActionServerOnAck_Forward forward;
         forward.dst_addr = client_addr;
         forward.dst_port = client_port;
-        forward.shift_seq = connection->shift_server;
-        bucket->Unlock();        
+        forward.shift_seq = conn_ptr->connection->shift_server;
         return forward;
     }
 }
@@ -645,31 +641,32 @@ void ConnectionBucket::Unlock()
     mutex.unlock();
 }
 
-bool ServiceConnections::Find(uint32_t addr, uint16_t port, uint32_t current_time, bool create, OneConnection** connection, ConnectionBucket** bucket)
+ServiceConnections::LockPointer ServiceConnections::FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time, bool create)
 {
     if (number_buckets_ == 0)
     {
-        return false;
+        return LockPointer{};
     }
 
     uint64_t key = KeyConnection(addr, port);
     uint32_t bucket_index = key & (number_buckets_ - 1);
     uint32_t record_index = ConnectionBucket::bucket_size;
-    *bucket = &buckets_[bucket_index];
-    (*bucket)->Lock();
+    ConnectionBucket* bucket = &buckets_[bucket_index];
+    bucket->Lock();
 
     for (uint32_t index = 0; index < ConnectionBucket::bucket_size; index++)
     {
-        *connection = &(*bucket)->connections[index];
-        if (!(*connection)->IsExpired(current_time))    // todo - check time = 0
+        OneConnection* connection = &bucket->connections[index];
+        if (!connection->IsExpired(current_time))    // todo - check time = 0
         {
             // time ok
-            if ((*connection)->client == key)
+            if (connection->client == key)
             {
-                return true;
+                bucket->Unlock();
+                return std::make_shared<_LockPointer>(bucket, connection);
             }
         }
-        else if ((*connection)->local == 0 && record_index == ConnectionBucket::bucket_size)
+        else if (connection->local == 0 && record_index == ConnectionBucket::bucket_size)
         {
             record_index = index;
         }
@@ -677,16 +674,17 @@ bool ServiceConnections::Find(uint32_t addr, uint16_t port, uint32_t current_tim
 
     if (!create || record_index == ConnectionBucket::bucket_size)
     {
-        (*bucket)->Unlock();
-        return false;
+        bucket->Unlock();
+        return LockPointer{};
     }
 
-    *connection = &(*bucket)->connections[record_index];
-    (*connection)->Clear();
-    (*connection)->client = key;
-    (*connection)->last_time = current_time;
+    OneConnection* connection = &bucket->connections[record_index];
+    connection->Clear();
+    connection->client = key;
+    connection->last_time = current_time;
 
-    return true;
+    bucket->Unlock();
+    return std::make_shared<_LockPointer>(bucket, connection);
 }
 
 void ServiceConnections::GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response)

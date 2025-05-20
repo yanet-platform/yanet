@@ -53,14 +53,14 @@ public:
     void CollectGarbage(uint32_t current_time, LocalPool& local_pool);
 
 private:
-    struct _Pointer {
+    struct _LockPointer {
         SynBucket* bucket;
         OneSynConnection* connection;
 
-        _Pointer(SynBucket* bucket, OneSynConnection* conn) : bucket(bucket), connection(conn) {
+        _LockPointer(SynBucket* bucket, OneSynConnection* conn) : bucket(bucket), connection(conn) {
             if (bucket) bucket->mutex.lock();
         }
-        ~_Pointer() {
+        ~_LockPointer() {
             if (bucket) bucket->mutex.unlock();
         }
 
@@ -68,15 +68,15 @@ private:
             return bucket != nullptr && connection != nullptr;
         }
 
-        bool operator==(const _Pointer& other) const {
+        bool operator==(const _LockPointer& other) const {
             return bucket == other.bucket && connection == other.connection;
         }
     };
     
 public:
-    using Pointer = std::shared_ptr<_Pointer>;
-    Pointer FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time);
-    void Remove(Pointer ptr);   // todo - error result
+    using LockPointer = std::shared_ptr<_LockPointer>;
+    LockPointer FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time);
+    void Remove(LockPointer ptr);   // todo - error result
 
 private:
     SynBucket* buckets_ = nullptr;
