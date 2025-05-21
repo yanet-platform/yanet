@@ -652,7 +652,8 @@ ServiceConnections::LockPointer ServiceConnections::FindAndLock(uint32_t addr, u
     uint32_t bucket_index = key & (number_buckets_ - 1);
     uint32_t record_index = ConnectionBucket::bucket_size;
     ConnectionBucket* bucket = &buckets_[bucket_index];
-    bucket->Lock();
+
+    LockPointer ptr = std::make_shared<_LockPointer>(bucket, nullptr);
 
     for (uint32_t index = 0; index < ConnectionBucket::bucket_size; index++)
     {
@@ -662,8 +663,8 @@ ServiceConnections::LockPointer ServiceConnections::FindAndLock(uint32_t addr, u
             // time ok
             if (connection->client == key)
             {
-                bucket->Unlock();
-                return std::make_shared<_LockPointer>(bucket, connection);
+                ptr->connection = connection;
+                return ptr;
             }
         }
         else if (connection->local == 0 && record_index == ConnectionBucket::bucket_size)
@@ -674,7 +675,6 @@ ServiceConnections::LockPointer ServiceConnections::FindAndLock(uint32_t addr, u
 
     if (!create || record_index == ConnectionBucket::bucket_size)
     {
-        bucket->Unlock();
         return LockPointer{};
     }
 
@@ -683,8 +683,8 @@ ServiceConnections::LockPointer ServiceConnections::FindAndLock(uint32_t addr, u
     connection->client = key;
     connection->last_time = current_time;
 
-    bucket->Unlock();
-    return std::make_shared<_LockPointer>(bucket, connection);
+    ptr->connection = connection;
+    return ptr;
 }
 
 void ServiceConnections::GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response)

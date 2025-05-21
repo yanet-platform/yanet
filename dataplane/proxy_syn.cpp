@@ -97,19 +97,19 @@ ServiceSynConnections::LockPointer ServiceSynConnections::FindAndLock(uint32_t a
     uint64_t key = KeyConnection(addr, port);
     SynBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
 
-    bucket->mutex.lock();
+    LockPointer ptr = std::make_shared<_LockPointer>(bucket, nullptr);
+
     for (uint32_t index = 0; index < SynBucket::bucket_size; index++)
     {
         OneSynConnection* connection = &bucket->connections[index];
         if (key == connection->client && !connection->IsExpired(current_time))
         {
             connection->last_time = current_time;
-            bucket->mutex.unlock();
-            return std::make_shared<_LockPointer>(bucket, connection);
+            ptr->connection = connection;
+            return ptr;
         }
     }
 
-    bucket->mutex.unlock();
     return LockPointer{};
 }
 
