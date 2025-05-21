@@ -63,9 +63,9 @@ bool ServiceSynConnections::TryInsert(uint32_t client_addr, uint16_t client_port
     {
         if (!bucket.connections[index].IsExpired(current_time))
         {
-            // time ok
             if (bucket.connections[index].client == key)
             {
+                bucket.connections[index].last_time = current_time;
                 return true;
             }
         }
@@ -80,6 +80,7 @@ bool ServiceSynConnections::TryInsert(uint32_t client_addr, uint16_t client_port
         return false;
     }
 
+    bucket.connections[record_index].Clear();
     bucket.connections[record_index].client = key;
     bucket.connections[record_index].local = KeyConnection(local_addr, local_port);
     bucket.connections[record_index].last_time = current_time;

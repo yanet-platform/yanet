@@ -235,8 +235,12 @@ struct ConnectionBucket
 
 class ServiceConnections
 {
-public:
+    public:
     bool Initialize(proxy_service_id_t service_id, uint32_t number_buckets, dataplane::memory_manager* memory_manager);
+    
+    bool TryInsert(uint32_t client_addr, uint16_t client_port,
+                    uint32_t local_addr, uint16_t local_port,
+                    ConnectionState state, uint32_t sent_seq, uint32_t current_time);
 
     void GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response);
 
@@ -265,7 +269,7 @@ private:
 
 public:
     using LockPointer = std::shared_ptr<_LockPointer>;
-    LockPointer FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time, bool create);
+    LockPointer FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time);
 
 private:
     ConnectionBucket* buckets_ = nullptr;
