@@ -294,6 +294,7 @@ public:
     // Info
     common::idp::proxy_connections::response GetConnections(std::optional<proxy_service_id_t> service_id);
     common::idp::proxy_syn::response GetSyn(std::optional<proxy_service_id_t> service_id);
+    common::idp::proxy_local_pool::response GetLocalPool(std::optional<proxy_service_id_t> service_id);
 
     // Action from worker
     ActionClientOnSyn_Result ActionClientOnSyn(proxy_service_id_t service_id,

@@ -71,4 +71,25 @@ void syn(std::optional<proxy_service_id_t> service_id)
 
 	table.Print();
 }
+
+void local_pool(std::optional<proxy_service_id_t> service_id)
+{
+	interface::dataPlane dataplane;
+	const auto response = dataplane.proxy_local_pool(service_id);
+
+	TablePrinter table;
+	table.insert_row("service_id",
+					 "prefix",
+					 "total_addresses",
+					 "free_addresses",
+					 "used_addresses");
+
+	for (const auto& [service_id, prefix, total_addresses, free_addresses, used_addresses] : response)
+	{
+		table.insert_row(service_id, prefix, total_addresses, free_addresses, used_addresses);
+	}
+
+	table.Print();
+}
+
 }

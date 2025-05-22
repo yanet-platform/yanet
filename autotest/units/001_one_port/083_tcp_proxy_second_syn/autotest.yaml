@@ -16,3 +16,4 @@ steps:
 
 - cli:
   - proxy syn
+  - proxy local_pool

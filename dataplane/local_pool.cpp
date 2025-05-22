@@ -41,6 +41,9 @@ bool LocalPool::Init(proxy_service_id_t service_id, dataplane::memory_manager* m
     }
     connection_queue_[num_connections_ - 1].next_idx = 0xffffffff;
 
+    free_addresses_ = num_connections_;
+    used_addresses_ = 0;
+
     initialized_ = true;
 
     return true;
@@ -106,6 +109,9 @@ std::optional<std::pair<uint32_t, tPortId>> LocalPool::Allocate(uint32_t client_
     info.address = client_addr;
     info.port = client_port;
 
+    free_addresses_--;
+    used_addresses_++;
+
     return res;
 }
 
@@ -126,6 +132,9 @@ void LocalPool::Free(uint32_t address, tPortId port)
     info.is_used = 0;
     info.next_idx = first_connection_idx_;
     first_connection_idx_ = idx;
+
+    free_addresses_++;
+    used_addresses_--;
 }
 
 std::optional<std::pair<uint32_t, tPortId>> LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) const
@@ -152,6 +161,15 @@ std::optional<std::pair<uint32_t, tPortId>> LocalPool::FindClientByLocal(uint32_
     }
     YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: found, local_addr=%s local_port=%d idx=%d\n", common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx);
     return std::make_pair(info.address, info.port);
+}
+
+void LocalPool::GetLocalPool(proxy_service_id_t service_id, common::idp::proxy_local_pool::response& response) const {
+    if (unlikely(!initialized_))
+    {
+        return;
+    }
+
+    response.emplace_back(service_id, common::ipv4_prefix_t{prefix_.address.address, prefix_.mask}, num_connections_, free_addresses_, used_addresses_);
 }
 
 inline std::pair<uint32_t, tPortId> LocalPool::index_to_tuple(uint32_t index) const

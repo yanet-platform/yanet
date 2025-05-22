@@ -330,6 +330,25 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(std::optional<proxy_
     return response;
 }
 
+common::idp::proxy_local_pool::response TcpConnectionStore::GetLocalPool(std::optional<proxy_service_id_t> service_id)
+{
+    common::idp::proxy_local_pool::response response;
+    std::lock_guard guard(mutex_);
+
+    if (!service_id.has_value())
+    {
+        for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+        {
+            local_pools_[index].GetLocalPool(index, response);
+        }
+    }
+    else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    {
+        local_pools_[*service_id].GetLocalPool(*service_id, response);
+    }
+
+    return response;
+}
 
 // Action from worker
 ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,

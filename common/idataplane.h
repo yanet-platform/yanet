@@ -155,6 +155,11 @@ public:
 		return get<common::idp::requestType::proxy_syn, common::idp::proxy_syn::response>(request);
 	}
 
+	auto proxy_local_pool(const common::idp::proxy_local_pool::request& request) const
+	{
+		return get<common::idp::requestType::proxy_local_pool, common::idp::proxy_local_pool::response>(request);
+	}
+
 	auto limits() const
 	{
 		return get<common::idp::requestType::limits, common::idp::limits::response>();
