@@ -216,8 +216,8 @@ void FillProxyHeader(proxy_v2_ipv4_hdr* proxy_header, uint32_t src_addr, tPortId
 
 void TcpConnectionStore::proxy_update(proxy_id_t proxy_id, const dataplane::globalBase::proxy_t& proxy)
 {
-    YANET_LOG_WARNING("proxy_update: proxy_id=%d, syn_type=%s, max_local_addresses=%d, mem_size_syn=%d, mem_size_connections=%d\n", proxy_id, from_proxy_type(proxy.syn_type), proxy.max_local_addresses, proxy.mem_size_syn, proxy.mem_size_connections);
-    YANET_LOG_WARNING("\ttimeout_syn=%d, timeout_connection=%d, timeout_fin=%d, flow=%s\n", proxy.timeout_syn, proxy.timeout_connection, proxy.timeout_fin, proxy.flow.to_string().c_str());
+    YANET_LOG_WARNING("proxy_update: proxy_id=%d\n", proxy_id);
+    YANET_LOG_WARNING("\ttimeout_syn_rto=%d, timeout_syn_recv=%d, timeout_established=%d, flow=%s\n", proxy.timeout_syn_rto, proxy.timeout_syn_recv, proxy.timeout_established, proxy.flow.to_string().c_str());
 }
 
 void TcpConnectionStore::proxy_remove(proxy_id_t proxy_id)
@@ -237,9 +237,9 @@ void TcpConnectionStore::proxy_add_local_pool(proxy_service_id_t service_id, con
 
 eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager)
 {
-    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, service=%s:%d, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
+    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, upstream=%s:%d, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
         service_id, common::ipv4_address_t(rte_cpu_to_be_32(service.proxy_addr.address)).toString().c_str(), service.proxy_port,
-        common::ipv4_address_t(rte_cpu_to_be_32(service.service_addr.address)).toString().c_str(), service.service_port, service.proxy_header, service.size_connections_table, service.size_syn_table);
+        common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr.address)).toString().c_str(), service.upstream_port, service.proxy_header, service.size_connections_table, service.size_syn_table);
 
     std::lock_guard guard(mutex_);
 
@@ -369,7 +369,7 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_service_id_
     local_pools_[service_id].Free(local->first, local->second);
 
     uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack_permitted, tcp_options.window_scaling, 0}); // ecn
-    uint32_t cookie = syn_cookies_.GetCookie(src_addr, service.service_addr.address, src_port, service.service_port, seq, cookie_data); // dst_addr, dst_port
+    uint32_t cookie = syn_cookies_.GetCookie(src_addr, service.upstream_addr.address, src_port, service.upstream_port, seq, cookie_data); // dst_addr, dst_port
     YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, seq);
 
     return ActionClientOnSyn_SynAckToClient{rte_cpu_to_be_32(cookie), add_cpu_32(seq, 1)};
@@ -435,7 +435,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
     
     // try check cookie
     uint32_t cookie_data;
-    uint32_t result = syn_cookies_.CheckCookie(rte_cpu_to_be_32(ack) - 1, src_addr, service.service_addr.address, src_port, service.service_port, add_cpu_32(seq, -1)); // dst_addr, dst_port
+    uint32_t result = syn_cookies_.CheckCookie(rte_cpu_to_be_32(ack) - 1, src_addr, service.upstream_addr.address, src_port, service.upstream_port, add_cpu_32(seq, -1)); // dst_addr, dst_port
     YANET_LOG_WARNING("\tresult=%d, cookie_data=%d, ack=%u, seq=%u\n", result, cookie_data, ack, seq);
 
     if (result == 0)
@@ -598,15 +598,16 @@ ConnectionBucket::ConnectionBucket()
     }
 }
 
-bool ServiceConnections::Initialize(proxy_service_id_t service_id, uint32_t number_buckets, dataplane::memory_manager* memory_manager)
+bool ServiceConnections::Initialize(proxy_service_id_t service_id, uint32_t number_connections, dataplane::memory_manager* memory_manager)
 {
     if (initialized_)
     {
         return true;
     }
 
+    uint32_t number_buckets = number_connections / ConnectionBucket::bucket_size;
     size_t mem_size = number_buckets * sizeof(ConnectionBucket);
-    YANET_LOG_WARNING("ServiceConnections::Initialize number_buckets=%d, mem_size=%ld\n", number_buckets, mem_size);
+    YANET_LOG_WARNING("ServiceConnections::Initialize number_connections=%d, number_buckets=%d, mem_size=%ld\n", number_connections, number_buckets, mem_size);
 
     tSocketId socket_id = 0; // todo !!!
     std::string name = "tcp_proxy.connections." + std::to_string(service_id);

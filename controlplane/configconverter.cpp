@@ -756,7 +756,7 @@ void config_converter_t::processProxy()
 			throw error_result_t(eResult::invalidFlow, "invalid flow type for proxy: " + std::to_string(unsigned(proxy.flow.type)));
 		}
 
-		if (proxy.local_pool.empty() && !proxy.services.empty())
+		if (proxy.upstream_nets.empty() && !proxy.services.empty())
 		{
 			throw error_result_t(eResult::invalidFlow, "empty local pool for proxy");
 		}
@@ -1956,8 +1956,8 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 			acl.nextModuleRules.emplace_back(client_rule_network, rule_ping, flow);
 		}
 
-		controlplane::base::acl_rule_network_ipv4_t server_rule_network({common::ipv4_prefix_t(service.service_addr)}, {common::ipv4_prefix_default});
-		controlplane::base::acl_rule_transport_tcp_t server_rule_transport{range_t{service.service_port}, range_t{0x0000, 0xFFFF}};
+		controlplane::base::acl_rule_network_ipv4_t server_rule_network({common::ipv4_prefix_t(service.upstream_addr)}, {common::ipv4_prefix_default});
+		controlplane::base::acl_rule_transport_tcp_t server_rule_transport{range_t{service.upstream_port}, range_t{0x0000, 0xFFFF}};
 
 		{
 			// server_syn_ack

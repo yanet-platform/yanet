@@ -16,20 +16,21 @@ inline void UnpackKeyConnection(uint64_t key, uint32_t& addr, uint16_t& port)
     addr = key >> 16;
 }
 
-bool ServiceSynConnections::Initialize(proxy_service_id_t service_id, uint32_t number_buckets, dataplane::memory_manager* memory_manager)
+bool ServiceSynConnections::Initialize(proxy_service_id_t service_id, uint32_t number_syns, dataplane::memory_manager* memory_manager)
 {
     if (initialized_)
     {
         return true;
     }
-    else if (number_buckets == 0)
+    else if (number_syns == 0)
     {
         number_buckets_ = 0;
         return true;
     }
 
+    uint32_t number_buckets = number_syns / SynBucket::bucket_size;
     size_t mem_size = number_buckets * sizeof(SynBucket);
-    YANET_LOG_WARNING("ServiceSynConnections::Initialize number_buckets=%d, mem_size=%ld\n", number_buckets, mem_size);
+    YANET_LOG_WARNING("ServiceSynConnections::Initialize number_syns=%d, number_buckets=%d, mem_size=%ld\n", number_syns, number_buckets, mem_size);
 
     tSocketId socket_id = 0; // todo !!!
     std::string name = "tcp_proxy.syn_connections." + std::to_string(service_id);

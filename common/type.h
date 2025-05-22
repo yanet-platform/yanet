@@ -56,52 +56,6 @@ enum class eDscpMarkType : uint8_t
 	always,
 };
 
-enum class proxySynType : uint8_t
-{
-	only_table,
-	syn_cookie,
-	mixed,
-};
-
-[[maybe_unused]] static std::optional<common::proxySynType> to_proxy_type(const std::string& string)
-{
-	if (string == "only_table")
-	{
-		return common::proxySynType::only_table;
-	}
-	else if (string == "syn_cookie")
-	{
-		return common::proxySynType::syn_cookie;
-	}
-	else if (string == "mixed")
-	{
-		return common::proxySynType::mixed;
-	}
-
-	return std::nullopt;
-}
-
-[[maybe_unused]] constexpr const char* from_proxy_type(const common::proxySynType& proto)
-{
-	switch (proto)
-	{
-		case common::proxySynType::only_table:
-		{
-			return "only_table";
-		}
-		case common::proxySynType::syn_cookie:
-		{
-			return "syn_cookie";
-		}
-		case common::proxySynType::mixed:
-		{
-			return "mixed";
-		}
-	}
-
-	return "unknown";
-}
-
 template<typename type_t,
          type_t default_value = 0>
 class default_value_t

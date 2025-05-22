@@ -2639,7 +2639,7 @@ eResult generation::update_host_config(const common::idp::updateGlobalBase::upda
 
 eResult generation::proxy_update(const common::idp::updateGlobalBase::proxy_update::request& request)
 {
-	auto [proxy_id, syn_type, max_local_addresses, mem_size_syn, mem_size_connections, timeout_syn, timeout_connection, timeout_fin, flow] = request;
+	auto [proxy_id, timeout_syn_rto, timeout_syn_recv, timeout_established, flow] = request;
 	// YANET_LOG_WARNING("proxy_update: proxy_id=%d, syn_type=%s, max_local_addresses=%d, mem_size_syn=%d, mem_size_connections=%d, timeout_syn=%d, timeout_connection=%d, timeout_fin=%d, flow=%s\n",
 	// 	proxy_id, from_proxy_type(syn_type), max_local_addresses, mem_size_syn, mem_size_connections, timeout_syn, timeout_connection, timeout_fin, flow.to_string().c_str());
 
@@ -2664,13 +2664,9 @@ eResult generation::proxy_update(const common::idp::updateGlobalBase::proxy_upda
 
 	auto& proxy = proxies[proxy_id];
 
-	proxy.syn_type = syn_type;
-	proxy.max_local_addresses = max_local_addresses;
-	proxy.mem_size_syn = mem_size_syn;
-	proxy.mem_size_connections = mem_size_connections;
-	proxy.timeout_syn = timeout_syn;
-	proxy.timeout_connection = timeout_connection;
-	proxy.timeout_fin = timeout_fin;
+	proxy.timeout_syn_rto = timeout_syn_rto;
+	proxy.timeout_syn_recv = timeout_syn_recv;
+	proxy.timeout_established = timeout_established;
 
 	proxy.flow = flow;
 
@@ -2699,7 +2695,7 @@ eResult generation::proxy_add_local_pool(const common::idp::updateGlobalBase::pr
 
 eResult generation::proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request)
 {
-	auto [service_id, counter_id, proxy_addr, proxy_port, service_addr, service_port, proxy_header, size_connections_table, size_syn_table, use_sack, mss, winscale] = request;
+	auto [service_id, counter_id, proxy_addr, proxy_port, upstream_addr, upstream_port, proxy_header, size_connections_table, size_syn_table, use_sack, mss, ecn, winscale] = request;
 	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, counter_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
 	// 	service_id, counter_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port, proxy_header, size_connections_table, size_syn_table);
 
@@ -2719,14 +2715,15 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 
 	service.proxy_addr = ipv4_address_t::convert(proxy_addr.get_ipv4());
 	service.proxy_port = proxy_port;
-	service.service_addr = ipv4_address_t::convert(service_addr.get_ipv4());
-	service.service_port = service_port;
+	service.upstream_addr = ipv4_address_t::convert(upstream_addr.get_ipv4());
+	service.upstream_port = upstream_port;
 	service.counter_id = counter_id;
 	service.proxy_header = proxy_header;
 	service.size_connections_table = size_connections_table;
 	service.size_syn_table = size_syn_table;
 	service.use_sack = use_sack;
 	service.mss = mss;
+	service.ecn = ecn;
 	service.winscale = winscale;
 
 	return tcp_connection_store->proxy_service_update(service_id, service, &dataPlane->memory_manager);

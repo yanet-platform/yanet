@@ -57,7 +57,7 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
             {
                 for (const auto& service : config.services)
                 {
-                    for (const auto& prefix : config.local_pool)
+                    for (const auto& prefix : config.upstream_nets)
                     {
                         AddPrefixToPool(globalbase, service.service_id, prefix);
                     }
@@ -88,9 +88,9 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
 
             for (auto iter_serv_next : services_next)
             {
-                for (const auto& prefix : config.local_pool)
+                for (const auto& prefix : config.upstream_nets)
                 {
-                    if (iter_prev->second.local_pool.count(prefix) == 0)
+                    if (iter_prev->second.upstream_nets.count(prefix) == 0)
                     {
                         AddPrefixToPool(globalbase, iter_serv_next.second->service_id, prefix);
                     }
@@ -243,13 +243,9 @@ void proxy_t::AddRequestUpdateProxy(common::idp::updateGlobalBase::request& glob
 {
 	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_update,
 	                        common::idp::updateGlobalBase::proxy_update::request{proxy_id,
-	                                                                             config.syn_type,
-	                                                                             config.max_local_addresses,
-	                                                                             config.mem_size_syn,
-	                                                                             config.mem_size_connections,
-	                                                                             config.timeout_syn,
-	                                                                             config.timeout_connection,
-	                                                                             config.timeout_fin,
+                                                                                 config.timeout_syn_rto,
+	                                                                             config.timeout_syn_recv,
+	                                                                             config.timeout_established,
 	                                                                             config.flow});
 }
 
@@ -260,13 +256,14 @@ void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& gl
 	                                                                                     0,
 	                                                                                     config.proxy_addr,
 	                                                                                     config.proxy_port,
-	                                                                                     config.service_addr,
-	                                                                                     config.service_port,
+	                                                                                     config.upstream_addr,
+	                                                                                     config.upstream_port,
                                                                                          config.proxy_header,
                                                                                          config.size_connections_table,
                                                                                          config.size_syn_table,
                                                                                          config.use_sack,
                                                                                          config.mss,
+                                                                                         config.ecn,
                                                                                          config.winscale});
 }
 

@@ -318,7 +318,7 @@ class service_t
 public:
 	service_t() = default;
 
-	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, service_addr, service_port, blacklist, proxy_header, size_connections_table, size_syn_table, use_sack, mss, winscale);
+	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, upstream_addr, upstream_port, blacklist, proxy_header, size_connections_table, size_syn_table, use_sack, mss, ecn, winscale);
 
 public:
 	proxy_service_id_t service_id;
@@ -326,14 +326,15 @@ public:
     // "proto": "tcp",
 	common::ip_address_t proxy_addr;
     tPortId proxy_port;
-    common::ip_address_t service_addr;
-    tPortId service_port;
+    common::ip_address_t upstream_addr;
+    tPortId upstream_port;
     std::set<common::ip_prefix_t> blacklist;
 	bool proxy_header;
 	uint32_t size_connections_table;
 	uint32_t size_syn_table;
 	bool use_sack;
 	uint32_t mss;
+	bool ecn;
 	uint32_t winscale;
 
 	std::pair<common::ip_address_t, tPortId> Key() const
@@ -347,23 +348,18 @@ class config_t
 public:
 	config_t() = default;
 
-	SERIALIZABLE(proxy_id, syn_type, services, local_pool, max_local_addresses, mem_size_syn, mem_size_connections, timeout_syn, timeout_connection, timeout_fin, nextModule, flow);
+	SERIALIZABLE(proxy_id, services, upstream_nets, timeout_syn_rto, timeout_syn_recv, timeout_established, nextModule, flow);
 
 public:
 	proxy_id_t proxy_id;
 
-	common::proxySynType syn_type{common::proxySynType::mixed};
-	uint32_t max_local_addresses;
-	uint32_t mem_size_syn;
-	uint32_t mem_size_connections;
-	
-	std::set<common::ip_prefix_t> local_pool;
+	std::set<common::ip_prefix_t> upstream_nets;
 
 	std::vector<service_t> services;
 	
-	uint32_t timeout_syn;
-	uint32_t timeout_connection;
-	uint32_t timeout_fin;
+	uint32_t timeout_syn_rto;
+	uint32_t timeout_syn_recv;
+	uint32_t timeout_established;
 
 	std::string nextModule;
 	common::globalBase::tFlow flow;

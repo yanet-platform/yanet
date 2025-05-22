@@ -236,7 +236,7 @@ struct ConnectionBucket
 class ServiceConnections
 {
     public:
-    bool Initialize(proxy_service_id_t service_id, uint32_t number_buckets, dataplane::memory_manager* memory_manager);
+    bool Initialize(proxy_service_id_t service_id, uint32_t number_connections, dataplane::memory_manager* memory_manager);
     
     bool TryInsert(uint32_t client_addr, uint16_t client_port,
                     uint32_t local_addr, uint16_t local_port,

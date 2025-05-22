@@ -1114,35 +1114,26 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 
 	auto& proxy = baseNext.proxies[moduleId];
 
-	if (exist(moduleJson, "syn_type"))
+	if (exist(moduleJson, "upstreamNets"))
 	{
-		std::string str_syn_type = moduleJson["syn_type"].get<std::string>();
-		std::optional<common::proxySynType> syn_type = common::to_proxy_type(str_syn_type);
-		if (syn_type.has_value())
+		for (const auto& ipPrefixJson : moduleJson["upstreamNets"])
 		{
-			proxy.syn_type = syn_type.value();
-		}
-		else
-		{
-			throw error_result_t(eResult::invalidType, "unknown syn_type: " + str_syn_type);
-		}
-		
-	}
-
-	if (exist(moduleJson, "local_pool"))
-	{
-		for (const auto& ipPrefixJson : moduleJson["local_pool"])
-		{
-			proxy.local_pool.emplace(ipPrefixJson.get<std::string>());
+			proxy.upstream_nets.emplace(ipPrefixJson.get<std::string>());
 		}
 	}
 	
-	proxy.max_local_addresses = moduleJson.value("max_local_addresses", YANET_PROXY_MAX_LOCAL_ADDRESSES);
-	proxy.mem_size_syn = moduleJson.value("mem_size_syn", YANET_PROXY_DEFAULT_MEM_SIZE_TABLE_SYN);
-	proxy.mem_size_connections = moduleJson.value("mem_size_connections", YANET_PROXY_DEFAULT_MEM_SIZE_TABLE_CONNECTIONS);
-	proxy.timeout_syn = moduleJson.value("timeout_syn", YANET_PROXY_DEFAULT_TIMEOUT_SYN);
-	proxy.timeout_connection = moduleJson.value("timeout_connection", YANET_PROXY_DEFAULT_TIMEOUT_CONNECTION);
-	proxy.timeout_fin = moduleJson.value("timeout_fin", YANET_PROXY_DEFAULT_TIMEOUT_CONNECTION_FIN);
+	if (exist(moduleJson, "timeouts"))
+	{
+		proxy.timeout_syn_rto = moduleJson["timeouts"].value("SYNRTO", YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO);
+		proxy.timeout_syn_recv = moduleJson["timeouts"].value("SYNRecv", YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV);
+		proxy.timeout_established = moduleJson["timeouts"].value("established", YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED);
+	} 
+	else
+	{
+		proxy.timeout_syn_rto = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO;
+		proxy.timeout_syn_recv = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV;
+		proxy.timeout_established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED;
+	}
 
 	if (exist(moduleJson, "services"))
 	{
@@ -1234,7 +1225,7 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 		controlplane::proxy::service_t service;
 		service.service_id = baseNext.proxy_services_count + 1;
 
-		std::vector<std::string> required_parameters = {"proxy_addr", "proxy_port", "service_addr", "service_port"};
+		std::vector<std::string> required_parameters = {"proxyAddress", "proxyPort", "upstreamAddress", "upstreamPort", "sizeConnectionsTable", "sizeSYNTable"};
 		for (const auto& parameter : required_parameters)
 		{
 			if (!exist(service_json, parameter))
@@ -1244,15 +1235,20 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 		}
 
 		service.service = service_json.value("service", "");
-		service.proxy_addr = common::ip_address_t(service_json["proxy_addr"]);
-		service.proxy_port = service_json["proxy_port"];
-		service.service_addr = common::ip_address_t(service_json["service_addr"]);
-		service.service_port = service_json["service_port"];
-		service.proxy_header = service_json.value("proxy_header", true);
-		service.size_connections_table = service_json["size_connections_table"];	// todo - check power 2
-		service.size_syn_table = service_json.value("size_syn_table", 0);
-		service.use_sack = service_json.value("use_sack", true);
+		service.proxy_addr = common::ip_address_t(service_json["proxyAddress"]);
+		service.proxy_port = service_json["proxyPort"];
+		service.upstream_addr = common::ip_address_t(service_json["upstreamAddress"]);
+		service.upstream_port = service_json["upstreamPort"];
+		service.proxy_header = service_json.value("proxyHeader", true);
+		service.size_connections_table = service_json["sizeConnectionsTable"];
+		if (service.size_connections_table & 1)
+			throw error_result_t(eResult::invalidConfigurationFile, "sizeConnectionsTable must be power of 2");
+		service.size_syn_table = service_json.value("sizeSYNTable", 0);
+		if (service.size_syn_table & 1)
+			throw error_result_t(eResult::invalidConfigurationFile, "sizeSYNTable must be power of 2");
+		service.use_sack = service_json.value("useSack", true);
 		service.mss = service_json.value("mss", 1462);
+		service.ecn = service_json.value("ecn", false);
 		service.winscale = service_json.value("winscale", 0);
 
 		if (exist(service_json, "blacklist"))
@@ -1265,7 +1261,7 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 				{
 					includePath = dirname(rootFilePath) + "/" + includePath;
 				}
-					std::ifstream includeFileStream(includePath);
+				std::ifstream includeFileStream(includePath);
 				if (!includeFileStream.is_open())
 				{
 					throw error_result_t(eResult::errorOpenFile, "can't open file " + includePath);

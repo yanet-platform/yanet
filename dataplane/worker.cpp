@@ -6181,13 +6181,13 @@ inline void cWorker::proxy_client_syn_handle()
 		else if (const auto syn_to_server = std::get_if<dataplane::proxy::ActionClientOnSyn_SynToServer>(&action))
 		{
 			ipv4Header->src_addr = syn_to_server->local_addr;
-			ipv4Header->dst_addr = service.service_addr.address;	// todo
+			ipv4Header->dst_addr = service.upstream_addr.address;	// todo
 			ipv4Header->hdr_checksum = 0;
 			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
 
 			tcp_header->sent_seq = syn_to_server->seq;
 			tcp_header->src_port = syn_to_server->local_port;
-			tcp_header->dst_port = rte_cpu_to_be_16(service.service_port);	// todo
+			tcp_header->dst_port = rte_cpu_to_be_16(service.upstream_port);	// todo
 			tcp_header->cksum = 0;
 			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
 		}
@@ -6295,7 +6295,7 @@ inline void cWorker::proxy_client_ack_handle()
 			// uint8_t buf_tcp_options[MAX_SIZE_TCP_OPTIONS];
 			new_server_connection->tcp_options.Write(mbuf);
 
-			ipv4Header->dst_addr = service.service_addr.address;
+			ipv4Header->dst_addr = service.upstream_addr.address;
 			ipv4Header->src_addr = new_server_connection->local_addr;
 			ipv4Header->time_to_live = 64;
 			ipv4Header->hdr_checksum = 0;
@@ -6305,7 +6305,7 @@ inline void cWorker::proxy_client_ack_handle()
 			tcp_header->recv_ack = 0;
 			tcp_header->tcp_flags = TCP_SYN_FLAG;
 			tcp_header->src_port = new_server_connection->local_port;
-			tcp_header->dst_port = rte_cpu_to_be_16(service.service_port);
+			tcp_header->dst_port = rte_cpu_to_be_16(service.upstream_port);
 
 			// uint8_t* buf_tcp_options = rte_pktmbuf_mtod_offset(mbuf, uint8_t*, metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
 			// memcpy(buf_tcp_options, new_server_connection->tcp_options, new_server_connection->tcp_options_size);
@@ -6347,13 +6347,13 @@ inline void cWorker::proxy_client_ack_handle()
 				dataplane::proxy::FillProxyHeader(proxy_header, ipv4Header->src_addr, tcp_header->src_port, service.proxy_addr.address, rte_cpu_to_be_16(service.proxy_port));
 			}
 
-			ipv4Header->dst_addr = service.service_addr.address;
+			ipv4Header->dst_addr = service.upstream_addr.address;
 			ipv4Header->src_addr = forward_to_server->local_addr;
 			ipv4Header->hdr_checksum = 0;
 			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
 
 			tcp_header->src_port = forward_to_server->local_port;
-			tcp_header->dst_port = rte_cpu_to_be_16(service.service_port);
+			tcp_header->dst_port = rte_cpu_to_be_16(service.upstream_port);
 			tcp_header->sent_seq = dataplane::proxy::add_cpu_32(tcp_header->sent_seq, forward_to_server->shift_seq);
 			tcp_header->recv_ack = dataplane::proxy::add_cpu_32(tcp_header->recv_ack, forward_to_server->shift_ack);
 			tcp_header->cksum = 0;
