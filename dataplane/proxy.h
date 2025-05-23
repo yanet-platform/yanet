@@ -45,7 +45,7 @@ private:
     bool CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected);
 };    
 
-void ShiftSAcks(rte_tcp_hdr* tcp_header, uint32_t shift);
+void ShiftTcpOptions(rte_tcp_hdr* tcp_header, uint32_t sack, uint32_t timestamp_value, uint32_t timestamp_echo);
 
 extern const uint8_t PROXY_V2_SIGNATURE[12];
 
@@ -154,6 +154,7 @@ struct ActionClientOnAck_Forward
     uint16_t local_port;
     uint32_t shift_seq;
     uint32_t shift_ack;
+    uint32_t shift_timestamp;
     bool add_proxy_header;
 };
 
@@ -174,6 +175,7 @@ struct ActionServerOnSynAck_AckToClient
     uint16_t client_port;
     uint32_t seq;
     uint32_t ack;
+    uint32_t timestamp_shift;
 };
 
 using ActionServerOnSynAck_Result = std::variant<ActionServerOnSynAck_SynAckToClient, ActionServerOnSynAck_AckToClient, ActionDrop>;
@@ -195,6 +197,7 @@ struct ActionServerOnAck_Forward
     uint32_t dst_addr;
     uint16_t dst_port;
     uint32_t shift_seq;
+    uint32_t timestamp_shift;
 };
 
 using ActionServerOnAck_Result = std::variant<ActionServerOnAck_ForwardFirst, ActionServerOnAck_Forward, ActionDrop>;
@@ -216,6 +219,8 @@ struct OneConnection
     ConnectionState state;
     uint32_t sent_seq;
     uint32_t shift_server;
+    uint32_t timestamp_echo;
+    uint32_t timestamp_shift;
         
     void Clear();
     bool IsExpired(uint32_t current_time);
@@ -240,7 +245,7 @@ class ServiceConnections
     
     bool TryInsert(uint32_t client_addr, uint16_t client_port,
                     uint32_t local_addr, uint16_t local_port,
-                    ConnectionState state, uint32_t sent_seq, uint32_t current_time);
+                    ConnectionState state, uint32_t sent_seq, uint32_t current_time, uint32_t timestamp_echo);
 
     void GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response);
 
@@ -311,7 +316,8 @@ public:
 	                                       uint32_t src_addr,
 	                                       uint16_t src_port,
 	                                       uint32_t seq,
-	                                       uint32_t ack);
+	                                       uint32_t ack,
+                                           uint32_t timestamp_echo);
 
     ActionServerOnSynAck_Result ActionServerOnSynAck(proxy_service_id_t service_id,
                                                  const dataplane::globalBase::proxy_service_t& service,
@@ -320,8 +326,7 @@ public:
 	                                             uint16_t dst_port,
 	                                             uint32_t seq,
 	                                             uint32_t ack,
-	                                             uint8_t* tcp_options,
-	                                             size_t tcp_options_size);
+                                                 const TcpOptions& tcp_options);
 
     ActionServerOnAck_Result ActionServerOnAck(proxy_service_id_t service_id,
                                            const dataplane::globalBase::proxy_service_t& service,

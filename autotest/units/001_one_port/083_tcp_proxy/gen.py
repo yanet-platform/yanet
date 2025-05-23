@@ -76,10 +76,14 @@ data_client2 = 'client second'
 data_server1 = 'server first'
 data_server2 = 'server second'
 
-options_client_syn = [("MSS", 1460), ("SAckOK", ''), ("Timestamp", (2983139994, 0)), ('WScale', 5), ("NOP", '')]
+ts_client = 2983139994
+ts_proxy = 1
+ts_server = 12345
+
+options_client_syn = [("MSS", 1460), ("SAckOK", ''), ("Timestamp", (ts_client, 0)), ('WScale', 5), ("NOP", '')]
 options_client_ack = [("Timestamp", (1, 2)), ("NOP", ''), ("NOP", '')]
-options_server_syn = [("MSS", 1260), ("SAckOK", ''), ("Timestamp", (123456789, 2983139994)), ('WScale', 3), ("NOP", '')]
-options_server_syn_proxy = [("MSS", 1260-len_pr), ("SAckOK", ''), ("Timestamp", (123456789, 2983139994)), ('WScale', 3), ("NOP", '')]
+options_server_syn = [("MSS", 1260), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 3), ("NOP", '')]
+options_server_syn_proxy = [("MSS", 1260-len_pr), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 3), ("NOP", '')]
 
 
 # 001 - type 1 - no proxy, no sec
@@ -112,21 +116,21 @@ SYN_COOKIE2 = 0x08857553
 data_type2 = [
 	(
 		FromClient(IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=options_client_syn), 
-		ToClient(IP_SERVER2, SYN_COOKIE2, START_CLIENT_SEQ + 1, 'AS', window=0, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (1, 2983139994)), ('WScale', 9), ("NOP", '')])
+		ToClient(IP_SERVER2, SYN_COOKIE2, START_CLIENT_SEQ + 1, 'AS', window=0, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (1, ts_client)), ('WScale', 9), ("NOP", '')])
 	), (
-		FromClient(IP_SERVER2, START_CLIENT_SEQ + 1, SYN_COOKIE2 + 1, 'A', options=[("Timestamp", (12345, 54321))]),
-		ToServer(IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (12345, 0)), ('WScale', 5), ("NOP", '')])
+		FromClient(IP_SERVER2, START_CLIENT_SEQ + 1, SYN_COOKIE2 + 1, 'A', options=[("Timestamp", (ts_client + 1, 1))]),
+		ToServer(IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client + 1, 0)), ('WScale', 5), ("NOP", '')])
 	), (
-		FromServer(IP_SERVER2, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (33333, 12345)), ('WScale', 9), ("NOP", '')]),
-		ToClient(IP_SERVER2, SYN_COOKIE2 + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (33333, 12345)), ('WScale', 9), ("NOP", ''), ("NOP", ''), ("NOP", '')])
+		FromServer(IP_SERVER2, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client + 1)), ('WScale', 9), ("NOP", '')]),
+		ToClient(IP_SERVER2, SYN_COOKIE2 + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client + 1)), ('WScale', 9), ("NOP", ''), ("NOP", ''), ("NOP", '')])
 	),
 	(
-		FromClient(IP_SERVER2, START_CLIENT_SEQ + 1, SYN_COOKIE2 + 1, 'A', raw=data_client1),
-		ToServer(IP_SERVER2, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1)
+		FromClient(IP_SERVER2, START_CLIENT_SEQ + 1, SYN_COOKIE2 + 1, 'A', raw=data_client1, options=[("Timestamp", (ts_client + 2, ts_proxy)), ("NOP", ''), ("NOP", '')]),
+		ToServer(IP_SERVER2, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=[("Timestamp", (ts_client + 2, ts_server)), ("NOP", ''), ("NOP", '')])
 	),
 	(
-		FromServer(IP_SERVER2, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
-		ToClient(IP_SERVER2, SYN_COOKIE2 + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
+		FromServer(IP_SERVER2, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1, options=[("Timestamp", (ts_server + 1, ts_client + 2)), ("NOP", ''), ("NOP", '')]), 
+		ToClient(IP_SERVER2, SYN_COOKIE2 + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1, options=[("Timestamp", (ts_proxy + 1, ts_client + 2)), ("NOP", ''), ("NOP", '')])
 	),
 ]
 
@@ -162,13 +166,13 @@ SYN_COOKIE3 = 0x784fb723
 data_type4 = [
 	(
 		FromClient(IP_SERVER4, START_CLIENT_SEQ, 0, 'S', options=options_client_syn), 
-		ToClient(IP_SERVER4, SYN_COOKIE3, START_CLIENT_SEQ + 1, 'AS', window=0, options=[("MSS", 1300-len_pr), ("SAckOK", ''), ("Timestamp", (1, 2983139994)), ('WScale', 9), ("NOP", '')])
+		ToClient(IP_SERVER4, SYN_COOKIE3, START_CLIENT_SEQ + 1, 'AS', window=0, options=[("MSS", 1300-len_pr), ("SAckOK", ''), ("Timestamp", (1, ts_client)), ('WScale', 9), ("NOP", '')])
 	), (
-		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE3 + 1, 'A', options=[("Timestamp", (12345, 54321))]),
-		ToServer(IP_SERVER4, START_CLIENT_SEQ - len_pr, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (12345, 0)), ('WScale', 5), ("NOP", '')])
+		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE3 + 1, 'A', options=[("Timestamp", (ts_client + 1, 1))]),
+		ToServer(IP_SERVER4, START_CLIENT_SEQ - len_pr, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client + 1, 0)), ('WScale', 5), ("NOP", '')])
 	), (
-		FromServer(IP_SERVER4, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (33333, 12345)), ('WScale', 9), ("NOP", '')]),
-		ToClient(IP_SERVER4, SYN_COOKIE3 + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (33333, 12345)), ('WScale', 9), ("NOP", ''), ("NOP", ''), ("NOP", '')])
+		FromServer(IP_SERVER4, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client + 1)), ('WScale', 9), ("NOP", '')]),
+		ToClient(IP_SERVER4, SYN_COOKIE3 + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client + 1)), ('WScale', 9), ("NOP", ''), ("NOP", ''), ("NOP", '')])
 	),
 	(
 		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE3 + 1, 'A', raw=data_client1),
@@ -254,10 +258,10 @@ WriteTest("004", data_type4)
 # def SS(dt1, dt2, port_proxy, raw='', raw_res='', tcp_options=[]):
 # 	return (packet_server_proxy(dt1, port_proxy, raw=raw, tcp_options=tcp_options),	packet_proxy_server(dt2, port_proxy, raw=raw_res))
 
-# tcp_options_client = options = [("MSS", 1460), ("SAckOK", ''), ("Timestamp", (2983139994, 0)), ('WScale', 5), ("NOP", '')]
-# tcp_options_answer_to_client = [("MSS", 1000), ("SAckOK", ''), ("Timestamp", (1234567, 2983139994)), ('WScale', 3), ("NOP", '')]
-# tcp_options_server = options = [("MSS", 1000), ("SAckOK", ''), ("Timestamp", (1234567890, 2983139994)), ("NOP", ''), ('WScale', 3)]
-# tcp_options_server_to_client = options = [("Timestamp", (1234567890, 2983139994)), ("NOP", ''), ("NOP", '')]
+# tcp_options_client = options = [("MSS", 1460), ("SAckOK", ''), ("Timestamp", (ts_client, 0)), ('WScale', 5), ("NOP", '')]
+# tcp_options_answer_to_client = [("MSS", 1000), ("SAckOK", ''), ("Timestamp", (1234567, ts_client)), ('WScale', 3), ("NOP", '')]
+# tcp_options_server = options = [("MSS", 1000), ("SAckOK", ''), ("Timestamp", (1234567890, ts_client)), ("NOP", ''), ('WScale', 3)]
+# tcp_options_server_to_client = options = [("Timestamp", (1234567890, ts_client)), ("NOP", ''), ("NOP", '')]
 
 # data = [
 # 	CC((0, 0, 'S'),  (0, 1, 'SA'), IP_CLIENT1, tcp_options=tcp_options_client, tcp_options_answer=tcp_options_answer_to_client),							# 1

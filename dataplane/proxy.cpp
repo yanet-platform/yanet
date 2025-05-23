@@ -171,7 +171,7 @@ std::string TcpOptions::DebugInfo() const
     return ss.str();
 }
 
-void ShiftSAcks(rte_tcp_hdr* tcp_header, uint32_t shift)
+void ShiftTcpOptions(rte_tcp_hdr* tcp_header, uint32_t sack, uint32_t timestamp_value, uint32_t timestamp_echo)
 {
     size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
     uint8_t* options = (uint8_t*)tcp_header + sizeof(rte_tcp_hdr);
@@ -183,11 +183,13 @@ void ShiftSAcks(rte_tcp_hdr* tcp_header, uint32_t shift)
         switch (options[index])
         {
         case TCPOPT_SACK:
-            *((uint32_t*)(options + index + 2)) = dataplane::proxy::add_cpu_32(*((uint32_t*)(options + index + 2)), shift);
-            *((uint32_t*)(options + index + 6)) = dataplane::proxy::add_cpu_32(*((uint32_t*)(options + index + 6)), shift);
+            *((uint32_t*)(options + index + 2)) = dataplane::proxy::add_cpu_32(*((uint32_t*)(options + index + 2)), sack);
+            *((uint32_t*)(options + index + 6)) = dataplane::proxy::add_cpu_32(*((uint32_t*)(options + index + 6)), sack);
             index += 10;
             break;
         case TCPOPT_TIMESTAMP:
+            *((uint32_t*)(options + index + 2)) = dataplane::proxy::add_cpu_32(*((uint32_t*)(options + index + 2)), timestamp_value);
+            *((uint32_t*)(options + index + 6)) = dataplane::proxy::add_cpu_32(*((uint32_t*)(options + index + 6)), timestamp_echo);
             index += 10;
             break;
         case TCPOPT_NOP:
@@ -195,6 +197,8 @@ void ShiftSAcks(rte_tcp_hdr* tcp_header, uint32_t shift)
             break;
         case TCPOPT_EOL:
             return;
+        default:
+            index += options[index + 1]; // todo =0?
         }
     }
 }
@@ -270,7 +274,7 @@ void TcpConnectionStore::proxy_service_remove(proxy_service_id_t service_id)
 
 void TcpConnectionStore::CollectGarbage(uint32_t current_time)
 {
-    YANET_LOG_WARNING("TcpConnectionStore::CollectGarbage: current_time=%d\n", current_time);
+    // YANET_LOG_WARNING("TcpConnectionStore::CollectGarbage: current_time=%d\n", current_time);
     std::lock_guard guard(mutex_);
     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
     {
@@ -400,7 +404,8 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
                                                                uint32_t src_addr,
                                                                uint16_t src_port,
                                                                uint32_t seq,
-                                                               uint32_t ack)
+                                                               uint32_t ack,
+                                                               uint32_t timestamp_echo)
 {
     auto conn_ptr = service_connections_[service_id].FindAndLock(src_addr, src_port, current_time);
     if (conn_ptr)
@@ -410,6 +415,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
         result.add_proxy_header = false;
         result.shift_ack = -conn_ptr->connection->shift_server;
         result.shift_seq = 0;
+        result.shift_timestamp = -conn_ptr->connection->timestamp_shift;
 
         if (conn_ptr->connection->state == ConnectionState::SENT_PROXY_HEADER)
         {
@@ -434,7 +440,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
         UnpackKeyConnection(syn_ptr->connection->local, local_addr, local_port);
         // todo - Try add to connections, can fail !!!!
         if (!service_connections_[service_id].TryInsert(src_addr, src_port, local_addr, local_port, 
-                                                        ConnectionState::ESTABLISHED, 0, current_time))
+                                                        ConnectionState::ESTABLISHED, 0, current_time, 0))
         {
             YANET_LOG_WARNING("failed insert to connections\n");
             return ActionDrop{0};
@@ -479,7 +485,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
 
     // Add to connections
     if (!service_connections_[service_id].TryInsert(src_addr, src_port, local->first, local->second,
-                                                    ConnectionState::SENT_SYN_SERVER, rte_cpu_to_be_32(ack) - 1, current_time))
+                                                    ConnectionState::SENT_SYN_SERVER, rte_cpu_to_be_32(ack) - 1, current_time, timestamp_echo))
     {
         YANET_LOG_WARNING("failed insert to connections\n");
         local_pools_[service_id].Free(local->first, local->second);
@@ -508,8 +514,7 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_servi
                                                                      uint16_t dst_port,
                                                                      uint32_t seq,
                                                                      uint32_t ack,
-                                                                     uint8_t* tcp_options,
-                                                                     size_t tcp_options_size)
+                                                                     const TcpOptions& tcp_options)
 {
     // find in local pool
     std::optional<std::pair<uint32_t, tPortId>> client_info = local_pools_[service_id].FindClientByLocal(dst_addr, dst_port);
@@ -546,11 +551,18 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_servi
     YANET_LOG_WARNING("\t\tshift_seq=%u\n", conn_ptr->connection->shift_server);
     uint32_t sent_seq = conn_ptr->connection->sent_seq;
 
+    // timestamps shift
+    uint32_t timestamp_shift = conn_ptr->connection->timestamp_echo - tcp_options.timestamp_value;
+    YANET_LOG_WARNING("\t timestamps: proxy_start=%d, server_start=%d, shift=%d\n", conn_ptr->connection->timestamp_echo, tcp_options.timestamp_value, timestamp_shift);
+    conn_ptr->connection->timestamp_shift = timestamp_shift;
+
+
     return ActionServerOnSynAck_AckToClient{
 	    .client_addr = client_addr,
 	    .client_port = client_port,
 	    .seq = rte_cpu_to_be_32(sent_seq + 1),
-	    .ack = (service.proxy_header ? add_cpu_32(ack, int(sizeof(proxy_v2_ipv4_hdr))) : ack) };
+	    .ack = (service.proxy_header ? add_cpu_32(ack, int(sizeof(proxy_v2_ipv4_hdr))) : ack),
+        .timestamp_shift = timestamp_shift };
 }
 
 ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_service_id_t service_id,
@@ -591,6 +603,7 @@ ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_service_id_
         forward.dst_addr = client_addr;
         forward.dst_port = client_port;
         forward.shift_seq = conn_ptr->connection->shift_server;
+        forward.timestamp_shift = conn_ptr->connection->timestamp_shift;
         return forward;
     }
 }
@@ -602,6 +615,8 @@ void OneConnection::Clear()
 {
     last_time = 0;
     local = 0;
+    shift_server = 0;
+    timestamp_shift = 0;
 }
 
 bool OneConnection::IsExpired(uint32_t current_time)
@@ -643,7 +658,7 @@ bool ServiceConnections::Initialize(proxy_service_id_t service_id, uint32_t numb
 
 bool ServiceConnections::TryInsert(uint32_t client_addr, uint16_t client_port,
                                     uint32_t local_addr, uint16_t local_port,
-                                    ConnectionState state, uint32_t sent_seq, uint32_t current_time)
+                                    ConnectionState state, uint32_t sent_seq, uint32_t current_time, uint32_t timestamp_echo)
 {
     if (number_buckets_ == 0)
         return false;
@@ -679,6 +694,7 @@ bool ServiceConnections::TryInsert(uint32_t client_addr, uint16_t client_port,
     bucket.connections[record_index].state = state;
     bucket.connections[record_index].sent_seq = sent_seq;
     bucket.connections[record_index].last_time = current_time;
+    bucket.connections[record_index].timestamp_echo = timestamp_echo;
     return true;
 }
 

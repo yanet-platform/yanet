@@ -6275,7 +6275,8 @@ inline void cWorker::proxy_client_ack_handle()
 		                                                                                            ipv4Header->src_addr,
 		                                                                                            tcp_header->src_port,
 		                                                                                            tcp_header->sent_seq,
-		                                                                                            tcp_header->recv_ack);
+		                                                                                            tcp_header->recv_ack,
+																									tcp_options.timestamp_echo);
 
 		if (const auto action_drop = std::get_if<dataplane::proxy::ActionDrop>(&action))
 		{
@@ -6323,7 +6324,7 @@ inline void cWorker::proxy_client_ack_handle()
 				rte_cpu_to_be_32(tcp_header->recv_ack), forward_to_server->shift_seq,
 				forward_to_server->shift_ack, forward_to_server->add_proxy_header);
 
-			dataplane::proxy::ShiftSAcks(tcp_header, forward_to_server->shift_ack);
+			dataplane::proxy::ShiftTcpOptions(tcp_header, forward_to_server->shift_ack, 0, forward_to_server->shift_timestamp);
 
 			if (forward_to_server->add_proxy_header)
 			{
@@ -6402,8 +6403,6 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
 		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
 
-		(void)proxy;
-
 		size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
 		dataplane::proxy::TcpOptions tcp_options;
 		memset(&tcp_options, 0, sizeof(tcp_options));
@@ -6416,8 +6415,7 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		                                                                                                 tcp_header->dst_port,
 		                                                                                                 tcp_header->sent_seq,
 		                                                                                                 tcp_header->recv_ack,
-		                                                                                                 (uint8_t*)tcp_header,
-		                                                                                                 tcp_header_len);
+		                                                                                                 tcp_options);
 
 		if (const auto action_drop = std::get_if<dataplane::proxy::ActionDrop>(&action))
 		{
@@ -6462,6 +6460,7 @@ inline void cWorker::proxy_server_syn_ack_handle()
 			tcp_header->src_port = rte_cpu_to_be_16(service.proxy_port);	// todo
 			tcp_header->dst_port = ack_to_client->client_port;
 			tcp_header->tcp_flags = TCP_ACK_FLAG;
+			dataplane::proxy::ShiftTcpOptions(tcp_header, 0, ack_to_client->timestamp_shift, 0);
 
 			tcp_header->cksum = 0;
 			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
@@ -6574,6 +6573,9 @@ inline void cWorker::proxy_server_ack_handle()
 			tcp_header->src_port = rte_cpu_to_be_16(service.proxy_port);
 			tcp_header->dst_port = forward->dst_port;
 			tcp_header->sent_seq = dataplane::proxy::add_cpu_32(tcp_header->sent_seq, forward->shift_seq);
+
+			dataplane::proxy::ShiftTcpOptions(tcp_header, 0, forward->timestamp_shift, 0);
+
 			tcp_header->cksum = 0;
 			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
 
