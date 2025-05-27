@@ -158,7 +158,7 @@ void ServiceSynConnections::CollectGarbage(uint32_t current_time, LocalPool& loc
             {
                 uint32_t src_addr;
                 uint16_t src_port;
-                UnpackKeyConnection(connection.client, src_addr, src_port);
+                UnpackKeyConnection(connection.local, src_addr, src_port);
                 local_pool.Free(src_addr, src_port);
                 connection.Clear();
             }

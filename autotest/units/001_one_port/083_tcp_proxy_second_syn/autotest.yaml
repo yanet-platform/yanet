@@ -9,11 +9,13 @@ steps:
 
 - cli:
   - proxy services
-  - proxy connections
   - proxy syn
+  - proxy connections
+  - proxy local_pool
 
 - sleep: 5
 
 - cli:
   - proxy syn
+  - proxy connections
   - proxy local_pool

@@ -770,7 +770,7 @@ void ServiceConnections::CollectGarbage(uint32_t current_time, LocalPool& local_
             {
                 uint32_t addr;
                 uint16_t port;
-                UnpackKeyConnection(connection.client, addr, port);
+                UnpackKeyConnection(connection.local, addr, port);
                 local_pool.Free(addr, port);
                 connection.Clear();
             }
