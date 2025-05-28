@@ -1,6 +1,8 @@
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 #include <pcap/pcap.h>
-#include <unistd.h>
 #include <vector>
 
 #include "common/define.h"
@@ -81,12 +83,13 @@ PcapShmWriterDevice::~PcapShmWriterDevice()
 	PcapShmWriterDevice::close();
 }
 
-ssize_t PcapShmWriterDevice::DumpPcapFilesToFd(bool first, int fd)
+void PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_view prefix, std::string_view path)
 {
+	std::filesystem::path dir_path(path);
+
 	Flush();
 
-	bool header_written = false;
-	ssize_t total_written = 0;
+	size_t file_index = 1;
 
 	for (size_t i = 0; i < pcap_files_; ++i)
 	{
@@ -112,49 +115,24 @@ ssize_t PcapShmWriterDevice::DumpPcapFilesToFd(bool first, int fd)
 			continue;
 		}
 
-		char* start = reinterpret_cast<char*>(segments_[segment_index].start_ptr);
-		long seg_len = used;
+		auto file_path = dir_path / (std::string(prefix) + "-" + std::to_string(file_index++) + ".pcap");
 
-		auto safe_write = [](int fd, const char* buf, size_t len) -> ssize_t {
-			ssize_t count = 0;
-			while (len > 0)
-			{
-				ssize_t written = write(fd, buf, len);
-				if (written < 0)
-				{
-					if (errno == EINTR)
-						continue;
-					return -1;
-				}
-				buf += written;
-				len -= written;
-				count += written;
-			}
-			return count;
-		};
-
-		ssize_t this_written = 0;
-		if (!header_written && first)
+		std::ofstream output_file(file_path, std::ios::binary);
+		if (!output_file)
 		{
-			this_written = safe_write(fd, start, seg_len);
-			header_written = true;
-		}
-		else
-		{
-			this_written = safe_write(fd, start + kPcapFileHeaderSize, seg_len - kPcapFileHeaderSize);
+			YANET_LOG_ERROR("Failed to open %s for writing\n", file_path.c_str());
+			continue;
 		}
 
-		if (this_written < 0)
+		output_file.write(reinterpret_cast<char*>(segments_[segment_index].start_ptr), used);
+		if (output_file.bad())
 		{
-			YANET_LOG_ERROR("write() failed: %s\n", strerror(errno));
-			return -1;
+			YANET_LOG_ERROR("Error writing to file %s\n", file_path.c_str());
+			continue;
 		}
 
-		total_written += this_written;
+		YANET_LOG_INFO("Created file: %s\n", file_path.c_str());
 	}
-
-	fsync(fd);
-	return total_written;
 }
 
 bool PcapShmWriterDevice::open()

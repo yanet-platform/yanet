@@ -73,7 +73,7 @@ public:
 	common::idp::limits::response limits();
 	common::idp::samples::response samples();
 	common::idp::hitcount_dump::response hitcount_dump();
-	common::idp::tcpdump::response tcpdump(const common::idp::tcpdump::request& request, int fd);
+	eResult tcpdump_ring(const common::idp::tcpdump_ring::request& request);
 	common::idp::balancer_connection::response balancer_connection(const common::idp::balancer_connection::request& request);
 	common::idp::balancer_service_connections::response balancer_service_connections();
 	common::idp::balancer_real_connections::response balancer_real_connections();

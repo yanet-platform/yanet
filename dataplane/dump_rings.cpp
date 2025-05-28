@@ -5,6 +5,7 @@
 #include "metadata.h"
 
 #include "MBufRawPacket.h"
+#include <iostream>
 
 namespace dumprings
 {
@@ -125,9 +126,9 @@ void RingPcap::Flush()
 	dev_.Flush();
 }
 
-ssize_t RingPcap::DumpPcapFilesToFd(bool first, int fd)
+void RingPcap::DumpPcapFilesToDisk(std::string_view prefix, std::string_view path)
 {
-	return dev_.DumpPcapFilesToFd(first, fd);
+	dev_.DumpPcapFilesToDisk(prefix, path);
 }
 
 bool RingPcap::GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const

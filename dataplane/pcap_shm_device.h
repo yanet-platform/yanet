@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdio>
+#include <fstream>
+#include <iostream>
 #include <pcap/pcap.h>
 #include <vector>
 
@@ -261,29 +263,13 @@ public:
 	PcapShmWriterDevice& operator=(PcapShmWriterDevice const&) = delete;
 
 	/**
-	 * @brief Stream all captured packets from the shared memory ring buffer to fd in PCAP format.
+	 * @brief Dump each pcap segment from shared memory to a file on disk.
 	 *
-	 * This function prints the contents of each PCAP segment in correct order to standard output,
-	 * producing a single valid PCAP stream as seen by packet analysis tools.
-	 * The first segment (containing the most recent packets) is printed fully, including
-	 * the global PCAP header. Subsequent segments are printed without their headers, so the output
-	 * is a single concatenated PCAP file suitable for downstream tools.
-	 *
-	 * Typical usage is to pipe the output directly into tcpdump or Wireshark, e.g.:
-	 * \code
-	 *   yanet-cli ... | tcpdump -r -
-	 * \endcode
-	 * or
-	 * \code
-	 *   yanet-cli ... | wireshark -k -i -
-	 * \endcode
-	 *
-	 * @param[in] first Whether the current ring being dumped is the first. Determines if we
-	 *                  should write PCAP file header or not.
-	 * @param[in] fd    Descriptor to write into
-	 * @return Amount of bytes written
+	 * @param filenamePrefix The prefix for the output pcap files, e.g. "capture_"
+	 *        will produce "capture_1.pcap", "capture_2.pcap", etc.
+	 * @param path Directory path where files should be created (defaults to current directory)
 	 */
-	ssize_t DumpPcapFilesToFd(bool first, int fd);
+	void DumpPcapFilesToDisk(std::string_view prefix, std::string_view path);
 
 	bool open() override;
 

@@ -28,7 +28,7 @@ public:
 	[[nodiscard]] virtual bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const = 0;
 
 	virtual void Flush() = 0;
-	virtual ssize_t DumpPcapFilesToFd(bool first, int fd) = 0;
+	virtual void DumpPcapFilesToDisk(std::string_view prefix, std::string_view path) = 0;
 
 	bool GetNextPacket(pcpp::RawPacket& raw_packet)
 	{
@@ -89,12 +89,12 @@ public:
 		                "it does not use any buffers.");
 	}
 
-	ssize_t DumpPcapFilesToFd([[maybe_unused]] bool first, [[maybe_unused]] int fd) override
+	void DumpPcapFilesToDisk([[maybe_unused]] std::string_view prefix,
+	                         [[maybe_unused]] std::string_view path) override
 	{
 		YANET_LOG_DEBUG("Cannot dump packets written in raw format in this ring "
 		                "on disk as pcap files. You should use this function only with "
 		                "RingPcap ring.");
-		return -1;
 	}
 };
 
@@ -117,7 +117,7 @@ public:
 
 	void Flush() override;
 
-	ssize_t DumpPcapFilesToFd(bool first, int fd) override;
+	void DumpPcapFilesToDisk(std::string_view prefix, std::string_view path) override;
 };
 
 size_t GetCapacity(const Config& config);

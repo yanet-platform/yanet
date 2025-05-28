@@ -817,18 +817,19 @@ common::idp::samples::response cControlPlane::samples()
 	return common::idp::samples::response(samples.begin(), samples.end());
 }
 
-common::idp::tcpdump::response cControlPlane::tcpdump(const common::idp::tcpdump::request& request, int fd)
+eResult cControlPlane::tcpdump_ring(const common::idp::tcpdump_ring::request& request)
 {
-	const auto& [ring_desc, first] = request;
+	const auto& [ring_desc, prefix, path] = request;
 
-	for (cWorker* worker : dataPlane->workers_vector)
+	for (auto& [core_id, worker] : dataPlane->workers)
 	{
-		if (worker->coreId != ring_desc.core_id || worker->socketId != ring_desc.socket_id)
+		if (core_id != ring_desc.core_id && worker->socketId != ring_desc.socket_id)
 			continue;
 
 		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[ring_desc.tag]];
 
-		return ring->DumpPcapFilesToFd(first, fd);
+		ring->DumpPcapFilesToDisk(prefix, path);
+		return eResult::success;
 	}
 
 	YANET_LOG_WARNING("Asked to create pcap files from DumpRing %s within "
@@ -838,7 +839,7 @@ common::idp::tcpdump::response cControlPlane::tcpdump(const common::idp::tcpdump
 	                  ring_desc.core_id,
 	                  ring_desc.socket_id);
 
-	return -1;
+	return eResult::invalidId;
 }
 
 common::idp::hitcount_dump::response cControlPlane::hitcount_dump()
