@@ -7,7 +7,6 @@
 #include "common/define.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
-#include "common/idp.h"
 #include "common/sdpclient.h"
 #include "common/tsc_deltas.h"
 #include "common/version.h"
@@ -730,128 +729,45 @@ inline void hitcount_dump(const std::string& source)
 	std::cout << "\n]\n";
 }
 
-inline bool is_stdout_pipe_or_file()
+inline void tcpdump_ring(const std::string& target_ring_name, std::optional<std::string> path)
 {
-	struct stat st;
-	if (!isatty(STDOUT_FILENO) &&
-	    fstat(STDOUT_FILENO, &st) == 0 &&
-	    (S_ISREG(st.st_mode) || S_ISFIFO(st.st_mode)))
+	if (target_ring_name.empty())
 	{
-		return true;
-	}
-	return false;
-}
-
-inline bool copy_pipe_to_stdout(int read_fd, ssize_t bytes_to_copy)
-{
-	constexpr size_t chunk = 128 * 1024; // 128 KB
-	std::array<char, chunk> buf;
-	ssize_t total = 0;
-	while (total < bytes_to_copy)
-	{
-		ssize_t want = std::min<ssize_t>(bytes_to_copy - total, buf.size());
-		ssize_t n = read(read_fd, buf.data(), want);
-		if (n <= 0)
-		{
-			YANET_LOG_ERROR("Short/failed read from dataplane dump pipe\n");
-			return false;
-		}
-		ssize_t wr = write(STDOUT_FILENO, buf.data(), n);
-		if (wr != n)
-		{
-			YANET_LOG_ERROR("Failed to write to stdout\n");
-			return false;
-		}
-		total += n;
-	}
-	return true;
-}
-
-inline void dump_ring_to_stdout(interface::dataPlane& dataplane, common::idp::tcpdump::request&& request, bool direct)
-{
-	if (direct)
-	{
-		ssize_t bytes_written = dataplane.tcpdump(std::move(request), STDOUT_FILENO);
-		if (bytes_written < 0)
-		{
-			YANET_LOG_ERROR("Something went wrong in dataplane on dumping pcap files for ring %s",
-			                request.ring_desc.tag.data());
-			return;
-		}
-	}
-	else
-	{
-		int fds[2];
-		if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0)
-		{
-			YANET_LOG_ERROR("socketpair failed: %s\n", strerror(errno));
-			return;
-		}
-
-		ssize_t bytes_to_copy = dataplane.tcpdump(std::move(request), fds[1]);
-		close(fds[1]);
-		if (bytes_to_copy < 0)
-		{
-			YANET_LOG_ERROR("Something went wrong in dataplane on dumping pcap files for ring %s",
-			                request.ring_desc.tag.data());
-			close(fds[0]);
-			return;
-		}
-		if (bytes_to_copy > 0)
-		{
-			copy_pipe_to_stdout(fds[0], bytes_to_copy);
-		}
-		close(fds[0]);
-	}
-}
-
-/**
- * @brief Streams the contents of a dataplane dump ring as a PCAP file to stdout.
- *
- * If stdout is redirected (pipe or file), gives dataplane direct access to this
- * file descriptor using SCM_RIGHTS, so PCAP data is written as efficiently as
- * possible. Otherwise, falls back to using a pipe and copying. Never mixes log
- * output with stdout-PCAP data.
- */
-inline void tcpdump(const std::string& target_dump_tag)
-{
-	if (target_dump_tag.empty())
-	{
-		YANET_LOG_ERROR("Ring tag should be specified\n");
+		YANET_LOG_ERROR("Ring name should be specified\n");
 		return;
 	}
 
 	interface::dataPlane dataplane;
 	const auto& shm_info = dataplane.get_shm_info();
-	bool first_ring = true;
-
-	std::cout.flush();
-
-	const bool can_pass_stdout = is_stdout_pipe_or_file();
 
 	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : shm_info)
 	{
-		if (target_dump_tag != dump_tag)
+		GCC_BUG_UNUSED(ipc_key);
+		GCC_BUG_UNUSED(offset);
+
+		if (target_ring_name != ring_name)
 			continue;
 
 		if (dump_config.format != tDataPlaneConfig::DumpFormat::kPcap)
 		{
-			YANET_LOG_ERROR("Asked to dump pcap files for dump tag %s, but provided "
+			YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but provided "
 			                "ring is not configured to pcap format. "
 			                "Double-check dataplane.conf \"sharedMemory\" section\n",
-			                target_dump_tag.data());
-			return;
+			                target_ring_name.data());
 		}
 
-		dump_ring_to_stdout(dataplane, {dump_tag, core_id, socket_id, first_ring}, can_pass_stdout);
-		first_ring = false;
+		eResult result = dataplane.tcpdump_ring({dump_tag, core_id, socket_id, ring_name, path.value_or("./")});
+
+		if (result != eResult::success)
+		{
+			YANET_LOG_ERROR("Something went wrong in dataplane on creating pcap files for ring %s",
+			                target_ring_name.data());
+		}
+		return;
 	}
 
-	if (first_ring)
-	{
-		YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but such ring was not found\n",
-		                target_dump_tag.data());
-	}
+	YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but such ring was not found\n",
+	                target_ring_name.data());
 }
 
 inline void values()
