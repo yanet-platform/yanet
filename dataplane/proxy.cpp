@@ -497,7 +497,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
     new_server_connection.local_port = std::get<1>(*local);
     new_server_connection.seq = add_cpu_32(seq, -1 + (service.proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0));
 
-    TcpOptions tcp_options;
+    TcpOptions tcp_options{};
     tcp_options.mss = SynCookies::MssFromTable(options.mss);
     tcp_options.sack_permitted = options.sack;
     tcp_options.window_scaling = options.wscale;
@@ -653,6 +653,33 @@ bool ServiceConnections::Initialize(proxy_service_id_t service_id, uint32_t numb
 
     number_buckets_ = number_buckets;
     initialized_ = true;
+    return true;
+}
+
+bool ServiceConnections::_TestInit(proxy_service_id_t service_id, uint32_t number_connections)
+{
+    if (initialized_)
+    {
+        return true;
+    }
+
+    uint32_t number_buckets = number_connections / ConnectionBucket::bucket_size;
+    buckets_ = new ConnectionBucket[number_buckets];
+
+    number_buckets_ = number_buckets;
+    initialized_ = true;
+    return true;
+}
+
+bool ServiceConnections::_TestFree()
+{
+    if (initialized_)
+    {
+        delete[] buckets_;
+        buckets_ = nullptr;
+        number_buckets_ = 0;
+        initialized_ = false;
+    }
     return true;
 }
 

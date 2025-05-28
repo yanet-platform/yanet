@@ -8,6 +8,8 @@ dependencies += dependency('gtest_main')
 
 dataplane_sources = files('../local_pool.cpp',
                           '../syncookies.cpp',
+                          '../proxy_syn.cpp',
+                          '../proxy.cpp',
                           '../memory_manager.cpp')
 
 sources = files('unittest.cpp',
@@ -15,7 +17,9 @@ sources = files('unittest.cpp',
                 'hashtable.cpp',
                 'sdp.cpp',
                 'local_pool.cpp',
-                'syncookies.cpp')
+                'syncookies.cpp',
+                'proxy_syn.cpp',
+                'proxy.cpp')
 
 arch = 'corei7'
 cpp_args_append = ['-march=' + arch]
@@ -29,4 +33,5 @@ unittest = executable('yanet-dataplane-unittest',
 
 test('dataplane',
      unittest,
+     timeout: 60,
      protocol: 'gtest')

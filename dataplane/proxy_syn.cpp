@@ -45,6 +45,38 @@ bool ServiceSynConnections::Initialize(proxy_service_id_t service_id, uint32_t n
     return true;    
 }
 
+bool ServiceSynConnections::_TestInit(proxy_service_id_t service_id, uint32_t number_syns)
+{
+    if (initialized_)
+    {
+        return true;
+    }
+    else if (number_syns == 0)
+    {
+        number_buckets_ = 0;
+        return true;
+    }
+
+    uint32_t number_buckets = number_syns / SynBucket::bucket_size;
+    buckets_ = new SynBucket[number_buckets];
+
+    number_buckets_ = number_buckets;
+    initialized_ = true;
+    return true;    
+}
+
+bool ServiceSynConnections::_TestFree()
+{
+    if (initialized_)
+    {
+        delete[] buckets_;
+        buckets_ = nullptr;
+        number_buckets_ = 0;
+        initialized_ = false;
+    }
+    return true;
+}
+
 bool ServiceSynConnections::TryInsert(uint32_t client_addr, uint16_t client_port,
                                         uint32_t local_addr, uint16_t local_port,
                                         uint32_t seq, uint32_t current_time)

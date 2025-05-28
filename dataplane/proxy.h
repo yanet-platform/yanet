@@ -242,7 +242,9 @@ class ServiceConnections
 {
     public:
     bool Initialize(proxy_service_id_t service_id, uint32_t number_connections, dataplane::memory_manager* memory_manager);
-    
+    bool _TestInit(proxy_service_id_t service_id, uint32_t number_connections);
+    bool _TestFree();
+
     bool TryInsert(uint32_t client_addr, uint16_t client_port,
                     uint32_t local_addr, uint16_t local_port,
                     ConnectionState state, uint32_t sent_seq, uint32_t current_time, uint32_t timestamp_echo);

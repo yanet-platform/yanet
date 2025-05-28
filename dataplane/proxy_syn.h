@@ -45,6 +45,9 @@ class ServiceSynConnections
 {
 public:
     bool Initialize(proxy_service_id_t service_id, uint32_t number_syns, dataplane::memory_manager* memory_manager);
+    bool _TestInit(proxy_service_id_t service_id, uint32_t number_syns);
+    bool _TestFree();
+    
     bool TryInsert(uint32_t client_addr, uint16_t client_port,
                 uint32_t local_addr, uint16_t local_port,
                 uint32_t seq, uint32_t current_time);
