@@ -12,4 +12,4 @@ steps:
 
 - cli: show shm info
 
-- cli: tcpdump ring1
+- cli: tcpdump read ring1 /tmp
