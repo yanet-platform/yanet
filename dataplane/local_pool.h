@@ -13,6 +13,7 @@ namespace dataplane::proxy
 class LocalPool
 {
 public:
+    LocalPool() : initialized_(false) {}
     void Add(const ipv4_prefix_t& prefix);
     bool Init(proxy_service_id_t service_id, dataplane::memory_manager* memory_manager);
     bool _TestInit();

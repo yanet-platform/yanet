@@ -41,6 +41,7 @@ bool LocalPool::Init(proxy_service_id_t service_id, dataplane::memory_manager* m
     }
     connection_queue_[num_connections_ - 1].next_idx = 0xffffffff;
 
+    first_connection_idx_ = 0;
     free_addresses_ = num_connections_;
     used_addresses_ = 0;
 
@@ -74,6 +75,10 @@ bool LocalPool::_TestInit()
         }
     }
     connection_queue_[num_connections_ - 1].next_idx = 0xffffffff;
+
+    first_connection_idx_ = 0;
+    free_addresses_ = num_connections_;
+    used_addresses_ = 0;
 
     initialized_ = true;
 
