@@ -170,9 +170,9 @@ public:
 		return get<common::idp::requestType::hitcount_dump, common::idp::hitcount_dump::response>();
 	}
 
-	auto tcpdump(const common::idp::tcpdump::request& request, int fd) const
+	auto tcpdump_ring(const common::idp::tcpdump_ring::request& request) const
 	{
-		return get_with_fd<common::idp::requestType::tcpdump, common::idp::tcpdump::response>(request, fd);
+		return get<common::idp::requestType::tcpdump_ring, eResult>(request);
 	}
 
 	eResult debug_latch_update(const common::idp::debug_latch_update::request& request) const
@@ -319,21 +319,6 @@ protected:
 		std::lock_guard<std::mutex> guard(mutex);
 		connectToDataPlane();
 		return common::sendAndRecv<common::idp::response>(clientSocket, common::idp::request(T, std::move(request)));
-	}
-
-	template<common::idp::requestType T, class Resp, class Req>
-	Resp get_with_fd(Req&& request, int fd_to_send) const
-	{
-		return std::get<Resp>(call_with_fd<T>(std::forward<Req>(request), fd_to_send));
-	}
-
-	template<common::idp::requestType T, class Req>
-	common::idp::response call_with_fd(Req&& request, int fd_to_send) const
-	{
-		std::lock_guard<std::mutex> guard(mutex);
-		connectToDataPlane();
-		return common::send_and_recv_with_fd<common::idp::response>(
-		        clientSocket, common::idp::request(T, std::forward<Req>(request)), fd_to_send);
 	}
 
 protected:
