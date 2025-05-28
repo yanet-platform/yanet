@@ -729,45 +729,110 @@ inline void hitcount_dump(const std::string& source)
 	std::cout << "\n]\n";
 }
 
-inline void tcpdump_ring(const std::string& target_ring_name, std::optional<std::string> path)
+static void print_pcap_helper(const std::vector<std::string> &created_files)
 {
-	if (target_ring_name.empty())
+	std::cout << "Created the following pcap files:\n";
+	for (const auto& file : created_files)
 	{
-		YANET_LOG_ERROR("Ring name should be specified\n");
+		std::cout << "  " << file << "\n";
+	}
+
+	if (created_files.size() <= 1)
+	{
 		return;
 	}
 
+	std::cout << "\nTo combine them into a single pcap file for convenience, you can use:\n"
+	          << "  mergecap -w combined.pcap";
+	for (const auto& file : created_files)
+	{
+		std::cout << " " << file;
+	}
+	std::cout << "\n";
+}
+
+/**
+ * @brief Dumps packets from shared memory rings configured in pcap mode.
+ *
+ * This function scans all known shared memory rings, and if a ring's tag matches the
+ * provided `target_dump_tag` and it is configured in pcap format, the function dumps
+ * packets to disk using the dataplane interface.
+ *
+ * @note If `path` is not provided, files will be dumped to `/tmp/`.
+ *
+ * @param target_dump_tag The tag of the dump ring to search for.
+ * @param path Optional output directory for pcap files.
+ */
+static void tcpdump_read(const std::string& target_dump_tag, std::optional<std::string> path)
+{
 	interface::dataPlane dataplane;
 	const auto& shm_info = dataplane.get_shm_info();
+	bool first_ring = true;
+	std::vector<std::string> created_files;
 
 	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : shm_info)
 	{
-		GCC_BUG_UNUSED(ipc_key);
-		GCC_BUG_UNUSED(offset);
+		YANET_LOG_INFO("Checking ring: name='%s', tag='%s', target='%s'\n",
+		               ring_name.c_str(),
+		               dump_tag.c_str(),
+		               target_dump_tag.c_str());
 
-		if (target_ring_name != ring_name)
+		if (target_dump_tag != dump_tag)
 			continue;
 
 		if (dump_config.format != tDataPlaneConfig::DumpFormat::kPcap)
 		{
-			YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but provided "
+			YANET_LOG_ERROR("Asked to dump pcap files for dump tag %s, but provided "
 			                "ring is not configured to pcap format. "
 			                "Double-check dataplane.conf \"sharedMemory\" section\n",
-			                target_ring_name.data());
+			                target_dump_tag.c_str());
+			return;
 		}
 
-		eResult result = dataplane.tcpdump_ring({dump_tag, core_id, socket_id, ring_name, path.value_or("./")});
+		YANET_LOG_INFO("Matched ring: name='%s', tag='%s', core=%d, socket=%d, path='%s'\n",
+		               ring_name.c_str(),
+		               dump_tag.c_str(),
+		               core_id,
+		               socket_id,
+		               path.value_or("/tmp/").c_str());
 
-		if (result != eResult::success)
-		{
-			YANET_LOG_ERROR("Something went wrong in dataplane on creating pcap files for ring %s",
-			                target_ring_name.data());
-		}
+		auto files = dataplane.tcpdump({dump_tag, core_id, socket_id, ring_name, path.value_or("/tmp/")});
+		created_files.insert(created_files.end(), files.begin(), files.end());
+
+		first_ring = false;
+	}
+
+	if (first_ring)
+	{
+		YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but such ring was not found\n",
+		                target_dump_tag.c_str());
+	}
+
+	if (created_files.empty())
+	{
+		std::cout << "No pcap files were created. "
+		             "Please check yanet-dataplane logs for more details.\n";
 		return;
 	}
 
-	YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but such ring was not found\n",
-	                target_ring_name.data());
+	print_pcap_helper(created_files);
+}
+
+inline void tcpdump(const std::string& mode, const std::string& target_dump_tag, std::optional<std::string> path)
+{
+	if (mode != "read")
+	{
+		YANET_LOG_ERROR("Unsupported mode '%s'. Only 'read' mode is currently supported.\n", mode.c_str());
+		return;
+	}
+
+	if (target_dump_tag.empty())
+	{
+		YANET_LOG_ERROR("Ring tag should be specified\n");
+		return;
+	}
+
+	tcpdump_read(target_dump_tag, path);
 }
 
 inline void values()

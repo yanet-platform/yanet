@@ -83,8 +83,9 @@ PcapShmWriterDevice::~PcapShmWriterDevice()
 	PcapShmWriterDevice::close();
 }
 
-void PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_view prefix, std::string_view path)
+std::vector<std::string> PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_view prefix, std::string_view path)
 {
+	std::vector<std::string> files_created;
 	std::filesystem::path dir_path(path);
 
 	Flush();
@@ -115,12 +116,15 @@ void PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_view prefix, std::stri
 			continue;
 		}
 
-		auto file_path = dir_path / (std::string(prefix) + "-" + std::to_string(file_index++) + ".pcap");
+		auto file_path = std::filesystem::absolute(dir_path / (std::string(prefix) + "-" + std::to_string(file_index++) + ".pcap"));
 
 		std::ofstream output_file(file_path, std::ios::binary);
 		if (!output_file)
 		{
-			YANET_LOG_ERROR("Failed to open %s for writing\n", file_path.c_str());
+			YANET_LOG_ERROR("Failed to open %s for writing. "
+			                "Double-check provided directory path '%s'\n",
+			                file_path.c_str(),
+			                dir_path.c_str());
 			continue;
 		}
 
@@ -131,8 +135,10 @@ void PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_view prefix, std::stri
 			continue;
 		}
 
-		YANET_LOG_INFO("Created file: %s\n", file_path.c_str());
+		files_created.push_back(file_path);
 	}
+
+	return files_created;
 }
 
 bool PcapShmWriterDevice::open()

@@ -267,9 +267,10 @@ public:
 	 *
 	 * @param filenamePrefix The prefix for the output pcap files, e.g. "capture_"
 	 *        will produce "capture_1.pcap", "capture_2.pcap", etc.
-	 * @param path Directory path where files should be created (defaults to current directory)
+	 * @param path Directory path where files should be created
+	 * @return list of filenames created
 	 */
-	void DumpPcapFilesToDisk(std::string_view prefix, std::string_view path);
+	std::vector<std::string> DumpPcapFilesToDisk(std::string_view prefix, std::string_view path);
 
 	bool open() override;
 

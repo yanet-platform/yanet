@@ -118,6 +118,8 @@ void RingPcap::Write(rte_mbuf* mbuf, [[maybe_unused]] common::globalBase::eFlowT
 	// TODO: can I do this, or should I use time obtained from basePermanently.globalBaseAtomic->currentTime like I do now?
 	/* timespec_get(&ts, TIME_UTC); */
 
+	YANET_LOG_INFO("DumpRing %p was asked to write a packet\n", this);
+
 	dev_.WritePacket(raw_packet);
 }
 
@@ -126,9 +128,10 @@ void RingPcap::Flush()
 	dev_.Flush();
 }
 
-void RingPcap::DumpPcapFilesToDisk(std::string_view prefix, std::string_view path)
+Filenames RingPcap::DumpPcapFilesToDisk(std::string_view prefix, std::string_view path)
 {
-	dev_.DumpPcapFilesToDisk(prefix, path);
+	YANET_LOG_INFO("DumpRing %p was asked to dump it's contents to a file\n", this);
+	return dev_.DumpPcapFilesToDisk(prefix, path);
 }
 
 bool RingPcap::GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const
