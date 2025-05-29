@@ -378,18 +378,19 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_service_id_
     }
 
     std::optional<std::pair<uint32_t, tPortId>> local = local_pools_[service_id].Allocate(src_addr, src_port);
-    if (local.has_value() && 
-        syn_connections_[service_id].TryInsert(src_addr, src_port, local->first, local->second, seq, current_time))
+    if (local.has_value())
     {
-        YANET_LOG_WARNING("\tSyn New Record\n");
-        if (service.proxy_header)
+        if (syn_connections_[service_id].TryInsert(src_addr, src_port, local->first, local->second, seq, current_time))
         {
-            seq = add_cpu_32(seq, -int(sizeof(proxy_v2_ipv4_hdr)));
+            YANET_LOG_WARNING("\tSyn New Record\n");
+            if (service.proxy_header)
+            {
+                seq = add_cpu_32(seq, -int(sizeof(proxy_v2_ipv4_hdr)));
+            }
+            return ActionClientOnSyn_SynToServer{seq, local->first, local->second};
         }
-        return ActionClientOnSyn_SynToServer{seq, local->first, local->second};
+        local_pools_[service_id].Free(local->first, local->second);
     }
-
-    local_pools_[service_id].Free(local->first, local->second);
 
     uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack_permitted, tcp_options.window_scaling, 0}); // ecn
     uint32_t cookie = syn_cookies_.GetCookie(src_addr, service.upstream_addr.address, src_port, service.upstream_port, seq, cookie_data); // dst_addr, dst_port

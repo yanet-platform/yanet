@@ -41,7 +41,8 @@ bool LocalPool::Init(proxy_service_id_t service_id, dataplane::memory_manager* m
     }
     connection_queue_[num_connections_ - 1].next_idx = 0xffffffff;
 
-    first_connection_idx_ = 0;
+    first_ = 0;
+    last_ = num_connections_ - 1;
     free_addresses_ = num_connections_;
     used_addresses_ = 0;
 
@@ -76,7 +77,8 @@ bool LocalPool::_TestInit()
     }
     connection_queue_[num_connections_ - 1].next_idx = 0xffffffff;
 
-    first_connection_idx_ = 0;
+    first_ = 0;
+    last_ = num_connections_ - 1;
     free_addresses_ = num_connections_;
     used_addresses_ = 0;
 
@@ -98,17 +100,19 @@ bool LocalPool::_TestFree()
 std::optional<std::pair<uint32_t, tPortId>> LocalPool::Allocate(uint32_t client_addr, tPortId client_port)
 {
     std::lock_guard<std::shared_mutex> lock(mutex_);
-    if (unlikely(!initialized_) || first_connection_idx_ == 0xffffffff)
+    if (unlikely(!initialized_) || first_ == 0xffffffff)
     {
         return std::nullopt;
     }
 
-    std::pair<uint32_t, tPortId> res = index_to_tuple(first_connection_idx_);
+    std::pair<uint32_t, tPortId> res = index_to_tuple(first_);
     res.first = rte_cpu_to_be_32(res.first);
     res.second = rte_cpu_to_be_16(res.second);
     
-    ConnectionInfo& info = connection_queue_[first_connection_idx_];
-    first_connection_idx_ = info.next_idx;
+    ConnectionInfo& info = connection_queue_[first_];
+    first_ = info.next_idx;
+    if (first_ == 0xffffffff)
+        last_ = 0xffffffff;
 
     info.is_used = 1;
     info.address = client_addr;
@@ -133,10 +137,15 @@ void LocalPool::Free(uint32_t address, tPortId port)
         return;
     }
 
-    ConnectionInfo& info = connection_queue_[idx];
+    if (last_ != 0xffffffff)
+        connection_queue_[last_].next_idx = idx;
+    last_ = idx;
+    if (first_ == 0xffffffff)
+        first_ = idx;
+
+    ConnectionInfo& info = connection_queue_[last_];
     info.is_used = 0;
-    info.next_idx = first_connection_idx_;
-    first_connection_idx_ = idx;
+    info.next_idx = 0xffffffff;
 
     free_addresses_++;
     used_addresses_--;

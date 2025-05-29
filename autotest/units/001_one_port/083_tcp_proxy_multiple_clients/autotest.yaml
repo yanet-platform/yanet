@@ -27,7 +27,7 @@ steps:
   - proxy connections
   - proxy syn
 
-- sleep: 5
+- sleep: 10
 
 - cli:
   - proxy syn

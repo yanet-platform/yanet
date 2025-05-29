@@ -47,7 +47,8 @@ private:
     };
     ConnectionInfo* connection_queue_;
     uint32_t num_connections_;
-    uint32_t first_connection_idx_;
+    uint32_t first_;
+    uint32_t last_;
 
     uint32_t free_addresses_;
     uint32_t used_addresses_;
