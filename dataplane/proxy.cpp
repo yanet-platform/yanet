@@ -461,13 +461,19 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
     
     // try check cookie
     uint32_t cookie_data;
-    uint32_t result = syn_cookies_.CheckCookie(rte_cpu_to_be_32(ack) - 1, src_addr, service.upstream_addr.address, src_port, service.upstream_port, add_cpu_32(seq, -1)); // dst_addr, dst_port
+    uint32_t result = syn_cookies_.CheckCookie(rte_cpu_to_be_32(ack) - 1, src_addr, service.upstream_addr.address, src_port, service.upstream_port, add_cpu_32(seq, -1));
     YANET_LOG_WARNING("\tresult=%d, cookie_data=%d, ack=%u, seq=%u\n", result, cookie_data, ack, seq);
 
     if (result == 0)
     {
-        YANET_LOG_WARNING("\tcookie check error\n");
-        return ActionDrop{0};
+        result = syn_cookies_.CheckCookie(rte_cpu_to_be_32(ack) - 1, src_addr, service.upstream_addr.address, src_port, service.upstream_port, seq);
+        YANET_LOG_WARNING("\tsecond result=%d, cookie_data=%d, ack=%u, seq=%u\n", result, cookie_data, ack, seq);
+        if (result == 0)
+        {
+            YANET_LOG_WARNING("\tcookie check error\n");
+            return ActionDrop{0};
+        }
+        seq = add_cpu_32(seq, 1);
     }
 
     SynCookies::TCPOptions options = SynCookies::UnpackData(result);
