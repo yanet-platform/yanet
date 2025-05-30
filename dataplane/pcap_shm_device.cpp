@@ -222,7 +222,6 @@ bool PcapShmWriterDevice::EnsureSegmentCapacity(size_t needed_size)
 		                  "Such packet cannot be written in any segment -- skipping it\n",
 		                  needed_size,
 		                  max_segment_capacity);
-		++num_of_packets_not_written_;
 		return false;
 	}
 
@@ -231,7 +230,6 @@ bool PcapShmWriterDevice::EnsureSegmentCapacity(size_t needed_size)
 	if (used < 0)
 	{
 		YANET_LOG_ERROR("ftell failed on current segment\n");
-		++num_of_packets_not_written_;
 		return false;
 	}
 
@@ -241,7 +239,6 @@ bool PcapShmWriterDevice::EnsureSegmentCapacity(size_t needed_size)
 		if (!RotateToNextSegment())
 		{
 			YANET_LOG_ERROR("fseek failed when rotating to next segment\n");
-			++num_of_packets_not_written_;
 			return false;
 		}
 	}
@@ -253,14 +250,12 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 	if (!m_DeviceOpened)
 	{
 		YANET_LOG_ERROR("Device not opened\n");
-		++num_of_packets_not_written_;
 		return false;
 	}
 
 	if (packet.getLinkLayerType() != link_layer_type_)
 	{
 		YANET_LOG_ERROR("Cannot write a packet with a different link layer type\n");
-		++num_of_packets_not_written_;
 		return false;
 	}
 
@@ -274,7 +269,6 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 	}
 
 	pcap_dump(reinterpret_cast<uint8_t*>(segments_[current_segment_index_].dumper), &pkt_hdr, packet.getRawData());
-	++num_of_packets_written_;
 	return true;
 }
 
