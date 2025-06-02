@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/define.h"
+#include "common/utils.h"
 #include "pcap_shm_device.h"
 
 namespace pcpp
@@ -57,7 +58,9 @@ bool PcapShmWriterDevice::FillSegments()
 }
 
 PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t pcap_files, LinkLayerType link_layer_type, bool nanoseconds_precision) :
-        IShmWriterDevice(shm_ptr, shm_size),
+        // 1.  tell the parent that “my usable buffer starts after the header”
+        IShmWriterDevice(utils::ShiftBuffer(shm_ptr, sizeof(Meta)),
+                         shm_size - sizeof(Meta)),
         link_layer_type_(link_layer_type),
         pcap_files_(pcap_files),
         current_segment_index_(0)
@@ -76,6 +79,12 @@ PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t 
 	}
 	m_Precision_ = FileTimestampPrecision::Microseconds;
 #endif
+
+	/* --- place RingMeta at the very front -------------------------------- */
+	meta = new (shm_ptr) Meta();
+	meta->before.store(0, std::memory_order_relaxed);
+	meta->after.store(0, std::memory_order_relaxed);
+	meta->last_byte_of_pcap_ring_object = reinterpret_cast<uintptr_t>(this) % 0xff;
 }
 
 PcapShmWriterDevice::~PcapShmWriterDevice()

@@ -1,13 +1,12 @@
 #pragma once
 
 #include <cstdio>
-#include <fstream>
-#include <iostream>
 #include <pcap/pcap.h>
 #include <vector>
 
 #include "PcapDevice.h"
 #include "PcapFileDevice.h"
+#include "config.h"
 
 namespace pcpp
 {
@@ -150,6 +149,9 @@ class PcapShmWriterDevice : public IShmWriterDevice
 	};
 
 	std::vector<SegmentInfo> segments_;
+
+	using Meta = tDataPlaneConfig::RingMeta;
+	Meta* meta; ///< points into the start of the given SHM page
 
 	/*
 	 * @brief Helper to create libpcap's packet header from PcapPlusPlus's raw packet.
