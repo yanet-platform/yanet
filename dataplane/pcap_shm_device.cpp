@@ -84,7 +84,9 @@ PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t 
 	meta = new (shm_ptr) Meta();
 	meta->before.store(0, std::memory_order_relaxed);
 	meta->after.store(0, std::memory_order_relaxed);
-	meta->last_byte_of_pcap_ring_object = reinterpret_cast<uintptr_t>(this) % 0xff;
+	/* meta->last_byte_of_pcap_ring_object = reinterpret_cast<uintptr_t>(this) % 0xff; */
+	meta->last_byte_of_pcap_ring_object = 42;
+	YANET_LOG_INFO("PcapShmWriterDevice object %p set meta value to 42\n", this);
 }
 
 PcapShmWriterDevice::~PcapShmWriterDevice()
