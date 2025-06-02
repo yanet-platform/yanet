@@ -60,6 +60,7 @@ TEST(LocalPoolTest, Benchmark)
             futures[j] = std::async(std::launch::async, [&]() -> std::pair<std::chrono::duration<double>, std::chrono::duration<double>> {
                 dataplane::proxy::LocalPool pool;
                 pool.Add(ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()});
+                pool._TestInit();
             
                 std::vector<std::optional<std::pair<uint32_t, uint16_t>>> addresses(iterations);
                 
@@ -130,6 +131,7 @@ TEST(LocalPoolTest, BenchmarkConcurrent)
             futures[j] = std::async(std::launch::async, [&]() -> std::pair<std::chrono::duration<double>, std::chrono::duration<double>> {
                 dataplane::proxy::LocalPool pool;
                 pool.Add(ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()});
+                pool._TestInit();
             
                 std::vector<std::optional<std::pair<uint32_t, uint16_t>>> addresses(iterations);
                 
