@@ -9,6 +9,7 @@
 #include "common/idataplane.h"
 #include "common/sdpclient.h"
 #include "common/tsc_deltas.h"
+#include "common/utils.h"
 #include "common/version.h"
 
 #include "dataplane/config.h"
@@ -818,13 +819,57 @@ static void tcpdump_read(const std::string& target_dump_tag, std::optional<std::
 	print_pcap_helper(created_files);
 }
 
+static void tcpdump_follow(const std::string& target_dump_tag, std::optional<std::string> path)
+{
+	interface::dataPlane dataplane;
+	const auto& shm_info = dataplane.get_shm_info();
+
+	/* 1. map every matching ring-segment */
+	std::unordered_map<key_t, void*> mapped;
+
+	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : shm_info)
+	{
+		YANET_LOG_INFO("Checking ring: name='%s', tag='%s', target='%s'\n",
+		               ring_name.c_str(),
+		               dump_tag.c_str(),
+		               target_dump_tag.c_str());
+
+		if (target_dump_tag != dump_tag)
+			continue;
+
+		if (dump_config.format != tDataPlaneConfig::DumpFormat::kPcap)
+		{
+			YANET_LOG_ERROR("Asked to dump pcap files for dump tag %s, but provided "
+			                "ring is not configured to pcap format. "
+			                "Double-check dataplane.conf \"sharedMemory\" section\n",
+			                target_dump_tag.c_str());
+			return;
+		}
+
+		YANET_LOG_INFO("Matched ring: name='%s', tag='%s', core=%d, socket=%d, path='%s'\n",
+		               ring_name.c_str(),
+		               dump_tag.c_str(),
+		               core_id,
+		               socket_id,
+		               path.value_or("/tmp/").c_str());
+
+		if (!mapped.count(ipc_key))
+		{
+			int id = shmget(ipc_key, 0, 0);
+			void* sh = shmat(id, nullptr, 0);
+			mapped[ipc_key] = sh;
+		}
+		void* base = utils::ShiftBuffer(mapped[ipc_key], offset);
+		auto* meta = reinterpret_cast<tDataPlaneConfig::RingMeta*>(base);
+		std::cout << "Ring's ptr last byte is " << meta->last_byte_of_pcap_ring_object << std::endl;
+	}
+}
+
 inline void tcpdump(const std::string& mode, const std::string& target_dump_tag, std::optional<std::string> path)
 {
-	if (mode != "read")
-	{
-		YANET_LOG_ERROR("Unsupported mode '%s'. Only 'read' mode is currently supported.\n", mode.c_str());
-		return;
-	}
+	// TODO: imorozko@lab-vla-lb3ac:~$ sudo yanet-cli tcpdump defaultdump
+	// [ERROR] 1748886977.864754 ../cli/show.h:872: Ring tag should be specified
+	//  That is obscuring user, made it better
 
 	if (target_dump_tag.empty())
 	{
@@ -832,7 +877,19 @@ inline void tcpdump(const std::string& mode, const std::string& target_dump_tag,
 		return;
 	}
 
-	tcpdump_read(target_dump_tag, path);
+	if (mode == "read")
+	{
+		tcpdump_read(target_dump_tag, path);
+	}
+	else if (mode == "follow")
+	{
+		tcpdump_follow(target_dump_tag, path);
+	}
+	else
+	{
+		YANET_LOG_ERROR("Unsupported mode '%s'. Supported modes are 'read' and 'follow'.\n", mode.c_str());
+		return;
+	}
 }
 
 inline void values()
