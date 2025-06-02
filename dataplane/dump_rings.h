@@ -16,7 +16,7 @@ using Filenames = std::vector<std::string>;
 
 class RingBase
 {
-	// Current packet number that we will read next
+	// Current packet number that we will read next. It's used only by autotests
 	unsigned read_pkt_number = 0;
 
 	virtual void Clean() = 0;
