@@ -2,6 +2,7 @@
 
 #include "common/define.h"
 #include "common/type.h"
+#include <atomic>
 #include <set>
 #include <string>
 
@@ -75,6 +76,25 @@ struct tDataPlaneConfig
 		tSocketId socket_id;
 
 		SERIALIZABLE(tag, core_id, socket_id);
+	};
+
+	/**
+	 * 24-byte lock-free header that sits in front of each pcap ring in SHM.
+	 *
+	 * ┌────────────┬────────────┬────────────────┐
+	 * │ before     │ after      │ current_seg    │
+	 * └────────────┴────────────┴────────────────┘
+	 *
+	 *  *before*  – byte offset **after reservation** (writer fetch-add).
+	 *  *after*   – byte offset **after commit**     (writer release-store).
+	 *  *current_seg* – index of the segment currently used by the writer
+	 *                  (purely informational for the reader).
+	 */
+	struct alignas(64) RingMeta
+	{
+		std::atomic<uint64_t> before{};
+		std::atomic<uint64_t> after{};
+		uint8_t last_byte_of_pcap_ring_object{};
 	};
 
 	/*
