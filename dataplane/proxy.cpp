@@ -411,6 +411,27 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
     auto conn_ptr = service_connections_[service_id].FindAndLock(src_addr, src_port, current_time);
     if (conn_ptr)
     {
+        // YANET_LOG_WARNING("\t\tTcpConnectionStore::ActionClientOnAck: seq=%u, ack=%u, client_start_seq=%u\n", seq, ack, conn_ptr->connection->client_start_seq);
+        if (seq == conn_ptr->connection->client_start_seq)
+        {
+            // YANET_LOG_WARNING("\t !!!! Need send SYN\n");
+            
+            ActionClientOnAck_NewServerConnection new_server_connection;
+            UnpackKeyConnection(conn_ptr->connection->local, new_server_connection.local_addr, new_server_connection.local_port);
+            new_server_connection.seq = add_cpu_32(seq, (service.proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0));
+
+            TcpOptions tcp_options{};
+            // todo - need save options in ServiceConnections !!!
+            tcp_options.mss = 1300;
+            tcp_options.sack_permitted = true;
+            tcp_options.window_scaling = 5;
+
+            new_server_connection.tcp_options = tcp_options;
+
+            return new_server_connection;
+        }
+        bool is_first_ack = (seq == add_cpu_32(conn_ptr->connection->client_start_seq, 1)); // todo - check time
+
         ActionClientOnAck_Forward result;
         UnpackKeyConnection(conn_ptr->connection->local, result.local_addr, result.local_port);
         result.add_proxy_header = false;
@@ -418,7 +439,8 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
         result.shift_seq = 0;
         result.shift_timestamp = -conn_ptr->connection->timestamp_shift;
 
-        if (conn_ptr->connection->state == ConnectionState::SENT_PROXY_HEADER)
+        // if (conn_ptr->connection->state == ConnectionState::SENT_PROXY_HEADER)
+        if (is_first_ack)
         {
             YANET_LOG_WARNING("\t\t\tchange state from SENT_PROXY_HEADER -> ESTABLISHED\n");
             conn_ptr->connection->state = ConnectionState::ESTABLISHED;
@@ -441,7 +463,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
         UnpackKeyConnection(syn_ptr->connection->local, local_addr, local_port);
         // todo - Try add to connections, can fail !!!!
         if (!service_connections_[service_id].TryInsert(src_addr, src_port, local_addr, local_port, 
-                                                        ConnectionState::ESTABLISHED, 0, current_time, 0))
+                                                        ConnectionState::ESTABLISHED, 0, syn_ptr->connection->recv_seq, current_time, 0))
         {
             YANET_LOG_WARNING("failed insert to connections\n");
             return ActionDrop{0};
@@ -492,7 +514,7 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
 
     // Add to connections
     if (!service_connections_[service_id].TryInsert(src_addr, src_port, local->first, local->second,
-                                                    ConnectionState::SENT_SYN_SERVER, rte_cpu_to_be_32(ack) - 1, current_time, timestamp_echo))
+                                                    ConnectionState::SENT_SYN_SERVER, rte_cpu_to_be_32(ack) - 1, add_cpu_32(seq, -1), current_time, timestamp_echo))
     {
         YANET_LOG_WARNING("failed insert to connections\n");
         local_pools_[service_id].Free(local->first, local->second);
@@ -692,7 +714,8 @@ bool ServiceConnections::_TestFree()
 
 bool ServiceConnections::TryInsert(uint32_t client_addr, uint16_t client_port,
                                     uint32_t local_addr, uint16_t local_port,
-                                    ConnectionState state, uint32_t sent_seq, uint32_t current_time, uint32_t timestamp_echo)
+                                    ConnectionState state, uint32_t sent_seq, uint32_t client_start_seq,
+                                    uint32_t current_time, uint32_t timestamp_echo)
 {
     if (number_buckets_ == 0)
         return false;
@@ -727,6 +750,7 @@ bool ServiceConnections::TryInsert(uint32_t client_addr, uint16_t client_port,
     bucket.connections[record_index].local = KeyConnection(local_addr, local_port);
     bucket.connections[record_index].state = state;
     bucket.connections[record_index].sent_seq = sent_seq;
+    bucket.connections[record_index].client_start_seq = client_start_seq;
     bucket.connections[record_index].last_time = current_time;
     bucket.connections[record_index].timestamp_echo = timestamp_echo;
     return true;

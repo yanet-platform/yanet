@@ -6258,9 +6258,10 @@ inline void cWorker::proxy_client_ack_handle()
 		rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
 		size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
 		
-		YANET_LOG_WARNING("proxy_client_ack_handle %s:%d -> %s:%d\n",
+		YANET_LOG_WARNING("proxy_client_ack_handle %s:%d -> %s:%d, seq=%u, ack=%u\n",
 				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->src_port),
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->dst_port));
+				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->dst_port),
+				rte_cpu_to_be_32(tcp_header->sent_seq), rte_cpu_to_be_32(tcp_header->recv_ack));
 
 		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
 		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_in] += mbuf->pkt_len;

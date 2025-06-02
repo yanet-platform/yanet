@@ -221,6 +221,8 @@ struct OneConnection
     uint32_t shift_server;
     uint32_t timestamp_echo;
     uint32_t timestamp_shift;
+
+    uint32_t client_start_seq;
         
     void Clear();
     bool IsExpired(uint32_t current_time);
@@ -247,7 +249,7 @@ class ServiceConnections
 
     bool TryInsert(uint32_t client_addr, uint16_t client_port,
                     uint32_t local_addr, uint16_t local_port,
-                    ConnectionState state, uint32_t sent_seq, uint32_t current_time, uint32_t timestamp_echo);
+                    ConnectionState state, uint32_t sent_seq, uint32_t client_start_seq, uint32_t current_time, uint32_t timestamp_echo);
 
     void GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response);
 
