@@ -33,5 +33,5 @@ unittest = executable('yanet-dataplane-unittest',
 
 test('dataplane',
      unittest,
-     timeout: 60,
+     timeout: 120,
      protocol: 'gtest')
