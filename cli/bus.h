@@ -23,6 +23,7 @@ inline std::vector<bus_request_info> get_bus_requests(common::sdp::DataPlaneInSh
 	        {common::idp::requestType::clearWorkerDumpRings, "clearWorkerDumpRings"},
 	        {common::idp::requestType::flushDumpRing, "flushDumpRing"},
 	        {common::idp::requestType::switchToFollowDumpRing, "switchToFollowDumpRing"},
+	        {common::idp::requestType::followDoneDumpRing, "followDoneDumpRing"},
 	        {common::idp::requestType::get_worker_gc_stats, "get_worker_gc_stats"},
 	        {common::idp::requestType::get_dregress_counters, "get_dregress_counters"},
 	        {common::idp::requestType::get_ports_stats, "get_ports_stats"},

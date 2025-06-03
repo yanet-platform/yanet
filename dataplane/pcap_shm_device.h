@@ -308,6 +308,24 @@ public:
 	 */
 	void SwitchToFollow();
 
+	/**
+	 * @brief Ends the 'follow' mode and restores libpcap dumping.
+	 *
+	 * This function is used to gracefully exit the "follow" mode,
+	 * returning the ring to its default libpcap-based behavior.
+	 *
+	 * 1. Sets the ring mode to `Stop`, preventing any further packet writes.
+	 *
+	 * 2. Calls `Clean()`, which flushes and closes all pcap dumpers and FILE* handles,
+	 *    and resets internal state to a "closed" condition, then reopens it so we
+	 *    get normal 'read' mode.
+	 *
+	 * This function is triggered from `yanet-cli tcpdump follow` on Ctrl+C
+	 * to ensure shared memory is left in a valid state after live packet
+	 * streaming ends.
+	 */
+	void FollowDone();
+
 	bool open() override;
 
 	bool WritePacket(RawPacket const& packet) override;
