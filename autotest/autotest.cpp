@@ -185,7 +185,7 @@ eResult tAutotest::initSharedMemory()
 		return res;
 	}
 
-	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : dataPlaneSharedMemory)
+	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset, capacity] : dataPlaneSharedMemory)
 	{
 		void* memaddr = utils::ShiftBuffer(shm_by_key[ipc_key], offset);
 

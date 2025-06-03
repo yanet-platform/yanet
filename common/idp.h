@@ -908,7 +908,8 @@ using dump_meta = std::tuple<std::string, ///< ring name
                              tCoreId, ///< core id
                              tSocketId, ///< socket id
                              key_t, /// ipc shm key
-                             uint64_t>; /// offset
+                             uint64_t, /// offset
+                             uint64_t>; /// capacity
 
 using response = std::vector<dump_meta>;
 }
