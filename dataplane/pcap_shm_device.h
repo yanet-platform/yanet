@@ -160,6 +160,8 @@ class PcapShmWriterDevice : public IShmWriterDevice
 	/* Sets counters to zero */
 	void ResetMeta();
 
+	using PcapOnDiskRecordHeader = dumprings::PcapOnDiskRecordHeader;
+
 	/*
 	 * @brief Helper to create libpcap's packet header from PcapPlusPlus's raw packet.
 	 */
@@ -252,7 +254,6 @@ class PcapShmWriterDevice : public IShmWriterDevice
 	bool WritePacketForFollow(RawPacket const& packet);
 
 public:
-	static constexpr size_t kPcapPacketHeaderSizeOnDisk = 16;
 	static constexpr size_t kPcapFileHeaderSize = 24;
 
 	/**

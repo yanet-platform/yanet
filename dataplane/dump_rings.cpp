@@ -118,8 +118,6 @@ void RingPcap::Write(rte_mbuf* mbuf, [[maybe_unused]] common::globalBase::eFlowT
 	// TODO: can I do this, or should I use time obtained from basePermanently.globalBaseAtomic->currentTime like I do now?
 	/* timespec_get(&ts, TIME_UTC); */
 
-	YANET_LOG_INFO("DumpRing %p was asked to write a packet\n", this);
-
 	dev_.WritePacket(raw_packet);
 }
 
@@ -151,8 +149,8 @@ bool RingPcap::GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const
 
 size_t RingPcap::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 {
-	auto& file_hdr_size = pcpp::PcapShmWriterDevice::kPcapFileHeaderSize;
-	auto& pkt_hdr_size = pcpp::PcapShmWriterDevice::kPcapPacketHeaderSizeOnDisk;
+	auto file_hdr_size = pcpp::PcapShmWriterDevice::kPcapFileHeaderSize;
+	auto pkt_hdr_size = sizeof(dumprings::PcapOnDiskRecordHeader);
 	auto meta_size = sizeof(RingMeta);
 
 	size_t capacity = meta_size + file_hdr_size + (pkt_hdr_size + max_pkt_size) * pkt_count;
