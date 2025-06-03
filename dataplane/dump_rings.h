@@ -58,7 +58,7 @@ public:
 	}
 };
 
-class RingRaw : public RingBase
+class RingRaw final : public RingBase
 {
 	using PacketBufferRing = common::PacketBufferRing;
 	using ring_t = PacketBufferRing::ring_t;
@@ -100,7 +100,7 @@ public:
 	}
 };
 
-class RingPcap : public RingBase
+class RingPcap final : public RingBase
 {
 	pcpp::PcapShmWriterDevice dev_;
 
