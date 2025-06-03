@@ -13,6 +13,7 @@
 #include "common/version.h"
 
 #include "dataplane/config.h"
+#include "dataplane/dump_rings_meta.h"
 #include "helper.h"
 #include "table_printer.h"
 
