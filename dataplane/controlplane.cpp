@@ -327,6 +327,30 @@ eResult cControlPlane::flushDumpRing(const common::idp::flushDumpRing::request& 
 	return eResult::invalidId;
 }
 
+eResult cControlPlane::switchToFollowDumpRing(const common::idp::switchToFollowDumpRing::request& request)
+{
+	const auto& [tag, ring_core_id, ring_socket_id] = request.data;
+
+	for (cWorker* worker : dataPlane->workers_vector)
+	{
+		if (worker->coreId != ring_core_id || worker->socketId != ring_socket_id)
+			continue;
+
+		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[tag]];
+
+		ring->SwitchToFollow();
+		return eResult::success;
+	}
+
+	YANET_LOG_WARNING("Asked to switch mode of DumpRing %s within Worker[core_id = %d, socket_id = %d] "
+	                  "to 'follow', but such ring was not found.\n",
+	                  tag.data(),
+	                  ring_core_id,
+	                  ring_socket_id);
+
+	return eResult::invalidId;
+}
+
 common::idp::get_worker_gc_stats::response cControlPlane::get_worker_gc_stats()
 {
 	common::idp::get_worker_gc_stats::response response;

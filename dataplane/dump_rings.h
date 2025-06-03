@@ -31,6 +31,8 @@ public:
 	virtual void Flush() = 0;
 	virtual Filenames DumpPcapFilesToDisk(std::string_view prefix, std::string_view path) = 0;
 
+	virtual void SwitchToFollow() = 0;
+
 	bool GetNextPacket(pcpp::RawPacket& raw_packet)
 	{
 		raw_packet.clear();
@@ -98,6 +100,12 @@ public:
 		                "RingPcap ring.");
 		return {};
 	}
+
+	void SwitchToFollow() override
+	{
+		YANET_LOG_DEBUG("Cannot switch mode to 'follow' in raw dump ring. "
+		                "You should use this function only with RingPcap ring.");
+	}
 };
 
 class RingPcap final : public RingBase
@@ -120,6 +128,8 @@ public:
 	void Flush() override;
 
 	Filenames DumpPcapFilesToDisk(std::string_view prefix, std::string_view path) override;
+
+	void SwitchToFollow() override;
 };
 
 size_t GetCapacity(const Config& config);

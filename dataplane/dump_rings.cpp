@@ -134,6 +134,11 @@ Filenames RingPcap::DumpPcapFilesToDisk(std::string_view prefix, std::string_vie
 	return dev_.DumpPcapFilesToDisk(prefix, path);
 }
 
+void RingPcap::SwitchToFollow()
+{
+	dev_.SwitchToFollow();
+}
+
 bool RingPcap::GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const
 {
 	return dev_.GetPacket(raw_packet, pkt_number);

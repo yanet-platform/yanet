@@ -284,6 +284,30 @@ public:
 	 */
 	std::vector<std::string> DumpPcapFilesToDisk(std::string_view prefix, std::string_view path);
 
+	/**
+	 * @brief Transitions the dump ring into 'follow' mode.
+	 *
+	 * This function prepares the shared memory ring for real-time packet streaming
+	 * by performing the following steps:
+	 *
+	 * 1. Switches the ring mode to `Stop` to prevent any new packets from being
+	 *    written during the transition.
+	 *
+	 * 2. Flushes all buffered libpcap dumper data to shared memory.
+	 *    This ensures that no internal buffers are flushed after meta is reset.
+	 *
+	 * 3. Resets the `before` and `after` offsets in the ring meta to zero.
+	 *    This provides a clean starting point for the reader.
+	 *
+	 * 4. Sets the ring mode to `Follow`, enabling the writer to begin writing
+	 *    packets using raw memcpy into SHM.
+	 *
+	 * Notes:
+	 * - The reader (see tcpdump_follow in cli/show.h) relies solely on `before` and `after` offsets,
+	 *   not on the `mode`. The mode is strictly for internal control in `WritePacket()`.
+	 */
+	void SwitchToFollow();
+
 	bool open() override;
 
 	bool WritePacket(RawPacket const& packet) override;
