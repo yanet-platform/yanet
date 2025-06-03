@@ -148,6 +148,11 @@ std::vector<std::string> PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_vi
 		files_created.push_back(file_path);
 	}
 
+	if (files_created.empty())
+	{
+		YANET_LOG_INFO("Ring is empty\n");
+	}
+
 	meta->mode.store(RingMode::Read, std::memory_order_release);
 
 	return files_created;
