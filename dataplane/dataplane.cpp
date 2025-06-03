@@ -1710,8 +1710,9 @@ eResult cDataPlane::splitSharedMemoryPerWorkers()
 
 			std::string name = "shm_" + std::to_string(core_id) + "_" + std::to_string(ring_id);
 
-			dumps_meta.emplace_back(name, tag, ring_cfg, core_id, socket_id, key, offset);
-			offset += GetCapacity(ring_cfg);
+			size_t capacity = GetCapacity(ring_cfg);
+			dumps_meta.emplace_back(name, tag, ring_cfg, core_id, socket_id, key, offset, capacity);
+			offset += capacity;
 
 			tag_to_id[tag] = ring_id;
 

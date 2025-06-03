@@ -772,7 +772,7 @@ static void tcpdump_read(const std::string& target_dump_tag, std::optional<std::
 	bool first_ring = true;
 	std::vector<std::string> created_files;
 
-	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : shm_info)
+	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset, capacity] : shm_info)
 	{
 		YANET_LOG_INFO("Checking ring: name='%s', tag='%s', target='%s'\n",
 		               ring_name.c_str(),
@@ -828,7 +828,7 @@ static void tcpdump_follow(const std::string& target_dump_tag, std::optional<std
 	/* 1. map every matching ring-segment */
 	std::unordered_map<key_t, void*> mapped;
 
-	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset] : shm_info)
+	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset, capacity] : shm_info)
 	{
 		YANET_LOG_INFO("Checking ring: name='%s', tag='%s', target='%s'\n",
 		               ring_name.c_str(),
@@ -1018,7 +1018,8 @@ inline void shm_info()
 	                   "core id",
 	                   "socket id",
 	                   "ipc key",
-	                   "offset"},
+	                   "offset",
+	                   "capacity"},
 	                  response);
 }
 
