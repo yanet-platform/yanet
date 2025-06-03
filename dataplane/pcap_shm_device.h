@@ -151,7 +151,14 @@ class PcapShmWriterDevice : public IShmWriterDevice
 	std::vector<SegmentInfo> segments_;
 
 	using Meta = tDataPlaneConfig::RingMeta;
+	using RingMode = tDataPlaneConfig::RingMode;
 	Meta* meta; ///< points into the start of the given SHM page
+
+	/* Stops packets parsing */
+	void StopPackets();
+
+	/* Sets counters to zero */
+	void ResetMeta();
 
 	/*
 	 * @brief Helper to create libpcap's packet header from PcapPlusPlus's raw packet.
@@ -240,6 +247,9 @@ class PcapShmWriterDevice : public IShmWriterDevice
 	 * @return std::unique_ptr<pcap_t> owning pcap reader
 	 */
 	[[nodiscard]] PcapReaderPtr CreatePcapReader(const SegmentInfo& segment) const;
+
+	bool WritePacketForRead(RawPacket const& packet);
+	bool WritePacketForFollow(RawPacket const& packet);
 
 public:
 	static constexpr size_t kPcapPacketHeaderSizeOnDisk = 16;

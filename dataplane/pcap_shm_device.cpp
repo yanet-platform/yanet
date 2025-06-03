@@ -58,7 +58,7 @@ bool PcapShmWriterDevice::FillSegments()
 }
 
 PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t pcap_files, LinkLayerType link_layer_type, bool nanoseconds_precision) :
-        // 1.  tell the parent that “my usable buffer starts after the header”
+        // Tell the parent that "my usable buffer starts after the header"
         IShmWriterDevice(utils::ShiftBuffer(shm_ptr, sizeof(Meta)),
                          shm_size - sizeof(Meta)),
         link_layer_type_(link_layer_type),
@@ -81,12 +81,9 @@ PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t 
 #endif
 
 	/* --- place RingMeta at the very front -------------------------------- */
+	// Mode is "Stop" by default, so we won't parse any packets before
+	// we're fully initizlized (see open())
 	meta = new (shm_ptr) Meta();
-	meta->before.store(0, std::memory_order_relaxed);
-	meta->after.store(0, std::memory_order_relaxed);
-	/* meta->last_byte_of_pcap_ring_object = reinterpret_cast<uintptr_t>(this) % 0xff; */
-	meta->last_byte_of_pcap_ring_object = 42;
-	YANET_LOG_INFO("PcapShmWriterDevice object %p set meta value to 42\n", this);
 }
 
 PcapShmWriterDevice::~PcapShmWriterDevice()
@@ -98,6 +95,8 @@ std::vector<std::string> PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_vi
 {
 	std::vector<std::string> files_created;
 	std::filesystem::path dir_path(path);
+
+	StopPackets();
 
 	Flush();
 
@@ -149,7 +148,20 @@ std::vector<std::string> PcapShmWriterDevice::DumpPcapFilesToDisk(std::string_vi
 		files_created.push_back(file_path);
 	}
 
+	meta->mode.store(RingMode::Read, std::memory_order_release);
+
 	return files_created;
+}
+
+void PcapShmWriterDevice::StopPackets()
+{
+	meta->mode.store(RingMode::Stop, std::memory_order_release);
+}
+
+void PcapShmWriterDevice::ResetMeta()
+{
+	meta->before.store(0, std::memory_order_relaxed);
+	meta->after.store(0, std::memory_order_relaxed);
 }
 
 bool PcapShmWriterDevice::open()
@@ -190,6 +202,13 @@ bool PcapShmWriterDevice::open()
 
 	current_segment_index_ = 0;
 	m_DeviceOpened = true;
+
+	ResetMeta();
+
+	// By default we're storing packets to be read as pcap files.
+	// 'Follow' mode is explicitly called by users.
+	meta->mode.store(RingMode::Read, std::memory_order_relaxed);
+
 	return true;
 }
 
@@ -256,6 +275,27 @@ bool PcapShmWriterDevice::EnsureSegmentCapacity(size_t needed_size)
 	return true;
 }
 
+bool PcapShmWriterDevice::WritePacketForRead(RawPacket const& packet)
+{
+	const pcap_pkthdr pkt_hdr = CreatePacketHeader(packet);
+
+	// kPcapPacketHeaderSizeOnDisk is different from sizeof(pcap_pkthdr)
+	size_t needed = kPcapPacketHeaderSizeOnDisk + pkt_hdr.caplen;
+	if (!EnsureSegmentCapacity(needed))
+	{
+		return false;
+	}
+
+	pcap_dump(reinterpret_cast<uint8_t*>(segments_[current_segment_index_].dumper), &pkt_hdr, packet.getRawData());
+	return true;
+}
+
+bool PcapShmWriterDevice::WritePacketForFollow([[maybe_unused]] RawPacket const& packet)
+{
+	YANET_LOG_ERROR("'Follow' mode is not yet implemented.");
+	return false;
+}
+
 bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 {
 	if (!m_DeviceOpened)
@@ -270,17 +310,16 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 		return false;
 	}
 
-	const pcap_pkthdr pkt_hdr = CreatePacketHeader(packet);
-
-	// kPcapPacketHeaderSizeOnDisk is different from sizeof(pcap_pkthdr)
-	size_t needed = kPcapPacketHeaderSizeOnDisk + pkt_hdr.caplen;
-	if (!EnsureSegmentCapacity(needed))
+	switch (meta->mode.load(std::memory_order_acquire))
 	{
-		return false;
+		case RingMode::Read:
+			return WritePacketForRead(packet);
+		case RingMode::Follow:
+			return WritePacketForFollow(packet);
+		case RingMode::Stop:
+		default:
+			return false;
 	}
-
-	pcap_dump(reinterpret_cast<uint8_t*>(segments_[current_segment_index_].dumper), &pkt_hdr, packet.getRawData());
-	return true;
 }
 
 bool PcapShmWriterDevice::WritePackets(RawPacketVector const& packets)
@@ -319,6 +358,8 @@ void PcapShmWriterDevice::close()
 {
 	if (!m_DeviceOpened)
 		return;
+
+	StopPackets();
 
 	Flush();
 

@@ -861,10 +861,11 @@ static void tcpdump_follow(const std::string& target_dump_tag, std::optional<std
 		}
 		void* base = utils::ShiftBuffer(mapped[ipc_key], offset);
 		auto* meta = reinterpret_cast<tDataPlaneConfig::RingMeta*>(base);
-		std::cout << "Ring's ptr last byte is " << meta->last_byte_of_pcap_ring_object << std::endl;
 	}
 }
 
+// TODO: what if we call tcpdump read on other ring while this is busy-looping?
+// Or on the same ring? Some warning would be nice, I guess.
 inline void tcpdump(const std::string& mode, const std::string& target_dump_tag, std::optional<std::string> path)
 {
 	// TODO: imorozko@lab-vla-lb3ac:~$ sudo yanet-cli tcpdump defaultdump
