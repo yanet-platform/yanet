@@ -4,18 +4,19 @@
 #include <netdb.h>
 #include <unordered_map>
 
+#include <csignal>
+#include <pcap/pcap.h>
+
 #include "common/define.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
 #include "common/sdpclient.h"
 #include "common/tsc_deltas.h"
-#include "common/utils.h"
 #include "common/version.h"
 
-#include "dataplane/config.h"
-#include "dataplane/dump_rings_meta.h"
 #include "helper.h"
 #include "table_printer.h"
+#include "tcpdump.h"
 
 namespace show
 {
@@ -731,145 +732,11 @@ inline void hitcount_dump(const std::string& source)
 	std::cout << "\n]\n";
 }
 
-static void print_pcap_helper(const std::vector<std::string> &created_files)
-{
-	std::cout << "Created the following pcap files:\n";
-	for (const auto& file : created_files)
-	{
-		std::cout << "  " << file << "\n";
-	}
-
-	if (created_files.size() <= 1)
-	{
-		return;
-	}
-
-	std::cout << "\nTo combine them into a single pcap file for convenience, you can use:\n"
-	          << "  mergecap -w combined.pcap";
-	for (const auto& file : created_files)
-	{
-		std::cout << " " << file;
-	}
-	std::cout << "\n";
-}
-
-/**
- * @brief Dumps packets from shared memory rings configured in pcap mode.
- *
- * This function scans all known shared memory rings, and if a ring's tag matches the
- * provided `target_dump_tag` and it is configured in pcap format, the function dumps
- * packets to disk using the dataplane interface.
- *
- * @note If `path` is not provided, files will be dumped to `/tmp/`.
- *
- * @param target_dump_tag The tag of the dump ring to search for.
- * @param path Optional output directory for pcap files.
- */
-static void tcpdump_read(const std::string& target_dump_tag, std::optional<std::string> path)
-{
-	interface::dataPlane dataplane;
-	const auto& shm_info = dataplane.get_shm_info();
-	bool first_ring = true;
-	std::vector<std::string> created_files;
-
-	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset, capacity] : shm_info)
-	{
-		YANET_LOG_INFO("Checking ring: name='%s', tag='%s', target='%s'\n",
-		               ring_name.c_str(),
-		               dump_tag.c_str(),
-		               target_dump_tag.c_str());
-
-		if (target_dump_tag != dump_tag)
-			continue;
-
-		if (dump_config.format != tDataPlaneConfig::DumpFormat::kPcap)
-		{
-			YANET_LOG_ERROR("Asked to dump pcap files for dump tag %s, but provided "
-			                "ring is not configured to pcap format. "
-			                "Double-check dataplane.conf \"sharedMemory\" section\n",
-			                target_dump_tag.c_str());
-			return;
-		}
-
-		YANET_LOG_INFO("Matched ring: name='%s', tag='%s', core=%d, socket=%d, path='%s'\n",
-		               ring_name.c_str(),
-		               dump_tag.c_str(),
-		               core_id,
-		               socket_id,
-		               path.value_or("/tmp/").c_str());
-
-		auto files = dataplane.tcpdump({dump_tag, core_id, socket_id, ring_name, path.value_or("/tmp/")});
-		created_files.insert(created_files.end(), files.begin(), files.end());
-
-		first_ring = false;
-	}
-
-	if (first_ring)
-	{
-		YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but such ring was not found\n",
-		                target_dump_tag.c_str());
-	}
-
-	if (created_files.empty())
-	{
-		std::cout << "No pcap files were created. "
-		             "Please check yanet-dataplane logs for more details.\n";
-		return;
-	}
-
-	print_pcap_helper(created_files);
-}
-
-static void tcpdump_follow(const std::string& target_dump_tag, std::optional<std::string> path)
-{
-	interface::dataPlane dataplane;
-	const auto& shm_info = dataplane.get_shm_info();
-
-	/* 1. map every matching ring-segment */
-	std::unordered_map<key_t, void*> mapped;
-
-	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset, capacity] : shm_info)
-	{
-		YANET_LOG_INFO("Checking ring: name='%s', tag='%s', target='%s'\n",
-		               ring_name.c_str(),
-		               dump_tag.c_str(),
-		               target_dump_tag.c_str());
-
-		if (target_dump_tag != dump_tag)
-			continue;
-
-		if (dump_config.format != tDataPlaneConfig::DumpFormat::kPcap)
-		{
-			YANET_LOG_ERROR("Asked to dump pcap files for dump tag %s, but provided "
-			                "ring is not configured to pcap format. "
-			                "Double-check dataplane.conf \"sharedMemory\" section\n",
-			                target_dump_tag.c_str());
-			return;
-		}
-
-		YANET_LOG_INFO("Matched ring: name='%s', tag='%s', core=%d, socket=%d, path='%s'\n",
-		               ring_name.c_str(),
-		               dump_tag.c_str(),
-		               core_id,
-		               socket_id,
-		               path.value_or("/tmp/").c_str());
-
-		if (!mapped.count(ipc_key))
-		{
-			int id = shmget(ipc_key, 0, 0);
-			void* sh = shmat(id, nullptr, 0);
-			mapped[ipc_key] = sh;
-		}
-		void* base = utils::ShiftBuffer(mapped[ipc_key], offset);
-		auto* meta = reinterpret_cast<tDataPlaneConfig::RingMeta*>(base);
-	}
-}
-
 // TODO: what if we call tcpdump read on other ring while this is busy-looping?
 // Or on the same ring? Some warning would be nice, I guess.
 inline void tcpdump(const std::string& mode, const std::string& target_dump_tag, std::optional<std::string> path)
 {
-	if (mode != "read" || mode != "follow")
+	if (mode != "read" && mode != "follow")
 	{
 		YANET_LOG_ERROR("Unsupported mode '%s'. Supported modes are 'read' and 'follow'.\n", mode.c_str());
 		return;
@@ -883,7 +750,7 @@ inline void tcpdump(const std::string& mode, const std::string& target_dump_tag,
 
 	if (mode == "follow")
 	{
-		tcpdump_follow(target_dump_tag, path);
+		tcpdump_follow(target_dump_tag);
 	}
 	else
 	{
