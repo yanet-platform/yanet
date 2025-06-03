@@ -153,7 +153,7 @@ size_t RingPcap::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 {
 	auto& file_hdr_size = pcpp::PcapShmWriterDevice::kPcapFileHeaderSize;
 	auto& pkt_hdr_size = pcpp::PcapShmWriterDevice::kPcapPacketHeaderSizeOnDisk;
-	auto meta_size = sizeof(tDataPlaneConfig::RingMeta);
+	auto meta_size = sizeof(RingMeta);
 
 	size_t capacity = meta_size + file_hdr_size + (pkt_hdr_size + max_pkt_size) * pkt_count;
 
