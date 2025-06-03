@@ -305,7 +305,7 @@ eResult cControlPlane::clearWorkerDumpRings()
 
 eResult cControlPlane::flushDumpRing(const common::idp::flushDumpRing::request& request)
 {
-	const auto& [tag, ring_core_id, ring_socket_id] = request;
+	const auto& [tag, ring_core_id, ring_socket_id] = request.data;
 
 	for (cWorker* worker : dataPlane->workers_vector)
 	{

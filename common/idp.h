@@ -644,9 +644,30 @@ using response = std::tuple<common::slowworker::stats_t,
                             std::vector<hashtable_gc>>;
 }
 
+/*
+ * Our IPC is imperfect. Since we push all possible requests input information into one
+ * std::variant, we can't have two requests that use the same type as an input information.
+ * Therefore, we need to create custom wrapper structures so std::variant will compile.
+ */
+template<typename T, common::idp::requestType ReqId>
+struct DumpRingRequestWrapper
+{
+	T data{};
+
+	DumpRingRequestWrapper() = default;
+
+	DumpRingRequestWrapper(const T& value) :
+	        data(value) {}
+	DumpRingRequestWrapper(T&& value) :
+	        data(std::move(value)) {}
+
+	SERIALIZABLE(data);
+};
+
 namespace flushDumpRing
 {
-using request = tDataPlaneConfig::DumpRingDesc;
+using request = DumpRingRequestWrapper<tDataPlaneConfig::DumpRingDesc,
+                                       common::idp::requestType::flushDumpRing>;
 }
 
 namespace get_worker_gc_stats
