@@ -164,6 +164,14 @@ void PcapShmWriterDevice::ResetMeta()
 	meta->after.store(0, std::memory_order_relaxed);
 }
 
+void PcapShmWriterDevice::SwitchToFollow()
+{
+	meta->mode.store(RingMode::Stop, std::memory_order_release);
+	Flush();
+	ResetMeta();
+	meta->mode.store(RingMode::Follow, std::memory_order_release);
+}
+
 bool PcapShmWriterDevice::open()
 {
 	if (m_DeviceOpened)
