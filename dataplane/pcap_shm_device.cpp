@@ -58,8 +58,7 @@ bool PcapShmWriterDevice::FillSegments()
 }
 
 PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t pcap_files, LinkLayerType link_layer_type, bool nanoseconds_precision) :
-        // Tell the parent that "my usable buffer starts after the header"
-        IShmWriterDevice(utils::ShiftBuffer(shm_ptr, sizeof(Meta)),
+        IShmWriterDevice(utils::ShiftBuffer(shm_ptr, sizeof(Meta)), // Usable buffer starts after the meta
                          shm_size - sizeof(Meta)),
         link_layer_type_(link_layer_type),
         pcap_files_(pcap_files),
@@ -80,9 +79,7 @@ PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t 
 	m_Precision_ = FileTimestampPrecision::Microseconds;
 #endif
 
-	/* --- place RingMeta at the very front -------------------------------- */
-	// Mode is "Stop" by default, so we won't parse any packets before
-	// we're fully initizlized (see open())
+	// Mode is "Stop" by default, so we won't parse any packets before we're fully initizlized (see open())
 	meta = new (shm_ptr) Meta();
 }
 
@@ -179,10 +176,7 @@ void PcapShmWriterDevice::SwitchToFollow()
 
 void PcapShmWriterDevice::FollowDone()
 {
-	// Prevent any further packet writes by switching to STOP mode
-	meta->mode.store(RingMode::Stop, std::memory_order_release);
-
-	// Fully reset state — flush, close FILE*, recreate pcap handles, etc.
+	StopPackets();
 	Clean();
 }
 
@@ -301,8 +295,8 @@ bool PcapShmWriterDevice::WritePacketForRead(RawPacket const& packet)
 {
 	const pcap_pkthdr pkt_hdr = CreatePacketHeader(packet);
 
-	// kPcapPacketHeaderSizeOnDisk is different from sizeof(pcap_pkthdr)
-	size_t needed = kPcapPacketHeaderSizeOnDisk + pkt_hdr.caplen;
+	// sizeof(PcapOnDiskRecordHeader) is different from sizeof(pcap_pkthdr)
+	size_t needed = sizeof(PcapOnDiskRecordHeader) + pkt_hdr.caplen;
 	if (!EnsureSegmentCapacity(needed))
 	{
 		return false;
@@ -312,10 +306,76 @@ bool PcapShmWriterDevice::WritePacketForRead(RawPacket const& packet)
 	return true;
 }
 
-bool PcapShmWriterDevice::WritePacketForFollow([[maybe_unused]] RawPacket const& packet)
+bool PcapShmWriterDevice::WritePacketForFollow(RawPacket const& packet)
 {
-	YANET_LOG_ERROR("'Follow' mode is not yet implemented.");
-	return false;
+	PcapOnDiskRecordHeader disk_hdr;
+	timespec packet_timestamp = packet.getPacketTimeStamp();
+	using utils::ShiftBuffer;
+
+	disk_hdr.ts_sec = static_cast<uint32_t>(packet_timestamp.tv_sec);
+	disk_hdr.ts_usec = static_cast<uint32_t>(packet_timestamp.tv_nsec / 1000);
+	disk_hdr.incl_len = packet.getRawDataLen();
+	disk_hdr.orig_len = packet.getFrameLength();
+
+	constexpr size_t on_disk_hdr_len = sizeof(PcapOnDiskRecordHeader);
+	const size_t payload_len = disk_hdr.incl_len;
+	const size_t total_record_size = on_disk_hdr_len + payload_len;
+
+	// shm_size_ is the usable data area size (already excludes Meta).
+	// A single record cannot be larger than the entire usable ring buffer.
+	if (total_record_size > shm_size_)
+	{
+		YANET_LOG_WARNING("Packet record size %zu (header %zu + payload %zu) "
+		                  "exceeds SHM Follow buffer capacity %zu. Skipping packet.",
+		                  total_record_size,
+		                  on_disk_hdr_len,
+		                  payload_len,
+		                  shm_size_);
+		return false;
+	}
+
+	uint64_t record_abs_start_offset = meta->before.fetch_add(total_record_size, std::memory_order_relaxed);
+
+	auto* start = static_cast<uint8_t*>(shm_ptr_); // Base of SHM data area
+	size_t capacity = shm_size_; // Capacity of SHM data area
+
+	size_t hdr_offset = record_abs_start_offset % capacity;
+	size_t hdr_available = capacity - hdr_offset;
+
+	// Copy header
+	if (on_disk_hdr_len <= hdr_available)
+	{
+		memcpy(ShiftBuffer(start, hdr_offset), &disk_hdr, on_disk_hdr_len);
+	}
+	else
+	{
+		// Header wraps
+		memcpy(ShiftBuffer(start, hdr_offset), &disk_hdr, hdr_available);
+		memcpy(start, ShiftBuffer(&disk_hdr, hdr_available), on_disk_hdr_len - hdr_available);
+	}
+
+	// Copy payload
+	uint64_t payload_abs_start_offset = record_abs_start_offset + on_disk_hdr_len;
+	size_t payload_offset = payload_abs_start_offset % capacity;
+	size_t payload_available = capacity - payload_offset;
+	const uint8_t* data = packet.getRawData();
+
+	if (payload_len > 0) // Only copy if there's payload
+	{
+		if (payload_len <= payload_available)
+		{
+			memcpy(ShiftBuffer(start, payload_offset), data, payload_len);
+		}
+		else
+		{
+			// Payload wraps
+			memcpy(ShiftBuffer(start, payload_offset), data, payload_available);
+			memcpy(start, ShiftBuffer(data, payload_available), payload_len - payload_available);
+		}
+	}
+
+	meta->after.store(record_abs_start_offset + total_record_size, std::memory_order_release);
+	return true;
 }
 
 bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
@@ -402,18 +462,13 @@ void PcapShmWriterDevice::close()
 	m_DeviceOpened = false;
 }
 
-void PcapShmWriterDevice::getStatistics(PcapStats& stats) const
+void PcapShmWriterDevice::getStatistics([[maybe_unused]] PcapStats& stats) const
 {
-	stats.packetsRecv = num_of_packets_written_;
-	stats.packetsDrop = num_of_packets_not_written_;
-	stats.packetsDropByInterface = 0;
+	YANET_LOG_INFO("getStatistics method is not implemented and not required. Don't use it.\n");
 }
 
 void PcapShmWriterDevice::Clean()
 {
-	num_of_packets_not_written_ = 0;
-	num_of_packets_written_ = 0;
-
 	close();
 	open();
 }

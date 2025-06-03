@@ -338,6 +338,11 @@ eResult cControlPlane::switchToFollowDumpRing(const common::idp::switchToFollowD
 
 		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[tag]];
 
+		YANET_LOG_INFO("Switching mode of DumpRing %s within Worker[core_id = %d, socket_id = %d] "
+		               "to 'follow'\n",
+		               tag.data(),
+		               ring_core_id,
+		               ring_socket_id);
 		ring->SwitchToFollow();
 		return eResult::success;
 	}
