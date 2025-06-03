@@ -307,9 +307,9 @@ eResult cControlPlane::flushDumpRing(const common::idp::flushDumpRing::request& 
 {
 	const auto& [tag, ring_core_id, ring_socket_id] = request;
 
-	for (auto& [core_id, worker] : dataPlane->workers)
+	for (cWorker* worker : dataPlane->workers_vector)
 	{
-		if (core_id != ring_core_id && worker->socketId != ring_socket_id)
+		if (worker->coreId != ring_core_id || worker->socketId != ring_socket_id)
 			continue;
 
 		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[tag]];
