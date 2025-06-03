@@ -70,6 +70,11 @@ public:
 		return get<common::idp::requestType::switchToFollowDumpRing, eResult>(request);
 	}
 
+	auto followDoneDumpRing(const common::idp::followDoneDumpRing::request& request) const
+	{
+		return get<common::idp::requestType::followDoneDumpRing, eResult>(request);
+	}
+
 	auto get_worker_gc_stats() const
 	{
 		return get<common::idp::requestType::get_worker_gc_stats, common::idp::get_worker_gc_stats::response>();

@@ -52,6 +52,7 @@ public:
 	eResult clearWorkerDumpRings();
 	eResult flushDumpRing(const common::idp::flushDumpRing::request& request);
 	eResult switchToFollowDumpRing(const common::idp::switchToFollowDumpRing::request& request);
+	eResult followDoneDumpRing(const common::idp::followDoneDumpRing::request& request);
 	common::idp::get_worker_gc_stats::response get_worker_gc_stats();
 	common::idp::get_dregress_counters::response get_dregress_counters();
 	common::idp::get_ports_stats::response get_ports_stats();

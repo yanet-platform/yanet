@@ -172,6 +172,15 @@ void PcapShmWriterDevice::SwitchToFollow()
 	meta->mode.store(RingMode::Follow, std::memory_order_release);
 }
 
+void PcapShmWriterDevice::FollowDone()
+{
+	// Prevent any further packet writes by switching to STOP mode
+	meta->mode.store(RingMode::Stop, std::memory_order_release);
+
+	// Fully reset state — flush, close FILE*, recreate pcap handles, etc.
+	Clean();
+}
+
 bool PcapShmWriterDevice::open()
 {
 	if (m_DeviceOpened)
