@@ -6,7 +6,7 @@
 
 #include "PcapDevice.h"
 #include "PcapFileDevice.h"
-#include "config.h"
+#include "dump_rings_meta.h"
 
 namespace pcpp
 {
@@ -150,8 +150,8 @@ class PcapShmWriterDevice : public IShmWriterDevice
 
 	std::vector<SegmentInfo> segments_;
 
-	using Meta = tDataPlaneConfig::RingMeta;
-	using RingMode = tDataPlaneConfig::RingMode;
+	using Meta = dumprings::RingMeta;
+	using RingMode = dumprings::RingMode;
 	Meta* meta; ///< points into the start of the given SHM page
 
 	/* Stops packets parsing */
