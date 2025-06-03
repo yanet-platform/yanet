@@ -98,12 +98,6 @@ struct ActionDispatcher
 
 		worker->aclCounters[action.counter_id]++;
 
-		YANET_LOG_INFO("Packet arrived at worker (coreId=%u, socketId=%u), ring_id=%ld, ring_ptr=%p\n",
-		               worker->coreId,
-		               worker->socketId,
-		               ring_id,
-		               static_cast<void*>(worker->dump_rings[ring_id].get()));
-
 		// polymorphic, will execute either DumpRingRaw or DumpRingPcap method,
 		// likely to be devirtualized
 		worker->dump_rings[ring_id]->Write(args.mbuf, flow.type, worker->CurrentTime());
