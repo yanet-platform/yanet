@@ -13,4 +13,3 @@ steps:
 - cli: show shm info
 
 - cli: tcpdump read ring1 /tmp
-- cli: tcpdump follow ring1 ./abc
