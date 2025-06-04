@@ -869,9 +869,11 @@ static void tcpdump_follow(const std::string& target_dump_tag, std::optional<std
 // Or on the same ring? Some warning would be nice, I guess.
 inline void tcpdump(const std::string& mode, const std::string& target_dump_tag, std::optional<std::string> path)
 {
-	// TODO: imorozko@lab-vla-lb3ac:~$ sudo yanet-cli tcpdump defaultdump
-	// [ERROR] 1748886977.864754 ../cli/show.h:872: Ring tag should be specified
-	//  That is obscuring user, made it better
+	if (mode != "read" || mode != "follow")
+	{
+		YANET_LOG_ERROR("Unsupported mode '%s'. Supported modes are 'read' and 'follow'.\n", mode.c_str());
+		return;
+	}
 
 	if (target_dump_tag.empty())
 	{
@@ -879,18 +881,13 @@ inline void tcpdump(const std::string& mode, const std::string& target_dump_tag,
 		return;
 	}
 
-	if (mode == "read")
-	{
-		tcpdump_read(target_dump_tag, path);
-	}
-	else if (mode == "follow")
+	if (mode == "follow")
 	{
 		tcpdump_follow(target_dump_tag, path);
 	}
 	else
 	{
-		YANET_LOG_ERROR("Unsupported mode '%s'. Supported modes are 'read' and 'follow'.\n", mode.c_str());
-		return;
+		tcpdump_read(target_dump_tag, path);
 	}
 }
 
