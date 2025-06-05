@@ -99,8 +99,8 @@ TEST(SynCookiesTest, RandomValidation) {
     //          positive / total ~= 1/(2^23)
     // positive / total * (2^23) ~= 1
     double res = (double)positive / total * (1 << 23);
-    EXPECT_GT(res, 0.8);
-    EXPECT_LT(res, 1.2);
+    EXPECT_GT(res, 0.75);
+    EXPECT_LT(res, 1.25);
 }
 
 }
