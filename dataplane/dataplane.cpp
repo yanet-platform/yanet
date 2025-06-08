@@ -1144,7 +1144,7 @@ eResult cDataPlane::initWorkers()
 	return eResult::success;
 }
 
-eResult cDataPlane::InitSlowWorker(tCoreId core, const std::set<tCoreId>& worker_cores, tQueueId phy_queue)
+eResult cDataPlane::InitSlowWorker(tCoreId core, const std::set<tCoreId>& worker_cores, tQueueId phy_queue, bool first)
 {
 	const tSocketId socket_id = rte_lcore_to_socket_id(core);
 
@@ -1259,6 +1259,19 @@ eResult cDataPlane::InitSlowWorker(tCoreId core, const std::set<tCoreId>& worker
 		}
 	}
 
+	rte_ring* ring_retransmit_free = nullptr;
+	rte_ring* ring_retransmit_send = nullptr;
+	if (first)
+	{
+		eResult result = InitRingsForRetransmits(core, socket_id);
+		if (result != eResult::success)
+		{
+			return result;
+		}
+		ring_retransmit_free = ring_retransmit_free_;
+		ring_retransmit_send = ring_retransmit_send_;
+	}
+
 	auto slow = new dataplane::SlowWorker(worker,
 	                                      std::move(ports_to_service),
 	                                      std::move(workers_to_service),
@@ -1266,7 +1279,9 @@ eResult cDataPlane::InitSlowWorker(tCoreId core, const std::set<tCoreId>& worker
 	                                      dataplane::KernelInterfaceWorker{kni_bundleconf},
 	                                      socket_cplane_mempools.at(socket_id),
 	                                      config.use_kernel_interface,
-	                                      config.SWICMPOutRateLimit);
+	                                      config.SWICMPOutRateLimit,
+										  ring_retransmit_free,
+										  ring_retransmit_send);
 	if (!slow)
 	{
 		return eResult::dataplaneIsBroken;
@@ -1276,15 +1291,50 @@ eResult cDataPlane::InitSlowWorker(tCoreId core, const std::set<tCoreId>& worker
 	return eResult::success;
 }
 
+eResult cDataPlane::InitRingsForRetransmits(tCoreId core, tSocketId socket_id)
+{
+	ring_retransmit_free_ = rte_ring_create(("ring_retransmit_free_" + std::to_string(core)).c_str(),
+	                                        MAX_COUNT_RETRANSMITS_ALL_SERVICES,
+	                                        socket_id,
+	                                        RING_F_SP_ENQ | RING_F_SC_DEQ);
+	if (!ring_retransmit_free_)
+	{
+		return eResult::errorInitRing;
+	}
+
+	auto* data_for_retransmits = memory_manager.create_static_array<dataplane::proxy::DataForRetransmit>("slow_worker.data_for_retransmits", MAX_COUNT_RETRANSMITS_ALL_SERVICES - 1, socket_id);
+	if (!data_for_retransmits)
+	{
+		return eResult::errorAllocatingMemory;
+	}
+	for (uint32_t index = 0; index < MAX_COUNT_RETRANSMITS_ALL_SERVICES - 1; index++)
+	{
+		rte_ring_sp_enqueue(ring_retransmit_free_, (void*)&data_for_retransmits[index]);
+	}
+
+	ring_retransmit_send_ = rte_ring_create(("ring_retransmit_send_" + std::to_string(core)).c_str(),
+	                                        MAX_COUNT_RETRANSMITS_ALL_SERVICES,
+	                                        socket_id,
+	                                        RING_F_SP_ENQ | RING_F_SC_DEQ);
+	if (!ring_retransmit_send_)
+	{
+		return eResult::errorInitRing;
+	}
+
+	return eResult::success;
+}
+
 eResult cDataPlane::InitSlowWorkers()
 {
 	auto q = tx_queues_;
+	bool first = true;
 	for (auto& [core, cfg] : config.controlplane_workers)
 	{
-		if (auto res = InitSlowWorker(core, cfg, q--); res != eResult::success)
+		if (auto res = InitSlowWorker(core, cfg, q--, first); res != eResult::success)
 		{
 			return res;
 		}
+		first = false;
 	}
 	YANET_LOG_INFO("slow workers size is %lu\n", slow_workers.size());
 
@@ -1486,6 +1536,15 @@ void cDataPlane::start()
 		for (;;)
 		{
 			tcp_connection_store.CollectGarbage(current_time);
+			std::this_thread::sleep_for(std::chrono::seconds(1));
+		}
+	});
+
+	threads.emplace_back([this]() {
+		for (;;)
+		{
+			// todo - time in ms
+			tcp_connection_store.GetDataForRetramsits(current_time - TIMEOUT_RETRANSMIT - 1, ring_retransmit_free_, ring_retransmit_send_);
 			std::this_thread::sleep_for(std::chrono::seconds(1));
 		}
 	});

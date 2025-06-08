@@ -7,6 +7,7 @@
 #include "dregress.h"
 #include "fragmentation.h"
 #include "kernel_interface_handler.h"
+#include "proxy.h"
 #include "worker.h"
 
 namespace dataplane
@@ -35,6 +36,10 @@ private:
 	Config config_;
 	dataplane::KernelInterfaceWorker kni_worker_;
 
+	// tcp proxy
+	rte_ring* ring_retransmit_free_;
+	rte_ring* ring_retransmit_send_;
+
 	auto SlowWorkerSender()
 	{
 		return [this](rte_mbuf* pkt, const common::globalBase::tFlow& flow) {
@@ -56,7 +61,9 @@ public:
 	           KernelInterfaceWorker&& kni,
 	           rte_mempool* mempool,
 	           bool use_kni,
-	           uint32_t sw_icmp_out_rate_limit);
+	           uint32_t sw_icmp_out_rate_limit,
+			   rte_ring* ring_retransmit_free,
+			   rte_ring* ring_retransmit_send);
 	SlowWorker(const SlowWorker&) = delete;
 	SlowWorker(SlowWorker&& other);
 	SlowWorker& operator=(const SlowWorker&) = delete;
@@ -88,6 +95,7 @@ public:
 	void handlePacket_balancer_icmp_forward(rte_mbuf* mbuf);
 	void handlePacketFromForwardingPlane(rte_mbuf* mbuf);
 	void HandleWorkerRings();
+	void SendRentransmits();
 
 	// \brief dequeue packets from worker_gc's ring to slowworker
 	void DequeueGC();
@@ -106,6 +114,7 @@ public:
 		DequeueGC();
 		fragmentation_.handle();
 		dregress_.handle();
+		SendRentransmits();
 
 		if (config_.use_kernel_interface)
 		{

@@ -1,14 +1,16 @@
 #pragma once
 
-#include "memory_manager.h"
-#include <rte_tcp.h>
-#include "local_pool.h"
-#include "proxy_syn.h"
-#include "type.h"
-#include "syncookies.h"
-#include "common/idp.h"
-
 #include <mutex>
+#include <rte_tcp.h>
+
+#include "common/idp.h"
+#include "common/static_vector.h"
+
+#include "local_pool.h"
+#include "memory_manager.h"
+#include "proxy_syn.h"
+#include "syncookies.h"
+#include "type.h"
 
 #define TCPOPT_NOP		1	/* Padding */
 #define TCPOPT_EOL		0	/* End of options */
@@ -25,6 +27,11 @@
 
 #define MAX_SIZE_TCP_OPTIONS 40
 
+#define TIMEOUT_ACK 10 // todo
+#define TIMEOUT_RETRANSMIT 1 // todo
+#define MAX_COUNT_RETRANSMITS_PER_SERVICE (uint32_t)16 // todo
+#define MAX_COUNT_RETRANSMITS_ALL_SERVICES (uint32_t)128 // todo - must be a power of 2
+
 namespace dataplane::proxy
 {
 
@@ -38,6 +45,7 @@ struct TcpOptions
 
     bool Read(uint8_t* data, uint32_t len);
     uint32_t Write(rte_mbuf* mbuf) const;
+    uint32_t WriteBuffer(uint8_t* data) const;
 
     std::string DebugInfo() const;
 
@@ -223,9 +231,30 @@ struct OneConnection
     uint32_t timestamp_shift;
 
     uint32_t client_start_seq;
+    uint32_t flags;
+    uint32_t client_timestamp_start;    // used for sent retransmits syn packets to service
+    uint32_t cookie_data;    // used for sent retransmits syn packets to service
+
+    static constexpr uint32_t flag_from_synkookie = 1 << 0;
+    static constexpr uint32_t flag_answer_from_server = 1 << 1;
+    static constexpr uint32_t flag_nonempty_ack_from_client = 1 << 2;
+    static constexpr uint32_t flag_sent_rentransmit_syn_to_server = 1 << 3;
         
     void Clear();
     bool IsExpired(uint32_t current_time);
+};
+
+struct DataForRetransmit
+{
+    proxy_service_id_t service_id;
+    uint32_t src;
+    uint32_t dst;
+	uint16_t sport;
+    uint16_t dport;
+    uint32_t client_start_seq;
+    uint32_t tcp_options_len;
+    uint8_t tcp_options_data[MAX_SIZE_TCP_OPTIONS];
+    common::globalBase::tFlow flow;
 };
 
 struct ConnectionBucket
@@ -243,17 +272,19 @@ struct ConnectionBucket
 class ServiceConnections
 {
     public:
-    bool Initialize(proxy_service_id_t service_id, uint32_t number_connections, dataplane::memory_manager* memory_manager);
+    bool Initialize(proxy_service_id_t service_id,uint32_t number_connections, dataplane::memory_manager* memory_manager, uint32_t service_addr, uint16_t service_port);
     bool _TestInit(proxy_service_id_t service_id, uint32_t number_connections);
     bool _TestFree();
 
     bool TryInsert(uint32_t client_addr, uint16_t client_port,
                     uint32_t local_addr, uint16_t local_port,
-                    ConnectionState state, uint32_t sent_seq, uint32_t client_start_seq, uint32_t current_time, uint32_t timestamp_echo);
+                    ConnectionState state, uint32_t sent_seq, uint32_t client_start_seq,
+                    uint32_t current_time, uint32_t timestamp_echo, uint32_t flags, uint32_t client_timestamp_start, uint32_t cookie_data);
 
     void GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response);
 
     void CollectGarbage(uint32_t current_time, LocalPool& local_pool);
+    uint32_t GetDataForRetramsits(uint32_t before_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send, const common::globalBase::tFlow& flow);
 
 private:
     struct _LockPointer {
@@ -284,6 +315,8 @@ private:
     ConnectionBucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;
     bool initialized_ = false;
+    proxy_service_id_t service_id_;
+    uint64_t service_key_;
 };
 
 class TcpConnectionStore
@@ -321,7 +354,9 @@ public:
 	                                       uint16_t src_port,
 	                                       uint32_t seq,
 	                                       uint32_t ack,
-                                           uint32_t timestamp_echo);
+                                           uint32_t timestamp_echo,
+                                           bool empty_tcp_data,
+                                           uint32_t client_timestamp_start);
 
     ActionServerOnSynAck_Result ActionServerOnSynAck(proxy_service_id_t service_id,
                                                  const dataplane::globalBase::proxy_service_t& service,
@@ -342,6 +377,8 @@ public:
                                            
     uint32_t currentTime;   // todo
 
+    void GetDataForRetramsits(uint32_t before_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
+
 private:
     std::mutex mutex_;
     SynCookies syn_cookies_;
@@ -349,6 +386,9 @@ private:
     LocalPool local_pools_[YANET_CONFIG_PROXY_SERVICES_SIZE];
     ServiceConnections service_connections_[YANET_CONFIG_PROXY_SERVICES_SIZE];
     ServiceSynConnections syn_connections_[YANET_CONFIG_PROXY_SERVICES_SIZE];
+
+    uint32_t index_start_check_retransmits_ = 0;
+    common::globalBase::tFlow next_flow_;
 };
 
 }

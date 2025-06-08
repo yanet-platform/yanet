@@ -184,13 +184,14 @@ protected:
 	bool KNIAddRxQueue(KniHandleBundle& bundle, tQueueId queue, tSocketId socket, rte_mempool* mempool);
 	eResult initGlobalBases();
 	eResult initWorkers();
-	eResult InitSlowWorker(tCoreId core, const std::set<tCoreId>& workers, tQueueId phy_queue);
+	eResult InitSlowWorker(tCoreId core, const std::set<tCoreId>& workers, tQueueId phy_queue, bool first);
 	eResult InitSlowWorkers();
 	eResult initKniQueues();
 	eResult InitTxQueues();
 	eResult InitRxQueues();
 	eResult initSharedMemory();
 	void init_worker_base();
+	eResult InitRingsForRetransmits(tCoreId core, tSocketId socket_id);
 
 	eResult allocateSharedMemory();
 	eResult splitSharedMemoryPerWorkers();
@@ -232,6 +233,10 @@ protected:
 
 	std::mutex currentGlobalBaseId_mutex;
 	uint8_t currentGlobalBaseId;
+
+	// tcp proxy
+	rte_ring* ring_retransmit_free_;
+	rte_ring* ring_retransmit_send_;
 
 public:
 	std::map<tSocketId, dataplane::globalBase::atomic*> globalBaseAtomics;

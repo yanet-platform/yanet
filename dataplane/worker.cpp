@@ -6233,6 +6233,12 @@ inline void cWorker::proxy_client_ack_entry(rte_mbuf* mbuf)
 	proxy_client_ack_stack.insert(mbuf);
 }
 
+bool EmptyTcpData(const rte_ipv4_hdr* ipv4Header, const rte_tcp_hdr* tcp_header)
+{
+	uint16_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+	return ipv4Header->total_length == ((ipv4Header->ihl & 0xf) << 2) + tcp_header_len;
+}
+
 inline void cWorker::proxy_client_ack_handle()
 {
 	const auto& base = bases[localBaseId & 1];
@@ -6270,6 +6276,9 @@ inline void cWorker::proxy_client_ack_handle()
 		memset(&tcp_options, 0, sizeof(tcp_options));
 		tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
 		YANET_LOG_WARNING("\ttcp options: %s\n", tcp_options.DebugInfo().c_str());
+
+		bool empty_tcp_data = (rte_be_to_cpu_16(ipv4Header->total_length) == sizeof(rte_ipv4_hdr) + tcp_header_len);
+
 		dataplane::proxy::ActionClientOnAck_Result action = tcp_connection_store->ActionClientOnAck(metadata->flow.data.proxy.service_id,
 																									service,
 																									current_time,
@@ -6277,7 +6286,9 @@ inline void cWorker::proxy_client_ack_handle()
 		                                                                                            tcp_header->src_port,
 		                                                                                            tcp_header->sent_seq,
 		                                                                                            tcp_header->recv_ack,
-																									tcp_options.timestamp_echo);
+																									tcp_options.timestamp_echo,
+																									empty_tcp_data,
+																									tcp_options.timestamp_value);
 
 		if (const auto action_drop = std::get_if<dataplane::proxy::ActionDrop>(&action))
 		{

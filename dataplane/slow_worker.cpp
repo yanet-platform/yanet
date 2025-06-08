@@ -15,7 +15,9 @@ SlowWorker::SlowWorker(cWorker* worker,
                        KernelInterfaceWorker&& kni,
                        rte_mempool* mempool,
                        bool use_kni,
-                       uint32_t sw_icmp_out_rate_limit) :
+                       uint32_t sw_icmp_out_rate_limit,
+					   rte_ring* ring_retransmit_free,
+					   rte_ring* ring_retransmit_send) :
         ports_serviced_{std::move(ports_to_service)},
         workers_serviced_{std::move(workers_to_service)},
         from_gcs_{std::move(from_gcs)},
@@ -28,7 +30,9 @@ SlowWorker::SlowWorker(cWorker* worker,
                   slow_worker_->dataPlane,
                   static_cast<uint32_t>(slow_worker_->dataPlane->getConfigValues().gc_step)), // @TODO fix mismatch in type of config value and actually used one
         config_{sw_icmp_out_rate_limit, use_kni},
-        kni_worker_{std::move(kni)}
+        kni_worker_{std::move(kni)},
+		ring_retransmit_free_(ring_retransmit_free),
+		ring_retransmit_send_(ring_retransmit_send)
 {
 	workers_serviced_.emplace_back(slow_worker_);
 }
@@ -40,7 +44,9 @@ SlowWorker::SlowWorker(SlowWorker&& other) :
         mempool_{other.mempool_},
         fragmentation_{std::move(other.fragmentation_)},
         dregress_{std::move(other.dregress_)},
-        kni_worker_{std::move(other.kni_worker_)}
+        kni_worker_{std::move(other.kni_worker_)},
+		ring_retransmit_free_(other.ring_retransmit_free_),
+		ring_retransmit_send_(other.ring_retransmit_send_)
 {
 	fragmentation_.Callback() = SlowWorkerSender();
 }
@@ -55,6 +61,8 @@ SlowWorker& SlowWorker::operator=(SlowWorker&& other)
 	fragmentation_.Callback() = SlowWorkerSender();
 	dregress_ = std::move(other.dregress_);
 	kni_worker_ = std::move(other.kni_worker_);
+	ring_retransmit_free_ = other.ring_retransmit_free_;
+	ring_retransmit_send_ = other.ring_retransmit_send_;
 	return *this;
 }
 
@@ -978,6 +986,76 @@ void SlowWorker::DequeueGC()
 			dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
 			SendToSlowWorker(mbuf, metadata->flow);
+		}
+	}
+}
+
+void SlowWorker::SendRentransmits()
+{
+	common::globalBase::tFlow flow;
+	flow.type = common::globalBase::eFlowType::route;
+
+	if (ring_retransmit_free_ != nullptr && ring_retransmit_send_ != nullptr)
+	{
+		dataplane::proxy::DataForRetransmit* data;
+		for (uint32_t index = 0; (index < MAX_COUNT_RETRANSMITS_ALL_SERVICES) && (rte_ring_dequeue(ring_retransmit_send_, (void**)&data) == 0); index++)
+		{
+			
+			YANET_LOG_WARNING("!!!!  SlowWorker::SendRentransmits src=%x:%u, dst=%x:%u, client_start_seq=%u\n",
+				rte_be_to_cpu_32(data->src), rte_be_to_cpu_16(data->sport), rte_be_to_cpu_32(data->dst), rte_be_to_cpu_16(data->sport),
+				rte_be_to_cpu_32(data->client_start_seq));
+
+			rte_mbuf* mbuf = rte_pktmbuf_alloc(mempool_);
+			if (mbuf == nullptr)
+			{
+				YANET_LOG_WARNING("Can't allocate mbuf\n");
+				break;
+			}
+
+			constexpr uint16_t payload_offset = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + sizeof(rte_ipv4_hdr) + sizeof(rte_tcp_hdr);
+			rte_pktmbuf_append(mbuf, payload_offset + data->tcp_options_len);
+
+			dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+			// metadata->flow.data.aclId = aclId;
+
+			void* payload = rte_pktmbuf_mtod_offset(mbuf, void*, payload_offset);
+			memcpy(payload, data->tcp_options_data, data->tcp_options_len);
+
+			metadata->network_headerType = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
+			metadata->network_headerOffset = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr);
+			metadata->transport_headerType = IPPROTO_TCP;
+			metadata->transport_headerOffset = metadata->network_headerOffset + sizeof(rte_ipv4_hdr);
+
+			generic_rte_ether_hdr* ethernetHeader = rte_pktmbuf_mtod(mbuf, generic_rte_ether_hdr*);
+			ethernetHeader->ether_type = rte_cpu_to_be_16(RTE_ETHER_TYPE_VLAN);
+			// rte_ether_addr_copy(&fw_state_config.ether_address_destination, &ethernetHeader->dst_addr);
+
+			rte_vlan_hdr* vlanHeader = rte_pktmbuf_mtod_offset(mbuf, rte_vlan_hdr*, sizeof(rte_ether_hdr));
+			vlanHeader->eth_proto = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
+
+			rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+			ipv4Header->total_length = rte_cpu_to_be_16(sizeof(rte_ipv4_hdr) + sizeof(rte_tcp_hdr) + data->tcp_options_len);
+			ipv4Header->next_proto_id = IPPROTO_TCP;
+			ipv4Header->time_to_live = 64;
+			ipv4Header->src_addr = data->src;
+			ipv4Header->dst_addr = data->dst;
+			ipv4Header->version_ihl = 0x45;
+
+			ipv4Header->hdr_checksum = 0;
+			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
+
+			rte_tcp_hdr* tcpHeader = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->network_headerOffset + sizeof(rte_ipv4_hdr));
+			tcpHeader->src_port = data->sport;
+			tcpHeader->dst_port = data->dport;
+			tcpHeader->tcp_flags = TCP_SYN_FLAG;
+			tcpHeader->data_off = ((sizeof(rte_tcp_hdr) + data->tcp_options_len) >> 2) << 4;
+			tcpHeader->rx_win = rte_cpu_to_be_16(1024);
+			tcpHeader->sent_seq = data->client_start_seq;
+			tcpHeader->recv_ack = 0;
+			tcpHeader->cksum = 0;
+			tcpHeader->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcpHeader);
+
+			SendToSlowWorker(mbuf, flow);
 		}
 	}
 }
