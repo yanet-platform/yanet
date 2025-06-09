@@ -6460,6 +6460,7 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		{
 			tcp_options.sack_permitted = false;
 			tcp_options.mss = 0;
+			tcp_options.window_scaling = 0;
 			tcp_options.Write(mbuf);
 
 			ipv4Header->src_addr = service.proxy_addr.address;	// todo
@@ -6473,6 +6474,7 @@ inline void cWorker::proxy_server_syn_ack_handle()
 			tcp_header->dst_port = ack_to_client->client_port;
 			tcp_header->tcp_flags = TCP_ACK_FLAG;
 			dataplane::proxy::ShiftTcpOptions(tcp_header, 0, ack_to_client->timestamp_shift, 0);
+			tcp_header->rx_win = dataplane::proxy::shift_cpu_16(tcp_header->rx_win, ack_to_client->window_size_shift);
 
 			tcp_header->cksum = 0;
 			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
@@ -6587,6 +6589,7 @@ inline void cWorker::proxy_server_ack_handle()
 			tcp_header->sent_seq = dataplane::proxy::add_cpu_32(tcp_header->sent_seq, forward->shift_seq);
 
 			dataplane::proxy::ShiftTcpOptions(tcp_header, 0, forward->timestamp_shift, 0);
+			tcp_header->rx_win = dataplane::proxy::shift_cpu_16(tcp_header->rx_win, forward->window_size_shift);
 
 			tcp_header->cksum = 0;
 			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);

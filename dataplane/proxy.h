@@ -120,6 +120,12 @@ inline uint32_t add_cpu_32(uint32_t value, int32_t added)
     return rte_cpu_to_be_32(rte_be_to_cpu_32(value) + added);
 }
 
+inline uint16_t shift_cpu_16(uint16_t value, int32_t shift)
+{
+    uint32_t result = (shift > 0 ? uint32_t(rte_be_to_cpu_16(value)) >> shift : uint32_t(rte_be_to_cpu_16(value)) << (-shift));
+    return rte_cpu_to_be_16(std::min(result, 0xffffu));
+}
+
 void FillProxyHeader(proxy_v2_ipv4_hdr* proxy_header, uint32_t src_addr, tPortId src_port, uint32_t dst_addr, tPortId dst_port);
 
 // ----------------------------------------------------------------------------
@@ -184,6 +190,7 @@ struct ActionServerOnSynAck_AckToClient
     uint32_t seq;
     uint32_t ack;
     uint32_t timestamp_shift;
+    int32_t window_size_shift;
 };
 
 using ActionServerOnSynAck_Result = std::variant<ActionServerOnSynAck_SynAckToClient, ActionServerOnSynAck_AckToClient, ActionDrop>;
@@ -198,6 +205,7 @@ struct ActionServerOnAck_ForwardFirst
     uint32_t ack;
     size_t tcp_options_size;
     uint8_t tcp_options[MAX_SIZE_TCP_OPTIONS];
+    int32_t window_size_shift;
 };
 
 struct ActionServerOnAck_Forward
@@ -206,6 +214,7 @@ struct ActionServerOnAck_Forward
     uint16_t dst_port;
     uint32_t shift_seq;
     uint32_t timestamp_shift;
+    int32_t window_size_shift;
 };
 
 using ActionServerOnAck_Result = std::variant<ActionServerOnAck_ForwardFirst, ActionServerOnAck_Forward, ActionDrop>;
@@ -234,6 +243,7 @@ struct OneConnection
     uint32_t flags;
     uint32_t client_timestamp_start;    // used for sent retransmits syn packets to service
     uint32_t cookie_data;    // used for sent retransmits syn packets to service
+    int32_t window_size_shift;
 
     static constexpr uint32_t flag_from_synkookie = 1 << 0;
     static constexpr uint32_t flag_answer_from_server = 1 << 1;

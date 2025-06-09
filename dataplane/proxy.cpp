@@ -502,7 +502,6 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
         result.add_proxy_header = service.proxy_header;
         result.shift_ack = 0;
         result.shift_seq = (result.add_proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0);
-        
         syn_ptr->connection->Clear();
 
         return result;
@@ -612,13 +611,18 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_servi
     YANET_LOG_WARNING("\t timestamps: proxy_start=%d, server_start=%d, shift=%d\n", conn_ptr->connection->timestamp_echo, tcp_options.timestamp_value, timestamp_shift);
     conn_ptr->connection->timestamp_shift = timestamp_shift;
 
+    if ((conn_ptr->connection->flags & OneConnection::flag_from_synkookie) != 0)
+    {
+        conn_ptr->connection->window_size_shift = tcp_options.window_scaling - service.winscale;
+    }
 
     return ActionServerOnSynAck_AckToClient{
         .client_addr = client_addr,
         .client_port = client_port,
         .seq = rte_cpu_to_be_32(sent_seq + 1),
         .ack = (service.proxy_header ? add_cpu_32(ack, int(sizeof(proxy_v2_ipv4_hdr))) : ack),
-        .timestamp_shift = timestamp_shift };
+        .timestamp_shift = timestamp_shift,
+        .window_size_shift = conn_ptr->connection->window_size_shift };
 }
 
 ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_service_id_t service_id,
@@ -660,6 +664,7 @@ ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_service_id_
         forward.dst_port = client_port;
         forward.shift_seq = conn_ptr->connection->shift_server;
         forward.timestamp_shift = conn_ptr->connection->timestamp_shift;
+        forward.window_size_shift = conn_ptr->connection->window_size_shift;
         return forward;
     }
 }
@@ -690,6 +695,7 @@ void OneConnection::Clear()
     shift_server = 0;
     timestamp_shift = 0;
     flags = 0;
+    window_size_shift = 0;
 }
 
 bool OneConnection::IsExpired(uint32_t current_time)
