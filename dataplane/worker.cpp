@@ -359,6 +359,11 @@ void cWorker::SetTcpConnectionStore(dataplane::proxy::TcpConnectionStore* store)
 	tcp_connection_store = store;
 }
 
+void cWorker::SetProxyWorkerId(uint32_t id)
+{
+	proxy_worker_id = id;
+}
+
 eResult cWorker::sanityCheck()
 {
 	if (coreId != rte_lcore_id())
@@ -6164,6 +6169,7 @@ inline void cWorker::proxy_client_syn_handle()
 
 		YANET_LOG_WARNING("\ttcp options: %s\n", tcp_options.DebugInfo().c_str());
 		dataplane::proxy::ActionClientOnSyn_Result action = tcp_connection_store->ActionClientOnSyn(metadata->flow.data.proxy.service_id,
+																									proxy_worker_id,
 																									service,
 																									current_time,
 		                                                                                            ipv4Header->src_addr,
@@ -6280,6 +6286,7 @@ inline void cWorker::proxy_client_ack_handle()
 		bool empty_tcp_data = (rte_be_to_cpu_16(ipv4Header->total_length) == sizeof(rte_ipv4_hdr) + tcp_header_len);
 
 		dataplane::proxy::ActionClientOnAck_Result action = tcp_connection_store->ActionClientOnAck(metadata->flow.data.proxy.service_id,
+																									proxy_worker_id,
 																									service,
 																									current_time,
 		                                                                                            ipv4Header->src_addr,

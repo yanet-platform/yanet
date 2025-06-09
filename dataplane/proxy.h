@@ -350,6 +350,7 @@ public:
 
     // Action from worker
     ActionClientOnSyn_Result ActionClientOnSyn(proxy_service_id_t service_id,
+                                           uint32_t worker_id,
                                            const dataplane::globalBase::proxy_service_t& service,
                                            uint32_t current_time,
 	                                       uint32_t src_addr,
@@ -358,6 +359,7 @@ public:
 	                                       const TcpOptions& tcp_options);
 
     ActionClientOnAck_Result ActionClientOnAck(proxy_service_id_t service_id,
+                                           uint32_t worker_id,
                                            const dataplane::globalBase::proxy_service_t& service,
                                            uint32_t current_time,
 	                                       uint32_t src_addr,

@@ -881,6 +881,7 @@ eResult cDataPlane::initGlobalBases()
 
 eResult cDataPlane::initWorkers()
 {
+	uint32_t proxy_worker_id = 0;
 	for (const auto& configWorkerIter : config.workers)
 	{
 		const tCoreId& coreId = configWorkerIter.first;
@@ -898,6 +899,7 @@ eResult cDataPlane::initWorkers()
 
 		worker->SetBufferForCounters(sdp_data.workers[coreId].buffer, sdp_data.metadata_worker);
 		worker->SetTcpConnectionStore(&tcp_connection_store);
+		worker->SetProxyWorkerId(proxy_worker_id++);
 
 		dataplane::base::permanently basePermanently;
 		{

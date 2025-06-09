@@ -78,6 +78,7 @@ public:
 	static void FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata);
 	void SetBufferForCounters(void* buffer, const common::sdp::MetadataWorker& metadata);
 	void SetTcpConnectionStore(dataplane::proxy::TcpConnectionStore* store);
+	void SetProxyWorkerId(uint32_t id);
 
 	[[nodiscard]] const dataplane::base::generation& current_base() const { return bases[localBaseId & 1]; }
 
@@ -411,4 +412,5 @@ protected:
 
 	dataplane::base::generation bases[2];
 	dataplane::proxy::TcpConnectionStore* tcp_connection_store;
+	uint32_t proxy_worker_id;
 };

@@ -363,6 +363,7 @@ common::idp::proxy_local_pool::response TcpConnectionStore::GetLocalPool(std::op
 
 // Action from worker
 ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
+                                                               uint32_t worker_id,
                                                                const dataplane::globalBase::proxy_service_t& service,
                                                                uint32_t current_time,
                                                                uint32_t src_addr,
@@ -384,19 +385,22 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_service_id_
         return ActionClientOnSyn_SynToServer{seq, local_addr, local_port};
     }
 
-    std::optional<std::pair<uint32_t, tPortId>> local = local_pools_[service_id].Allocate(src_addr, src_port);
-    if (local.has_value())
+    uint64_t local = local_pools_[service_id].Allocate(worker_id, src_addr, src_port);
+    if (local != 0)
     {
-        if (syn_connections_[service_id].TryInsert(src_addr, src_port, local->first, local->second, seq, current_time))
+        uint32_t local_addr;
+        tPortId local_port;
+        LocalPool::UnpackTuple(local, local_addr, local_port);
+        if (syn_connections_[service_id].TryInsert(src_addr, src_port, local_addr, local_port, seq, current_time))
         {
             YANET_LOG_WARNING("\tSyn New Record\n");
             if (service.proxy_header)
             {
                 seq = add_cpu_32(seq, -int(sizeof(proxy_v2_ipv4_hdr)));
             }
-            return ActionClientOnSyn_SynToServer{seq, local->first, local->second};
+            return ActionClientOnSyn_SynToServer{seq, local_addr, local_port};
         }
-        local_pools_[service_id].Free(local->first, local->second);
+        local_pools_[service_id].Free(worker_id, local);
     }
 
     uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack_permitted, tcp_options.window_scaling, 0}); // ecn
@@ -407,6 +411,7 @@ ActionClientOnSyn_Result TcpConnectionStore::ActionClientOnSyn(proxy_service_id_
 }
 
 ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
+                                                               uint32_t worker_id,
                                                                const dataplane::globalBase::proxy_service_t& service,
                                                                uint32_t current_time,
                                                                uint32_t src_addr,
@@ -527,29 +532,32 @@ ActionClientOnAck_Result TcpConnectionStore::ActionClientOnAck(proxy_service_id_
     YANET_LOG_WARNING("\tmss=%d, sack=%d, wscale=%d\n", SynCookies::MssFromTable(options.mss), options.sack, options.wscale);
 
     // get from local
-    auto local = local_pools_[service_id].Allocate(src_addr, src_port);
-    if (!local.has_value())
+    uint64_t local = local_pools_[service_id].Allocate(worker_id, src_addr, src_port);
+    if (local == 0)
     {
         YANET_LOG_WARNING("\tcan't allocate in local pool\n");
         return ActionDrop{1};
     }
+    uint32_t local_addr;
+    tPortId local_port;
+    LocalPool::UnpackTuple(local, local_addr, local_port);
 
     // try add to connections
     // can fail!
 
     // Add to connections
-    if (!service_connections_[service_id].TryInsert(src_addr, src_port, local->first, local->second, ConnectionState::SENT_SYN_SERVER, 
+    if (!service_connections_[service_id].TryInsert(src_addr, src_port, local_addr, local_port, ConnectionState::SENT_SYN_SERVER, 
                                                     rte_cpu_to_be_32(ack) - 1, add_cpu_32(seq, -1), current_time, timestamp_echo,
                                                     OneConnection::flag_from_synkookie | flags, client_timestamp_start, cookie_data))
     {
         YANET_LOG_WARNING("failed insert to connections\n");
-        local_pools_[service_id].Free(local->first, local->second);
+        local_pools_[service_id].Free(worker_id, local);
         return ActionDrop{0};
     }
 
     ActionClientOnAck_NewServerConnection new_server_connection;
-    new_server_connection.local_addr = std::get<0>(*local);
-    new_server_connection.local_port = std::get<1>(*local);
+    new_server_connection.local_addr = local_addr;
+    new_server_connection.local_port = local_port;
     new_server_connection.seq = add_cpu_32(seq, -1 + (service.proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0));
 
     TcpOptions tcp_options{};
@@ -572,13 +580,15 @@ ActionServerOnSynAck_Result TcpConnectionStore::ActionServerOnSynAck(proxy_servi
                                                                      const TcpOptions& tcp_options)
 {
     // find in local pool
-    std::optional<std::pair<uint32_t, tPortId>> client_info = local_pools_[service_id].FindClientByLocal(dst_addr, dst_port);
-    if (!client_info.has_value())
+    uint64_t client_info = local_pools_[service_id].FindClientByLocal(dst_addr, dst_port);
+    if (client_info == 0)
     {
         YANET_LOG_ERROR("Not found in local connections\n");
         return ActionDrop{0};
     }
-    auto [client_addr, client_port] = *client_info;
+    uint32_t client_addr;
+    tPortId client_port;
+    dataplane::proxy::LocalPool::UnpackTuple(client_info, client_addr, client_port);
 
     // find in syn or conneсtions
     auto syn_ptr = syn_connections_[service_id].FindAndLock(client_addr, client_port, current_time);
@@ -634,14 +644,15 @@ ActionServerOnAck_Result TcpConnectionStore::ActionServerOnAck(proxy_service_id_
                                                                uint32_t ack)
 {
     // find in local
-    std::optional<std::pair<uint32_t, tPortId>> client_info = local_pools_[service_id].FindClientByLocal(dst_addr, dst_port);
-    if (!client_info.has_value())
+    uint64_t client_info = local_pools_[service_id].FindClientByLocal(dst_addr, dst_port);
+    if (client_info == 0)
     {
         YANET_LOG_ERROR("Not found in local connections");
         return ActionDrop{0};
     }
-    auto [client_addr, client_port] = *client_info;
-
+    uint32_t client_addr;
+    tPortId client_port;
+    dataplane::proxy::LocalPool::UnpackTuple(client_info, client_addr, client_port);
 
     // find in connections
     auto conn_ptr = service_connections_[service_id].FindAndLock(client_addr, client_port, current_time);
@@ -882,10 +893,7 @@ void ServiceConnections::CollectGarbage(uint32_t current_time, LocalPool& local_
             OneConnection& connection = bucket.connections[i];
             if (connection.IsExpired(current_time))
             {
-                uint32_t addr;
-                uint16_t port;
-                UnpackKeyConnection(connection.local, addr, port);
-                local_pool.Free(addr, port);
+                local_pool.Free(LocalPool::max_workers, connection.local);
                 connection.Clear();
             }
         }
