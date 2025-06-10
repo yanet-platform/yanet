@@ -4021,8 +4021,8 @@ inline void cWorker::balancer_handle()
 		const balancer_service_id_t service_id = metadata->flow.data.atomic >> 8;
 		const auto& service = base.globalBase->balancer_services[service_id];
 
-		dataplane::calcHash(mbuf, service.flags);
-		metadata->hash = rte_hash_crc(&metadata->flowLabel, 4, metadata->hash);
+		dataplane::calcHash(mbuf, service.flags, city_hash_crc);
+		metadata->hash = city_hash_crc(&metadata->flowLabel, 4, metadata->hash);
 
 		auto& key = balancer_keys[mbuf_i];
 		if (metadata->network_headerType == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4))

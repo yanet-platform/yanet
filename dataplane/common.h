@@ -8,6 +8,7 @@
 
 #include "common/config.release.h"
 #include "common/define.h"
+#include "ext/city.h"
 
 #define YADECAP_UNUSED [[maybe_unused]]
 
@@ -85,6 +86,21 @@ template<uint32_t size>
 inline uint32_t yanet_hash_crc(const void* data, uint32_t init)
 {
 	return rte_hash_crc(data, size, init);
+}
+
+/*
+ * Incremental “CRC-style” CityHash.
+ *
+ * Feeds `data[0..len)` into the current 32-bit hash `seed` and returns a new 32-bit hash.
+ */
+static inline uint32_t city_hash_crc(const void* data, size_t len, uint32_t seed)
+{
+	// CityHash64WithSeeds consumes two 64-bit seeds.
+	// We keep the high seed = 0 and put the running value into the low seed.
+	uint64_t h = CityHash64WithSeeds(static_cast<const char*>(data), len, 0ULL, static_cast<uint64_t>(seed));
+
+	// low 32 bits are plenty
+	return static_cast<uint32_t>(h);
 }
 
 //

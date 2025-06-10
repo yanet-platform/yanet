@@ -45,5 +45,12 @@ static_assert(sizeof(metadata) + sizeof(rte_ipv6_hdr) ///< encap
                       <= RTE_PKTMBUF_HEADROOM,
               "invalid size of headroom");
 
-void calcHash(rte_mbuf* mbuf, uint8_t flags = 0);
+using hash_func_t = uint32_t (*)(const void* data, size_t len, uint32_t seed);
+
+inline uint32_t default_hash_crc32(const void* data, size_t len, uint32_t seed)
+{
+	return rte_hash_crc(data, len, seed);
+}
+
+void calcHash(rte_mbuf* mbuf, uint8_t flags = 0, hash_func_t hash_func = default_hash_crc32);
 }
