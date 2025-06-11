@@ -8,8 +8,6 @@ dependencies += dependency('gtest_main')
 
 dataplane_sources = files('../local_pool.cpp',
                           '../syncookies.cpp',
-                          '../proxy_syn.cpp',
-                          '../proxy.cpp',
                           '../memory_manager.cpp')
 
 sources = files('unittest.cpp',

@@ -8,7 +8,7 @@
 
 #include "local_pool.h"
 #include "memory_manager.h"
-#include "proxy_syn.h"
+#include "proxy_connections.h"
 #include "syncookies.h"
 #include "type.h"
 
@@ -27,7 +27,6 @@
 
 #define MAX_SIZE_TCP_OPTIONS 40
 
-#define TIMEOUT_ACK 10 // todo
 #define TIMEOUT_RETRANSMIT 1 // todo
 #define MAX_COUNT_RETRANSMITS_PER_SERVICE (uint32_t)16 // todo
 #define MAX_COUNT_RETRANSMITS_ALL_SERVICES (uint32_t)128 // todo - must be a power of 2
@@ -221,39 +220,6 @@ using ActionServerOnAck_Result = std::variant<ActionServerOnAck_ForwardFirst, Ac
 
 // ----------------------------------------------------------------------------
 
-enum ConnectionState
-{
-    SENT_SYN_SERVER,
-    SENT_PROXY_HEADER,
-    ESTABLISHED
-};
-
-struct OneConnection
-{
-    uint64_t client;    // client ip + port
-    uint64_t local;     // local ip + port
-    uint32_t last_time; // time of last packet
-    ConnectionState state;
-    uint32_t sent_seq;
-    uint32_t shift_server;
-    uint32_t timestamp_echo;
-    uint32_t timestamp_shift;
-
-    uint32_t client_start_seq;
-    uint32_t flags;
-    uint32_t client_timestamp_start;    // used for sent retransmits syn packets to service
-    uint32_t cookie_data;    // used for sent retransmits syn packets to service
-    int32_t window_size_shift;
-
-    static constexpr uint32_t flag_from_synkookie = 1 << 0;
-    static constexpr uint32_t flag_answer_from_server = 1 << 1;
-    static constexpr uint32_t flag_nonempty_ack_from_client = 1 << 2;
-    static constexpr uint32_t flag_sent_rentransmit_syn_to_server = 1 << 3;
-        
-    void Clear();
-    bool IsExpired(uint32_t current_time);
-};
-
 struct DataForRetransmit
 {
     proxy_service_id_t service_id;
@@ -265,68 +231,6 @@ struct DataForRetransmit
     uint32_t tcp_options_len;
     uint8_t tcp_options_data[MAX_SIZE_TCP_OPTIONS];
     common::globalBase::tFlow flow;
-};
-
-struct ConnectionBucket
-{
-    static constexpr uint32_t bucket_size = 16;
-
-    OneConnection connections[bucket_size];
-    std::mutex mutex;
-
-    ConnectionBucket();
-    void Lock();
-    void Unlock();
-};
-
-class ServiceConnections
-{
-    public:
-    bool Initialize(proxy_service_id_t service_id,uint32_t number_connections, dataplane::memory_manager* memory_manager, uint32_t service_addr, uint16_t service_port);
-    bool _TestInit(proxy_service_id_t service_id, uint32_t number_connections);
-    bool _TestFree();
-
-    bool TryInsert(uint32_t client_addr, uint16_t client_port,
-                    uint32_t local_addr, uint16_t local_port,
-                    ConnectionState state, uint32_t sent_seq, uint32_t client_start_seq,
-                    uint32_t current_time, uint32_t timestamp_echo, uint32_t flags, uint32_t client_timestamp_start, uint32_t cookie_data);
-
-    void GetConnections(proxy_service_id_t service_id, uint32_t current_time, common::idp::proxy_connections::response& response);
-
-    void CollectGarbage(uint32_t current_time, LocalPool& local_pool);
-    uint32_t GetDataForRetramsits(uint32_t before_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send, const common::globalBase::tFlow& flow);
-
-private:
-    struct _LockPointer {
-        ConnectionBucket* bucket;
-        OneConnection* connection;
-
-        _LockPointer(ConnectionBucket* bucket, OneConnection* conn) : bucket(bucket), connection(conn) {
-            if (bucket) bucket->mutex.lock();
-        }
-        ~_LockPointer() {
-            if (bucket) bucket->mutex.unlock();
-        }
-
-        operator bool() const {
-            return bucket != nullptr && connection != nullptr;
-        }
-
-        bool operator==(const _LockPointer& other) const {
-            return bucket == other.bucket && connection == other.connection;
-        }
-    };
-
-public:
-    using LockPointer = std::shared_ptr<_LockPointer>;
-    LockPointer FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time);
-
-private:
-    ConnectionBucket* buckets_ = nullptr;
-    uint32_t number_buckets_ = 0;
-    bool initialized_ = false;
-    proxy_service_id_t service_id_;
-    uint64_t service_key_;
 };
 
 class TcpConnectionStore

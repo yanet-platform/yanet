@@ -120,21 +120,21 @@ data_type2 = [
 		ToClient(IP_SERVER2, SYN_COOKIE2, START_CLIENT_SEQ + 1, 'AS', window=0, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (1, ts_client)), ('WScale', 5), ("NOP", '')])
 	), (
 		FromClient(IP_SERVER2, START_CLIENT_SEQ + 1, SYN_COOKIE2 + 1, 'A', options=[("Timestamp", (ts_client + 1, 1))]),
-		ToServer(PORT_PROXY_INT2, IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client + 1, 0)), ('WScale', 5), ("NOP", '')])
+		ToServer(PORT_PROXY_INT, IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client + 1, 0)), ('WScale', 5), ("NOP", '')])
 	), (
 		# Need retransmit SYN to server
 		FromClient(IP_SERVER2, START_CLIENT_SEQ, SYN_COOKIE2 + 1, 'A', options=[("Timestamp", (ts_client + 1, 1))]),
-		ToServer(PORT_PROXY_INT2, IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client + 1, 0)), ('WScale', 5), ("NOP", '')])
+		ToServer(PORT_PROXY_INT, IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client + 1, 0)), ('WScale', 5), ("NOP", '')])
 	), (
-		FromServer(PORT_PROXY_INT2, IP_SERVER2, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'SA', window=20000, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client + 1)), ('WScale', 9), ("NOP", '')]),
+		FromServer(PORT_PROXY_INT, IP_SERVER2, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'SA', window=20000, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client + 1)), ('WScale', 9), ("NOP", '')]),
 		ToClient(IP_SERVER2, SYN_COOKIE2 + 1, START_CLIENT_SEQ + 1, 'A', window=20000//16, options=[("Timestamp", (ts_proxy, ts_client + 1)), ("NOP", ''), ("NOP", '')])
 	),
 	(
 		FromClient(IP_SERVER2, START_CLIENT_SEQ + 1, SYN_COOKIE2 + 1, 'A', raw=data_client1, options=[("Timestamp", (ts_client + 2, ts_proxy)), ("NOP", ''), ("NOP", '')]),
-		ToServer(PORT_PROXY_INT2, IP_SERVER2, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=[("Timestamp", (ts_client + 2, ts_server)), ("NOP", ''), ("NOP", '')])
+		ToServer(PORT_PROXY_INT, IP_SERVER2, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=[("Timestamp", (ts_client + 2, ts_server)), ("NOP", ''), ("NOP", '')])
 	),
 	(
-		FromServer(PORT_PROXY_INT2, IP_SERVER2, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=20000, raw=data_server1, options=[("Timestamp", (ts_server + 1, ts_client + 2)), ("NOP", ''), ("NOP", '')]), 
+		FromServer(PORT_PROXY_INT, IP_SERVER2, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=20000, raw=data_server1, options=[("Timestamp", (ts_server + 1, ts_client + 2)), ("NOP", ''), ("NOP", '')]), 
 		ToClient(IP_SERVER2, SYN_COOKIE2 + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=20000//16, raw=data_server1, options=[("Timestamp", (ts_proxy + 1, ts_client + 2)), ("NOP", ''), ("NOP", '')])
 	),
 ]
@@ -179,21 +179,21 @@ data_type4 = [
 		ToClient(IP_SERVER4, SYN_COOKIE3, START_CLIENT_SEQ + 1, 'AS', window=0, options=[("MSS", 1300-len_pr), ("SAckOK", ''), ("Timestamp", (1, ts_client)), ('WScale', 9), ("NOP", '')])
 	), (
 		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE3 + 1, 'A', options=[("Timestamp", (ts_client + 1, 1))]),
-		ToServer(PORT_PROXY_INT2, IP_SERVER4, START_CLIENT_SEQ - len_pr, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client + 1, 0)), ('WScale', 5), ("NOP", '')])
+		ToServer(PORT_PROXY_INT, IP_SERVER4, START_CLIENT_SEQ - len_pr, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client + 1, 0)), ('WScale', 5), ("NOP", '')])
 	), (
-		FromServer(PORT_PROXY_INT2, IP_SERVER4, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'SA', window=20000, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client + 1)), ('WScale', 5), ("NOP", '')]),
+		FromServer(PORT_PROXY_INT, IP_SERVER4, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'SA', window=20000, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client + 1)), ('WScale', 5), ("NOP", '')]),
 		ToClient(IP_SERVER4, SYN_COOKIE3 + 1, START_CLIENT_SEQ + 1, 'A', window=65535, options=[("Timestamp", (ts_proxy, ts_client + 1)), ("NOP", ''), ("NOP", '')])
 	),
 	(
 		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE3 + 1, 'A', raw=data_client1),
-		ToServer(PORT_PROXY_INT2, IP_SERVER4, START_CLIENT_SEQ + 1 - len_pr, START_SERVER_SEQ + 1, 'A', raw=get_proxy_header(IP_SERVER4) + data_client1.encode())
+		ToServer(PORT_PROXY_INT, IP_SERVER4, START_CLIENT_SEQ + 1 - len_pr, START_SERVER_SEQ + 1, 'A', raw=get_proxy_header(IP_SERVER4) + data_client1.encode())
 	),
 	( # Packet#3 out of order
-		FromServer(PORT_PROXY_INT2, IP_SERVER4, START_SERVER_SEQ + 1 + len(data_server1)*2, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=20000, raw=data_server1), 
+		FromServer(PORT_PROXY_INT, IP_SERVER4, START_SERVER_SEQ + 1 + len(data_server1)*2, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=20000, raw=data_server1), 
 		ToClient(IP_SERVER4, SYN_COOKIE3 + 1 + len(data_server1)*2, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=65535, raw=data_server1)
 	),
 	( # Packet#1
-		FromServer(PORT_PROXY_INT2, IP_SERVER4, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=20000, raw=data_server1), 
+		FromServer(PORT_PROXY_INT, IP_SERVER4, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=20000, raw=data_server1), 
 		ToClient(IP_SERVER4, SYN_COOKIE3 + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=65535, raw=data_server1)
 	),
 	# ( # Packet#2 Lost
@@ -202,10 +202,10 @@ data_type4 = [
 	# ),
 	( # Ack Packet#1, SAck Packet#3
 		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), SYN_COOKIE3 + 1 + len(data_server1), 'A', options=[("SAck", (SYN_COOKIE3 + 1 + len(data_server1)*2, SYN_COOKIE3 + 1 + len(data_server1)*3))], raw=data_client1),
-		ToServer(PORT_PROXY_INT2, IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), START_SERVER_SEQ + 1 + len(data_server1), 'A', options=[("SAck", (START_SERVER_SEQ + 1 + len(data_server1)*2, START_SERVER_SEQ + 1 + len(data_server1)*3))], raw=data_client1)
+		ToServer(PORT_PROXY_INT, IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), START_SERVER_SEQ + 1 + len(data_server1), 'A', options=[("SAck", (START_SERVER_SEQ + 1 + len(data_server1)*2, START_SERVER_SEQ + 1 + len(data_server1)*3))], raw=data_client1)
 	),
 	( # Packet#5 out of order
-		FromServer(PORT_PROXY_INT2, IP_SERVER4, START_SERVER_SEQ + 1 + len(data_server1)*4, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=20000, raw=data_server1), 
+		FromServer(PORT_PROXY_INT, IP_SERVER4, START_SERVER_SEQ + 1 + len(data_server1)*4, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=20000, raw=data_server1), 
 		ToClient(IP_SERVER4, SYN_COOKIE3 + 1 + len(data_server1)*4, START_CLIENT_SEQ + 1 + len(data_client1), 'A', window=65535, raw=data_server1)
 	),
 	# ( # Packet#4 Lost
@@ -214,7 +214,7 @@ data_type4 = [
 	# ),
 	( # Duplicate Ack Packet#1, SAck Packet#5 and Packet#3
 		FromClient(IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), SYN_COOKIE3 + 1 + len(data_server1), 'A', options=[("SAck", (SYN_COOKIE3 + 1 + len(data_server1)*4, SYN_COOKIE3 + 1 + len(data_server1)*5)), ("SAck",(SYN_COOKIE3 + 1 + len(data_server1)*2, SYN_COOKIE3 + 1 + len(data_server1)*3))], raw=data_client2),
-		ToServer(PORT_PROXY_INT2, IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), START_SERVER_SEQ + 1 + len(data_server1), 'A', options=[("SAck", (START_SERVER_SEQ + 1 + len(data_server1)*4, START_SERVER_SEQ + 1 + len(data_server1)*5)), ("SAck", (START_SERVER_SEQ + 1 + len(data_server1)*2 , START_SERVER_SEQ + 1 + len(data_server1)*3))], raw=data_client2)
+		ToServer(PORT_PROXY_INT, IP_SERVER4, START_CLIENT_SEQ + 1 + len(data_client1), START_SERVER_SEQ + 1 + len(data_server1), 'A', options=[("SAck", (START_SERVER_SEQ + 1 + len(data_server1)*4, START_SERVER_SEQ + 1 + len(data_server1)*5)), ("SAck", (START_SERVER_SEQ + 1 + len(data_server1)*2 , START_SERVER_SEQ + 1 + len(data_server1)*3))], raw=data_client2)
 	),
 ]
 
