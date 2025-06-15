@@ -6145,90 +6145,38 @@ inline void cWorker::proxy_client_syn_handle()
 		rte_mbuf* mbuf = proxy_client_syn_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[metadata->flow.data.proxy.id];
-		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[metadata->flow.data.proxy.service_id];
+		proxy_id_t proxy_id = metadata->flow.data.proxy.id;
+		proxy_service_id_t service_id = metadata->flow.data.proxy.service_id;
 
-		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-		rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
-		size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
-
-		YANET_LOG_WARNING("proxy_client_syn_handle %s:%d -> %s:%d, data_off=%ld, sizeof(rte_tcp_hdr)=%ld, counter_id=%d\n",
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->src_port),
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->dst_port),
-				tcp_header_len, sizeof(rte_tcp_hdr), service.counter_id);
+		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[proxy_id];
+		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
 		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
 		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_in] += mbuf->pkt_len;
 		counters[service.counter_id + (tCounterId)proxy::service_counter::syn_count]++;
 
-		dataplane::proxy::TcpOptions tcp_options;
-		memset(&tcp_options, 0, sizeof(tcp_options));
-		tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
-		tcp_options.sack_permitted &= service.use_sack;
-		tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
-
-		YANET_LOG_WARNING("\ttcp options: %s\n", tcp_options.DebugInfo().c_str());
-		dataplane::proxy::ActionClientOnSyn_Result action = tcp_connection_store->ActionClientOnSyn(metadata->flow.data.proxy.service_id,
-																									proxy_worker_id,
-																									service,
-																									current_time,
-		                                                                                            ipv4Header->src_addr,
-		                                                                                            tcp_header->src_port,
-		                                                                                            tcp_header->sent_seq,
-		                                                                                            tcp_options);
-
-		if (const auto action_drop = std::get_if<dataplane::proxy::ActionDrop>(&action))
+		uint32_t action = tcp_connection_store->ActionClientOnSyn(service_id, proxy_worker_id, service, current_time, mbuf);
+		uint32_t counter_action = action & dataplane::proxy::mask_counter_action;
+		if (counter_action != 0)
 		{
-			YANET_LOG_WARNING("drop, counter: %d\n", action_drop->counter_id);
+			counters[service.counter_id + counter_action]++;
+		}
+
+		if ((action & dataplane::proxy::flag_action_drop) == 0)
+		{
+			if ((action & dataplane::proxy::flag_action_to_client) != 0)
+			{
+				counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
+				counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
+			}
+			
+			proxy_flow(mbuf, proxy.flow);
+		}
+		else
+		{
 			drop(mbuf);
-			// todo: counter
 			continue;
 		}
-		else if (const auto syn_to_server = std::get_if<dataplane::proxy::ActionClientOnSyn_SynToServer>(&action))
-		{
-			ipv4Header->src_addr = syn_to_server->local_addr;
-			ipv4Header->dst_addr = service.upstream_addr.address;	// todo
-			ipv4Header->hdr_checksum = 0;
-			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
-
-			tcp_header->sent_seq = syn_to_server->seq;
-			tcp_header->src_port = syn_to_server->local_port;
-			tcp_header->dst_port = rte_cpu_to_be_16(service.upstream_port);	// todo
-			tcp_header->cksum = 0;
-			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-		}
-		else if (const auto syn_ack_to_client = std::get_if<dataplane::proxy::ActionClientOnSyn_SynAckToClient>(&action))
-		{
-			tcp_options.window_scaling = service.winscale;
-			tcp_options.timestamp_echo = tcp_options.timestamp_value;
-			tcp_options.timestamp_value = 1;
-			if (service.proxy_header)
-			{
-				tcp_options.mss -= int(sizeof(dataplane::proxy::proxy_v2_ipv4_hdr));
-			}
-			tcp_options.Write(mbuf);
-
-			rte_be32_t tmp = ipv4Header->src_addr;
-			ipv4Header->src_addr = ipv4Header->dst_addr;
-			ipv4Header->dst_addr = tmp;
-			ipv4Header->time_to_live = 64;
-			ipv4Header->hdr_checksum = 0;
-			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
-
-			// auto [seq, ack] = *action;
-			tcp_header->sent_seq = syn_ack_to_client->seq;
-			tcp_header->recv_ack = syn_ack_to_client->ack;
-			tcp_header->tcp_flags = TCP_SYN_FLAG | TCP_ACK_FLAG;
-			tcp_header->rx_win = 0;
-			uint16_t tmp_port = tcp_header->src_port;
-			tcp_header->src_port = tcp_header->dst_port;
-			tcp_header->dst_port = tmp_port;
-
-			tcp_header->cksum = 0;
-			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-		}
-		
-		proxy_flow(mbuf, proxy.flow);
 	}
 
 	proxy_client_syn_stack.clear();
@@ -6237,12 +6185,6 @@ inline void cWorker::proxy_client_syn_handle()
 inline void cWorker::proxy_client_ack_entry(rte_mbuf* mbuf)
 {
 	proxy_client_ack_stack.insert(mbuf);
-}
-
-bool EmptyTcpData(const rte_ipv4_hdr* ipv4Header, const rte_tcp_hdr* tcp_header)
-{
-	uint16_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
-	return ipv4Header->total_length == ((ipv4Header->ihl & 0xf) << 2) + tcp_header_len;
 }
 
 inline void cWorker::proxy_client_ack_handle()
@@ -6263,123 +6205,36 @@ inline void cWorker::proxy_client_ack_handle()
 		rte_mbuf* mbuf = proxy_client_ack_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[metadata->flow.data.proxy.id];
-		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[metadata->flow.data.proxy.service_id];
+		proxy_id_t proxy_id = metadata->flow.data.proxy.id;
+		proxy_service_id_t service_id = metadata->flow.data.proxy.service_id;
 
-		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-		rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
-		size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
-		
-		YANET_LOG_WARNING("proxy_client_ack_handle %s:%d -> %s:%d, seq=%u, ack=%u\n",
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->src_port),
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->dst_port),
-				rte_cpu_to_be_32(tcp_header->sent_seq), rte_cpu_to_be_32(tcp_header->recv_ack));
+		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[proxy_id];
+		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
 		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
 		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_in] += mbuf->pkt_len;
 
-		dataplane::proxy::TcpOptions tcp_options;
-		memset(&tcp_options, 0, sizeof(tcp_options));
-		tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
-		YANET_LOG_WARNING("\ttcp options: %s\n", tcp_options.DebugInfo().c_str());
-
-		bool empty_tcp_data = (rte_be_to_cpu_16(ipv4Header->total_length) == sizeof(rte_ipv4_hdr) + tcp_header_len);
-
-		dataplane::proxy::ActionClientOnAck_Result action = tcp_connection_store->ActionClientOnAck(metadata->flow.data.proxy.service_id,
-																									proxy_worker_id,
-																									service,
-																									current_time,
-		                                                                                            ipv4Header->src_addr,
-		                                                                                            tcp_header->src_port,
-		                                                                                            tcp_header->sent_seq,
-		                                                                                            tcp_header->recv_ack,
-																									tcp_options.timestamp_echo,
-																									empty_tcp_data,
-																									tcp_options.timestamp_value);
-
-		if (const auto action_drop = std::get_if<dataplane::proxy::ActionDrop>(&action))
+		uint32_t action = tcp_connection_store->ActionClientOnAck(service_id, proxy_worker_id, service, current_time, mbuf);
+		uint32_t counter_action = action & dataplane::proxy::mask_counter_action;
+		if (counter_action != 0)
 		{
-			YANET_LOG_WARNING("drop, counter: %d\n", action_drop->counter_id);
+			counters[service.counter_id + counter_action]++;
+		}
+
+		if ((action & dataplane::proxy::flag_action_drop) == 0)
+		{
+			if ((action & dataplane::proxy::flag_action_to_client) != 0)
+			{
+				counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
+				counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
+			}
+			
+			proxy_flow(mbuf, proxy.flow);
+		}
+		else
+		{
 			drop(mbuf);
 			continue;
-		}
-		else if (const auto new_server_connection = std::get_if<dataplane::proxy::ActionClientOnAck_NewServerConnection>(&action))
-		{
-			YANET_LOG_WARNING("\tnew_server_connection, local=%s:%d, seq=%d, tcp_options=%s\n",
-				common::ipv4_address_t(rte_cpu_to_be_32(new_server_connection->local_addr)).toString().c_str(),
-				rte_cpu_to_be_16(new_server_connection->local_port), rte_cpu_to_be_32(new_server_connection->seq), new_server_connection->tcp_options.DebugInfo().c_str());
-
-			// read time from tcp options
-			new_server_connection->tcp_options.timestamp_value = tcp_options.timestamp_value;
-
-			// uint8_t buf_tcp_options[MAX_SIZE_TCP_OPTIONS];
-			new_server_connection->tcp_options.Write(mbuf);
-
-			ipv4Header->dst_addr = service.upstream_addr.address;
-			ipv4Header->src_addr = new_server_connection->local_addr;
-			ipv4Header->time_to_live = 64;
-			ipv4Header->hdr_checksum = 0;
-			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
-
-			tcp_header->sent_seq = new_server_connection->seq;
-			tcp_header->recv_ack = 0;
-			tcp_header->tcp_flags = TCP_SYN_FLAG;
-			tcp_header->src_port = new_server_connection->local_port;
-			tcp_header->dst_port = rte_cpu_to_be_16(service.upstream_port);
-
-			// uint8_t* buf_tcp_options = rte_pktmbuf_mtod_offset(mbuf, uint8_t*, metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
-			// memcpy(buf_tcp_options, new_server_connection->tcp_options, new_server_connection->tcp_options_size);
-
-			tcp_header->cksum = 0;
-			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-
-			proxy_flow(mbuf, proxy.flow);
-		}
-		else if (const auto forward_to_server = std::get_if<dataplane::proxy::ActionClientOnAck_Forward>(&action))
-		{
-			YANET_LOG_WARNING("\tforward_to_server, local=%s:%d, sent_seq=%d, recv_ack=%d, shift_seq=%d, shift_ack=%d, add_proxy_header=%d\n",
-				common::ipv4_address_t(rte_cpu_to_be_32(forward_to_server->local_addr)).toString().c_str(),
-				rte_cpu_to_be_16(forward_to_server->local_port), rte_cpu_to_be_32(tcp_header->sent_seq),
-				rte_cpu_to_be_32(tcp_header->recv_ack), forward_to_server->shift_seq,
-				forward_to_server->shift_ack, forward_to_server->add_proxy_header);
-
-			dataplane::proxy::ShiftTcpOptions(tcp_header, forward_to_server->shift_ack, 0, forward_to_server->shift_timestamp);
-
-			if (forward_to_server->add_proxy_header)
-			{
-				constexpr uint16_t size_proxy_header = sizeof(dataplane::proxy::proxy_v2_ipv4_hdr);
-
-				dataplane::proxy::proxy_v2_ipv4_hdr* proxy_header = 
-					rte_pktmbuf_mtod_offset(mbuf, dataplane::proxy::proxy_v2_ipv4_hdr*, metadata->transport_headerOffset + tcp_header_len);
-				uint16_t size_data = rte_be_to_cpu_16(ipv4Header->total_length) - rte_ipv4_hdr_len(ipv4Header) - tcp_header_len;
-				if (size_data != 0)
-				{
-					// YANET_LOG_WARNING("\t\tmem_cpy size_data=%d\n", size_data);
-					memmove((uint8_t*)proxy_header + size_proxy_header, proxy_header, size_data); // using intermediate buffer impacts performance
-				}
-				
-				uint16_t ipv4_total_length = rte_ipv4_hdr_len(ipv4Header) + tcp_header_len + size_proxy_header + size_data;
-				ipv4Header->total_length = rte_cpu_to_be_16(ipv4_total_length);
-
-				mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + ipv4_total_length;
-				mbuf->pkt_len = mbuf->data_len;
-
-				dataplane::proxy::FillProxyHeader(proxy_header, ipv4Header->src_addr, tcp_header->src_port, service.proxy_addr.address, rte_cpu_to_be_16(service.proxy_port));
-			}
-
-			ipv4Header->dst_addr = service.upstream_addr.address;
-			ipv4Header->src_addr = forward_to_server->local_addr;
-			ipv4Header->hdr_checksum = 0;
-			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
-
-			tcp_header->src_port = forward_to_server->local_port;
-			tcp_header->dst_port = rte_cpu_to_be_16(service.upstream_port);
-			tcp_header->sent_seq = dataplane::proxy::add_cpu_32(tcp_header->sent_seq, forward_to_server->shift_seq);
-			tcp_header->recv_ack = dataplane::proxy::add_cpu_32(tcp_header->recv_ack, forward_to_server->shift_ack);
-			tcp_header->cksum = 0;
-			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-
-			proxy_flow(mbuf, proxy.flow);
 		}
 	}
 
@@ -6409,84 +6264,30 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		rte_mbuf* mbuf = proxy_server_syn_ack_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		const auto& proxy = base.globalBase->proxies[metadata->flow.data.proxy.id];
-		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[metadata->flow.data.proxy.service_id];
+		proxy_id_t proxy_id = metadata->flow.data.proxy.id;
+		proxy_service_id_t service_id = metadata->flow.data.proxy.service_id;
 
-		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-		rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
-		
-		YANET_LOG_WARNING("proxy_server_syn_ack_handle %s:%d -> %s:%d\n",
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->src_port),
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->dst_port));
+		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[proxy_id];
+		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
-		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
-		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
-
-		size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
-		dataplane::proxy::TcpOptions tcp_options;
-		memset(&tcp_options, 0, sizeof(tcp_options));
-		tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
-
-		dataplane::proxy::ActionServerOnSynAck_Result action = tcp_connection_store->ActionServerOnSynAck(metadata->flow.data.proxy.service_id,
-																										 service,
-																										 current_time,
-		                                                                                                 ipv4Header->dst_addr,
-		                                                                                                 tcp_header->dst_port,
-		                                                                                                 tcp_header->sent_seq,
-		                                                                                                 tcp_header->recv_ack,
-		                                                                                                 tcp_options);
-
-		if (const auto action_drop = std::get_if<dataplane::proxy::ActionDrop>(&action))
+		uint32_t action = tcp_connection_store->ActionServerOnSynAck(service_id, service, current_time, mbuf);
+		uint32_t counter_action = action & dataplane::proxy::mask_counter_action;
+		if (counter_action != 0)
 		{
-			YANET_LOG_WARNING("drop, counter: %d\n", action_drop->counter_id);
+			counters[service.counter_id + counter_action]++;
+		}
+
+		if ((action & dataplane::proxy::flag_action_drop) == 0)
+		{
+			counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
+			counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
+			
+			proxy_flow(mbuf, proxy.flow);
+		}
+		else
+		{
 			drop(mbuf);
 			continue;
-		}
-		else if (const auto syn_ack_to_client = std::get_if<dataplane::proxy::ActionServerOnSynAck_SynAckToClient>(&action))
-		{
-			if (service.proxy_header)
-			{
-				tcp_options.mss -= int(sizeof(dataplane::proxy::proxy_v2_ipv4_hdr));
-				tcp_options.Write(mbuf);
-			}
-
-			ipv4Header->src_addr = service.proxy_addr.address;	// todo
-			ipv4Header->dst_addr = syn_ack_to_client->client_addr;
-			ipv4Header->hdr_checksum = 0;
-			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
-
-			tcp_header->recv_ack = syn_ack_to_client->ack;
-			tcp_header->src_port = rte_cpu_to_be_16(service.proxy_port);	// todo
-			tcp_header->dst_port = syn_ack_to_client->client_port;
-			tcp_header->cksum = 0;
-			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-
-			proxy_flow(mbuf, proxy.flow);
-		}
-		else if (const auto ack_to_client = std::get_if<dataplane::proxy::ActionServerOnSynAck_AckToClient>(&action))
-		{
-			tcp_options.sack_permitted = false;
-			tcp_options.mss = 0;
-			tcp_options.window_scaling = 0;
-			tcp_options.Write(mbuf);
-
-			ipv4Header->src_addr = service.proxy_addr.address;	// todo
-			ipv4Header->dst_addr = ack_to_client->client_addr;
-			ipv4Header->hdr_checksum = 0;
-			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
-
-			tcp_header->sent_seq = ack_to_client->seq;
-			tcp_header->recv_ack = ack_to_client->ack;
-			tcp_header->src_port = rte_cpu_to_be_16(service.proxy_port);	// todo
-			tcp_header->dst_port = ack_to_client->client_port;
-			tcp_header->tcp_flags = TCP_ACK_FLAG;
-			dataplane::proxy::ShiftTcpOptions(tcp_header, 0, ack_to_client->timestamp_shift, 0);
-			tcp_header->rx_win = dataplane::proxy::shift_cpu_16(tcp_header->rx_win, ack_to_client->window_size_shift);
-
-			tcp_header->cksum = 0;
-			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-
-			proxy_flow(mbuf, proxy.flow);
 		}
 	}
 
@@ -6516,92 +6317,30 @@ inline void cWorker::proxy_server_ack_handle()
 		rte_mbuf* mbuf = proxy_server_ack_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[metadata->flow.data.proxy.id];
-		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[metadata->flow.data.proxy.service_id];
+		proxy_id_t proxy_id = metadata->flow.data.proxy.id;
+		proxy_service_id_t service_id = metadata->flow.data.proxy.service_id;
 
-		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-		rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
-		
-		YANET_LOG_WARNING("proxy_server_ack_handle %s:%d -> %s:%d\n",
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->src_port),
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->dst_port));
+		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[proxy_id];
+		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
-		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
-		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
-
-		(void)proxy;
-
-		dataplane::proxy::ActionServerOnAck_Result action = tcp_connection_store->ActionServerOnAck(metadata->flow.data.proxy.service_id,
-																								   service,
-																								   current_time,
-		                                                                                           ipv4Header->dst_addr,
-		                                                                                           tcp_header->dst_port,
-		                                                                                           tcp_header->sent_seq,
-		                                                                                           tcp_header->recv_ack);
-
-		if (const auto action_drop = std::get_if<dataplane::proxy::ActionDrop>(&action))
+		uint32_t action = tcp_connection_store->ActionServerOnAck(metadata->flow.data.proxy.service_id, service, current_time, mbuf);
+		uint32_t counter_action = action & dataplane::proxy::mask_counter_action;
+		if (counter_action != 0)
 		{
-			YANET_LOG_WARNING("drop, counter: %d\n", action_drop->counter_id);
+			counters[service.counter_id + counter_action]++;
+		}
+
+		if ((action & dataplane::proxy::flag_action_drop) == 0)
+		{
+			counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
+			counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
+			
+			proxy_flow(mbuf, proxy.flow);
+		}
+		else
+		{
 			drop(mbuf);
 			continue;
-		}
-		else if (const auto forward_first = std::get_if<dataplane::proxy::ActionServerOnAck_ForwardFirst>(&action))
-		{
-			YANET_LOG_WARNING("\tforward_first, local=%s:%d, seq=%d, options_size=%ld\n",
-				common::ipv4_address_t(rte_cpu_to_be_32(forward_first->dst_addr)).toString().c_str(),
-				rte_cpu_to_be_16(forward_first->dst_port), rte_cpu_to_be_32(forward_first->seq), forward_first->tcp_options_size);
-
-			uint16_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
-			uint16_t tcp_data_len = rte_be_to_cpu_16(ipv4Header->total_length) - rte_ipv4_hdr_len(ipv4Header) - tcp_header_len;
-			uint16_t ipv4_total_length = rte_ipv4_hdr_len(ipv4Header) + sizeof(rte_tcp_hdr) + forward_first->tcp_options_size + tcp_data_len;
-			
-			ipv4Header->dst_addr = forward_first->dst_addr;
-			ipv4Header->src_addr = service.proxy_addr.address;
-			// ipv4Header->time_to_live = 64;
-			ipv4Header->total_length = rte_cpu_to_be_16(ipv4_total_length);
-			ipv4Header->hdr_checksum = 0;
-			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
-			
-			tcp_header->sent_seq = forward_first->seq;
-			tcp_header->recv_ack = forward_first->ack;
-			// tcp_header->tcp_flags = TCP_SYN_FLAG;
-			tcp_header->src_port = rte_cpu_to_be_16(service.proxy_port);
-			tcp_header->dst_port = forward_first->dst_port;
-			tcp_header->data_off = ((sizeof(rte_tcp_hdr) + forward_first->tcp_options_size) >> 2) << 4;
-
-			uint8_t* buf_tcp_options = rte_pktmbuf_mtod_offset(mbuf, uint8_t*, metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
-			memcpy(buf_tcp_options, forward_first->tcp_options, forward_first->tcp_options_size);
-
-			tcp_header->cksum = 0;
-			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-			
-			mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + ipv4_total_length;
-			mbuf->pkt_len = mbuf->data_len;
-
-			proxy_flow(mbuf, proxy.flow);
-		}
-		else if (const auto forward = std::get_if<dataplane::proxy::ActionServerOnAck_Forward>(&action))
-		{
-			YANET_LOG_WARNING("\tforward, client=%s:%d, seq=%d, shift_seq=%d\n",
-				common::ipv4_address_t(rte_cpu_to_be_32(forward->dst_addr)).toString().c_str(),
-				rte_cpu_to_be_16(forward->dst_port), rte_cpu_to_be_32(tcp_header->sent_seq), forward->shift_seq);
-
-			ipv4Header->dst_addr = forward->dst_addr;
-			ipv4Header->src_addr = service.proxy_addr.address;
-			ipv4Header->hdr_checksum = 0;
-			ipv4Header->hdr_checksum = rte_ipv4_cksum(ipv4Header);
-
-			tcp_header->src_port = rte_cpu_to_be_16(service.proxy_port);
-			tcp_header->dst_port = forward->dst_port;
-			tcp_header->sent_seq = dataplane::proxy::add_cpu_32(tcp_header->sent_seq, forward->shift_seq);
-
-			dataplane::proxy::ShiftTcpOptions(tcp_header, 0, forward->timestamp_shift, 0);
-			tcp_header->rx_win = dataplane::proxy::shift_cpu_16(tcp_header->rx_win, forward->window_size_shift);
-
-			tcp_header->cksum = 0;
-			tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4Header, tcp_header);
-
-			proxy_flow(mbuf, proxy.flow);
 		}
 	}
 
@@ -6673,7 +6412,7 @@ inline void cWorker::proxy_client_icmp_handle()
 
 inline void cWorker::proxy_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow)
 {
-	YANET_LOG_WARNING("\t\tcWorker::proxy_flow, flow = %s\n", flow.to_string().c_str());
+	// YANET_LOG_WARNING("\t\tcWorker::proxy_flow, flow = %s\n", flow.to_string().c_str());
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 	metadata->flow = flow;
 

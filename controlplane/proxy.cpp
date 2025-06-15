@@ -258,13 +258,14 @@ void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& gl
 	                                                                                     config.proxy_port,
 	                                                                                     config.upstream_addr,
 	                                                                                     config.upstream_port,
-                                                                                         config.proxy_header,
-                                                                                         config.size_connections_table,
-                                                                                         config.size_syn_table,
-                                                                                         config.use_sack,
-                                                                                         config.mss,
-                                                                                         config.ecn,
-                                                                                         config.winscale});
+	                                                                                     config.proxy_header,
+	                                                                                     config.size_connections_table,
+	                                                                                     config.size_syn_table,
+	                                                                                     config.use_sack,
+	                                                                                     config.mss,
+	                                                                                     config.ecn,
+	                                                                                     config.winscale,
+	                                                                                     config.ignore_size_update_detections});
 }
 
 void proxy_t::counters_gc_thread()
@@ -300,6 +301,12 @@ common::icp::proxy_services::response proxy_t::proxy_services() const
             uint64_t syn_count = 0;
             uint64_t ping_count = 0;
             uint64_t connections_count = 0;
+            uint64_t service_bucket_overflow = 0;
+            uint64_t failed_local_pool_allocation = 0;
+            uint64_t failed_local_pool_search = 0;
+            uint64_t failed_answer_service_syn_ack = 0;
+            uint64_t ignored_size_update_detections = 0;
+            uint64_t failed_check_syn_cookie = 0;
 
 			auto it = counters.find(service_id);
 			if (it != counters.end())
@@ -311,9 +318,17 @@ common::icp::proxy_services::response proxy_t::proxy_services() const
                 syn_count = (it->second)[(tCounterId)proxy::service_counter::syn_count];
                 ping_count = (it->second)[(tCounterId)proxy::service_counter::ping_count];
                 connections_count = (it->second)[(tCounterId)proxy::service_counter::connections_count];
+                service_bucket_overflow = (it->second)[(tCounterId)proxy::service_counter::service_bucket_overflow];
+                failed_local_pool_allocation = (it->second)[(tCounterId)proxy::service_counter::failed_local_pool_allocation];
+                failed_local_pool_search = (it->second)[(tCounterId)proxy::service_counter::failed_local_pool_search];
+                failed_answer_service_syn_ack = (it->second)[(tCounterId)proxy::service_counter::failed_answer_service_syn_ack];
+                ignored_size_update_detections = (it->second)[(tCounterId)proxy::service_counter::ignored_size_update_detections];
+                failed_check_syn_cookie = (it->second)[(tCounterId)proxy::service_counter::failed_check_syn_cookie];
 			}
 
-            response.emplace_back(service_id, service_name, packets_in, bytes_in, packets_out, bytes_out, syn_count, ping_count, connections_count);
+            response.emplace_back(service_id, service_name, packets_in, bytes_in, packets_out, bytes_out, syn_count, ping_count,
+                                  connections_count, service_bucket_overflow, failed_local_pool_allocation, failed_local_pool_search,
+                                  failed_answer_service_syn_ack, ignored_size_update_detections, failed_check_syn_cookie);
 		}
 	}
 

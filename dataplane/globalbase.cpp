@@ -2695,7 +2695,7 @@ eResult generation::proxy_add_local_pool(const common::idp::updateGlobalBase::pr
 
 eResult generation::proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request)
 {
-	auto [service_id, counter_id, proxy_addr, proxy_port, upstream_addr, upstream_port, proxy_header, size_connections_table, size_syn_table, use_sack, mss, ecn, winscale] = request;
+	auto [service_id, counter_id, proxy_addr, proxy_port, upstream_addr, upstream_port, proxy_header, size_connections_table, size_syn_table, use_sack, mss, ecn, winscale, ignore_size_update_detections] = request;
 	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, counter_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
 	// 	service_id, counter_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port, proxy_header, size_connections_table, size_syn_table);
 
@@ -2713,10 +2713,10 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 
 	auto& service = proxy_services[service_id];
 
-	service.proxy_addr = ipv4_address_t::convert(proxy_addr.get_ipv4());
-	service.proxy_port = proxy_port;
-	service.upstream_addr = ipv4_address_t::convert(upstream_addr.get_ipv4());
-	service.upstream_port = upstream_port;
+	service.proxy_addr = ipv4_address_t::convert(proxy_addr.get_ipv4()).address;
+	service.proxy_port = rte_cpu_to_be_16(proxy_port);
+	service.upstream_addr = ipv4_address_t::convert(upstream_addr.get_ipv4()).address;
+	service.upstream_port = rte_cpu_to_be_16(upstream_port);
 	service.counter_id = counter_id;
 	service.proxy_header = proxy_header;
 	service.size_connections_table = size_connections_table;
@@ -2725,6 +2725,7 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.mss = mss;
 	service.ecn = ecn;
 	service.winscale = winscale;
+	service.ignore_size_update_detections = ignore_size_update_detections;
 
 	return tcp_connection_store->proxy_service_update(service_id, service, &dataPlane->memory_manager);
 }

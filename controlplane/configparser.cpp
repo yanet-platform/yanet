@@ -1250,6 +1250,7 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 		service.mss = service_json.value("mss", 1462);
 		service.ecn = service_json.value("ecn", false);
 		service.winscale = service_json.value("winscale", 0);
+		service.ignore_size_update_detections = service_json.value("ignoreSizeUpdateDetections", false);
 
 		if (exist(service_json, "blacklist"))
 		{

@@ -349,7 +349,8 @@ using request = std::tuple<proxy_service_id_t,
                            bool, ///< use_sack;
                            uint32_t, ///< mss;
                            bool, ///< ecn;
-                           uint32_t>; ///< winscale;
+                           uint32_t, ///< winscale;
+                           bool>; ///< ignore_size_update_detections;
 }
 
 namespace update_early_decap_flags
@@ -836,8 +837,7 @@ using connection = std::tuple<proxy_service_id_t, ///< proxy_service_id
                               uint32_t, ///< src_addr
                               uint16_t, ///< src_port
                               uint32_t, ///< local_addr
-                              uint16_t, ///< local_port
-                              uint16_t>; ///< state
+                              uint16_t>; ///< local_port
 
 using response = std::vector<connection>;
 }

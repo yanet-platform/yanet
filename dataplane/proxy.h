@@ -109,115 +109,6 @@ struct proxy_v2_ipv4_hdr
     rte_be16_t dst_port;
 } __rte_packed;
 
-inline uint16_t add_cpu_16(uint16_t value, int16_t added)
-{
-    return rte_cpu_to_be_16(rte_be_to_cpu_16(value) + added);
-}
-
-inline uint32_t add_cpu_32(uint32_t value, int32_t added)
-{
-    return rte_cpu_to_be_32(rte_be_to_cpu_32(value) + added);
-}
-
-inline uint16_t shift_cpu_16(uint16_t value, int32_t shift)
-{
-    uint32_t result = (shift > 0 ? uint32_t(rte_be_to_cpu_16(value)) >> shift : uint32_t(rte_be_to_cpu_16(value)) << (-shift));
-    return rte_cpu_to_be_16(std::min(result, 0xffffu));
-}
-
-void FillProxyHeader(proxy_v2_ipv4_hdr* proxy_header, uint32_t src_addr, tPortId src_port, uint32_t dst_addr, tPortId dst_port);
-
-// ----------------------------------------------------------------------------
-
-struct ActionDrop
-{
-    uint32_t counter_id;
-};
-
-// Client Syn
-
-struct ActionClientOnSyn_SynToServer
-{
-    uint32_t seq;
-    uint32_t local_addr;
-    uint16_t local_port;
-};
-
-struct ActionClientOnSyn_SynAckToClient
-{
-    uint32_t seq;
-    uint32_t ack;
-};
-
-using ActionClientOnSyn_Result = std::variant<ActionClientOnSyn_SynToServer, ActionClientOnSyn_SynAckToClient, ActionDrop>;
-
-// Client Ack
-
-struct ActionClientOnAck_NewServerConnection
-{
-    uint32_t local_addr;
-    uint16_t local_port;
-    uint32_t seq;
-    TcpOptions tcp_options;
-};
-
-struct ActionClientOnAck_Forward
-{
-    uint32_t local_addr;
-    uint16_t local_port;
-    uint32_t shift_seq;
-    uint32_t shift_ack;
-    uint32_t shift_timestamp;
-    bool add_proxy_header;
-};
-
-using ActionClientOnAck_Result = std::variant<ActionClientOnAck_NewServerConnection, ActionClientOnAck_Forward, ActionDrop>;
-
-// Server Syn+Ack
-
-struct ActionServerOnSynAck_SynAckToClient
-{
-    uint32_t ack;
-    uint32_t client_addr;
-    uint16_t client_port;
-};
-
-struct ActionServerOnSynAck_AckToClient
-{
-    uint32_t client_addr;
-    uint16_t client_port;
-    uint32_t seq;
-    uint32_t ack;
-    uint32_t timestamp_shift;
-    int32_t window_size_shift;
-};
-
-using ActionServerOnSynAck_Result = std::variant<ActionServerOnSynAck_SynAckToClient, ActionServerOnSynAck_AckToClient, ActionDrop>;
-
-// Server Ack
-
-struct ActionServerOnAck_ForwardFirst
-{
-    uint32_t dst_addr;
-    uint16_t dst_port;
-    uint32_t seq;
-    uint32_t ack;
-    size_t tcp_options_size;
-    uint8_t tcp_options[MAX_SIZE_TCP_OPTIONS];
-    int32_t window_size_shift;
-};
-
-struct ActionServerOnAck_Forward
-{
-    uint32_t dst_addr;
-    uint16_t dst_port;
-    uint32_t shift_seq;
-    uint32_t timestamp_shift;
-    int32_t window_size_shift;
-};
-
-using ActionServerOnAck_Result = std::variant<ActionServerOnAck_ForwardFirst, ActionServerOnAck_Forward, ActionDrop>;
-
 // ----------------------------------------------------------------------------
 
 struct DataForRetransmit
@@ -232,6 +123,11 @@ struct DataForRetransmit
     uint8_t tcp_options_data[MAX_SIZE_TCP_OPTIONS];
     common::globalBase::tFlow flow;
 };
+
+constexpr uint32_t flag_action_drop = 1 << 8;
+constexpr uint32_t flag_action_to_service = 1 << 9;
+constexpr uint32_t flag_action_to_client = 1 << 10;
+constexpr uint32_t mask_counter_action = flag_action_drop - 1;
 
 class TcpConnectionStore
 {
@@ -252,46 +148,30 @@ public:
     common::idp::proxy_syn::response GetSyn(std::optional<proxy_service_id_t> service_id);
     common::idp::proxy_local_pool::response GetLocalPool(std::optional<proxy_service_id_t> service_id);
 
-    // Action from worker
-    ActionClientOnSyn_Result ActionClientOnSyn(proxy_service_id_t service_id,
-                                           uint32_t worker_id,
-                                           const dataplane::globalBase::proxy_service_t& service,
-                                           uint32_t current_time,
-	                                       uint32_t src_addr,
-	                                       uint16_t src_port,
-	                                       uint32_t seq,
-	                                       const TcpOptions& tcp_options);
+    // Actions from worker
+    uint32_t ActionClientOnSyn(proxy_service_id_t service_id,
+	                       uint32_t worker_id,
+	                       const dataplane::globalBase::proxy_service_t& service,
+	                       uint32_t current_time,
+	                       rte_mbuf* mbuf);
 
-    ActionClientOnAck_Result ActionClientOnAck(proxy_service_id_t service_id,
-                                           uint32_t worker_id,
-                                           const dataplane::globalBase::proxy_service_t& service,
-                                           uint32_t current_time,
-	                                       uint32_t src_addr,
-	                                       uint16_t src_port,
-	                                       uint32_t seq,
-	                                       uint32_t ack,
-                                           uint32_t timestamp_echo,
-                                           bool empty_tcp_data,
-                                           uint32_t client_timestamp_start);
+    uint32_t ActionClientOnAck(proxy_service_id_t service_id,
+	                       uint32_t worker_id,
+	                       const dataplane::globalBase::proxy_service_t& service,
+	                       uint32_t current_time,
+	                       rte_mbuf* mbuf);
 
-    ActionServerOnSynAck_Result ActionServerOnSynAck(proxy_service_id_t service_id,
-                                                 const dataplane::globalBase::proxy_service_t& service,
-                                                 uint32_t current_time,
-	                                             uint32_t dst_addr,
-	                                             uint16_t dst_port,
-	                                             uint32_t seq,
-	                                             uint32_t ack,
-                                                 const TcpOptions& tcp_options);
+    uint32_t ActionServerOnSynAck(proxy_service_id_t service_id,
+	                          const dataplane::globalBase::proxy_service_t& service,
+	                          uint32_t current_time,
+	                          rte_mbuf* mbuf);
 
-    ActionServerOnAck_Result ActionServerOnAck(proxy_service_id_t service_id,
-                                           const dataplane::globalBase::proxy_service_t& service,
-                                           uint32_t current_time,
-	                                       uint32_t dst_addr,
-	                                       uint16_t dst_port,
-	                                       uint32_t seq,
-	                                       uint32_t ack);
-                                           
-    uint32_t currentTime;   // todo
+    uint32_t ActionServerOnAck(proxy_service_id_t service_id,
+	                       const dataplane::globalBase::proxy_service_t& service,
+	                       uint32_t current_time,
+	                       rte_mbuf* mbuf);
+
+    uint32_t currentTime; // todo
 
     void GetDataForRetramsits(uint32_t before_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
 
@@ -305,6 +185,9 @@ private:
 
     uint32_t index_start_check_retransmits_ = 0;
     common::globalBase::tFlow next_flow_;
+
+    uint32_t BuildSynCookieAndFillTcpOptionsAnswer(const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
+    uint32_t CheckSynCookie(const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
 };
 
 }

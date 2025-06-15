@@ -1,5 +1,8 @@
 #pragma once
 
+#include <rte_ip.h>
+#include <rte_tcp.h>
+
 #include "type.h"
 #include "memory_manager.h"
 
@@ -66,6 +69,16 @@ public:
     inline static void UnpackTuple(uint64_t tuple, uint32_t& addr, tPortId& port) {
         addr = tuple >> 16;
         port = tuple & 0xffff;
+    }
+
+    inline static void UnpackTupleSrc(uint64_t tuple, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) {
+        ipv4_header->src_addr = tuple >> 16;
+        tcp_header->src_port = tuple & 0xffff;
+    }
+
+    inline static void UnpackTupleDst(uint64_t tuple, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) {
+        ipv4_header->dst_addr = tuple >> 16;
+        tcp_header->dst_port = tuple & 0xffff;
     }
 };
 

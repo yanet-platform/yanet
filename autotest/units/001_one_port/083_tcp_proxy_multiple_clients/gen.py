@@ -12,17 +12,17 @@ MAC_SERVER = "00:00:00:00:00:0A"
 IP_CLIENT1 = "10.0.2.1"
 IP_CLIENT2 = "10.0.2.2"
 IP_PROXY_INT = "10.0.0.1"
-IP_SERVER1 = "10.0.1.1"
-IP_SERVER2 = "10.0.1.2"
-IP_SERVER3 = "10.0.1.3"
-IP_SERVER4 = "10.0.1.4"
+IP_SERVER1 = "10.0.3.1"
+IP_SERVER2 = "10.0.3.2"
+IP_SERVER3 = "10.0.3.3"
+IP_SERVER4 = "10.0.3.4"
 
 PORT_SERVER = 8080
 PORT_PROXY_EXT = 80
 PORT_PROXY_INT = 32768
 PORT_PROXY_INT2 = 32769
-PORT_PROXY_INT3 = 32770
-PORT_PROXY_INT4 = 32771
+PORT_PROXY_INT3 = PORT_PROXY_INT
+PORT_PROXY_INT4 = PORT_PROXY_INT2
 PORT_CLIENT = 12380
 
 START_CLIENT_SEQ = 1000
@@ -122,8 +122,8 @@ WriteTest("001", data_type1)
 
 # 002 - type 2 - no proxy, sec
 
-SYN_COOKIE = 0x08857553
-SYN_COOKIE2 = 0x19036da1
+SYN_COOKIE = 0xa8624b85
+SYN_COOKIE2 = 0xb8285337
 
 data_type2 = [
 	# clients syn -> synack clients
@@ -147,11 +147,11 @@ data_type2 = [
 	# server synack -> ack clients
 	(
 		FromServer(PORT_PROXY_INT, IP_SERVER2, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
-		ToClient(IP_SERVER2, IP_CLIENT1, SYN_COOKIE + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client)), ('WScale', 9), ("NOP", ''), ("NOP", ''), ("NOP", '')])
+		ToClient(IP_SERVER2, IP_CLIENT1, SYN_COOKIE + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client)), ("NOP", ''), ("NOP", '')])
 	),
 	(
 		FromServer(PORT_PROXY_INT2, IP_SERVER2, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
-		ToClient(IP_SERVER2, IP_CLIENT2, SYN_COOKIE2 + 1, START_CLIENT_SEQ2 + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client)), ('WScale', 9), ("NOP", ''), ("NOP", ''), ("NOP", '')])
+		ToClient(IP_SERVER2, IP_CLIENT2, SYN_COOKIE2 + 1, START_CLIENT_SEQ2 + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client)), ("NOP", ''), ("NOP", '')])
 	),
 	# clients ack -> ack server
 	(
@@ -229,8 +229,8 @@ WriteTest("003", data_type3)
 
 # 004 - type 4 - proxy, sec
 
-SYN_COOKIE3 = 0x784fb723
-SYN_COOKIE4 = 0xa839aed1
+SYN_COOKIE3 = 0x189488b5
+SYN_COOKIE4 = 0x48f69107
 
 data_type4  = [
 	# clients syn -> synack clients
@@ -254,11 +254,11 @@ data_type4  = [
 	# server synack -> ack clients
 	(
 		FromServer(PORT_PROXY_INT3, IP_SERVER4, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
-		ToClient(IP_SERVER4, IP_CLIENT1, SYN_COOKIE3 + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client)), ('WScale', 9), ("NOP", ''), ("NOP", ''), ("NOP", '')])
+		ToClient(IP_SERVER4, IP_CLIENT1, SYN_COOKIE3 + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client)), ("NOP", ''), ("NOP", '')])
 	),
 	(
 		FromServer(PORT_PROXY_INT4, IP_SERVER4, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1 - len_pr, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
-		ToClient(IP_SERVER4, IP_CLIENT2, SYN_COOKIE4 + 1, START_CLIENT_SEQ2 + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client)), ('WScale', 9), ("NOP", ''), ("NOP", ''), ("NOP", '')])
+		ToClient(IP_SERVER4, IP_CLIENT2, SYN_COOKIE4 + 1, START_CLIENT_SEQ2 + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client)), ("NOP", ''), ("NOP", '')])
 	),
 	# clients ack -> ack server
 	(

@@ -387,9 +387,9 @@ struct proxy_t
 
 struct proxy_service_t
 {
-	ipv4_address_t proxy_addr;
+	uint32_t proxy_addr;
 	tPortId proxy_port;
-	ipv4_address_t upstream_addr;
+	uint32_t upstream_addr;
 	tPortId upstream_port;
 	tCounterId counter_id;
 	bool proxy_header;
@@ -399,6 +399,7 @@ struct proxy_service_t
 	uint32_t mss;
 	bool ecn;
 	uint32_t winscale;
+	bool ignore_size_update_detections;
 };
 
 struct dregress_t

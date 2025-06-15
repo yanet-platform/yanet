@@ -73,7 +73,10 @@ struct ConnectionData {
     
     void Unlock()
     {
-        bucket->Unlock();
+        if (bucket != nullptr)
+        {
+            bucket->Unlock();
+        }
     }
 
     operator bool() const {
@@ -94,15 +97,7 @@ enum class TableSearchResult : uint32_t
 
 struct Connection
 {
-    enum State
-    {
-        SENT_SYN_SERVER,
-        SENT_PROXY_HEADER,
-        ESTABLISHED
-    };
-
     uint64_t local;     // local ip + port
-    State state;
     uint32_t sent_seq;
     uint32_t shift_server;
     uint32_t timestamp_echo;
@@ -126,23 +121,28 @@ struct Connection
         flags = 0;
         window_size_shift = 0;
     }
+
+    bool CreatedFromSynCookie()
+    {
+        return (flags & flag_from_synkookie) != 0;
+    }
 };
 
 struct SynConnection
 {
-    uint64_t client;    // client ip + port
     uint64_t local;     // local ip + port
     uint32_t recv_seq;  // seq received from client
-    uint32_t last_time; // time of last packet
     bool server_answer; // was received answer from server
 
     void Clear()
     {
-        last_time = 0;
         server_answer = false;
         local = 0;
     }
 };
+
+using ServiceConnectionData = ConnectionData<Connection>;
+using SynConnectionData = ConnectionData<SynConnection>;
 
 template<typename ConnectionInfo>
 class ConnectionsTable
@@ -267,6 +267,7 @@ public:
 
     TableSearchResult FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time, ConnectionData<ConnectionInfo>& data)
     {
+        data.bucket = nullptr;
         data.connection = nullptr;
         if (number_buckets_ == 0)
         {

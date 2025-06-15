@@ -21,11 +21,17 @@ void services()
 	                 "bytes_out",
 	                 "syn_count",
 	                 "ping_count",
-	                 "connections_count");
+	                 "connections_count",
+					 "service_bucket_overflow",
+					 "failed_local_pool_allocation",
+					 "failed_local_pool_search",
+					 "failed_answer_service_syn_ack",
+					 "ignored_size_update_detections",
+					 "failed_check_syn_cookie");
 
-	for (const auto& [service_id, service_name, packets_in, bytes_in, packets_out, bytes_out, syn_count, ping_count, connections_count] : response)
+	for (const auto& record : response)
 	{
-        table.insert_row(service_id, service_name, packets_in, bytes_in, packets_out, bytes_out, syn_count, ping_count, connections_count);
+        table.insert_row(record);
     }
 
     table.Print();
@@ -41,12 +47,11 @@ void connections(std::optional<proxy_service_id_t> service_id)
 	                 "src_addr",
 	                 "src_port",
 	                 "local_addr",
-	                 "local_port",
-	                 "state");
+	                 "local_port");
 
-	for (const auto& [service_id, src_addr, src_port, local_addr, local_port, state] : response)
+	for (const auto& [service_id, src_addr, src_port, local_addr, local_port] : response)
 	{
-		table.insert_row(service_id, common::ipv4_address_t(rte_cpu_to_be_32(src_addr)).toString(), rte_cpu_to_be_16(src_port), common::ipv4_address_t(rte_cpu_to_be_32(local_addr)).toString(), rte_cpu_to_be_16(local_port), state);
+		table.insert_row(service_id, common::ipv4_address_t(rte_cpu_to_be_32(src_addr)).toString(), rte_cpu_to_be_16(src_port), common::ipv4_address_t(rte_cpu_to_be_32(local_addr)).toString(), rte_cpu_to_be_16(local_port));
 	}
 
 	table.Print();

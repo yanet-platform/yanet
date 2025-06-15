@@ -70,6 +70,12 @@ enum class service_counter : tCounterId
 	syn_count,
 	ping_count,
 	connections_count,
+	service_bucket_overflow,
+	failed_local_pool_allocation,
+	failed_local_pool_search,
+	failed_answer_service_syn_ack,
+	ignored_size_update_detections,
+	failed_check_syn_cookie,
 	size
 };
 

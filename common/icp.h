@@ -961,7 +961,13 @@ using response = std::vector<std::tuple<proxy_service_id_t, ///< service_id
                                         uint64_t, ///< bytes_out
                                         uint64_t, ///< syn_count
                                         uint64_t, ///< ping_count
-                                        uint64_t>>; ///< connections_count
+                                        uint64_t, ///< connections_count
+                                        uint64_t, ///< service_bucket_overflow
+                                        uint64_t, ///< failed_local_pool_allocation
+                                        uint64_t, ///< failed_local_pool_search,
+                                        uint64_t, ///< failed_answer_service_syn_ack,
+                                        uint64_t, ///< ignored_size_update_detections,
+                                        uint64_t>>; ///< failed_check_syn_cookie
 }
 
 using request = std::tuple<requestType,
