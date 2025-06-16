@@ -756,7 +756,7 @@ void config_converter_t::processProxy()
 			throw error_result_t(eResult::invalidFlow, "invalid flow type for proxy: " + std::to_string(unsigned(proxy.flow.type)));
 		}
 
-		if (proxy.upstream_nets.empty() && !proxy.services.empty())
+		if (proxy.upstream_net.mask() == 0 && !proxy.services.empty())
 		{
 			throw error_result_t(eResult::invalidFlow, "empty local pool for proxy");
 		}

@@ -3,21 +3,17 @@
 namespace dataplane::proxy
 {
 
-void LocalPool::Add(const ipv4_prefix_t& prefix)
-{
-    prefix_ = prefix;
-}
-
-bool LocalPool::Init(proxy_service_id_t service_id, dataplane::memory_manager* memory_manager)
+bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager)
 {
     if (initialized_)
     {
         return true;
     }
-    if (prefix_.mask == 0)
+    if (prefix.mask == 0)
     {
         return false;
     }
+    prefix_ = prefix;
 
     num_connections_ = ((1u << (32u - prefix_.mask)) - 2) * num_ports;
 
@@ -203,21 +199,17 @@ LocalPool2::LocalPool2()
     : initialized_(false)
 {}
 
-void LocalPool2::Add(const ipv4_prefix_t& prefix)
-{
-    prefix_ = prefix;
-}
-
-bool LocalPool2::Init(proxy_service_id_t service_id, dataplane::memory_manager* memory_manager)
+bool LocalPool2::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager)
 {
     if (initialized_)
     {
         return true;
     }
-    if (prefix_.mask == 0)
+    if (prefix.mask == 0)
     {
         return false;
     }
+    prefix_ = prefix;
 
     uint32_t num_connections = ((1u << (32u - prefix_.mask)) - 2) * num_ports;
     num_free_chunks_ = max_workers * 2;

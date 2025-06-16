@@ -488,10 +488,6 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		{
 			result = proxy_remove(std::get<common::idp::updateGlobalBase::proxy_or_service_remove::request>(data));
 		}
-		else if (type == common::idp::updateGlobalBase::requestType::proxy_add_local_pool)
-		{
-			result = proxy_add_local_pool(std::get<common::idp::updateGlobalBase::proxy_add_local_pool::request>(data));
-		}
 		else if (type == common::idp::updateGlobalBase::requestType::proxy_service_update)
 		{
 			result = proxy_service_update(std::get<common::idp::updateGlobalBase::proxy_service_update::request>(data));
@@ -2685,17 +2681,9 @@ eResult generation::proxy_remove(const common::idp::updateGlobalBase::proxy_or_s
 	return eResult::success;
 }
 
-eResult generation::proxy_add_local_pool(const common::idp::updateGlobalBase::proxy_add_local_pool::request& request)
-{
-	auto [service_id, prefix] = request;
-	tcp_connection_store->proxy_add_local_pool(service_id, prefix);
-	// YANET_LOG_WARNING("proxy_add_local_pool proxy_id=%d, prefix=%s\n", proxy_id, prefix.toString().c_str());
-	return eResult::success;
-}
-
 eResult generation::proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request)
 {
-	auto [service_id, counter_id, proxy_addr, proxy_port, upstream_addr, upstream_port, proxy_header, size_connections_table, size_syn_table, use_sack, mss, ecn, winscale, ignore_size_update_detections] = request;
+	auto [service_id, counter_id, proxy_addr, proxy_port, upstream_addr, upstream_port, prefix, proxy_header, size_connections_table, size_syn_table, use_sack, mss, ecn, winscale, ignore_size_update_detections] = request;
 	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, counter_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
 	// 	service_id, counter_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port, proxy_header, size_connections_table, size_syn_table);
 
@@ -2727,7 +2715,7 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.winscale = winscale;
 	service.ignore_size_update_detections = ignore_size_update_detections;
 
-	return tcp_connection_store->proxy_service_update(service_id, service, &dataPlane->memory_manager);
+	return tcp_connection_store->proxy_service_update(service_id, service, prefix, &dataPlane->memory_manager);
 }
 
 eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request)

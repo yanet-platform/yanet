@@ -349,12 +349,12 @@ class config_t
 public:
 	config_t() = default;
 
-	SERIALIZABLE(proxy_id, services, upstream_nets, timeout_syn_rto, timeout_syn_recv, timeout_established, nextModule, flow);
+	SERIALIZABLE(proxy_id, services, upstream_net, timeout_syn_rto, timeout_syn_recv, timeout_established, nextModule, flow);
 
 public:
 	proxy_id_t proxy_id;
 
-	std::set<common::ip_prefix_t> upstream_nets;
+	common::ipv4_prefix_t upstream_net;
 
 	std::vector<service_t> services;
 	

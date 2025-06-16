@@ -87,13 +87,12 @@ protected:
     std::optional<proxy_id_t> AddModule(common::idp::updateGlobalBase::request& globalbase, const std::string& module_name, const controlplane::proxy::config_t& config);
     std::optional<proxy_id_t> UpdateModule(common::idp::updateGlobalBase::request& globalbase, const std::string& module_name, const controlplane::proxy::config_t& config);
     std::optional<proxy_id_t> RemoveModule(common::idp::updateGlobalBase::request& globalbase, const std::string& module_name);
-    void AddPrefixToPool(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const common::ip_prefix_t& prefix);
-    void AddService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service);
-    void UpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service);
+    void AddService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service, const common::ipv4_prefix_t& prefix);
+    void UpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service, const common::ipv4_prefix_t& prefix);
     void RemoveService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service);
 
     void AddRequestUpdateProxy(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::config_t& config);
-    void AddRequestUpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, proxy_service_id_t service_id, const controlplane::proxy::service_t& config);
+    void AddRequestUpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, proxy_service_id_t service_id, const controlplane::proxy::service_t& config, const common::ipv4_prefix_t& prefix);
 
     void counters_gc_thread();
 

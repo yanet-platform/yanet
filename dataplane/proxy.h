@@ -135,8 +135,7 @@ public:
     // Update
     void proxy_update(proxy_id_t proxy_id, const dataplane::globalBase::proxy_t& proxy);
     void proxy_remove(proxy_id_t proxy_id);
-    void proxy_add_local_pool(proxy_service_id_t service_id, const common::ip_prefix_t& prefix);
-    eResult proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager);
+    eResult proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, const common::ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager);
     void proxy_service_remove(proxy_service_id_t service_id);
 
     void CollectGarbage(uint32_t current_time);

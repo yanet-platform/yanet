@@ -139,7 +139,6 @@ enum class requestType : uint32_t
 	update_balancer_services,
         proxy_update,
         proxy_remove,
-        proxy_add_local_pool,
         proxy_service_update,
         proxy_service_remove,
 	route_lpm_update,
@@ -329,12 +328,6 @@ namespace proxy_or_service_remove
 using request = std::tuple<proxy_id_t>;
 }
 
-namespace proxy_add_local_pool
-{
-using request = std::tuple<proxy_service_id_t,
-                           common::ip_prefix_t>; ///< prefix
-}
-
 namespace proxy_service_update
 {
 using request = std::tuple<proxy_service_id_t,
@@ -343,6 +336,7 @@ using request = std::tuple<proxy_service_id_t,
                            tPortId, ///< proxy_port;
                            common::ip_address_t, ///< upstream_addr;
                            tPortId, ///< upstream_port;
+                           common::ipv4_prefix_t, ///< prefix
                            bool, ///< proxy_header;
                            uint32_t, ///< size_connections_table;
                            uint32_t, ///< size_syn_table;
@@ -579,7 +573,6 @@ using requestVariant = std::variant<std::tuple<>,
                                     update_balancer_services::request,
                                     proxy_update::request,
                                     proxy_or_service_remove::request,
-                                    proxy_add_local_pool::request,
                                     proxy_service_update::request,
                                     route_tunnel_weight_update::request,
                                     acl_network_ipv4_source::request, /// + acl_network_ipv4_destination, acl_network_ipv6_source, acl_network_ipv6_destination

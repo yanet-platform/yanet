@@ -244,21 +244,11 @@ void TcpConnectionStore::proxy_remove(proxy_id_t proxy_id)
     YANET_LOG_WARNING("proxy_remove: proxy_id=%d\n", proxy_id);
 }
 
-void TcpConnectionStore::proxy_add_local_pool(proxy_service_id_t service_id, const common::ip_prefix_t& prefix)
+eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, const common::ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager)
 {
-    YANET_LOG_WARNING("proxy_add_local_pool service_id=%d, prefix=%s\n", service_id, prefix.toString().c_str());
-    ipv4_prefix_t prefix_pool;
-    prefix_pool.address = ipv4_address_t::convert(prefix.get_ipv4().address());
-    prefix_pool.address.address = rte_cpu_to_be_32(prefix_pool.address.address);
-    prefix_pool.mask = prefix.mask();
-    local_pools_[service_id].Add(prefix_pool);
-}
-
-eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager)
-{
-    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, upstream=%s:%d, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
+    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, upstream=%s:%d, prefix=%s, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
         service_id, common::ipv4_address_t(rte_cpu_to_be_32(service.proxy_addr)).toString().c_str(), rte_cpu_to_be_16(service.proxy_port),
-        common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(service.upstream_port), service.proxy_header, service.size_connections_table, service.size_syn_table);
+        common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(service.upstream_port), prefix.toString().c_str(), service.proxy_header, service.size_connections_table, service.size_syn_table);
 
     std::lock_guard guard(mutex_);
 
@@ -274,7 +264,11 @@ eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, 
         return eResult::errorAllocatingMemory;
     }
 
-    if (!local_pools_[service_id].Init(service_id, memory_manager))
+    ipv4_prefix_t pool_prefix;
+    pool_prefix.address = ipv4_address_t::convert(prefix.address());
+    pool_prefix.address.address = rte_be_to_cpu_32(pool_prefix.address.address);
+    pool_prefix.mask = prefix.mask();
+    if (!local_pools_[service_id].Init(service_id, pool_prefix, memory_manager))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.LocalPool, service: %d\n", service_id);
         return eResult::errorAllocatingMemory;

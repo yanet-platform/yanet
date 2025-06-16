@@ -1114,13 +1114,7 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 
 	auto& proxy = baseNext.proxies[moduleId];
 
-	if (exist(moduleJson, "upstreamNets"))
-	{
-		for (const auto& ipPrefixJson : moduleJson["upstreamNets"])
-		{
-			proxy.upstream_nets.emplace(ipPrefixJson.get<std::string>());
-		}
-	}
+	proxy.upstream_net = moduleJson.value("upstreamNet", "");
 	
 	if (exist(moduleJson, "timeouts"))
 	{

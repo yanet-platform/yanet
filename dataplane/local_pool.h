@@ -17,8 +17,7 @@ class LocalPool
 {
 public:
     LocalPool() : initialized_(false) {}
-    void Add(const ipv4_prefix_t& prefix);
-    bool Init(proxy_service_id_t service_id, dataplane::memory_manager* memory_manager);
+    bool Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager);
     bool _TestInit(const ipv4_prefix_t& prefix);
     bool _TestFree();
 
@@ -96,8 +95,7 @@ public:
     };
 
     LocalPool2();
-    void Add(const ipv4_prefix_t& prefix);
-    bool Init(proxy_service_id_t service_id, dataplane::memory_manager* memory_manager);
+    bool Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager);
     bool _TestInit(const ipv4_prefix_t& prefix);
     bool _TestFree();
 

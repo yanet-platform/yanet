@@ -57,11 +57,7 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
             {
                 for (const auto& service : config.services)
                 {
-                    for (const auto& prefix : config.upstream_nets)
-                    {
-                        AddPrefixToPool(globalbase, service.service_id, prefix);
-                    }
-                    AddService(globalbase, *proxy_id, service);
+                    AddService(globalbase, *proxy_id, service, config.upstream_net);
                 }
             }
         }
@@ -88,23 +84,16 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
 
             for (auto iter_serv_next : services_next)
             {
-                for (const auto& prefix : config.upstream_nets)
-                {
-                    if (iter_prev->second.upstream_nets.count(prefix) == 0)
-                    {
-                        AddPrefixToPool(globalbase, iter_serv_next.second->service_id, prefix);
-                    }
-                }
                 auto iter_serv_prev = services_prev.find(iter_serv_next.first);
                 if (iter_serv_prev == services_prev.end())
                 {
                     // new
-                    AddService(globalbase, *proxy_id, *iter_serv_next.second);
+                    AddService(globalbase, *proxy_id, *iter_serv_next.second, config.upstream_net);
                 }
                 else
                 {
                     // existing
-                    UpdateService(globalbase, *proxy_id, *iter_serv_next.second);
+                    UpdateService(globalbase, *proxy_id, *iter_serv_next.second, config.upstream_net);
                 }
             }
         }
@@ -185,14 +174,7 @@ std::optional<proxy_id_t> proxy_t::RemoveModule(common::idp::updateGlobalBase::r
     return proxy_id;
 }
 
-void proxy_t::AddPrefixToPool(common::idp::updateGlobalBase::request& globalbase, proxy_service_id_t service_id, const common::ip_prefix_t& prefix)
-{
-    // YANET_LOG_WARNING("LOCAL_POOL add: %s to ID=%d\n", prefix.toString().c_str(), proxy_id);
-    globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_add_local_pool,
-        common::idp::updateGlobalBase::proxy_add_local_pool::request{service_id, prefix});
-}
-
-void proxy_t::AddService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service)
+void proxy_t::AddService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service, const common::ipv4_prefix_t& prefix)
 {
     std::optional<proxy_id_t> service_id = services_assigner.Assign();
     if (!service_id.has_value())
@@ -203,10 +185,10 @@ void proxy_t::AddService(common::idp::updateGlobalBase::request& globalbase, pro
     service_counters.insert(*service_id);
     services[service.Key()] = *service_id;
     // YANET_LOG_WARNING("SERVICE add: %s:%d, IDs=%d to IDp=%d\n", service.proxy_addr.toString().c_str(), service.proxy_port, *service_id, proxy_id);
-    AddRequestUpdateService(globalbase, proxy_id, *service_id, service);
+    AddRequestUpdateService(globalbase, proxy_id, *service_id, service, prefix);
 }
 
-void proxy_t::UpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service)
+void proxy_t::UpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service, const common::ipv4_prefix_t& prefix)
 {
     auto iter = services.find(service.Key());
     if (iter == services.end())
@@ -217,7 +199,7 @@ void proxy_t::UpdateService(common::idp::updateGlobalBase::request& globalbase, 
     proxy_id_t service_id = iter->second;
 
     // YANET_LOG_WARNING("SERVICE update: %s:%d, ID=%d\n", service.proxy_addr.toString().c_str(), service.proxy_port, service_id);
-    AddRequestUpdateService(globalbase, proxy_id, service_id, service);
+    AddRequestUpdateService(globalbase, proxy_id, service_id, service, prefix);
 }
 
 void proxy_t::RemoveService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service)
@@ -249,7 +231,7 @@ void proxy_t::AddRequestUpdateProxy(common::idp::updateGlobalBase::request& glob
 	                                                                             config.flow});
 }
 
-void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, proxy_service_id_t service_id, const controlplane::proxy::service_t& config)
+void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, proxy_service_id_t service_id, const controlplane::proxy::service_t& config, const common::ipv4_prefix_t& prefix)
 {
 	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_service_update,
 	                        common::idp::updateGlobalBase::proxy_service_update::request{service_id,
@@ -258,6 +240,7 @@ void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& gl
 	                                                                                     config.proxy_port,
 	                                                                                     config.upstream_addr,
 	                                                                                     config.upstream_port,
+                                                                                         prefix,
 	                                                                                     config.proxy_header,
 	                                                                                     config.size_connections_table,
 	                                                                                     config.size_syn_table,

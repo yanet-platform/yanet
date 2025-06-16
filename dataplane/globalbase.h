@@ -196,7 +196,6 @@ protected:
 	eResult update_host_config(const common::idp::updateGlobalBase::update_host_config::request& request);
 	eResult proxy_update(const common::idp::updateGlobalBase::proxy_update::request& request);
 	eResult proxy_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request);
-	eResult proxy_add_local_pool(const common::idp::updateGlobalBase::proxy_add_local_pool::request& request);
 	eResult proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request);
 	eResult proxy_service_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request);
 
