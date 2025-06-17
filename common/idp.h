@@ -316,9 +316,6 @@ using request = std::tuple<
 namespace proxy_update
 {
 using request = std::tuple<proxy_id_t,
-                           uint32_t, ///< timeout_syn_rto
-                           uint32_t, ///< timeout_syn_recv
-                           uint32_t, ///< timeout_established
                            common::globalBase::tFlow ///< Flow
                            >;
 }
@@ -342,9 +339,12 @@ using request = std::tuple<proxy_service_id_t,
                            uint32_t, ///< size_syn_table;
                            bool, ///< use_sack;
                            uint32_t, ///< mss;
-                           bool, ///< ecn;
                            uint32_t, ///< winscale;
-                           bool>; ///< ignore_size_update_detections;
+                           bool, ///< timestamps;
+                           bool, ///< ignore_size_update_detections;
+                           uint32_t, ///< timeout_syn_rto
+                           uint32_t, ///< timeout_syn_recv
+                           uint32_t>; ///< timeout_established
 }
 
 namespace update_early_decap_flags

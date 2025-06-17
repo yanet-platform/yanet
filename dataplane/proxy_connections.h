@@ -8,8 +8,8 @@
 namespace dataplane::proxy
 {
 
-#define TIMEOUT_ACK 10 // todo
-#define TIMEOUT_SYN 3 // todo - to config
+#define TIMEOUT_ACK 10000 // todo
+#define TIMEOUT_SYN 3000 // todo - to config
 
 template<typename ConnectionInfo>
 struct ConnectionBucket
@@ -27,7 +27,7 @@ struct ConnectionBucket
 
     uint32_t addresses[bucket_size];
     uint16_t ports[bucket_size];
-    uint32_t last_times[bucket_size];
+    uint64_t last_times[bucket_size];
 
     ConnectionInfo connections[bucket_size];
     std::mutex mutex;
@@ -41,7 +41,7 @@ struct ConnectionBucket
         last_times[idx] = 0;
     }
 
-    bool IsExpired(uint32_t idx, uint32_t current_time, uint32_t timeout = TIMEOUT_ACK)
+    bool IsExpired(uint32_t idx, uint64_t current_time, uint64_t timeout = TIMEOUT_ACK)
     {
         return last_times[idx] + timeout < current_time;
     }
@@ -63,7 +63,7 @@ struct ConnectionData {
     ConnectionInfo* connection;
     uint32_t idx;    
     
-    void Init(uint32_t ip, uint16_t port, uint32_t time)
+    void Init(uint32_t ip, uint16_t port, uint64_t time)
     {
         bucket->addresses[idx] = ip;
         bucket->ports[idx] = port;
@@ -228,7 +228,7 @@ public:
         }
     }
 
-    void CollectGarbage(uint32_t current_time, LocalPool& local_pool)
+    void CollectGarbage(uint64_t current_time, LocalPool& local_pool)
     {
         for (uint32_t index = 0; index < number_buckets_; index++)
         {
@@ -265,7 +265,7 @@ public:
         return count;
     }
 
-    TableSearchResult FindAndLock(uint32_t addr, uint16_t port, uint32_t current_time, ConnectionData<ConnectionInfo>& data)
+    TableSearchResult FindAndLock(uint32_t addr, uint16_t port, uint64_t current_time, ConnectionData<ConnectionInfo>& data)
     {
         data.bucket = nullptr;
         data.connection = nullptr;

@@ -1919,6 +1919,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 
 	for (const auto& service : proxy.services)
 	{
+		YANET_LOG_WARNING("\t\t acl_rules_proxy service_id=%d, proxy_addr=%s\n", service.service_id, service.proxy_addr.toString().c_str());
 		controlplane::base::acl_rule_network_ipv4_t client_rule_network({common::ipv4_prefix_default}, {common::ipv4_prefix_t(service.proxy_addr)});
 		controlplane::base::acl_rule_transport_tcp_t client_rule_transport{range_t{0x0000, 0xFFFF}, range_t{service.proxy_port}};
 		

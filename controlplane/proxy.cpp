@@ -225,9 +225,6 @@ void proxy_t::AddRequestUpdateProxy(common::idp::updateGlobalBase::request& glob
 {
 	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_update,
 	                        common::idp::updateGlobalBase::proxy_update::request{proxy_id,
-                                                                                 config.timeout_syn_rto,
-	                                                                             config.timeout_syn_recv,
-	                                                                             config.timeout_established,
 	                                                                             config.flow});
 }
 
@@ -246,9 +243,12 @@ void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& gl
 	                                                                                     config.size_syn_table,
 	                                                                                     config.use_sack,
 	                                                                                     config.mss,
-	                                                                                     config.ecn,
 	                                                                                     config.winscale,
-	                                                                                     config.ignore_size_update_detections});
+                                                                                         config.timestamps,
+	                                                                                     config.ignore_size_update_detections,
+                                                                                         config.timeout_syn_rto,
+                                                                                         config.timeout_syn_recv,
+                                                                                         config.timeout_established,});
 }
 
 void proxy_t::counters_gc_thread()

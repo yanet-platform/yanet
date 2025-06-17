@@ -1129,6 +1129,12 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 		proxy.timeout_established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED;
 	}
 
+	proxy.use_sack = moduleJson.value("useSack", YANET_PROXY_DEFAULT_USE_SACK);
+	proxy.mss = moduleJson.value("mss", YANET_PROXY_DEFAULT_MSS);
+	proxy.winscale = moduleJson.value("winscale", YANET_PROXY_DEFAULT_WINSCALE);
+	proxy.timestamps = moduleJson.value("timestamps", YANET_PROXY_DEFAULT_USE_TIMESTAMPS);
+	proxy.ignore_size_update_detections = moduleJson.value("ignoreSizeUpdateDetections", false);
+
 	if (exist(moduleJson, "services"))
 	{
 		loadConfig_proxy_services(baseNext,
@@ -1235,16 +1241,33 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 		service.upstream_port = service_json["upstreamPort"];
 		service.proxy_header = service_json.value("proxyHeader", true);
 		service.size_connections_table = service_json["sizeConnectionsTable"];
-		if (service.size_connections_table & 1)
+		if ((service.size_connections_table & (service.size_connections_table - 1)) != 0)
+		{
 			throw error_result_t(eResult::invalidConfigurationFile, "sizeConnectionsTable must be power of 2");
+		}
 		service.size_syn_table = service_json.value("sizeSYNTable", 0);
-		if (service.size_syn_table & 1)
+		if ((service.size_syn_table & (service.size_syn_table - 1)) != 0)
+		{
 			throw error_result_t(eResult::invalidConfigurationFile, "sizeSYNTable must be power of 2");
-		service.use_sack = service_json.value("useSack", true);
-		service.mss = service_json.value("mss", 1462);
-		service.ecn = service_json.value("ecn", false);
-		service.winscale = service_json.value("winscale", 0);
-		service.ignore_size_update_detections = service_json.value("ignoreSizeUpdateDetections", false);
+		}
+		service.use_sack = service_json.value("useSack", proxy.use_sack);
+		service.mss = service_json.value("mss", proxy.mss);
+		service.winscale = service_json.value("winscale", proxy.winscale);
+		service.timestamps = service_json.value("timestamps", proxy.timestamps);
+		service.ignore_size_update_detections = service_json.value("ignoreSizeUpdateDetections", proxy.ignore_size_update_detections);
+
+		if (exist(service_json, "timeouts"))
+		{
+			service.timeout_syn_rto = service_json["timeouts"].value("SYNRTO", proxy.timeout_syn_rto);
+			service.timeout_syn_recv = service_json["timeouts"].value("SYNRecv", proxy.timeout_syn_recv);
+			service.timeout_established = service_json["timeouts"].value("established", proxy.timeout_established);
+		}
+		else
+		{
+			service.timeout_syn_rto = proxy.timeout_syn_rto;
+			service.timeout_syn_recv = proxy.timeout_syn_recv;
+			service.timeout_established = proxy.timeout_established;
+		}
 
 		if (exist(service_json, "blacklist"))
 		{

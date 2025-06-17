@@ -14,7 +14,7 @@
 
 #define MAX_SIZE_TCP_OPTIONS 40
 
-#define TIMEOUT_RETRANSMIT 1 // todo
+#define TIMEOUT_RETRANSMIT 1000 // todo
 #define MAX_COUNT_RETRANSMITS_PER_SERVICE (uint32_t)16 // todo
 #define MAX_COUNT_RETRANSMITS_ALL_SERVICES (uint32_t)128 // todo - must be a power of 2
 
@@ -81,7 +81,7 @@ public:
     eResult proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, const common::ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager);
     void proxy_service_remove(proxy_service_id_t service_id);
 
-    void CollectGarbage(uint32_t current_time);
+    void CollectGarbage();
 
     void UpdateSynCookieKeys();
 
@@ -94,26 +94,22 @@ public:
     uint32_t ActionClientOnSyn(proxy_service_id_t service_id,
 	                       uint32_t worker_id,
 	                       const dataplane::globalBase::proxy_service_t& service,
-	                       uint32_t current_time,
 	                       rte_mbuf* mbuf);
 
     uint32_t ActionClientOnAck(proxy_service_id_t service_id,
 	                       uint32_t worker_id,
 	                       const dataplane::globalBase::proxy_service_t& service,
-	                       uint32_t current_time,
 	                       rte_mbuf* mbuf);
 
     uint32_t ActionServerOnSynAck(proxy_service_id_t service_id,
 	                          const dataplane::globalBase::proxy_service_t& service,
-	                          uint32_t current_time,
 	                          rte_mbuf* mbuf);
 
     uint32_t ActionServerOnAck(proxy_service_id_t service_id,
 	                       const dataplane::globalBase::proxy_service_t& service,
-	                       uint32_t current_time,
 	                       rte_mbuf* mbuf);
 
-    uint32_t currentTime; // todo
+    uint64_t currentTime;
 
     void GetDataForRetramsits(uint32_t before_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
 

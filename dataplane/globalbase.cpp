@@ -2635,7 +2635,7 @@ eResult generation::update_host_config(const common::idp::updateGlobalBase::upda
 
 eResult generation::proxy_update(const common::idp::updateGlobalBase::proxy_update::request& request)
 {
-	auto [proxy_id, timeout_syn_rto, timeout_syn_recv, timeout_established, flow] = request;
+	auto [proxy_id, flow] = request;
 	// YANET_LOG_WARNING("proxy_update: proxy_id=%d, syn_type=%s, max_local_addresses=%d, mem_size_syn=%d, mem_size_connections=%d, timeout_syn=%d, timeout_connection=%d, timeout_fin=%d, flow=%s\n",
 	// 	proxy_id, from_proxy_type(syn_type), max_local_addresses, mem_size_syn, mem_size_connections, timeout_syn, timeout_connection, timeout_fin, flow.to_string().c_str());
 
@@ -2660,10 +2660,6 @@ eResult generation::proxy_update(const common::idp::updateGlobalBase::proxy_upda
 
 	auto& proxy = proxies[proxy_id];
 
-	proxy.timeout_syn_rto = timeout_syn_rto;
-	proxy.timeout_syn_recv = timeout_syn_recv;
-	proxy.timeout_established = timeout_established;
-
 	proxy.flow = flow;
 
 	proxy_enabled = 1;
@@ -2683,7 +2679,7 @@ eResult generation::proxy_remove(const common::idp::updateGlobalBase::proxy_or_s
 
 eResult generation::proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request)
 {
-	auto [service_id, counter_id, proxy_addr, proxy_port, upstream_addr, upstream_port, prefix, send_proxy_header, size_connections_table, size_syn_table, use_sack, mss, ecn, winscale, ignore_size_update_detections] = request;
+	auto [service_id, counter_id, proxy_addr, proxy_port, upstream_addr, upstream_port, prefix, send_proxy_header, size_connections_table, size_syn_table, use_sack, mss, winscale, timestamps, ignore_size_update_detections, timeout_syn_rto, timeout_syn_recv, timeout_established] = request;
 	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, counter_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
 	// 	service_id, counter_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port, proxy_header, size_connections_table, size_syn_table);
 
@@ -2711,8 +2707,8 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.size_syn_table = size_syn_table;
 	service.use_sack = use_sack;
 	service.mss = mss;
-	service.ecn = ecn;
 	service.winscale = winscale;
+	service.timestamps = timestamps;
 	service.ignore_size_update_detections = ignore_size_update_detections;
 	rte_memcpy(service.proxy_header.signature, dataplane::proxy::PROXY_V2_SIGNATURE, 12);
 	service.proxy_header.version_cmd = (dataplane::proxy::PROXY_VERSION_V2 << 4) + dataplane::proxy::PROXY_CMD_LOCAL;
@@ -2720,6 +2716,11 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.proxy_header.addr_len = rte_cpu_to_be_16(4+4+4);
 	service.proxy_header.dst_addr = service.proxy_addr;
 	service.proxy_header.dst_port = service.proxy_port;
+
+	service.timeout_syn_rto = timeout_syn_rto;
+	service.timeout_syn_recv = timeout_syn_recv;
+	service.timeout_established = timeout_established;
+
 
 	return tcp_connection_store->proxy_service_update(service_id, service, prefix, &dataPlane->memory_manager);
 }

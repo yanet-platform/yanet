@@ -109,9 +109,13 @@ extern LogPriority logPriority;
 #define YANET_BALANCER_PURE_L3 ((uint8_t)(1u << 2))
 #define YANET_BALANCER_PURE_ROUND_ROBIN ((uint8_t)(1u << 3))
 
+#define YANET_PROXY_DEFAULT_MSS ((uint32_t)(1460))
+#define YANET_PROXY_DEFAULT_USE_SACK ((bool)(true))
+#define YANET_PROXY_DEFAULT_WINSCALE ((uint32_t)(14))
+#define YANET_PROXY_DEFAULT_USE_TIMESTAMPS ((bool)(true))
 #define YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO ((uint32_t)(1))
-#define YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV ((uint32_t)(2))
-#define YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED ((uint32_t)(60))
+#define YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV ((uint32_t)(3))
+#define YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED ((uint32_t)(30))
 
 #define CALCULATE_LOGICALPORT_ID(portId, vlanId) ((portId << 13) | ((vlanId & 0xFFF) << 1) | 1)
 

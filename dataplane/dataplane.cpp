@@ -1466,12 +1466,12 @@ void cDataPlane::timestamp_thread()
 				globalbase_atomic->currentTime = current_time;
 			}
 
-			tcp_connection_store.currentTime = current_time;
-
 			prev_time = current_time;
 		}
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		tcp_connection_store.currentTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 }
 
@@ -1537,8 +1537,8 @@ void cDataPlane::start()
 	threads.emplace_back([this]() {
 		for (;;)
 		{
-			tcp_connection_store.CollectGarbage(current_time);
-			std::this_thread::sleep_for(std::chrono::seconds(1));
+			tcp_connection_store.CollectGarbage();
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 	});
 
