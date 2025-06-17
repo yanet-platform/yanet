@@ -245,6 +245,64 @@ struct tcp_option_t
 namespace dataplane
 {
 
+namespace proxy
+{
+enum
+{
+	PROXY_VERSION_V2 = 0x2
+};
+
+enum
+{
+	PROXY_CMD_LOCAL = 0x1,
+	PROXY_CMD_PROXY
+};
+
+enum
+{
+	PROXY_AF_UNSET = 0x0,
+	PROXY_AF_INET,
+	PROXY_AF_INET6,
+	PROXY_AF_UNIX
+};
+
+enum
+{
+	PROXY_PROTO_STREAM = 0x1,
+	PROXY_PROTO_DGRAM = 0x2
+};
+
+const uint8_t PROXY_V2_SIGNATURE[12] = {0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A};
+
+struct proxy_v2_ipv4_hdr
+{
+    uint8_t signature[12]; //  Proxy Protocol v2 Signature
+    union
+    {
+        uint8_t version_cmd;
+        struct
+        {
+            uint8_t version : 4; // Version
+            uint8_t cmd : 4; // Command
+        };
+    };
+    union
+    {
+        uint8_t af_proto;
+        struct
+        {
+            uint8_t af : 4; // Address Family
+            uint8_t proto : 4; // Transport Protocol
+        };
+    };
+    rte_be16_t addr_len; // Address Length (Big Endian)
+    uint32_t src_addr;
+    uint32_t dst_addr;
+    rte_be16_t src_port; // Src Port (Big Endian).
+    rte_be16_t dst_port;
+} __rte_packed;
+}
+
 namespace base
 {
 class permanently;
@@ -392,7 +450,7 @@ struct proxy_service_t
 	uint32_t upstream_addr;
 	tPortId upstream_port;
 	tCounterId counter_id;
-	bool proxy_header;
+	bool send_proxy_header;
 	uint32_t size_connections_table;
 	uint32_t size_syn_table;
 	bool use_sack;
@@ -400,6 +458,7 @@ struct proxy_service_t
 	bool ecn;
 	uint32_t winscale;
 	bool ignore_size_update_detections;
+	proxy::proxy_v2_ipv4_hdr proxy_header;
 };
 
 struct dregress_t

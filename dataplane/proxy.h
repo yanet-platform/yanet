@@ -54,61 +54,6 @@ private:
 
 void ShiftTcpOptions(rte_tcp_hdr* tcp_header, uint32_t sack, uint32_t timestamp_value, uint32_t timestamp_echo);
 
-extern const uint8_t PROXY_V2_SIGNATURE[12];
-
-enum
-{
-	PROXY_VERSION_V2 = 0x2
-};
-
-enum
-{
-	PROXY_CMD_LOCAL = 0x1,
-	PROXY_CMD_PROXY
-};
-
-enum
-{
-	PROXY_AF_UNSET = 0x0,
-	PROXY_AF_INET,
-	PROXY_AF_INET6,
-	PROXY_AF_UNIX
-};
-
-enum
-{
-	PROXY_PROTO_STREAM = 0x1,
-	PROXY_PROTO_DGRAM = 0x2
-};
-
-struct proxy_v2_ipv4_hdr
-{
-    uint8_t signature[12]; //  Proxy Protocol v2 Signature
-    union
-    {
-        uint8_t version_cmd;
-        struct
-        {
-            uint8_t version : 4; // Version
-            uint8_t cmd : 4; // Command
-        };
-    };
-    union
-    {
-        uint8_t af_proto;
-        struct
-        {
-            uint8_t af : 4; // Address Family
-            uint8_t proto : 4; // Transport Protocol
-        };
-    };
-    rte_be16_t addr_len; // Address Length (Big Endian)
-    uint32_t src_addr;
-    uint32_t dst_addr;
-    rte_be16_t src_port; // Src Port (Big Endian).
-    rte_be16_t dst_port;
-} __rte_packed;
-
 // ----------------------------------------------------------------------------
 
 struct DataForRetransmit

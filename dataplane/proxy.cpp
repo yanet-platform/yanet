@@ -25,8 +25,6 @@ inline uint16_t shift_cpu_16(uint16_t value, int32_t shift)
     return rte_cpu_to_be_16(std::min(result, 0xffffu));
 }
 
-const uint8_t PROXY_V2_SIGNATURE[12] = {0x0D, 0x0A, 0x0D, 0x0A, 0x00, 0x0D, 0x0A, 0x51, 0x55, 0x49, 0x54, 0x0A};
-
 bool TcpOptions::Read(uint8_t* data, uint32_t len)
 {
     uint32_t index = 0;
@@ -215,20 +213,6 @@ void ShiftTcpOptions(rte_tcp_hdr* tcp_header, uint32_t sack, uint32_t timestamp_
     }
 }
 
-void FillProxyHeader(proxy_v2_ipv4_hdr* proxy_header, uint32_t src_addr, tPortId src_port, uint32_t dst_addr, tPortId dst_port)
-{
-    rte_memcpy(proxy_header->signature, PROXY_V2_SIGNATURE, 12);
-    proxy_header->version_cmd = (PROXY_VERSION_V2 << 4) + PROXY_CMD_LOCAL;
-    proxy_header->af_proto = (PROXY_AF_INET << 4) + PROXY_PROTO_STREAM;
-    proxy_header->addr_len = rte_cpu_to_be_16(4+4+4);
-    proxy_header->src_addr = src_addr;
-    proxy_header->dst_addr = dst_addr;
-    proxy_header->src_port = src_port;
-    proxy_header->dst_port = dst_port;
-}
-
-
-
 // Update
 
 void TcpConnectionStore::proxy_update(proxy_id_t proxy_id, const dataplane::globalBase::proxy_t& proxy)
@@ -246,9 +230,9 @@ void TcpConnectionStore::proxy_remove(proxy_id_t proxy_id)
 
 eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, const common::ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager)
 {
-    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, upstream=%s:%d, prefix=%s, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
+    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, upstream=%s:%d, prefix=%s, send_proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
         service_id, common::ipv4_address_t(rte_cpu_to_be_32(service.proxy_addr)).toString().c_str(), rte_cpu_to_be_16(service.proxy_port),
-        common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(service.upstream_port), prefix.toString().c_str(), service.proxy_header, service.size_connections_table, service.size_syn_table);
+        common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(service.upstream_port), prefix.toString().c_str(), service.send_proxy_header, service.size_connections_table, service.size_syn_table);
 
     std::lock_guard guard(mutex_);
 
@@ -489,7 +473,7 @@ uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(const datapla
     tcp_options.window_scaling = service.winscale;
     tcp_options.timestamp_echo = tcp_options.timestamp_value;
     tcp_options.timestamp_value = 1;
-    if (service.proxy_header)
+    if (service.send_proxy_header)
     {
         tcp_options.mss -= int(sizeof(proxy_v2_ipv4_hdr));
     }
@@ -512,7 +496,7 @@ void ActionClientOnSynPrepareSynToClient(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr*
 void ActionClientOnSynPrepareSynToService(const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t local)
 {
     LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
-    if (service.proxy_header)
+    if (service.send_proxy_header)
     {
         // При использовании ProxyHeader уменьшаем значение SEQ полученное от клиента
         tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, sizeof(proxy_v2_ipv4_hdr));
@@ -634,7 +618,9 @@ void ActionClientOnAckForward(const dataplane::globalBase::proxy_service_t& serv
         mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + ipv4_total_length;
         mbuf->pkt_len = mbuf->data_len;
 
-        FillProxyHeader(proxy_header, src_addr, src_port, service.proxy_addr, service.proxy_port);
+        *proxy_header = service.proxy_header;
+        proxy_header->src_addr = src_addr;
+        proxy_header->src_port = src_port;
     }
 }
 
@@ -697,7 +683,7 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                     tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
 
                     LocalPool::UnpackTupleSrc(service_connection_data.connection->local, ipv4_header, tcp_header);
-                    tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, (service.proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
+                    tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, (service.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
 
                     // todo - need save options in ServiceConnections !!!
                     tcp_options.mss = 1300;
@@ -727,7 +713,7 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                 bool is_first_ack = (tcp_header->sent_seq == add_cpu_32(service_connection_data.connection->client_start_seq, 1)); // todo - check time
                 if (is_first_ack)
                 {
-                    add_proxy_header = service.proxy_header;
+                    add_proxy_header = service.send_proxy_header;
                     if (add_proxy_header)
                     {
                         shift_seq = -int(sizeof(proxy_v2_ipv4_hdr));
@@ -758,7 +744,7 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                 service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
                 service_connection_data.connection->flags = flags;
 
-                bool add_proxy_header = service.proxy_header;
+                bool add_proxy_header = service.send_proxy_header;
                 uint32_t shift_seq = (add_proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0);
                 ActionClientOnAckForward(service, mbuf, metadata, ipv4_header, tcp_header, shift_seq, 0, 0, add_proxy_header, src_addr, src_port);
 
@@ -803,7 +789,7 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                         service_connection_data.connection->client_timestamp_start = tcp_options.timestamp_value;
                         service_connection_data.connection->cookie_data = cookie_data;
 
-                        tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, 1 + (service.proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
+                        tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, 1 + (service.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
 
                         tcp_options.mss = SynCookies::MssFromTable(options.mss);
                         tcp_options.sack_permitted = options.sack;
@@ -859,7 +845,7 @@ uint32_t TcpConnectionStore::ActionServerOnSynAck(proxy_service_id_t service_id,
         syn_connection_data.connection->server_answer = true;
         syn_connection_data.Unlock();
 
-        if (service.proxy_header)
+        if (service.send_proxy_header)
         {
             tcp_header->recv_ack = add_cpu_32(tcp_header->recv_ack, sizeof(proxy_v2_ipv4_hdr));
             DecreaseMssInTcpOptions(tcp_header, mbuf);
@@ -901,7 +887,7 @@ uint32_t TcpConnectionStore::ActionServerOnSynAck(proxy_service_id_t service_id,
 
         tcp_header->tcp_flags = TCP_ACK_FLAG;
 
-        if (service.proxy_header)
+        if (service.send_proxy_header)
         {
             tcp_header->recv_ack = add_cpu_32(tcp_header->recv_ack, sizeof(proxy_v2_ipv4_hdr));
         }
