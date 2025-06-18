@@ -593,27 +593,34 @@ uint32_t TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
 }
 
 void ActionClientOnAckForward(const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, dataplane::metadata* metadata,
-    rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint32_t shift_seq, uint32_t shift_ack,
+    rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header, uint32_t shift_seq, uint32_t shift_ack,
     uint32_t shift_timestamp, bool add_proxy_header, uint32_t src_addr, uint16_t src_port)
 {
-    ShiftTcpOptions(tcp_header, shift_ack, 0, shift_timestamp);
-    tcp_header->sent_seq = add_cpu_32(tcp_header->sent_seq, shift_seq);
-    tcp_header->recv_ack = add_cpu_32(tcp_header->recv_ack, shift_ack);
+    ShiftTcpOptions(*tcp_header, shift_ack, 0, shift_timestamp);
+    (*tcp_header)->sent_seq = add_cpu_32((*tcp_header)->sent_seq, shift_seq);
+    (*tcp_header)->recv_ack = add_cpu_32((*tcp_header)->recv_ack, shift_ack);
 
     if (add_proxy_header)
     {
-        size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+        size_t tcp_header_len = ((*tcp_header)->data_off >> 4) << 2;
         constexpr uint16_t size_proxy_header = sizeof(proxy_v2_ipv4_hdr);
         proxy_v2_ipv4_hdr* proxy_header = 
             rte_pktmbuf_mtod_offset(mbuf, proxy_v2_ipv4_hdr*, metadata->transport_headerOffset + tcp_header_len);
-        uint16_t size_data = rte_be_to_cpu_16(ipv4_header->total_length) - rte_ipv4_hdr_len(ipv4_header) - tcp_header_len;
+        uint16_t size_data = rte_be_to_cpu_16((*ipv4_header)->total_length) - rte_ipv4_hdr_len(*ipv4_header) - tcp_header_len;
         if (size_data != 0)
-        {
-            memmove((uint8_t*)proxy_header + size_proxy_header, proxy_header, size_data); // using intermediate buffer impacts performance
+        {   
+            rte_pktmbuf_prepend(mbuf, size_proxy_header);
+            memmove(rte_pktmbuf_mtod(mbuf, char*), 
+                    rte_pktmbuf_mtod_offset(mbuf, char*, size_proxy_header),
+                    metadata->transport_headerOffset + tcp_header_len);
+            *ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+            *tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+            proxy_header = 
+                rte_pktmbuf_mtod_offset(mbuf, proxy_v2_ipv4_hdr*, metadata->transport_headerOffset + tcp_header_len);
         }
         
-        uint16_t ipv4_total_length = rte_ipv4_hdr_len(ipv4_header) + tcp_header_len + size_proxy_header + size_data;
-        ipv4_header->total_length = rte_cpu_to_be_16(ipv4_total_length);
+        uint16_t ipv4_total_length = rte_ipv4_hdr_len(*ipv4_header) + tcp_header_len + size_proxy_header + size_data;
+        (*ipv4_header)->total_length = rte_cpu_to_be_16(ipv4_total_length);
 
         mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + ipv4_total_length;
         mbuf->pkt_len = mbuf->data_len;
@@ -719,7 +726,7 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                         shift_seq = -int(sizeof(proxy_v2_ipv4_hdr));
                     }
                 }
-                ActionClientOnAckForward(service, mbuf, metadata, ipv4_header, tcp_header, shift_seq, shift_ack, shift_timestamp, add_proxy_header, src_addr, src_port);
+                ActionClientOnAckForward(service, mbuf, metadata, &ipv4_header, &tcp_header, shift_seq, shift_ack, shift_timestamp, add_proxy_header, src_addr, src_port);
 
                 action = flag_action_to_service;
             }
@@ -746,7 +753,7 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
 
                 bool add_proxy_header = service.send_proxy_header;
                 uint32_t shift_seq = (add_proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0);
-                ActionClientOnAckForward(service, mbuf, metadata, ipv4_header, tcp_header, shift_seq, 0, 0, add_proxy_header, src_addr, src_port);
+                ActionClientOnAckForward(service, mbuf, metadata, &ipv4_header, &tcp_header, shift_seq, 0, 0, add_proxy_header, src_addr, src_port);
 
                 action = flag_action_to_service;
             }
