@@ -43,8 +43,9 @@ struct TcpOptions
     uint8_t window_scaling;
 
     bool Read(uint8_t* data, uint32_t len);
-    uint32_t Write(rte_mbuf* mbuf) const;
+    uint32_t Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const;
     uint32_t WriteBuffer(uint8_t* data) const;
+    uint32_t Size() const;
 
     std::string DebugInfo() const;
 
@@ -130,7 +131,7 @@ private:
     uint32_t index_start_check_retransmits_ = 0;
     common::globalBase::tFlow next_flow_;
 
-    uint32_t BuildSynCookieAndFillTcpOptionsAnswer(const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
+    uint32_t BuildSynCookieAndFillTcpOptionsAnswer(const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header);
     uint32_t CheckSynCookie(const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
 };
 

@@ -130,21 +130,47 @@ uint32_t TcpOptions::WriteBuffer(uint8_t* data) const
     return len;
 }
 
-uint32_t TcpOptions::Write(rte_mbuf* mbuf) const
+uint32_t TcpOptions::Size() const {
+    uint32_t size = 0;
+    if (mss != 0) size += 4;
+    if (sack_permitted != 0) size += 2;
+    if (timestamp_value != 0 || timestamp_echo != 0) size += 10;
+    if (window_scaling != 0) size += 3;
+    // Round up to multiple of 4
+    size = (size + 4 - 1) & -4;
+    return size;
+}
+
+uint32_t TcpOptions::Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-    rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-    rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
-    size_t tcp_header_len_old = (tcp_header->data_off >> 4) << 2;
-    uint16_t tcp_data_len = rte_be_to_cpu_16(ipv4_header->total_length) - rte_ipv4_hdr_len(ipv4_header) - tcp_header_len_old;
+    size_t tcp_header_len_old = ((*tcp_header)->data_off >> 4) << 2;
+    uint16_t tcp_data_len = rte_be_to_cpu_16((*ipv4_header)->total_length) - rte_ipv4_hdr_len(*ipv4_header) - tcp_header_len_old;
 
-    uint8_t* data = (uint8_t*)tcp_header + sizeof(rte_tcp_hdr);
-    uint32_t len = WriteBuffer(data);
+    uint32_t old_opts_size = tcp_header_len_old - sizeof(rte_tcp_hdr);
+    int diff = old_opts_size - Size();
+    if (diff < 0) // Options size increased
+    {
+        rte_pktmbuf_prepend(mbuf, -diff);
+        memmove(rte_pktmbuf_mtod(mbuf, char*),
+                rte_pktmbuf_mtod_offset(mbuf, char*, -diff),
+                metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
+    }
+    else if (diff > 0) // Options size decreased
+    {
+        memmove(rte_pktmbuf_mtod_offset(mbuf, char*, diff),
+                rte_pktmbuf_mtod(mbuf, char*),
+                metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
+        rte_pktmbuf_adj(mbuf, diff);
+    }
+    *ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+    *tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+    uint32_t len = WriteBuffer((uint8_t*)(*tcp_header) + sizeof(rte_tcp_hdr));
 
-    tcp_header->data_off = ((sizeof(rte_tcp_hdr) + len) >> 2) << 4;
+    (*tcp_header)->data_off = ((sizeof(rte_tcp_hdr) + len) >> 2) << 4;
     
-    uint16_t total_length = rte_ipv4_hdr_len(ipv4_header) + sizeof(rte_tcp_hdr) + len + tcp_data_len;
-    ipv4_header->total_length = rte_cpu_to_be_16(total_length);
+    uint16_t total_length = rte_ipv4_hdr_len(*ipv4_header) + sizeof(rte_tcp_hdr) + len + tcp_data_len;
+    (*ipv4_header)->total_length = rte_cpu_to_be_16(total_length);
 
     mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + total_length;
     mbuf->pkt_len = mbuf->data_len;
@@ -412,42 +438,42 @@ void UpdateCheckSums(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
     tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4_header, tcp_header);
 }
 
-void DecreaseMssInTcpOptions(rte_tcp_hdr* tcp_header, rte_mbuf* mbuf)
+void DecreaseMssInTcpOptions(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
 {
-	size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+	size_t tcp_header_len = ((*tcp_header)->data_off >> 4) << 2;
 	TcpOptions tcp_options;
 	memset(&tcp_options, 0, sizeof(tcp_options));
-	tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+	tcp_options.Read((uint8_t*)(*tcp_header) + sizeof(rte_tcp_hdr), tcp_header_len);
 	tcp_options.mss -= int(sizeof(proxy_v2_ipv4_hdr));
-	tcp_options.Write(mbuf);
+	tcp_options.Write(mbuf, ipv4_header, tcp_header);
 }
 
-void ClearTcpOptionsOnlyTimestamps(rte_tcp_hdr* tcp_header, rte_mbuf* mbuf, uint32_t timestamp_shift)
+void ClearTcpOptionsOnlyTimestamps(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header, uint32_t timestamp_shift)
 {
-    size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+    size_t tcp_header_len = ((*tcp_header)->data_off >> 4) << 2;
     TcpOptions tcp_options;
     memset(&tcp_options, 0, sizeof(tcp_options));
-    tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+    tcp_options.Read((uint8_t*)(*tcp_header) + sizeof(rte_tcp_hdr), tcp_header_len);
     tcp_options.sack_permitted = false;
     tcp_options.mss = 0;
     tcp_options.window_scaling = 0;
-    tcp_options.Write(mbuf);
-    ShiftTcpOptions(tcp_header, 0, timestamp_shift, 0);
+    tcp_options.Write(mbuf, ipv4_header, tcp_header);
+    ShiftTcpOptions(*tcp_header, 0, timestamp_shift, 0);
 }
 
-std::pair<uint32_t, uint8_t> ClearTcpOptionsSetTimestamps(rte_tcp_hdr* tcp_header, rte_mbuf* mbuf, uint32_t timestamp_value)
+std::pair<uint32_t, uint8_t> ClearTcpOptionsSetTimestamps(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header, uint32_t timestamp_value)
 {
-    size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+    size_t tcp_header_len = ((*tcp_header)->data_off >> 4) << 2;
     TcpOptions tcp_options;
     memset(&tcp_options, 0, sizeof(tcp_options));
-    tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+    tcp_options.Read((uint8_t*)(*tcp_header) + sizeof(rte_tcp_hdr), tcp_header_len);
     uint32_t old_value = tcp_options.timestamp_value;
     uint8_t old_window_scaling = tcp_options.window_scaling;
     tcp_options.sack_permitted = false;
     tcp_options.mss = 0;
     tcp_options.window_scaling = 0;
     tcp_options.timestamp_value = timestamp_value;
-    tcp_options.Write(mbuf);
+    tcp_options.Write(mbuf, ipv4_header, tcp_header);
     return {old_value, old_window_scaling};
 }
 
@@ -457,17 +483,17 @@ bool NonEmptyTcpData(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
     return (rte_be_to_cpu_16(ipv4_header->total_length) != sizeof(rte_ipv4_hdr) + tcp_header_len);
 }
 
-uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
+uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
 {
-    size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+    size_t tcp_header_len = ((*tcp_header)->data_off >> 4) << 2;
     TcpOptions tcp_options;
     memset(&tcp_options, 0, sizeof(tcp_options));
-    tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+    tcp_options.Read((uint8_t*)(*tcp_header) + sizeof(rte_tcp_hdr), tcp_header_len);
     tcp_options.sack_permitted &= service.use_sack;
     tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
 
     uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack_permitted, tcp_options.window_scaling, 0}); // ecn
-    uint32_t cookie = syn_cookies_.GetCookie(ipv4_header->src_addr, service.upstream_addr, tcp_header->src_port, service.upstream_port, tcp_header->sent_seq, cookie_data);
+    uint32_t cookie = syn_cookies_.GetCookie((*ipv4_header)->src_addr, service.upstream_addr, (*tcp_header)->src_port, service.upstream_port, (*tcp_header)->sent_seq, cookie_data);
     // YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, tcp_header->sent_seq);
 
     tcp_options.window_scaling = service.winscale;
@@ -477,7 +503,7 @@ uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(const datapla
     {
         tcp_options.mss -= int(sizeof(proxy_v2_ipv4_hdr));
     }
-    tcp_options.Write(mbuf);
+    tcp_options.Write(mbuf, ipv4_header, tcp_header);
 
     return cookie;
 }
@@ -548,7 +574,7 @@ uint32_t TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
             {
                 case TableSearchResult::Overflow:
                 {
-                    uint32_t cookie = BuildSynCookieAndFillTcpOptionsAnswer(service, mbuf, ipv4_header, tcp_header);
+                    uint32_t cookie = BuildSynCookieAndFillTcpOptionsAnswer(service, mbuf, &ipv4_header, &tcp_header);
                     ActionClientOnSynPrepareSynToClient(ipv4_header, tcp_header, cookie);
                     action = flag_action_to_client;
                     break;
@@ -698,7 +724,7 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                     tcp_options.window_scaling = 5;
                     tcp_options.timestamp_echo = 0;
 
-                    tcp_options.Write(mbuf);
+                    tcp_options.Write(mbuf, &ipv4_header, &tcp_header);
                     ipv4_header->time_to_live = 64;
                     tcp_header->recv_ack = 0;
                     tcp_header->tcp_flags = TCP_SYN_FLAG;
@@ -803,7 +829,7 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                         tcp_options.window_scaling = options.wscale;
                         tcp_options.timestamp_echo = 0;
 
-                        tcp_options.Write(mbuf);
+                        tcp_options.Write(mbuf, &ipv4_header, &tcp_header);
                         ipv4_header->time_to_live = 64;
                         tcp_header->recv_ack = 0;
                         tcp_header->tcp_flags = TCP_SYN_FLAG;
@@ -855,7 +881,7 @@ uint32_t TcpConnectionStore::ActionServerOnSynAck(proxy_service_id_t service_id,
         if (service.send_proxy_header)
         {
             tcp_header->recv_ack = add_cpu_32(tcp_header->recv_ack, sizeof(proxy_v2_ipv4_hdr));
-            DecreaseMssInTcpOptions(tcp_header, mbuf);
+            DecreaseMssInTcpOptions(mbuf, &ipv4_header, &tcp_header);
         }
 
         ipv4_header->src_addr = service.proxy_addr;
@@ -883,7 +909,7 @@ uint32_t TcpConnectionStore::ActionServerOnSynAck(proxy_service_id_t service_id,
     else
     {
         // timestamps shift
-        auto [old_timestamp_value, window_scaling] = ClearTcpOptionsSetTimestamps(tcp_header, mbuf, service_connection_data.connection->timestamp_echo);        
+        auto [old_timestamp_value, window_scaling] = ClearTcpOptionsSetTimestamps(mbuf, &ipv4_header, &tcp_header, service_connection_data.connection->timestamp_echo);        
         service_connection_data.connection->timestamp_shift = service_connection_data.connection->timestamp_echo - old_timestamp_value;
         
         service_connection_data.connection->window_size_shift = (int)window_scaling - (int)service.winscale;
