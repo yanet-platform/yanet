@@ -2,6 +2,7 @@
 #include "syncookies.h"
 
 #include "rte_hash_crc.h"
+#include "proxy.h"
 
 #include <random>
 
@@ -30,6 +31,22 @@ uint32_t SynCookies::MssToTable(uint32_t mss)
 uint32_t SynCookies::MssFromTable(uint32_t table_value)
 {
     return mss_tab_values_[table_value];
+}
+
+uint32_t SynCookies::PackData(TcpOptions options) {
+    return ((MssToTable(options.mss) << MSS_OFFSET) & MSS_MASK) |
+        (((uint32_t)options.sack_permitted << SACK_OFFSET) & SACK_MASK) | 
+        (((uint32_t)options.window_scaling << WSCALE_OFFSET) & WSCALE_MASK);
+}
+
+TcpOptions SynCookies::UnpackData(uint32_t data) {
+    return {
+        .timestamp_value = 0,
+        .timestamp_echo = 0,
+        .mss = (uint16_t)MssFromTable((data & MSS_MASK) >> MSS_OFFSET),
+        .sack_permitted = (uint8_t)((data & SACK_MASK) >> SACK_OFFSET),
+        .window_scaling = (uint8_t)((data & WSCALE_MASK) >> WSCALE_OFFSET),
+    };
 }
 
 SynCookies::SynCookies() 

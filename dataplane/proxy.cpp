@@ -5,6 +5,7 @@
 #include "common.h"
 #include "metadata.h"
 #include "proxy.h"
+#include "syncookies.h"
 
 namespace dataplane::proxy
 {
@@ -492,7 +493,7 @@ uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(const datapla
     tcp_options.sack_permitted &= service.use_sack;
     tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
 
-    uint32_t cookie_data = SynCookies::PackData({SynCookies::MssToTable(tcp_options.mss), tcp_options.sack_permitted, tcp_options.window_scaling, 0}); // ecn
+    uint32_t cookie_data = SynCookies::PackData(tcp_options);
     uint32_t cookie = syn_cookies_.GetCookie((*ipv4_header)->src_addr, service.upstream_addr, (*tcp_header)->src_port, service.upstream_port, (*tcp_header)->sent_seq, cookie_data);
     // YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, tcp_header->sent_seq);
 
@@ -808,10 +809,7 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                         memset(&tcp_options, 0, sizeof(tcp_options));
                         tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
 
-                        SynCookies::TCPOptions options = SynCookies::UnpackData(cookie_data);
-                        // YANET_LOG_WARNING("\tmss=%d, sack=%d, wscale=%d\n", SynCookies::MssFromTable(options.mss), options.sack, options.wscale);
-
-                        // // Add to connections
+                        // Add to connections
                         service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time);
                         LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
                         service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
@@ -824,12 +822,10 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
 
                         tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, 1 + (service.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
 
-                        tcp_options.mss = SynCookies::MssFromTable(options.mss);
-                        tcp_options.sack_permitted = options.sack;
-                        tcp_options.window_scaling = options.wscale;
-                        tcp_options.timestamp_echo = 0;
+                        TcpOptions cookie_options = SynCookies::UnpackData(cookie_data);
+                        cookie_options.timestamp_value = tcp_options.timestamp_value;
 
-                        tcp_options.Write(mbuf, &ipv4_header, &tcp_header);
+                        cookie_options.Write(mbuf, &ipv4_header, &tcp_header);
                         ipv4_header->time_to_live = 64;
                         tcp_header->recv_ack = 0;
                         tcp_header->tcp_flags = TCP_SYN_FLAG;
@@ -999,13 +995,9 @@ void TcpConnectionStore::GetDataForRetramsits(uint32_t before_time, rte_ring* ri
                     return true;
                 }
 
-                SynCookies::TCPOptions options = SynCookies::UnpackData(connection.cookie_data);
-                TcpOptions tcp_options;
+                TcpOptions tcp_options = SynCookies::UnpackData(connection.cookie_data);
                 tcp_options.timestamp_value = connection.client_timestamp_start;
                 tcp_options.timestamp_echo = 0;
-                tcp_options.mss = SynCookies::MssFromTable(options.mss);
-                tcp_options.sack_permitted = options.sack;
-                tcp_options.window_scaling = options.wscale;
 
                 data->tcp_options_len = tcp_options.WriteBuffer(data->tcp_options_data);
 
