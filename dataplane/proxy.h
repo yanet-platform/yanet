@@ -49,6 +49,16 @@ struct TcpOptions
 
     std::string DebugInfo() const;
 
+    constexpr bool operator==(const TcpOptions& other) const {
+        return timestamp_value == other.timestamp_value && timestamp_echo == other.timestamp_echo
+                && mss == other.mss && sack_permitted == other.sack_permitted
+                && window_scaling == other.window_scaling;
+    }
+
+    constexpr bool operator!=(const TcpOptions& other) const {
+        return !(*this == other);
+    }
+
 private:
     bool CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected);
 };    

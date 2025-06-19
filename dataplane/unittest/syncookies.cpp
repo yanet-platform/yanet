@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "../syncookies.h"
+#include "../proxy.h"
 #include "../type.h"
 
 #include <array>
@@ -11,11 +12,12 @@ namespace {
 using namespace dataplane::proxy;
 
 TEST(SynCookiesTest, PackData) {
-    SynCookies::TCPOptions options{
-        .mss = 2,
-        .sack = 1,
-        .wscale = 14,
-        .ecn = 1,
+    TcpOptions options{
+        .timestamp_value = 0,
+        .timestamp_echo = 0,
+        .mss = 1440,
+        .sack_permitted = 1,
+        .window_scaling = 14,
     };
     uint32_t packed = SynCookies::PackData(options);
     EXPECT_EQ(SynCookies::UnpackData(packed), options);
@@ -29,11 +31,12 @@ TEST(SynCookiesTest, Cookies) {
     uint16_t sport = 1000;
     uint16_t dport = 2000;
     uint32_t seq = 1;
-    uint32_t data = SynCookies::PackData(SynCookies::TCPOptions{
-        .mss = 3,
-        .sack = 1,
-        .wscale = 7,
-        .ecn = 1,
+    uint32_t data = SynCookies::PackData(TcpOptions{
+        .timestamp_value = 0,
+        .timestamp_echo = 0,
+        .mss = 1440,
+        .sack_permitted = 1,
+        .window_scaling = 7,
     });
 
     constexpr int N = 1000000;
@@ -67,12 +70,12 @@ TEST(SynCookiesTest, RandomCookies) {
     std::mt19937 gen(rd());
     std::uniform_int_distribution<uint32_t> dist32(0, std::numeric_limits<uint32_t>::max());
     std::uniform_int_distribution<uint16_t> dist16(0, std::numeric_limits<uint16_t>::max());
-    std::uniform_int_distribution<uint8_t> dist8(0, 255);
+    std::uniform_int_distribution<uint8_t> dist7(0, 127);
 
     for(uint32_t i = 0; i < 100'000'000; ++i) {
         uint32_t sa = dist32(gen), da = dist32(gen), s = dist32(gen);
         uint16_t sp = dist16(gen), dp = dist16(gen);
-        uint32_t data = dist8(gen);
+        uint32_t data = dist7(gen);
         uint32_t cookie = cookies.GetCookie(sa, da, sp, dp, s, data);
         EXPECT_EQ(cookies.CheckCookie(cookie, sa, da, sp, dp, s), data);
     }
@@ -96,9 +99,9 @@ TEST(SynCookiesTest, RandomValidation) {
         }
     }
 
-    //          positive / total ~= 1/(2^23)
-    // positive / total * (2^23) ~= 1
-    double res = (double)positive / total * (1 << 23);
+    //          positive / total ~= 1/(2^24)
+    // positive / total * (2^24) ~= 1
+    double res = (double)positive / total * (1 << 24);
     EXPECT_GT(res, 0.75);
     EXPECT_LT(res, 1.25);
 }
