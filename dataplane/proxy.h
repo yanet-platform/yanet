@@ -12,19 +12,6 @@
 #include "syncookies.h"
 #include "type.h"
 
-#define TCPOPT_NOP		1	/* Padding */
-#define TCPOPT_EOL		0	/* End of options */
-#define TCPOPT_MSS		2	/* Segment size negotiating */
-#define TCPOPT_WINDOW		3	/* Window scaling */
-#define TCPOPT_SACK_PERM        4       /* SACK Permitted */
-#define TCPOPT_SACK             5       /* SACK Block */
-#define TCPOPT_TIMESTAMP	8	/* Better RTT estimations/PAWS */
-#define TCPOPT_MD5SIG		19	/* MD5 Signature (RFC2385) */
-#define TCPOPT_AO		29	/* Authentication Option (RFC5925) */
-#define TCPOPT_MPTCP		30	/* Multipath TCP (RFC6824) */
-#define TCPOPT_FASTOPEN		34	/* Fast open (RFC7413) */
-#define TCPOPT_EXP		254	/* Experimental */
-
 #define MAX_SIZE_TCP_OPTIONS 40
 
 #define TIMEOUT_RETRANSMIT 1 // todo

@@ -94,7 +94,13 @@ extern LogPriority logPriority;
 #define YANET_TCP_OPTION_YA_KIND (253)
 #define YANET_TCP_OPTION_YA_MAGIC (0x7961)
 
+#define TCP_OPTION_NOP_LEN (1)
 #define TCP_OPTION_MSS_LEN (4)
+#define TCP_OPTION_WS_LEN (3)
+#define TCP_OPTION_SP_LEN (2)
+#define TCP_OPTION_SACK_LEN (10)
+#define TCP_OPTION_TS_LEN (10)
+
 #define YANET_BALANCER_DEFAULT_MSS_SIZE 536
 #define YANET_BALANCER_FIX_MSS_SIZE 1220
 #define YANET_BALANCER_FIX_MSS_FLAG ((uint8_t)(1u << 0))

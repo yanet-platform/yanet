@@ -31,51 +31,47 @@ bool TcpOptions::Read(uint8_t* data, uint32_t len)
     uint32_t index = 0;
     while (index < len)
     {
-        switch (data[index])
+        tcp_option_t* opt = (tcp_option_t*)&data[index];
+        switch (opt->kind)
         {
-        case TCPOPT_MSS:
-            if (!CheckSize(index, len, data, 4)) {
+        case TCP_OPTION_KIND_MSS:
+            if (!CheckSize(index, len, data, TCP_OPTION_MSS_LEN)) {
                 return false;
             }
-            mss = rte_be_to_cpu_16(*((uint16_t*)(data + index + 2)));
-            index += 4;
+            mss = rte_be_to_cpu_16(*(uint16_t*)opt->data);
+            index += TCP_OPTION_MSS_LEN;
             break;
 
-        case TCPOPT_SACK_PERM:
-            if (!CheckSize(index, len, data, 2)) {
+        case TCP_OPTION_KIND_SP:
+            if (!CheckSize(index, len, data, TCP_OPTION_SP_LEN)) {
                 return false;
             }
             sack_permitted = 1;
-
-            index += 2;
+            index += TCP_OPTION_SP_LEN;
             break;
 
-        case TCPOPT_TIMESTAMP:
-            if (!CheckSize(index, len, data, 10)) {
+        case TCP_OPTION_KIND_TS:
+            if (!CheckSize(index, len, data, TCP_OPTION_TS_LEN)) {
                 return false;
             }
-
-            timestamp_value = rte_be_to_cpu_32(*((uint32_t*)(data + index + 2)));
-            timestamp_echo = rte_be_to_cpu_32(*((uint32_t*)(data + index + 6)));
-
-            index += 10;
+            timestamp_value = rte_be_to_cpu_32(*(uint32_t*)opt->data);
+            timestamp_echo = rte_be_to_cpu_32(*(uint32_t*)(opt->data + 4));
+            index += TCP_OPTION_TS_LEN;
             break;
 
-        case TCPOPT_NOP:
-            index++;
+        case TCP_OPTION_KIND_NOP:
+            index += TCP_OPTION_NOP_LEN;
             break;
 
-        case TCPOPT_EOL:
+        case TCP_OPTION_KIND_EOL:
             return true;
 
-        case TCPOPT_WINDOW:
-            if (!CheckSize(index, len, data, 3)) {
+        case TCP_OPTION_KIND_WS:
+            if (!CheckSize(index, len, data, TCP_OPTION_WS_LEN)) {
                 return false;
             }
-
-            window_scaling = data[index + 2];
-            
-            index += 3;
+            window_scaling = *(uint8_t*)opt->data;
+            index += TCP_OPTION_WS_LEN;
             break;
         
         default:
@@ -93,39 +89,43 @@ uint32_t TcpOptions::WriteBuffer(uint8_t* data) const
     
     if (mss != 0)
     {
-        data[len] = TCPOPT_MSS;
-        data[len + 1] = 4;
-        *((uint16_t*)(data + len + 2)) = rte_cpu_to_be_16(mss);
-        len += 4;
+        tcp_option_t* opt = (tcp_option_t*)&data[len];
+        opt->kind = TCP_OPTION_KIND_MSS;
+        opt->len = TCP_OPTION_MSS_LEN;
+        *(uint16_t*)opt->data = rte_cpu_to_be_16(mss);
+        len += TCP_OPTION_MSS_LEN;
     }
 
     if (sack_permitted != 0)
     {
-        data[len] = TCPOPT_SACK_PERM;
-        data[len + 1] = 2;
-        len += 2;
+        tcp_option_t* opt = (tcp_option_t*)&data[len];
+        opt->kind = TCP_OPTION_KIND_SP;
+        opt->len = TCP_OPTION_SP_LEN;
+        len += TCP_OPTION_SP_LEN;
     }
 
     if (timestamp_value != 0 || timestamp_echo != 0)
     {
-        data[len] = TCPOPT_TIMESTAMP;
-        data[len + 1] = 10;
-        *((uint32_t*)(data + len + 2)) = rte_cpu_to_be_32(timestamp_value);
-        *((uint32_t*)(data + len + 6)) = rte_cpu_to_be_32(timestamp_echo);
-        len += 10;
+        tcp_option_t* opt = (tcp_option_t*)&data[len];
+        opt->kind = TCP_OPTION_KIND_TS;
+        opt->len = TCP_OPTION_TS_LEN;
+        *(uint32_t*)opt->data = rte_cpu_to_be_32(timestamp_value);
+        *(uint32_t*)(opt->data + 4) = rte_cpu_to_be_32(timestamp_echo);
+        len += TCP_OPTION_TS_LEN;
     }
 
     if (window_scaling != 0)
     {
-        data[len] = TCPOPT_WINDOW;
-        data[len + 1] = 3;
-        data[len + 2] = window_scaling;
-        len += 3;
+        tcp_option_t* opt = (tcp_option_t*)&data[len];
+        opt->kind = TCP_OPTION_KIND_WS;
+        opt->len = TCP_OPTION_WS_LEN;
+        *(uint8_t*)opt->data = window_scaling;
+        len += TCP_OPTION_WS_LEN;
     }
 
     while ((len % 4) != 0)
     {
-        data[len++] = TCPOPT_NOP;
+        data[len++] = TCP_OPTION_KIND_NOP;
     }
 
     return len;
@@ -215,24 +215,27 @@ void ShiftTcpOptions(rte_tcp_hdr* tcp_header, uint32_t sack, uint32_t timestamp_
     uint32_t len = tcp_header_len - sizeof(rte_tcp_hdr);
 
     uint32_t index = 0;
+    tcp_option_t* opt;
     while (index < len)
     {
         switch (options[index])
         {
-        case TCPOPT_SACK:
-            *((uint32_t*)(options + index + 2)) = add_cpu_32(*((uint32_t*)(options + index + 2)), sack);
-            *((uint32_t*)(options + index + 6)) = add_cpu_32(*((uint32_t*)(options + index + 6)), sack);
-            index += 10;
+        case TCP_OPTION_KIND_SACK:
+            opt = (tcp_option_t*)&options[index];
+            *(uint32_t*)opt->data = add_cpu_32(*(uint32_t*)opt->data, sack);
+            *(uint32_t*)(opt->data + 4) = add_cpu_32(*(uint32_t*)(opt->data + 4), sack);
+            index += TCP_OPTION_SACK_LEN;
             break;
-        case TCPOPT_TIMESTAMP:
-            *((uint32_t*)(options + index + 2)) = add_cpu_32(*((uint32_t*)(options + index + 2)), timestamp_value);
-            *((uint32_t*)(options + index + 6)) = add_cpu_32(*((uint32_t*)(options + index + 6)), timestamp_echo);
-            index += 10;
+        case TCP_OPTION_KIND_TS:
+            opt = (tcp_option_t*)&options[index];
+            *(uint32_t*)opt->data =  add_cpu_32(*(uint32_t*)opt->data, timestamp_value);
+            *(uint32_t*)(opt->data + 4) =  add_cpu_32(*(uint32_t*)(opt->data + 4), timestamp_echo);
+            index += TCP_OPTION_TS_LEN;
             break;
-        case TCPOPT_NOP:
+        case TCP_OPTION_KIND_NOP:
             index++;
             break;
-        case TCPOPT_EOL:
+        case TCP_OPTION_KIND_EOL:
             return;
         default:
             index += options[index + 1]; // todo =0?
