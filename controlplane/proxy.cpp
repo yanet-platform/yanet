@@ -270,6 +270,7 @@ common::icp::proxy_services::response proxy_t::proxy_services() const
 	generations_config.current_unlock();
 
 	const auto counters = service_counters.get_counters();
+    constexpr size_t num_counters = static_cast<size_t>(proxy::service_counter::size);
 
 	for (auto& [module, config] : config_proxies)
 	{
@@ -277,41 +278,16 @@ common::icp::proxy_services::response proxy_t::proxy_services() const
 		{
             proxy_service_id_t service_id = service.service_id;
             std::string service_name = service.service;
-            uint64_t packets_in = 0;
-            uint64_t bytes_in = 0;
-            uint64_t packets_out = 0;
-            uint64_t bytes_out = 0;
-            uint64_t syn_count = 0;
-            uint64_t ping_count = 0;
-            uint64_t connections_count = 0;
-            uint64_t service_bucket_overflow = 0;
-            uint64_t failed_local_pool_allocation = 0;
-            uint64_t failed_local_pool_search = 0;
-            uint64_t failed_answer_service_syn_ack = 0;
-            uint64_t ignored_size_update_detections = 0;
-            uint64_t failed_check_syn_cookie = 0;
+            std::array<uint64_t, num_counters> counts;
 
 			auto it = counters.find(service_id);
 			if (it != counters.end())
 			{
-                packets_in = (it->second)[(tCounterId)proxy::service_counter::packets_in];
-                bytes_in = (it->second)[(tCounterId)proxy::service_counter::bytes_in];
-                packets_out = (it->second)[(tCounterId)proxy::service_counter::packets_out];
-                bytes_out = (it->second)[(tCounterId)proxy::service_counter::bytes_out];
-                syn_count = (it->second)[(tCounterId)proxy::service_counter::syn_count];
-                ping_count = (it->second)[(tCounterId)proxy::service_counter::ping_count];
-                connections_count = (it->second)[(tCounterId)proxy::service_counter::connections_count];
-                service_bucket_overflow = (it->second)[(tCounterId)proxy::service_counter::service_bucket_overflow];
-                failed_local_pool_allocation = (it->second)[(tCounterId)proxy::service_counter::failed_local_pool_allocation];
-                failed_local_pool_search = (it->second)[(tCounterId)proxy::service_counter::failed_local_pool_search];
-                failed_answer_service_syn_ack = (it->second)[(tCounterId)proxy::service_counter::failed_answer_service_syn_ack];
-                ignored_size_update_detections = (it->second)[(tCounterId)proxy::service_counter::ignored_size_update_detections];
-                failed_check_syn_cookie = (it->second)[(tCounterId)proxy::service_counter::failed_check_syn_cookie];
+                for (size_t i = 0; i < num_counters; i++)
+                    counts[i] = (it->second)[i];
 			}
 
-            response.emplace_back(service_id, service_name, packets_in, bytes_in, packets_out, bytes_out, syn_count, ping_count,
-                                  connections_count, service_bucket_overflow, failed_local_pool_allocation, failed_local_pool_search,
-                                  failed_answer_service_syn_ack, ignored_size_update_detections, failed_check_syn_cookie);
+            response.push_back(std::tuple_cat(std::tie(service_id, service_name), counts));
 		}
 	}
 
