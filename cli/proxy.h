@@ -28,7 +28,9 @@ void services()
 					 "failed_answer_service_syn_ack",
 					 "ignored_size_update_detections",
 					 "failed_check_syn_cookie",
-					 "failed_search_client_service_ack");
+					 "failed_search_client_service_ack",
+					 "new_connections",
+					 "new_syn_connections");
 
 	for (const auto& record : response)
 	{

@@ -603,7 +603,7 @@ uint32_t TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
                         syn_connection_data.connection->recv_seq = tcp_header->sent_seq;
 
                         ActionClientOnSynPrepareSynToService(service, ipv4_header, tcp_header, local);
-                        action = flag_action_to_service;
+                        action = BuildResult(flag_action_to_service, ::proxy::service_counter::new_syn_connections);
                     }
                     break;
                 }
@@ -784,7 +784,7 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                 uint32_t shift_seq = (add_proxy_header ? -int(sizeof(proxy_v2_ipv4_hdr)) : 0);
                 ActionClientOnAckForward(service, mbuf, metadata, &ipv4_header, &tcp_header, shift_seq, 0, 0, add_proxy_header, src_addr, src_port);
 
-                action = flag_action_to_service;
+                action = BuildResult(flag_action_to_service, ::proxy::service_counter::new_connections);
             }
             else
             {
@@ -831,6 +831,8 @@ uint32_t TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                         ipv4_header->time_to_live = 64;
                         tcp_header->recv_ack = 0;
                         tcp_header->tcp_flags = TCP_SYN_FLAG;
+
+                        action = BuildResult(flag_action_to_service, ::proxy::service_counter::new_connections);
                     }
                 }
             }

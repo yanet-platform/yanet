@@ -77,6 +77,8 @@ enum class service_counter : tCounterId
 	ignored_size_update_detections,
 	failed_check_syn_cookie,
 	failed_search_client_service_ack,
+	new_connections,
+	new_syn_connections,
 	size
 };
 
