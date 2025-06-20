@@ -222,7 +222,7 @@ public:
             bucket.Lock();
             for (uint32_t i = 0; i < Bucket::bucket_size; i++)
             {
-                func(bucket, index);
+                func(bucket, i);
             }
             bucket.Unlock();
         }
@@ -236,7 +236,7 @@ public:
             bucket.Lock();
             for (uint32_t i = 0; i < Bucket::bucket_size; i++)
             {
-                if (bucket.IsExpired(i, current_time))
+                if (bucket.addresses[i] != 0 && bucket.IsExpired(i, current_time))
                 {
                     local_pool.Free(LocalPool::max_workers, bucket.connections[i].local);
                     bucket.Clear(i);
