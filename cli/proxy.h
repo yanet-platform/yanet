@@ -30,7 +30,8 @@ void services()
 					 "failed_check_syn_cookie",
 					 "failed_search_client_service_ack",
 					 "new_connections",
-					 "new_syn_connections");
+					 "new_syn_connections",
+					 "error_service_config");
 
 	for (const auto& record : response)
 	{

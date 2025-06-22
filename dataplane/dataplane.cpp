@@ -1465,11 +1465,12 @@ void cDataPlane::timestamp_thread()
 				GCC_BUG_UNUSED(socket_id);
 				globalbase_atomic->currentTime = current_time;
 			}
+			tcp_connection_store.current_time_sec = current_time;
 
 			prev_time = current_time;
 		}
 
-		tcp_connection_store.currentTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+		tcp_connection_store.current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}

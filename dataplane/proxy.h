@@ -13,6 +13,7 @@
 #include "type.h"
 
 #define MAX_SIZE_TCP_OPTIONS 40
+#define TCP_OPTIONS_MAX_COUNT 12
 
 #define TIMEOUT_RETRANSMIT 1000 // todo
 #define MAX_COUNT_RETRANSMITS_PER_SERVICE (uint32_t)16 // todo
@@ -29,7 +30,12 @@ struct TcpOptions
     uint8_t sack_permitted;
     uint8_t window_scaling;
 
+    uint32_t sack_count;
+    uint32_t sack_start[TCP_OPTIONS_MAX_SACK_COUNT];
+    uint32_t sack_finish[TCP_OPTIONS_MAX_SACK_COUNT];
+
     bool Read(uint8_t* data, uint32_t len);
+    void ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header);
     uint32_t Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const;
     uint32_t WriteBuffer(uint8_t* data) const;
     uint32_t Size() const;
@@ -48,7 +54,7 @@ struct TcpOptions
 
 private:
     bool CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected);
-};    
+};
 
 void ShiftTcpOptions(rte_tcp_hdr* tcp_header, uint32_t sack, uint32_t timestamp_value, uint32_t timestamp_echo);
 
@@ -109,7 +115,8 @@ public:
 	                       const dataplane::globalBase::proxy_service_t& service,
 	                       rte_mbuf* mbuf);
 
-    uint64_t currentTime;
+    uint32_t current_time_sec;
+    uint64_t current_time_ms;
 
     void GetDataForRetramsits(uint32_t before_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
 

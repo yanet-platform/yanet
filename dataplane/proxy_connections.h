@@ -97,22 +97,29 @@ enum class TableSearchResult : uint32_t
 
 struct Connection
 {
-    uint64_t local;     // local ip + port
-    uint32_t sent_seq;
+    uint64_t local;     // ip + port from local pool
+
+    // SEQ values
+    uint32_t client_start_seq; // SEQ received from client in first SYN packet
+    uint32_t proxy_start_seq; // SEQ sent from proxy to client in SYN+ACK packet (= our syn-cookie)
     uint32_t shift_server;
-    uint32_t timestamp_echo;
+    uint32_t cookie_data;    // used for sent retransmits syn packets to service
+
+    // Timestamps
+    uint32_t timestamp_proxy_first;
+    uint32_t timestamp_client_last;    // used for sent retransmits syn packets to service
     uint32_t timestamp_shift;
 
-    uint32_t client_start_seq;
-    uint32_t flags;
-    uint32_t client_timestamp_start;    // used for sent retransmits syn packets to service
-    uint32_t cookie_data;    // used for sent retransmits syn packets to service
     int32_t window_size_shift;
+    uint32_t flags;
 
-    static constexpr uint32_t flag_from_synkookie = 1 << 0;
-    static constexpr uint32_t flag_answer_from_server = 1 << 1;
-    static constexpr uint32_t flag_nonempty_ack_from_client = 1 << 2;
-    static constexpr uint32_t flag_sent_rentransmit_syn_to_server = 1 << 3;
+    static constexpr uint32_t flag_from_synkookie = 1u << 0;
+    static constexpr uint32_t flag_answer_from_server = 1u << 1;
+    static constexpr uint32_t flag_nonempty_ack_from_client = 1u << 2;
+    static constexpr uint32_t flag_sent_rentransmit_syn_to_server = 1u << 3;
+    static constexpr uint32_t flag_clear_sack = 1u << 4;
+    static constexpr uint32_t flag_no_timestamps = 1u << 5;
+    static constexpr uint32_t flag_timestamp_fail = 1u << 6;
 
     void Clear() {
         local = 0;
@@ -130,8 +137,8 @@ struct Connection
 
 struct SynConnection
 {
-    uint64_t local;     // local ip + port
-    uint32_t recv_seq;  // seq received from client
+    uint64_t local;     // ip + port from local pool
+    uint32_t client_start_seq;  // SEQ received from client in first SYN packet
     bool server_answer; // was received answer from server
 
     void Clear()

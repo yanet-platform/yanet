@@ -970,7 +970,8 @@ using response = std::vector<std::tuple<proxy_service_id_t, ///< service_id
                                         uint64_t, ///< failed_check_syn_cookie
                                         uint64_t, ///< failed_search_client_service_ack
                                         uint64_t, ///< new_connections
-                                        uint64_t>>; ///< new_syn_connections
+                                        uint64_t, ///< new_syn_connections
+                                        uint64_t>>; ///< error_service_config
 }
 
 using request = std::tuple<requestType,

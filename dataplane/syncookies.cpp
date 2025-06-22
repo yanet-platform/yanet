@@ -46,6 +46,9 @@ TcpOptions SynCookies::UnpackData(uint32_t data) {
         .mss = (uint16_t)MssFromTable((data & MSS_MASK) >> MSS_OFFSET),
         .sack_permitted = (uint8_t)((data & SACK_MASK) >> SACK_OFFSET),
         .window_scaling = (uint8_t)((data & WSCALE_MASK) >> WSCALE_OFFSET),
+        .sack_count = 0,
+        .sack_start = {0, 0, 0, 0},
+        .sack_finish = {0, 0, 0, 0}
     };
 }
 

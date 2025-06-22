@@ -79,6 +79,7 @@ enum class service_counter : tCounterId
 	failed_search_client_service_ack,
 	new_connections,
 	new_syn_connections,
+	error_service_config,
 	size
 };
 

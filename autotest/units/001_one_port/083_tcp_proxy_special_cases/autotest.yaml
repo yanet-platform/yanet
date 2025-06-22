@@ -1,0 +1,34 @@
+steps:
+- cli:
+  - rib static insert default 10.0.4.0/24 10.0.4.1
+  - rib static insert default 10.0.2.0/24 10.0.2.1
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+
+- sendPackets:
+  - port: kni0
+    send: 003_ts_1-send.pcap
+    expect: 003_ts_1-expect.pcap
+
+- sendPackets:
+  - port: kni0
+    send: 003_ts_2-send.pcap
+    expect: 003_ts_2-expect.pcap
+
+- sendPackets:
+  - port: kni0
+    send: 003_ts_3-send.pcap
+    expect: 003_ts_3-expect.pcap
+
+- cli:
+  - rib static remove default 10.0.4.0/24 10.0.4.1
+  - rib static remove default 10.0.2.0/24 10.0.2.1
+  - proxy services
