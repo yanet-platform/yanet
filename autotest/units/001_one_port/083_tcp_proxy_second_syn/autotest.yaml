@@ -1,0 +1,21 @@
+steps:
+- cli:
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+- cli:
+  - proxy counters
+  - proxy syn
+  - proxy connections
+  - proxy local_pool
+
+- sleep: 5
+
+- cli:
+  - proxy syn
+  - proxy connections
+  - proxy local_pool

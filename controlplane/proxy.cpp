@@ -5,8 +5,8 @@ eResult proxy_t::init()
 {
     service_counters.init(&controlPlane->counter_manager);
 
-    controlPlane->register_command(common::icp::requestType::proxy_services, [this]() {
-		return proxy_services();
+    controlPlane->register_command(common::icp::requestType::proxy_counters, [this]() {
+		return proxy_counters();
 	});
 
     controlPlane->register_service(this);
@@ -261,9 +261,9 @@ void proxy_t::counters_gc_thread()
 	}
 }
 
-common::icp::proxy_services::response proxy_t::proxy_services() const
+common::icp::proxy_counters::response proxy_t::proxy_counters() const
 {
-	common::icp::proxy_services::response response;
+	common::icp::proxy_counters::response response;
 
 	generations_config.current_lock();
 	std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;

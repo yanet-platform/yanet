@@ -30,7 +30,7 @@ steps:
     expect: 005-expect.pcap
 
 - cli:
-  - proxy services
+  - proxy counters
   - proxy connections
   - proxy syn
 

@@ -96,7 +96,7 @@ protected:
 
     void counters_gc_thread();
 
-    common::icp::proxy_services::response proxy_services() const;
+    common::icp::proxy_counters::response proxy_counters() const;
 
     std::map<std::string, proxy_id_t> modules;
     std::map<std::pair<common::ip_address_t, tPortId>, proxy_service_id_t> services;

@@ -7,10 +7,10 @@
 namespace proxy
 {
 
-void services()
+void counters()
 {
     interface::controlPlane controlplane;
-	const auto response = controlplane.proxy_services();
+	const auto response = controlplane.proxy_counters();
 
     TablePrinter table;
 	table.insert_row("service_id",

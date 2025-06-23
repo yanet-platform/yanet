@@ -88,7 +88,7 @@ enum class requestType : uint32_t
 	counters_stat,
 	route_counters,
 	route_tunnel_counters,
-        proxy_services,
+        proxy_counters,
 	size // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -228,8 +228,8 @@ inline const char* requestType_toString(requestType t)
 			return "route_counters";
 		case requestType::route_tunnel_counters:
 			return "route_tunnel_counters";
-                case requestType::proxy_services:
-			return "proxy_services";
+                case requestType::proxy_counters:
+			return "proxy_counters";
 		case requestType::size:
 			return "unknown";
 	}
@@ -951,7 +951,7 @@ using response = std::tuple<common_info,
                             std::vector<one_size_info>>;
 }
 
-namespace proxy_services
+namespace proxy_counters
 {
 using response = std::vector<std::tuple<proxy_service_id_t, ///< service_id
                                         std::string, ///< service_name
@@ -1045,5 +1045,5 @@ using response = std::variant<std::tuple<>,
                               nat46clat_stats::response,
                               convert::response,
                               counters_stat::response,
-                              proxy_services::response>;
+                              proxy_counters::response>;
 }
