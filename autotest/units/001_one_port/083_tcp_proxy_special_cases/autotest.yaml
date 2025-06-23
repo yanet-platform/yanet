@@ -31,4 +31,4 @@ steps:
 - cli:
   - rib static remove default 10.0.4.0/24 10.0.4.1
   - rib static remove default 10.0.2.0/24 10.0.2.1
-  - proxy services
+  - proxy counters
