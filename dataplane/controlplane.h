@@ -77,6 +77,7 @@ public:
 	common::idp::proxy_connections::response proxy_connections(const common::idp::proxy_connections::request& request);
 	common::idp::proxy_syn::response proxy_syn(const common::idp::proxy_syn::request& request);
 	common::idp::proxy_local_pool::response proxy_local_pool(const common::idp::proxy_local_pool::request& request);
+	common::idp::proxy_tables::response proxy_tables(const common::idp::proxy_tables::request& request);
 	eResult debug_latch_update(const common::idp::debug_latch_update::request& request);
 	eResult unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request);
 	eResult update_vip_vport_proto(const common::idp::update_vip_vport_proto::request& request);

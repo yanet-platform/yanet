@@ -424,6 +424,31 @@ common::idp::proxy_local_pool::response TcpConnectionStore::GetLocalPool(std::op
     return response;
 }
 
+common::idp::proxy_tables::response TcpConnectionStore::GetTables(std::optional<proxy_service_id_t> service_id)
+{
+    common::idp::proxy_tables::response response;
+
+    if (!service_id.has_value())
+    {
+        for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+        {
+            if (service_connections_[index].IsInitialized())
+            {
+                response.emplace_back(index,
+                                  service_connections_[index].Size(), service_connections_[index].Capacity(),
+                                  syn_connections_[index].Size(), syn_connections_[index].Capacity());
+            }
+        }
+    }
+    else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    {
+        return {{*service_id,
+                service_connections_[*service_id].Size(), service_connections_[*service_id].Capacity(), 
+                syn_connections_[*service_id].Size(), syn_connections_[*service_id].Capacity()}};
+    }
+
+    return response;
+}
 
 void DebugPacket(const char* message, proxy_service_id_t service_id, const rte_ipv4_hdr* ipv4_header, const rte_tcp_hdr* tcp_header)
 {

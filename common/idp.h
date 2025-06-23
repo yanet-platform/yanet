@@ -83,6 +83,7 @@ enum class requestType : uint32_t
         proxy_connections,
         proxy_syn,
         proxy_local_pool,
+        proxy_tables,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -859,6 +860,19 @@ using prefix = std::tuple<proxy_service_id_t, ///< proxy_service_id
 using response = std::vector<prefix>;
 }
 
+namespace proxy_tables
+{
+using request = std::tuple<std::optional<proxy_service_id_t>>;
+
+using tables = std::tuple<proxy_service_id_t, ///< proxy_service_id
+                        size_t, ///< connections
+                        size_t, ///< max connections
+                        size_t, ///< syn connections
+                        size_t>; ///< max syn connections
+
+using response = std::vector<tables>;
+}
+
 namespace balancer_connection
 {
 using connection = std::tuple<common::ip_address_t, ///< client_ip
@@ -1128,5 +1142,6 @@ using response = std::variant<std::tuple<>,
                               memory_manager_stats::response,
                               proxy_connections::response,
                               proxy_syn::response,
-                              proxy_local_pool::response>;
+                              proxy_local_pool::response,
+                              proxy_tables::response>;
 }

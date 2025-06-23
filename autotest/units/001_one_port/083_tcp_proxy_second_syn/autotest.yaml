@@ -9,6 +9,7 @@ steps:
 
 - cli:
   - proxy counters
+  - proxy tables
   - proxy syn
   - proxy connections
   - proxy local_pool

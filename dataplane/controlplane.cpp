@@ -1008,6 +1008,12 @@ common::idp::proxy_local_pool::response cControlPlane::proxy_local_pool(const co
 	return dataPlane->tcp_connection_store.GetLocalPool(service_id);
 }
 
+common::idp::proxy_tables::response cControlPlane::proxy_tables(const common::idp::proxy_tables::request& request)
+{
+	auto [service_id] = request;
+	return dataPlane->tcp_connection_store.GetTables(service_id);
+}
+
 eResult cControlPlane::unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request)
 {
 	return vip_to_balancers.apply([&](auto& vtb) {

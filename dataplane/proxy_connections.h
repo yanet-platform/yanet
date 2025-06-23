@@ -166,6 +166,9 @@ public:
         if constexpr (std::is_same_v<ConnectionInfo, SynConnection>) {
             if (number_connections == 0) {
                 number_buckets_ = 0;
+                initialized_ = true;
+                service_id_ = service_id;
+                service_key_ = Pack(service_addr, rte_cpu_to_be_16(service_port));
                 return true;
             }
         }
@@ -223,6 +226,8 @@ public:
 
     void GetConnections(std::function<void(Bucket&, uint32_t)> func)
     {
+        if (unlikely(!initialized_)) return;
+
         for (uint32_t index = 0; index < number_buckets_; index++)
         {
             Bucket& bucket = buckets_[index];
@@ -251,6 +256,35 @@ public:
             }
             bucket.Unlock();
         }
+    }
+
+    bool IsInitialized() const
+    {
+        return initialized_;
+    }
+
+    size_t Size() const
+    {
+        if (unlikely(!initialized_)) return 0;
+
+        size_t size = 0;
+        for (uint32_t index = 0; index < number_buckets_; index++)
+        {
+            const Bucket& bucket = buckets_[index];
+            for (uint32_t i = 0; i < Bucket::bucket_size; i++)
+            {
+                if (bucket.addresses[i] != 0)
+                {
+                    size++;
+                }
+            }
+        }
+
+        return size;
+    }
+
+    size_t Capacity() const {
+        return number_buckets_ * Bucket::bucket_size;
     }
 
     uint32_t GetDataForRetramsits(std::function<bool(Bucket&, uint32_t, uint64_t)> func)

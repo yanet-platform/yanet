@@ -101,4 +101,23 @@ void local_pool(std::optional<proxy_service_id_t> service_id)
 	table.Print();
 }
 
+void tables(std::optional<proxy_service_id_t> service_id)
+{
+	interface::dataPlane dataplane;
+	const auto response = dataplane.proxy_tables(service_id);
+
+	TablePrinter table;
+	table.insert_row("service_id",
+					 "connections",
+					 "max_connections",
+					 "syn_connections",
+					 "max_syn_connections");
+	for (const auto& [service_id, connections, max_connections, syn_connections, max_syn_connections] : response)
+	{
+		table.insert_row(service_id, connections, max_connections, syn_connections, max_syn_connections);
+	}
+
+	table.Print();
+}
+
 }

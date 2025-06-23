@@ -317,6 +317,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::proxy_local_pool, request);
 		}
+		else if (type == common::idp::requestType::proxy_tables)
+		{
+			response = callWithResponse(&cControlPlane::proxy_tables, request);
+		}
 		else if (type == common::idp::requestType::samples)
 		{
 			response = callWithResponse(&cControlPlane::samples, request);
