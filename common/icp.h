@@ -955,23 +955,7 @@ namespace proxy_counters
 {
 using response = std::vector<std::tuple<proxy_service_id_t, ///< service_id
                                         std::string, ///< service_name
-                                        uint64_t, ///< packets_in
-                                        uint64_t, ///< bytes_in
-                                        uint64_t, ///< packets_out
-                                        uint64_t, ///< bytes_out
-                                        uint64_t, ///< syn_count
-                                        uint64_t, ///< ping_count
-                                        uint64_t, ///< connections_count
-                                        uint64_t, ///< service_bucket_overflow
-                                        uint64_t, ///< failed_local_pool_allocation
-                                        uint64_t, ///< failed_local_pool_search,
-                                        uint64_t, ///< failed_answer_service_syn_ack,
-                                        uint64_t, ///< ignored_size_update_detections,
-                                        uint64_t, ///< failed_check_syn_cookie
-                                        uint64_t, ///< failed_search_client_service_ack
-                                        uint64_t, ///< new_connections
-                                        uint64_t, ///< new_syn_connections
-                                        uint64_t>>; ///< error_service_config
+                                        std::array<uint64_t, proxy::names.size()>>>;
 }
 
 using request = std::tuple<requestType,

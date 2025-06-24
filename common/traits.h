@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <variant>
 #include <vector>
+#include <array>
 
 namespace traits
 {
@@ -71,6 +72,17 @@ struct is_vector<std::vector<T, Alloc>> : std::true_type
 
 template<typename T>
 inline constexpr bool is_vector_v = is_vector<T>::value;
+
+template<typename T>
+struct is_array : std::false_type
+{};
+
+template<typename T, size_t Size>
+struct is_array<std::array<T, Size>> : std::true_type
+{};
+
+template<typename T>
+inline constexpr bool is_array_v = is_array<T>::value;
 
 template<typename T>
 struct is_set : std::false_type

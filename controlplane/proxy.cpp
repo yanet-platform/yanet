@@ -287,7 +287,7 @@ common::icp::proxy_counters::response proxy_t::proxy_counters() const
                     counts[i] = (it->second)[i];
 			}
 
-            response.push_back(std::tuple_cat(std::tie(service_id, service_name), counts));
+            response.emplace_back(service_id, service_name, counts);
 		}
 	}
 

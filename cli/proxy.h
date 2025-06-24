@@ -11,31 +11,17 @@ void counters()
 {
     interface::controlPlane controlplane;
 	const auto response = controlplane.proxy_counters();
-
+	
     TablePrinter table;
-	table.insert_row("service_id",
-	                 "service_name",
-                     "packets_in",
-	                 "bytes_in",
-	                 "packets_out",
-	                 "bytes_out",
-	                 "syn_count",
-	                 "ping_count",
-	                 "connections_count",
-					 "service_bucket_overflow",
-					 "failed_local_pool_allocation",
-					 "failed_local_pool_search",
-					 "failed_answer_service_syn_ack",
-					 "ignored_size_update_detections",
-					 "failed_check_syn_cookie",
-					 "failed_search_client_service_ack",
-					 "new_connections",
-					 "new_syn_connections",
-					 "error_service_config");
+	constexpr std::tuple row = std::tuple_cat(std::tie("service_id", "service_name"),
+                        			  		  proxy::names);
+	table.insert_row(row);
 
 	for (const auto& record : response)
 	{
-        table.insert_row(record);
+		const std::tuple row = std::tuple_cat(std::tie(std::get<0>(record), std::get<1>(record)),
+								   			  std::get<2>(record));
+        table.insert_row(row);
     }
 
     table.Print();

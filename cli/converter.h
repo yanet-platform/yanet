@@ -16,6 +16,7 @@ struct config_t
 	std::string optional_null = "n/s";
 	std::string string_empty = "";
 	std::string vector_empty = "";
+	std::string array_empty = "";
 	std::string set_empty = "n/s";
 };
 
@@ -57,6 +58,10 @@ std::string to_string(const T& value, const config_t& config = {})
 			if constexpr (traits::is_vector_v<T>)
 			{
 				return config.vector_empty;
+			}
+			else if constexpr (traits::is_array_v<T>)
+			{
+				return config.array_empty;
 			}
 			else if constexpr (traits::is_set_v<T>)
 			{

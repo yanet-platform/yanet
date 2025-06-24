@@ -61,6 +61,24 @@ enum class module_counter : tCounterId
 namespace proxy
 {
 
+constexpr std::array names = std::array{"packets_in",
+                                        "bytes_in",
+                                        "packets_out",
+                                        "bytes_out",
+                                        "syn_count",
+                                        "ping_count",
+                                        "connections_count",
+                                        "service_bucket_overflow",
+                                        "failed_local_pool_allocation",
+                                        "failed_local_pool_search",
+                                        "failed_answer_service_syn_ack",
+                                        "ignored_size_update_detections",
+                                        "failed_check_syn_cookie",
+                                        "failed_search_client_service_ack",
+                                        "new_connections",
+                                        "new_syn_connections",
+                                        "error_service_config"};
+
 enum class service_counter : tCounterId
 {
 	packets_in,
