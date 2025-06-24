@@ -7,6 +7,11 @@ IP_SERVER1 = "10.0.1.1"
 IP_SERVER2 = "10.0.1.2"
 IP_SERVER3 = "10.0.1.3"
 IP_SERVER4 = "10.0.1.4"
+IP_SERVER5 = "10.0.1.5"
+
+IP_CLIENT = "10.0.2.1"
+IP_BLOCKED_CLIENT = "14.0.0.1"
+IP_BLOCKED_CLIENT2 = "15.0.0.1"
 
 PORT_PROXY_INT = 32768
 PORT_PROXY_INT2 = 32769
@@ -31,7 +36,7 @@ options_server_syn_proxy = [("MSS", 1260-len_pr), ("SAckOK", ''), ("Timestamp", 
 
 # 001 - type 1 - no proxy, no sec
 
-test_001 = ProxyTest(ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
+test_001 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 
 data_type1 = [
 	(
@@ -59,7 +64,7 @@ WriteTest("001", data_type1)
 
 SYN_COOKIE2 = 0x4e490b0b
 
-test_002 = ProxyTest(ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
+test_002 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 
 data_type2 = [
 	(
@@ -91,7 +96,7 @@ WriteTest("002", data_type2)
 
 # 003 - type 3 - proxy, no sec
 
-test_003 = ProxyTest(ip_server=IP_SERVER3, ip_proxy=IP_SERVER3, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
+test_003 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER3, ip_proxy=IP_SERVER3, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 
 data_type3 = [
 	(
@@ -122,7 +127,7 @@ WriteTest("003", data_type3)
 
 SYN_COOKIE3 = 0xde8bc93b
 
-test_004 = ProxyTest(ip_server=IP_SERVER4, ip_proxy=IP_SERVER4, start_seq_to_client=SYN_COOKIE3, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
+test_004 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER4, ip_proxy=IP_SERVER4, start_seq_to_client=SYN_COOKIE3, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 
 data_type4 = [
 	(
@@ -175,15 +180,53 @@ WriteTest("004", data_type4)
 # 005 - pings
 
 write_pcap("005-send.pcap",
-           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=ProxyTest.IP_CLIENT, dst=IP_SERVER1)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("abcdef"),
-           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=ProxyTest.IP_CLIENT, dst=IP_SERVER2)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("abcd"),
-           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=ProxyTest.IP_CLIENT, dst=IP_SERVER3)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("ab"),
-           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=ProxyTest.IP_CLIENT, dst=IP_SERVER4)/ICMP(type=8, code=0, id=1, seq=0x0001),
+           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER1)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("abcdef"),
+           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER2)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("abcd"),
+           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER3)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("ab"),
+           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER4)/ICMP(type=8, code=0, id=1, seq=0x0001),
 )
 
 write_pcap("005-expect.pcap",
-           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER1, dst=ProxyTest.IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("abcdef"),
-           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER2, dst=ProxyTest.IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("abcd"),
-           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER3, dst=ProxyTest.IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("ab"),
-           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER4, dst=ProxyTest.IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001),
+           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER1, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("abcdef"),
+           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER2, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("abcd"),
+           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER3, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("ab"),
+           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER4, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001),
 )
+
+# 006 - blacklist
+
+test_005 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER5, ip_proxy=IP_SERVER5, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
+test_005_blocked = ProxyTest(ip_client=IP_BLOCKED_CLIENT, ip_server=IP_SERVER5, ip_proxy=IP_SERVER5, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
+test_005_blocked2 = ProxyTest(ip_client=IP_BLOCKED_CLIENT2, ip_server=IP_SERVER5, ip_proxy=IP_SERVER5, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
+
+data_type5 = [
+    # Blocked client
+    (
+		test_005_blocked.FromClient((0, None), 'S', options=options_client_syn),
+        # Drop
+	),
+    # Allowed client
+	(
+		test_005.FromClient((0, None), 'S', options=options_client_syn),
+		test_005.ToServer((0, None), 'S', options=options_client_syn)
+	), (
+		test_005.FromServer((0, 1), 'AS', options=options_server_syn),
+		test_005.ToClient((0, 1), 'AS', options=options_server_syn)
+	), (
+		test_005.FromClient((1, 1), 'A', raw=data_client1, options=options_client_ack),
+		test_005.ToServer((1, 1), 'A', raw=data_client1, options=options_client_ack)
+	), (
+		test_005.FromServer((1, 1 + len(data_client1)), 'A', raw=data_server1),
+		test_005.ToClient((1, 1 + len(data_client1)), 'A', raw=data_server1)
+	), (
+		test_005.FromClient((1 + len(data_client1), 1 + len(data_server1)), 'A', raw=data_client2),
+		test_005.ToServer((1 + len(data_client1), 1 + len(data_server1)), 'A', raw=data_client2)
+	),
+    # Blocked client
+    (
+		test_005_blocked2.FromClient((0, None), 'S', options=options_client_syn),
+        # Drop
+	),
+]
+
+WriteTest("006", data_type5)
