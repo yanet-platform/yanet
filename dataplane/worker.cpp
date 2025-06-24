@@ -6153,27 +6153,13 @@ inline void cWorker::proxy_client_syn_handle()
 		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_in] += mbuf->pkt_len;
 		counters[service.counter_id + (tCounterId)proxy::service_counter::syn_count]++;
 
-		uint32_t action = tcp_connection_store->ActionClientOnSyn(service_id, proxy_worker_id, service, mbuf);
-		uint32_t counter_action = action & dataplane::proxy::mask_counter_action;
-		if (counter_action != 0)
+		if (tcp_connection_store->ActionClientOnSyn(service_id, proxy_worker_id, service, mbuf, &counters[service.counter_id]))
 		{
-			counters[service.counter_id + counter_action]++;
-		}
-
-		if ((action & dataplane::proxy::flag_action_drop) == 0)
-		{
-			if ((action & dataplane::proxy::flag_action_to_client) != 0)
-			{
-				counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
-				counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
-			}
-			
 			proxy_flow(mbuf, proxy.flow);
 		}
 		else
 		{
 			drop(mbuf);
-			continue;
 		}
 	}
 
@@ -6210,27 +6196,13 @@ inline void cWorker::proxy_client_ack_handle()
 		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
 		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_in] += mbuf->pkt_len;
 
-		uint32_t action = tcp_connection_store->ActionClientOnAck(service_id, proxy_worker_id, service, mbuf);
-		uint32_t counter_action = action & dataplane::proxy::mask_counter_action;
-		if (counter_action != 0)
+		if (tcp_connection_store->ActionClientOnAck(service_id, proxy_worker_id, service, mbuf, &counters[service.counter_id]))
 		{
-			counters[service.counter_id + counter_action]++;
-		}
-
-		if ((action & dataplane::proxy::flag_action_drop) == 0)
-		{
-			if ((action & dataplane::proxy::flag_action_to_client) != 0)
-			{
-				counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
-				counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
-			}
-			
 			proxy_flow(mbuf, proxy.flow);
 		}
 		else
 		{
 			drop(mbuf);
-			continue;
 		}
 	}
 
@@ -6251,9 +6223,7 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		return;
 	}
 
-	for (unsigned int mbuf_i = 0;
-	     mbuf_i < proxy_server_syn_ack_stack.mbufsCount;
-	     mbuf_i++)
+	for (unsigned int mbuf_i = 0; mbuf_i < proxy_server_syn_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_server_syn_ack_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
@@ -6264,24 +6234,15 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[proxy_id];
 		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
-		uint32_t action = tcp_connection_store->ActionServerOnSynAck(service_id, service, mbuf);
-		uint32_t counter_action = action & dataplane::proxy::mask_counter_action;
-		if (counter_action != 0)
-		{
-			counters[service.counter_id + counter_action]++;
-		}
-
-		if ((action & dataplane::proxy::flag_action_drop) == 0)
+		if (tcp_connection_store->ActionServiceOnSynAck(service_id, service, mbuf, &counters[service.counter_id]))
 		{
 			counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
-			counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
-			
+			counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;			
 			proxy_flow(mbuf, proxy.flow);
 		}
 		else
 		{
 			drop(mbuf);
-			continue;
 		}
 	}
 
@@ -6302,9 +6263,7 @@ inline void cWorker::proxy_server_ack_handle()
 		return;
 	}
 
-	for (unsigned int mbuf_i = 0;
-	     mbuf_i < proxy_server_ack_stack.mbufsCount;
-	     mbuf_i++)
+	for (unsigned int mbuf_i = 0; mbuf_i < proxy_server_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_server_ack_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
@@ -6315,24 +6274,15 @@ inline void cWorker::proxy_server_ack_handle()
 		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[proxy_id];
 		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
-		uint32_t action = tcp_connection_store->ActionServerOnAck(metadata->flow.data.proxy.service_id, service, mbuf);
-		uint32_t counter_action = action & dataplane::proxy::mask_counter_action;
-		if (counter_action != 0)
-		{
-			counters[service.counter_id + counter_action]++;
-		}
-
-		if ((action & dataplane::proxy::flag_action_drop) == 0)
+		if (tcp_connection_store->ActionServiceOnAck(service_id, service, mbuf, &counters[service.counter_id]))
 		{
 			counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
-			counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
-			
+			counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;			
 			proxy_flow(mbuf, proxy.flow);
 		}
 		else
 		{
 			drop(mbuf);
-			continue;
 		}
 	}
 

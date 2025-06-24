@@ -56,8 +56,6 @@ private:
     bool CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected);
 };
 
-void ShiftTcpOptions(rte_tcp_hdr* tcp_header, uint32_t sack, uint32_t timestamp_value, uint32_t timestamp_echo);
-
 // ----------------------------------------------------------------------------
 
 struct DataForRetransmit
@@ -72,11 +70,6 @@ struct DataForRetransmit
     uint8_t tcp_options_data[MAX_SIZE_TCP_OPTIONS];
     common::globalBase::tFlow flow;
 };
-
-constexpr uint32_t flag_action_drop = 1 << 8;
-constexpr uint32_t flag_action_to_service = 1 << 9;
-constexpr uint32_t flag_action_to_client = 1 << 10;
-constexpr uint32_t mask_counter_action = flag_action_drop - 1;
 
 class TcpConnectionStore
 {
@@ -98,23 +91,27 @@ public:
     common::idp::proxy_tables::response GetTables(std::optional<proxy_service_id_t> service_id);
 
     // Actions from worker
-    uint32_t ActionClientOnSyn(proxy_service_id_t service_id,
-	                       uint32_t worker_id,
-	                       const dataplane::globalBase::proxy_service_t& service,
-	                       rte_mbuf* mbuf);
+    bool ActionClientOnSyn(proxy_service_id_t service_id,
+	                   uint32_t worker_id,
+	                   const dataplane::globalBase::proxy_service_t& service,
+	                   rte_mbuf* mbuf,
+	                   uint64_t* counters);
 
-    uint32_t ActionClientOnAck(proxy_service_id_t service_id,
-	                       uint32_t worker_id,
-	                       const dataplane::globalBase::proxy_service_t& service,
-	                       rte_mbuf* mbuf);
+    bool ActionClientOnAck(proxy_service_id_t service_id,
+	                   uint32_t worker_id,
+	                   const dataplane::globalBase::proxy_service_t& service,
+	                   rte_mbuf* mbuf,
+	                   uint64_t* counters);
 
-    uint32_t ActionServerOnSynAck(proxy_service_id_t service_id,
-	                          const dataplane::globalBase::proxy_service_t& service,
-	                          rte_mbuf* mbuf);
-
-    uint32_t ActionServerOnAck(proxy_service_id_t service_id,
+    bool ActionServiceOnSynAck(proxy_service_id_t service_id,
 	                       const dataplane::globalBase::proxy_service_t& service,
-	                       rte_mbuf* mbuf);
+	                       rte_mbuf* mbuf,
+	                       uint64_t* counters);
+
+    bool ActionServiceOnAck(proxy_service_id_t service_id,
+	                    const dataplane::globalBase::proxy_service_t& service,
+	                    rte_mbuf* mbuf,
+	                    uint64_t* counters);
 
     uint32_t current_time_sec;
     uint64_t current_time_ms;
