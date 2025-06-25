@@ -120,7 +120,7 @@ public:
 
 private:
     std::mutex mutex_;
-    SynCookies syn_cookies_;
+    SynCookies syn_cookies_[YANET_CONFIG_PROXY_SERVICES_SIZE];
 
     LocalPool local_pools_[YANET_CONFIG_PROXY_SERVICES_SIZE];
     ServiceConnections service_connections_[YANET_CONFIG_PROXY_SERVICES_SIZE];
@@ -129,8 +129,8 @@ private:
     uint32_t index_start_check_retransmits_ = 0;
     common::globalBase::tFlow next_flow_;
 
-    uint32_t BuildSynCookieAndFillTcpOptionsAnswer(const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header);
-    uint32_t CheckSynCookie(const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
+    uint32_t BuildSynCookieAndFillTcpOptionsAnswer(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header);
+    uint32_t CheckSynCookie(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
 };
 
 }

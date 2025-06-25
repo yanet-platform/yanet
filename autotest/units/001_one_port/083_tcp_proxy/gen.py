@@ -62,7 +62,7 @@ WriteTest("001", data_type1)
 
 # 002 - type 2 - no proxy, sec
 
-SYN_COOKIE2 = 0x4e490b0b
+SYN_COOKIE2 = 0x24cb2489
 
 test_002 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 
@@ -125,7 +125,7 @@ WriteTest("003", data_type3)
 
 # 004 - type 4 - proxy, sec, sack
 
-SYN_COOKIE3 = 0xde8bc93b
+SYN_COOKIE3 = 0x24cb2489
 
 test_004 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER4, ip_proxy=IP_SERVER4, start_seq_to_client=SYN_COOKIE3, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 

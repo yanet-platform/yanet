@@ -56,32 +56,36 @@ SynCookies::SynCookies()
     : keys_{}, current_key_(1),
     rd_(), gen_(rd_()), dist_(0, std::numeric_limits<uint32_t>::max()) 
 {
+    #ifdef CONFIG_YADECAP_AUTOTEST
+    keys_[0][0] = 0;
+    keys_[0][1] = 0;
+    #else
+    keys_[0][0] = dist_(gen_);
+    keys_[0][1] = dist_(gen_);
+    #endif
     UpdateKeys();
 }
 
-uint32_t SynCookies::GetCookie(uint32_t saddr, uint32_t daddr,
-                                uint16_t sport, uint16_t dport,
+uint32_t SynCookies::GetCookie(uint32_t saddr, uint16_t sport,
                                 uint32_t sseq, uint32_t data)
 {
-    uint32_t cookie = cookie_hash(saddr, daddr, sport, dport, 0) + sseq +
+    uint32_t cookie = cookie_hash(saddr, sport, 0) + sseq +
                     (current_key_ << COOKIE_BITS) +
-                    ((cookie_hash(saddr, daddr, sport, dport, current_key_) + data) & COOKIE_MASK);
+                    ((cookie_hash(saddr, sport, current_key_) + data) & COOKIE_MASK);
 
     return cookie;
 }
  
 uint32_t SynCookies::CheckCookie(uint32_t cookie,
-                                uint32_t saddr, uint32_t daddr,
-                                uint16_t sport, uint16_t dport,
-                                uint32_t sseq)
+                                uint32_t saddr, uint16_t sport, uint32_t sseq)
 {
-    cookie -= cookie_hash(saddr, daddr, sport, dport, 0) + sseq;
+    cookie -= cookie_hash(saddr, sport, 0) + sseq;
     uint32_t keyidx = (cookie >> COOKIE_BITS);
     if (1 > keyidx || keyidx > 2) {
         return 0;
     }
 
-    uint32_t data = (cookie - cookie_hash(saddr, daddr, sport, dport, keyidx)) & COOKIE_MASK;
+    uint32_t data = (cookie - cookie_hash(saddr, sport, keyidx)) & COOKIE_MASK;
     if (data & ~DATA_MASK) {
         return 0;
     }
@@ -92,20 +96,20 @@ uint32_t SynCookies::CheckCookie(uint32_t cookie,
 void SynCookies::UpdateKeys()
 {
     current_key_ = 3 - current_key_; // switch between 1 and 2
-    keys_[current_key_] = dist_(gen_);
+    keys_[current_key_][0] = dist_(gen_);
+    keys_[current_key_][1] = dist_(gen_);
     
 #ifdef CONFIG_YADECAP_AUTOTEST
-    YANET_LOG_WARNING("SynCookies::UpdateKeys, set key=0\n");
-    keys_[current_key_] = 0;
+    keys_[current_key_][0] = 0;
+    keys_[current_key_][1] = 0;
 #endif
 }
 
-uint32_t SynCookies::cookie_hash(uint32_t saddr, uint32_t daddr,
-                                uint16_t sport, uint16_t dport, 
-                                uint32_t keyidx)
+uint32_t SynCookies::cookie_hash(uint32_t saddr, uint16_t sport, uint32_t keyidx)
 {
-    const uint32_t data[3] = {saddr, daddr, (uint32_t)sport << 16 | (uint32_t)dport};
-	return rte_hash_crc(data, sizeof(data), keys_[keyidx]);
+    const uint64_t data[3] = {(uint64_t)saddr << 32 | (uint64_t)sport,
+                                keys_[keyidx][0], keys_[keyidx][1]};
+	return rte_hash_crc(data, sizeof(data), 0);
 }
 
 }

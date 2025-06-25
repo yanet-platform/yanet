@@ -329,7 +329,8 @@ void TcpConnectionStore::UpdateSynCookieKeys()
 {
     YANET_LOG_WARNING("TcpConnectionStore::UpdateSynCookieKeys\n");
     std::lock_guard guard(mutex_);
-    syn_cookies_.UpdateKeys();
+    for (uint32_t i = 0; i < YANET_CONFIG_PROXY_SERVICES_SIZE; i++)
+        syn_cookies_[i].UpdateKeys();
 }
 
 // Info
@@ -501,7 +502,7 @@ bool NonEmptyTcpData(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
     return (rte_be_to_cpu_16(ipv4_header->total_length) != sizeof(rte_ipv4_hdr) + tcp_header_len);
 }
 
-uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
+uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
 {
     size_t tcp_header_len = ((*tcp_header)->data_off >> 4) << 2;
     TcpOptions tcp_options;
@@ -511,7 +512,7 @@ uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(const datapla
     tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
 
     uint32_t cookie_data = SynCookies::PackData(tcp_options);
-    uint32_t cookie = syn_cookies_.GetCookie((*ipv4_header)->src_addr, service.upstream_addr, (*tcp_header)->src_port, service.upstream_port, (*tcp_header)->sent_seq, cookie_data);
+    uint32_t cookie = syn_cookies_[service_id].GetCookie((*ipv4_header)->src_addr, (*tcp_header)->src_port, (*tcp_header)->sent_seq, cookie_data);
     // YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, tcp_header->sent_seq);
 
     tcp_options.window_scaling = service.winscale;
@@ -604,7 +605,7 @@ bool TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
             {
                 case TableSearchResult::Overflow:
                 {
-                    uint32_t cookie = BuildSynCookieAndFillTcpOptionsAnswer(service, mbuf, &ipv4_header, &tcp_header);
+                    uint32_t cookie = BuildSynCookieAndFillTcpOptionsAnswer(service_id, service, mbuf, &ipv4_header, &tcp_header);
                     ActionClientOnSynPrepareSynToClient(ipv4_header, tcp_header, cookie);
                     counters[static_cast<uint32_t>(::proxy::service_counter::packets_out)]++;
 				    counters[static_cast<uint32_t>(::proxy::service_counter::bytes_out)] += mbuf->pkt_len;
@@ -680,14 +681,14 @@ void AddProxyHeader(const dataplane::globalBase::proxy_service_t& service, rte_m
     proxy_header->src_port = src_port;    
 }
 
-uint32_t TcpConnectionStore::CheckSynCookie(const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
+uint32_t TcpConnectionStore::CheckSynCookie(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
 {
-    uint32_t cookie_data = syn_cookies_.CheckCookie(rte_cpu_to_be_32(tcp_header->recv_ack) - 1, ipv4_header->src_addr, service.upstream_addr, tcp_header->src_port, service.upstream_port, sub_cpu_32(tcp_header->sent_seq, 1));
+    uint32_t cookie_data = syn_cookies_[service_id].CheckCookie(rte_cpu_to_be_32(tcp_header->recv_ack) - 1, ipv4_header->src_addr, tcp_header->src_port, sub_cpu_32(tcp_header->sent_seq, 1));
     // YANET_LOG_WARNING("\tcookie_data=%d, ack=%u, seq=%u\n", cookie_data, tcp_header->recv_ack, tcp_header->sent_seq);
 
     if (cookie_data == 0 && !service.ignore_size_update_detections)
     {
-        cookie_data = syn_cookies_.CheckCookie(rte_cpu_to_be_32(tcp_header->recv_ack) - 1, ipv4_header->src_addr, service.upstream_addr, tcp_header->src_port, service.upstream_port, tcp_header->sent_seq);
+        cookie_data = syn_cookies_[service_id].CheckCookie(rte_cpu_to_be_32(tcp_header->recv_ack) - 1, ipv4_header->src_addr, tcp_header->src_port, tcp_header->sent_seq);
         // YANET_LOG_WARNING("\tsecond cookie_data=%d, ack=%u, seq=%u\n", cookie_data, tcp_header->recv_ack, tcp_header->sent_seq);
         if (cookie_data != 0)
         {
@@ -847,7 +848,7 @@ bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
 
                 // try check cookie
                 // todo - check time overflow
-                uint32_t cookie_data = CheckSynCookie(service, ipv4_header, tcp_header);
+                uint32_t cookie_data = CheckSynCookie(service_id, service, ipv4_header, tcp_header);
                 if (cookie_data == 0)
                 {
                     counters[static_cast<uint32_t>(::proxy::service_counter::failed_check_syn_cookie)]++;

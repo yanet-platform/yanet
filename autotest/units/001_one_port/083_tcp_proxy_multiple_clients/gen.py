@@ -122,8 +122,8 @@ WriteTest("001", data_type1)
 
 # 002 - type 2 - no proxy, sec
 
-SYN_COOKIE = 0xa8624b85
-SYN_COOKIE2 = 0xb8285337
+SYN_COOKIE = 0x24cb2489
+SYN_COOKIE2 = 0xecb9edcb
 
 data_type2 = [
 	# clients syn -> synack clients
@@ -229,8 +229,8 @@ WriteTest("003", data_type3)
 
 # 004 - type 4 - proxy, sec
 
-SYN_COOKIE3 = 0x189488b5
-SYN_COOKIE4 = 0x48f69107
+SYN_COOKIE3 = 0x24cb2489
+SYN_COOKIE4 = 0xecb9edcb
 
 data_type4  = [
 	# clients syn -> synack clients

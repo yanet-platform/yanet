@@ -10,6 +10,8 @@ IP_SERVER1 = "10.0.4.1"
 IP_SERVER2 = "10.0.4.2"
 IP_SERVER3 = "10.0.4.3"
 
+IP_CLIENT = "10.0.2.1"
+
 PORT_CLIENT = 12380
 PORT_PROXY_INT = 32768
 
@@ -25,7 +27,7 @@ options_client_syn = [("MSS", 1460), ("SAckOK", ''), ("Timestamp", (ts_client, 0
 
 # 001 - syn rentransmit use the same local address + port
 
-test_001 = ProxyTest(ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=0, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
+test_001 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=0, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 
 data_type1 = [
 	(
@@ -41,8 +43,8 @@ WriteTest("001", data_type1)
 
 # 002 - Error in SACK config - the server does not support SACK, although the configuration file states that it supports
 
-SYN_COOKIE2 = 0x22cfb231
-test_002 = ProxyTest(ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
+SYN_COOKIE2 = 0x24cb248b
+test_002 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 
 data_type2 = [
 	(
@@ -72,8 +74,8 @@ PORT_CLIENT_TS = 12500
 
 # ts1 - Client does not support timestamps
 
-SYN_COOKIE_TS_1 = 0x1a95759b
-test_ts1 = ProxyTest(ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE_TS_1, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT_TS)
+SYN_COOKIE_TS_1 = 0x9d8eff7d
+test_ts1 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE_TS_1, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT_TS)
 
 # The first client packet does not contain timestamps, the proxy response should not contain timestamps
 data_type_ts_1 = [
@@ -87,8 +89,8 @@ WriteTest("003_ts_1", data_type_ts_1)
 
 # ts2 - Client supports timestamps, but on proxy - disabled
 
-SYN_COOKIE_TS_2 = 0xe46aac61
-test_ts2 = ProxyTest(ip_server=IP_SERVER3, ip_proxy=IP_SERVER3, start_seq_to_client=SYN_COOKIE_TS_2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT_TS+1)
+SYN_COOKIE_TS_2 = 0xab2f1f6d
+test_ts2 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER3, ip_proxy=IP_SERVER3, start_seq_to_client=SYN_COOKIE_TS_2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT_TS+1)
 
 # The first client packet contains timestamps, but timestamps disabled on proxy, the proxy response should not contain timestamps
 data_type_ts_2 = [
@@ -102,8 +104,8 @@ WriteTest("003_ts_2", data_type_ts_2)
 
 # ts3 - Client and proxy supports timestamps, but service does not
 
-SYN_COOKIE_TS_3 = 0xbbe794b1
-test_ts3 = ProxyTest(ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE_TS_3, port_proxy=PORT_PROXY_INT + 1, cport=PORT_CLIENT_TS+2)
+SYN_COOKIE_TS_3 = 0x49c73fdd
+test_ts3 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE_TS_3, port_proxy=PORT_PROXY_INT + 1, cport=PORT_CLIENT_TS+2)
 
 data_type_ts_3 = [
 	(
