@@ -230,3 +230,24 @@ data_type5 = [
 ]
 
 WriteTest("006", data_type5)
+
+
+# 007 - Client send SYN, service don't answer, client send ACK
+
+test_007 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT + 1, cport=PORT_CLIENT)
+
+data_type7 = [
+	(
+		test_007.FromClient((0, None), 'S', options=options_client_syn),
+		test_007.ToServer((0, None), 'S', options=options_client_syn)
+	),
+    # (
+	#	test_007.FromServer((0, 1), 'AS', options=options_server_syn),
+	#	test_007.ToClient((0, 1), 'AS', options=options_server_syn)
+	# ),
+    (
+		test_007.FromClient((1, 1), 'A', raw=data_client1, options=options_client_ack),
+	)
+]
+
+WriteTest("007", data_type7)

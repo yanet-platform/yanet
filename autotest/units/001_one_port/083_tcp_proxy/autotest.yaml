@@ -34,6 +34,11 @@ steps:
     send: 006-send.pcap
     expect: 006-expect.pcap
 
+- sendPackets:
+  - port: kni0
+    send: 007-send.pcap
+    expect: 007-expect.pcap
+
 - cli:
   - proxy counters
   - proxy tables

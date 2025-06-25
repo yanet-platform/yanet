@@ -812,25 +812,34 @@ bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
             SynConnectionData syn_connection_data;
             if (syn_connections_[service_id].FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data) == TableSearchResult::Found)
             {
-                // todo: check syn_connection_data.connection->server_answer = true ?
-                uint32_t src_addr = ipv4_header->src_addr;
-                uint16_t src_port = tcp_header->src_port;
-                service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
-                LocalPool::UnpackTupleSrc(syn_connection_data.connection->local, ipv4_header, tcp_header);
-                service_connection_data.connection->client_start_seq = syn_connection_data.connection->client_start_seq;
-                syn_connection_data.bucket->Clear(syn_connection_data.idx);
-                syn_connection_data.Unlock();
-
-                service_connection_data.connection->flags = flags;
-                service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
-
-                if (service.send_proxy_header)
+                if (!syn_connection_data.connection->server_answer)
                 {
-                        tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, sizeof(proxy_v2_ipv4_hdr));
-                        AddProxyHeader(service, mbuf, metadata, &ipv4_header, &tcp_header, src_addr, src_port);
+                    // ack, but server didn't answer
+                    syn_connection_data.Unlock();
+                    counters[static_cast<uint32_t>(::proxy::service_counter::ack_without_service_answer)]++;
+                    action = false;
                 }
+                else
+                {
+                    uint32_t src_addr = ipv4_header->src_addr;
+                    uint16_t src_port = tcp_header->src_port;
+                    service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
+                    LocalPool::UnpackTupleSrc(syn_connection_data.connection->local, ipv4_header, tcp_header);
+                    service_connection_data.connection->client_start_seq = syn_connection_data.connection->client_start_seq;
+                    syn_connection_data.bucket->Clear(syn_connection_data.idx);
+                    syn_connection_data.Unlock();
 
-                counters[static_cast<uint32_t>(::proxy::service_counter::new_connections)]++;
+                    service_connection_data.connection->flags = flags;
+                    service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
+
+                    if (service.send_proxy_header)
+                    {
+                            tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, sizeof(proxy_v2_ipv4_hdr));
+                            AddProxyHeader(service, mbuf, metadata, &ipv4_header, &tcp_header, src_addr, src_port);
+                    }
+
+                    counters[static_cast<uint32_t>(::proxy::service_counter::new_connections)]++;
+                }
             }
             else
             {
