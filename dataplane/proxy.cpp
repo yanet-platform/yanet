@@ -7,6 +7,8 @@
 #include "proxy.h"
 #include "syncookies.h"
 
+// #define TCP_PROXY_DEBUG
+
 namespace dataplane::proxy
 {
 
@@ -327,7 +329,7 @@ void TcpConnectionStore::CollectGarbage()
 
 void TcpConnectionStore::UpdateSynCookieKeys()
 {
-    YANET_LOG_WARNING("TcpConnectionStore::UpdateSynCookieKeys\n");
+    // YANET_LOG_WARNING("TcpConnectionStore::UpdateSynCookieKeys\n");
     std::lock_guard guard(mutex_);
     for (uint32_t i = 0; i < YANET_CONFIG_PROXY_SERVICES_SIZE; i++)
         syn_cookies_[i].UpdateKeys();
@@ -453,10 +455,12 @@ common::idp::proxy_tables::response TcpConnectionStore::GetTables(std::optional<
 
 void DebugPacket(const char* message, proxy_service_id_t service_id, const rte_ipv4_hdr* ipv4_header, const rte_tcp_hdr* tcp_header)
 {
+#ifdef TCP_PROXY_DEBUG
     YANET_LOG_WARNING("%s service_id=%d, %s:%d -> %s:%d, seq=%u, ack=%u\n", message, service_id,
         common::ipv4_address_t(rte_cpu_to_be_32(ipv4_header->src_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->src_port),
         common::ipv4_address_t(rte_cpu_to_be_32(ipv4_header->dst_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->dst_port),
         rte_cpu_to_be_32(tcp_header->sent_seq), rte_cpu_to_be_32(tcp_header->recv_ack));
+#endif
 }
 
 uint32_t BuildResult(uint32_t flags, ::proxy::service_counter counter)
@@ -1122,7 +1126,9 @@ void TcpConnectionStore::GetDataForRetramsits(uint32_t before_time, rte_ring* ri
 
                 data->tcp_options_len = tcp_options.WriteBuffer(data->tcp_options_data);
 
+#ifdef TCP_PROXY_DEBUG
                 YANET_LOG_WARNING("Add to retransmit, cookie_data=%d, tcp_options=%s, flags=%u\n", connection.cookie_data, tcp_options.DebugInfo().c_str(), connection.flags);
+#endif
 
                 data->service_id = service_key;
                 ServiceConnections::Unpack(connection.local, data->src, data->sport);
