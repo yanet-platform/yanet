@@ -363,7 +363,7 @@ private:
 
 		utils::zip_apply(op, of_store_tuple, cnt_tuple);
 
-		table.insert_row(row.begin(), row.end());
+		table.insert_row_from_range(row.begin(), row.end());
 	}
 };
 

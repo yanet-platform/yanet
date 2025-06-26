@@ -45,16 +45,9 @@ public:
 		insert_row(std::move(row));
 	}
 
-	/*
-	 * Insert values from a container as one row
-	 *
-	 * Disable this function if the iterator's value_type is a char, otherwise
-	 * it will win overload on things like insert_row("a", "b");
-	 */
-	template<typename Iterator,
-	         typename = typename std::iterator_traits<Iterator>::iterator_category,
-	         std::enable_if_t<!std::is_same_v<std::remove_cv_t<typename std::iterator_traits<Iterator>::value_type>, char>, int> = 0>
-	void insert_row(Iterator begin, Iterator end)
+	// Insert values from a container as one row
+	template<typename Iterator, typename = typename std::iterator_traits<Iterator>::iterator_category>
+	void insert_row_from_range(Iterator begin, Iterator end)
 	{
 		std::vector<std::string> row;
 		for (auto it = begin; it != end; ++it)
@@ -69,14 +62,9 @@ public:
 	 *
 	 * Useful when we have a container of containers like the "responce"
 	 * object obtained from controlplane
-	 *
-	 * Disable this function if the iterator's value_type is a char, otherwise
-	 * it will win overload on things like insert("a", "b");
 	 */
-	template<typename Iterator,
-	         typename = typename std::iterator_traits<Iterator>::iterator_category,
-	         std::enable_if_t<!std::is_same_v<std::remove_cv_t<typename std::iterator_traits<Iterator>::value_type>, char>, int> = 0>
-	void insert(Iterator begin, Iterator end)
+	template<typename Iterator, typename = typename std::iterator_traits<Iterator>::iterator_category>
+	void insert_from_range(Iterator begin, Iterator end)
 	{
 		for (auto it = begin; it != end; ++it)
 		{
