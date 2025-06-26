@@ -15,6 +15,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     libyaml-cpp-dev \
     libgtest-dev \
     flex \
+    cmake \
     libfl-dev \
     netbase \
     devscripts \
