@@ -757,6 +757,29 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
 	return result;
 }
 
+tCounterId get_or_create_counter_id(const ids_t& ids,
+                                    std::map<ids_t, uint32_t>& ids_map_map,
+                                    std::vector<ids_t>& ids_map,
+                                    std::set<ids_t>& ids_overflow)
+{
+	auto it = ids_map_map.find(ids);
+	if (it != ids_map_map.end())
+		return it->second;
+
+	if (ids_map.size() < YANET_CONFIG_ACL_COUNTERS_SIZE)
+	{
+		auto id = ids_map.size();
+		ids_map.push_back(ids);
+		ids_map_map.emplace(ids, id);
+		return id;
+	}
+	else
+	{
+		ids_overflow.insert(ids);
+		return 0;
+	}
+}
+
 std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::base::acl_t>& acls,
                                       const iface_map_t& iface_map,
                                       ref_t<filter_t> filter,
@@ -882,26 +905,7 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 						        {
 							        action.flags |= (int)common::globalBase::eFlowFlags::log;
 						        }
-						        auto it = ids_map_map.find(rule.ids);
-						        if (it != ids_map_map.end())
-						        {
-							        action.counter_id = it->second;
-						        }
-						        else
-						        {
-							        if (result.ids_map.size() < YANET_CONFIG_ACL_COUNTERS_SIZE)
-							        {
-								        auto id = result.ids_map.size();
-								        action.counter_id = id;
-								        result.ids_map.push_back(rule.ids);
-								        ids_map_map.emplace(rule.ids, id);
-							        }
-							        else
-							        {
-								        action.counter_id = 0;
-								        ids_overflow.insert(rule.ids);
-							        }
-						        }
+						        action.counter_id = get_or_create_counter_id(rule.ids, ids_map_map, result.ids_map, ids_overflow);
 					        }
 					        else if constexpr (std::is_same_v<T, common::acl::dump_t>)
 					        {
