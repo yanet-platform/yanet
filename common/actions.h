@@ -114,15 +114,7 @@ struct hit_count_t
 		return std::tie(id) < std::tie(o.id);
 	}
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(id);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(id);
-	}
+	SERIALIZABLE(id);
 
 	std::string id;
 };
