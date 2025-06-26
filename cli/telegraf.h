@@ -768,4 +768,25 @@ inline void acl()
 		                        {"bytes", data.bytes, "u"}});
 	}
 }
+
+void proxy_counters()
+{
+	interface::controlPlane controlplane;
+	const auto response = controlplane.proxy_counters();
+
+	for (const auto& record : response)
+	{
+		const auto& counters = std::get<2>(record);
+		std::vector<influxdb_format::value_t> values;
+		for (uint32_t i = 0; i < proxy::names.size(); i++)
+		{
+			values.emplace_back(proxy::names[i], counters[i]);
+		}
+		influxdb_format::print("proxy_counters",
+							   {{"service_id", std::get<0>(record)},
+								{"service_name", std::get<1>(record)}},
+							   values);
+    }
+}
+
 }
