@@ -9,23 +9,24 @@ namespace common
 
 namespace acl
 {
-class dump_t
+struct dump_t
 {
-public:
 	dump_t() :
 	        dump_id(0),
-	        dump_tag("")
+	        dump_tag(""),
+	        counter_id(0)
 	{}
 
 	dump_t(std::string dump_tag) :
 	        dump_id(0),
-	        dump_tag(std::move(dump_tag))
+	        dump_tag(std::move(dump_tag)),
+	        counter_id(0)
 	{}
 
 	bool operator==(const dump_t& o) const
 	{
-		return std::tie(dump_id, dump_tag) ==
-		       std::tie(o.dump_id, o.dump_tag);
+		return std::tie(dump_id, dump_tag, counter_id) ==
+		       std::tie(o.dump_id, o.dump_tag, counter_id);
 	}
 
 	bool operator!=(const dump_t& o) const
@@ -35,14 +36,16 @@ public:
 
 	constexpr bool operator<(const dump_t& o) const
 	{
-		return std::tie(dump_id, dump_tag) <
-		       std::tie(o.dump_id, o.dump_tag);
+		return std::tie(dump_id, dump_tag, counter_id) <
+		       std::tie(o.dump_id, o.dump_tag, counter_id);
 	}
 
-	SERIALIZABLE(dump_id, dump_tag);
+	SERIALIZABLE(dump_id, dump_tag, counter_id);
 
 	uint64_t dump_id;
 	std::string dump_tag;
+	// Id of a related counter in aclCounters array in dataplane cWorker class
+	tCounterId counter_id;
 };
 
 struct check_state_t
@@ -94,14 +97,19 @@ struct state_timeout_t
 struct hit_count_t
 {
 	hit_count_t() :
-	        id("") {}
+	        id(""),
+	        counter_id(0)
+	{}
 
 	hit_count_t(std::string id) :
-	        id(std::move(id)) {}
+	        id(std::move(id)),
+	        counter_id(0)
+	{}
 
 	bool operator==(const hit_count_t& o) const
 	{
-		return id == o.id;
+		return std::tie(id, counter_id) ==
+		       std::tie(o.id, o.counter_id);
 	}
 
 	bool operator!=(const hit_count_t& o) const
@@ -109,14 +117,17 @@ struct hit_count_t
 		return !operator==(o);
 	}
 
-	constexpr bool operator<(const hit_count_t& o) const
+	bool operator<(const hit_count_t& o) const
 	{
-		return std::tie(id) < std::tie(o.id);
+		return std::tie(id, counter_id) <
+		       std::tie(o.id, o.counter_id);
 	}
 
-	SERIALIZABLE(id);
+	SERIALIZABLE(id, counter_id);
 
 	std::string id;
+	// Id of a related counter in aclCounters array in dataplane cWorker class
+	tCounterId counter_id;
 };
 
 } // namespace acl
@@ -136,21 +147,23 @@ struct DumpAction final
 	static constexpr size_t MAX_COUNT = YANET_CONFIG_DUMP_ID_SIZE;
 	// The identifier for the dump ring.
 	uint64_t dump_id;
+	// Id of a related counter in aclCounters array in dataplane cWorker class
+	tCounterId counter_id;
 
 	DumpAction(const acl::dump_t& dump_action) :
-	        dump_id(dump_action.dump_id){};
+	        dump_id(dump_action.dump_id), counter_id(dump_action.counter_id) {};
 
 	DumpAction() :
-	        dump_id(0){};
+	        dump_id(0), counter_id(0) {};
 
 	[[nodiscard]] bool terminating() const { return false; }
 
-	SERIALIZABLE(dump_id);
+	SERIALIZABLE(dump_id, counter_id);
 
 	[[nodiscard]] std::string to_string() const
 	{
 		std::ostringstream oss;
-		oss << "DumpAction(dump_id=" << dump_id << ")";
+		oss << "DumpAction(dump_id=" << dump_id << ", counter_id=" << counter_id << ")";
 		return oss.str();
 	}
 };
@@ -164,13 +177,13 @@ struct FlowAction final
 {
 	// Maximum count of FlowAction objects allowed.
 	static constexpr size_t MAX_COUNT = 1;
-	// The flow associated with this action.
+	// The flow associated with this action. Note: flow has counter_id inside
 	globalBase::tFlow flow;
 	// Timeout for the state
 	std::optional<uint32_t> timeout;
 
 	FlowAction(const globalBase::tFlow& flow) :
-	        flow(flow){};
+	        flow(flow) {};
 
 	FlowAction(globalBase::tFlow&& flow) :
 	        flow(std::move(flow)) {}
@@ -185,7 +198,7 @@ struct FlowAction final
 	[[nodiscard]] std::string to_string() const
 	{
 		std::ostringstream oss;
-		oss << "FlowAction(flow=" << flow.to_string() << ", timeout = "
+		oss << "FlowAction(flow=" << flow.to_string() << ", timeout="
 		    << (timeout.has_value() ? std::to_string(timeout.value()) : "not specified")
 		    << ")";
 		return oss.str();
@@ -202,7 +215,7 @@ struct CheckStateAction final
 {
 	static constexpr size_t MAX_COUNT = 1;
 
-	CheckStateAction(const acl::check_state_t&){};
+	CheckStateAction(const acl::check_state_t&) {};
 	CheckStateAction() = default;
 
 	[[nodiscard]] bool terminating() const { return false; }
@@ -225,10 +238,10 @@ struct StateTimeoutAction final
 	uint32_t timeout;
 
 	StateTimeoutAction(const acl::state_timeout_t& timeout_action) :
-	        timeout(timeout_action.timeout){};
+	        timeout(timeout_action.timeout) {};
 
 	StateTimeoutAction() :
-	        timeout(0){};
+	        timeout(0) {};
 
 	[[nodiscard]] bool terminating() const { return false; }
 
@@ -252,21 +265,25 @@ struct HitCountAction final
 	static constexpr size_t MAX_COUNT = 10000;
 	// Id of a rule
 	std::string id;
+	// Id of a related counter in aclCounters array in dataplane cWorker class
+	tCounterId counter_id;
 
 	HitCountAction(const acl::hit_count_t& hitcount_action) :
-	        id(std::move(hitcount_action.id)){};
+	        id(std::move(hitcount_action.id)),
+	        counter_id(hitcount_action.counter_id) {};
 
 	HitCountAction() :
-	        id(""){};
+	        id(""),
+	        counter_id(0) {};
 
 	[[nodiscard]] bool terminating() const { return false; }
 
-	SERIALIZABLE(id);
+	SERIALIZABLE(id, counter_id);
 
 	[[nodiscard]] std::string to_string() const
 	{
 		std::ostringstream oss;
-		oss << "HitCountAction(id=" << id << ")";
+		oss << "HitCountAction(id=" << id << ", counter_id=" << counter_id << ")";
 		return oss.str();
 	}
 };

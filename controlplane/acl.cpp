@@ -895,6 +895,14 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 				        [&](auto& action) {
 					        using T = std::decay_t<decltype(action)>;
 
+					        // Assign counter_id to all relevant actions
+					        if constexpr (std::is_same_v<T, common::globalBase::tFlow> ||
+					                      std::is_same_v<T, common::acl::dump_t> ||
+					                      std::is_same_v<T, common::acl::hit_count_t>)
+					        {
+						        action.counter_id = get_or_create_counter_id(rule.ids, ids_map_map, result.ids_map, ids_overflow);
+					        }
+
 					        if constexpr (std::is_same_v<T, common::globalBase::tFlow>)
 					        {
 						        if (rule.filter->recordstate)
@@ -905,7 +913,6 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 						        {
 							        action.flags |= (int)common::globalBase::eFlowFlags::log;
 						        }
-						        action.counter_id = get_or_create_counter_id(rule.ids, ids_map_map, result.ids_map, ids_overflow);
 					        }
 					        else if constexpr (std::is_same_v<T, common::acl::dump_t>)
 					        {
