@@ -683,17 +683,13 @@ void AddProxyHeader(const dataplane::globalBase::proxy_service_t& service, rte_m
 
 uint32_t TcpConnectionStore::CheckSynCookie(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
 {
-    uint32_t cookie_data = syn_cookies_[service_id].CheckCookie(rte_cpu_to_be_32(tcp_header->recv_ack) - 1, ipv4_header->src_addr, tcp_header->src_port, sub_cpu_32(tcp_header->sent_seq, 1));
+    uint32_t prev_seq = rte_be_to_cpu_32(tcp_header->sent_seq) - 1;
+    uint32_t cookie_data = syn_cookies_[service_id].CheckCookie(rte_cpu_to_be_32(tcp_header->recv_ack) - 1, ipv4_header->src_addr, tcp_header->src_port);
     // YANET_LOG_WARNING("\tcookie_data=%d, ack=%u, seq=%u\n", cookie_data, tcp_header->recv_ack, tcp_header->sent_seq);
 
-    if (cookie_data == 0 && !service.ignore_size_update_detections)
+    if (cookie_data != 0 && !service.ignore_size_update_detections && (cookie_data & 1) != (prev_seq & 1))
     {
-        cookie_data = syn_cookies_[service_id].CheckCookie(rte_cpu_to_be_32(tcp_header->recv_ack) - 1, ipv4_header->src_addr, tcp_header->src_port, tcp_header->sent_seq);
-        // YANET_LOG_WARNING("\tsecond cookie_data=%d, ack=%u, seq=%u\n", cookie_data, tcp_header->recv_ack, tcp_header->sent_seq);
-        if (cookie_data != 0)
-        {
-            tcp_header->sent_seq = add_cpu_32(tcp_header->sent_seq, 1);
-        }
+        tcp_header->sent_seq = add_cpu_32(tcp_header->sent_seq, 1);
     }
     return cookie_data;
 }

@@ -8,6 +8,7 @@ IP_SERVER2 = "10.0.1.2"
 IP_SERVER3 = "10.0.1.3"
 IP_SERVER4 = "10.0.1.4"
 IP_SERVER5 = "10.0.1.5"
+IP_SERVER6 = "10.0.1.6"
 
 IP_CLIENT = "10.0.2.1"
 IP_BLOCKED_CLIENT = "14.0.0.1"
@@ -62,7 +63,7 @@ WriteTest("001", data_type1)
 
 # 002 - type 2 - no proxy, sec
 
-SYN_COOKIE2 = 0x24cb2489
+SYN_COOKIE2 = 0x3cc824b6
 
 test_002 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 
@@ -125,7 +126,7 @@ WriteTest("003", data_type3)
 
 # 004 - type 4 - proxy, sec, sack
 
-SYN_COOKIE3 = 0x24cb2489
+SYN_COOKIE3 = 0x3cc824b6
 
 test_004 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER4, ip_proxy=IP_SERVER4, start_seq_to_client=SYN_COOKIE3, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 
@@ -251,3 +252,38 @@ data_type7 = [
 ]
 
 WriteTest("007", data_type7)
+
+# 008 - Zero window probe with syn cookie
+
+test_008 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER6, ip_proxy=IP_SERVER6, start_seq_to_client=SYN_COOKIE2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
+
+data_type8 = [
+    (
+		test_008.FromClient((0, None), 'S', options=options_client_syn), 
+		test_008.ToClient((0, 1), 'AS', window=0, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (1, ts_client)), ('WScale', 5)])
+	),
+    #(
+        # First ACK lost
+		#test_006.FromClient((1, 1), 'A', options=[("Timestamp", (ts_client + 1, 1))]),
+		#test_006.ToServer((0, None), 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client + 1, 0)), ('WScale', 5)])
+	#),
+    (
+		# Zero window probe ACK
+		test_008.FromClient((0, 1), 'A', options=[("Timestamp", (ts_client + 1, 1))]),
+		test_008.ToServer((0, None), 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client + 1, 0)), ('WScale', 5)])
+	), 
+	(
+		test_008.FromServer((0, 1), 'SA', window=20000, options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client + 1)), ('WScale', 9)]),
+		test_008.ToClient((1, 1), 'A', window=20000//16, options=[("Timestamp", (ts_proxy, ts_client + 1))])
+	),
+	(
+		test_008.FromClient((1, 1), 'A', raw=data_client1, options=[("Timestamp", (ts_client + 2, ts_proxy)), ("NOP", ''), ("NOP", '')]),
+		test_008.ToServer((1, 1), 'A', raw=data_client1, options=[("Timestamp", (ts_client + 2, ts_server))])
+	),
+	(
+		test_008.FromServer((1, 1 + len(data_client1)), 'A', window=20000, raw=data_server1, options=[("Timestamp", (ts_server + 1, ts_client + 2))]), 
+		test_008.ToClient((1, 1 + len(data_client1)), 'A', window=20000//16, raw=data_server1, options=[("Timestamp", (ts_proxy + 1, ts_client + 2))])
+	),
+]
+
+WriteTest("008", data_type8)

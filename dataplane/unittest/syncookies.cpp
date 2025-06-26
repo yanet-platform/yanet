@@ -37,24 +37,24 @@ TEST(SynCookiesTest, Cookies) {
     std::array<uint32_t, N> cookies_array;
     for(int i = 0; i < N; ++i) {
         uint32_t cookie = cookies.GetCookie(saddr, sport, i, data);
-        EXPECT_EQ(cookies.CheckCookie(cookie, saddr, sport, i), data);
+        EXPECT_EQ(cookies.CheckCookie(cookie, saddr, sport), data);
         cookies_array[i] = cookie;
     }
     cookies.UpdateKeys();
     for(int i = 0; i < N; ++i) {
-        EXPECT_EQ(cookies.CheckCookie(cookies_array[i], saddr, sport, i), data);
+        EXPECT_EQ(cookies.CheckCookie(cookies_array[i], saddr, sport), data);
     }
     cookies.UpdateKeys();
     for(int i = 0; i < N; ++i) {
-        EXPECT_NE(cookies.CheckCookie(cookies_array[i], saddr, sport, i), data);
+        EXPECT_NE(cookies.CheckCookie(cookies_array[i], saddr, sport), data);
     }
 
     uint32_t cookie = cookies.GetCookie(saddr, sport, seq, data);
     
-    EXPECT_NE(cookies.CheckCookie(cookie, saddr, sport, seq + 1), data);
+    EXPECT_NE(cookies.CheckCookie(cookie, saddr, sport + 1), data);
     
 
-    EXPECT_EQ(cookies.CheckCookie(12345678, saddr, 345, 321), 0);
+    EXPECT_EQ(cookies.CheckCookie(12345678, saddr, 345), 0);
 }
 
 TEST(SynCookiesTest, RandomCookies) {
@@ -69,9 +69,12 @@ TEST(SynCookiesTest, RandomCookies) {
     for(uint32_t i = 0; i < 100'000'000; ++i) {
         uint32_t sa = dist32(gen), s = dist32(gen);
         uint16_t sp = dist16(gen);
-        uint32_t data = dist7(gen);
-        uint32_t cookie = cookies.GetCookie(sa, sp, s, data);
-        EXPECT_EQ(cookies.CheckCookie(cookie, sa, sp, s), data);
+        TcpOptions options{};
+        options.mss = 1440;
+        options.sack_permitted = true;
+        options.window_scaling = 14;
+        uint32_t cookie = cookies.GetCookie(sa, sp, s, SynCookies::PackData(options));
+        EXPECT_EQ(SynCookies::UnpackData(cookies.CheckCookie(cookie, sa, sp)), options);
     }
 }
 
@@ -86,16 +89,16 @@ TEST(SynCookiesTest, RandomValidation) {
     uint32_t total = 1'000'000'000, positive = 0;
     for(uint32_t i = 0; i < total; ++i) {
         uint32_t c = dist32(gen);
-        uint32_t sa = dist32(gen), s = dist32(gen);
+        uint32_t sa = dist32(gen);
         uint16_t sp = dist16(gen);
-        if (cookies.CheckCookie(c, sa, sp, s) != 0) {
+        if (cookies.CheckCookie(c, sa, sp) != 0) {
             ++positive;
         }
     }
 
-    //          positive / total ~= 1/(2^24)
-    // positive / total * (2^24) ~= 1
-    double res = (double)positive / total * (1 << 24);
+    //          positive / total ~= 1/(2^23)
+    // positive / total * (2^23) ~= 1
+    double res = (double)positive / total * (1 << 23);
     EXPECT_GT(res, 0.75);
     EXPECT_LT(res, 1.25);
 }
@@ -138,7 +141,7 @@ TEST(SynCookiesTest, Benchmark)
                 start = std::chrono::steady_clock::now();
                 for (uint32_t i = 0; i < iterations; i++)
                 {
-                    syn_cookies.CheckCookie(cookies[i], i, 0, -i);
+                    syn_cookies.CheckCookie(cookies[i], i, 0);
                 }
                 auto check_elapsed = std::chrono::steady_clock::now() - start;
 
@@ -224,7 +227,7 @@ TEST(SynCookiesTest, BenchmarkConcurrent)
                         unsigned int start = i * iter_per_future;
                         for (unsigned int k = start; k < start + iter_per_future; k++)
                         {
-                            syn_cookies.CheckCookie(cookies[i], k, 0, -k);
+                            syn_cookies.CheckCookie(cookies[i], k, 0);
                         }
                     });
                 }

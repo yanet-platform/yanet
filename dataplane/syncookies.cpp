@@ -69,17 +69,16 @@ SynCookies::SynCookies()
 uint32_t SynCookies::GetCookie(uint32_t saddr, uint16_t sport,
                                 uint32_t sseq, uint32_t data)
 {
-    uint32_t cookie = cookie_hash(saddr, sport, 0) + sseq +
+    uint32_t cookie = cookie_hash(saddr, sport, 0) +
                     (current_key_ << COOKIE_BITS) +
-                    ((cookie_hash(saddr, sport, current_key_) + data) & COOKIE_MASK);
+                    ((cookie_hash(saddr, sport, current_key_) + (data | (rte_be_to_cpu_32(sseq) & 1))) & COOKIE_MASK);
 
     return cookie;
 }
  
-uint32_t SynCookies::CheckCookie(uint32_t cookie,
-                                uint32_t saddr, uint16_t sport, uint32_t sseq)
+uint32_t SynCookies::CheckCookie(uint32_t cookie, uint32_t saddr, uint16_t sport)
 {
-    cookie -= cookie_hash(saddr, sport, 0) + sseq;
+    cookie -= cookie_hash(saddr, sport, 0);
     uint32_t keyidx = (cookie >> COOKIE_BITS);
     if (1 > keyidx || keyidx > 2) {
         return 0;
