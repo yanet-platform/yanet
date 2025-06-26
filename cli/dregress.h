@@ -43,8 +43,8 @@ void announce()
 	const auto response = controlPlane.dregress_config();
 
 	TablePrinter table;
-	table.insert("module",
-	             "announces");
+	table.insert_row("module",
+	                 "announces");
 
 	for (const auto& [module_name, dregress] : response)
 	{
