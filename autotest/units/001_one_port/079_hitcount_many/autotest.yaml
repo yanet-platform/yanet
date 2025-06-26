@@ -4,20 +4,64 @@ steps:
 
 - sleep: 1
 
+- checkCounters:
+    1: 0
+    2: 0
+    3: 0
+    4: 0
+    5: 0
+    6: 0
+    7: 0
+    8: 0
+    9: 0
+
 - sendPackets:
   - port: kni0
     send: 001-send.pcap
     expect: 001-expect.pcap
+
+- checkCounters:
+    1: 4
+    2: 1 # packet matched hitcount
+    3: 1 # allow packet and create state
+    4: 0
+    5: 0
+    6: 1 # reversed packet matched hitcount
+    7: 1 # reversed packet accepted on check-state
+    8: 0
+    9: 0
 
 - sendPackets:
   - port: kni0
     send: 002-send.pcap
     expect: 002-expect.pcap
 
+- checkCounters:
+    1: 8
+    2: 1
+    3: 1
+    4: 1
+    5: 1
+    6: 2
+    7: 2
+    8: 0
+    9: 0
+
 - sendPackets:
   - port: kni0
     send: 003-send.pcap
     expect: 003-expect.pcap
+
+- checkCounters:
+    1: 12
+    2: 1
+    3: 1
+    4: 1
+    5: 1
+    6: 3
+    7: 3
+    8: 1
+    9: 1
 
 - cli: "hitcount dump acl | diff - TESTDIR/hitcount_expected.txt"
 - cli: "telegraf acl | diff - TESTDIR/telegraf_expected.txt"
