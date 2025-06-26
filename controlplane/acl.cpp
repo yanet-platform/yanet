@@ -897,6 +897,7 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 
 					        // Assign counter_id to all relevant actions
 					        if constexpr (std::is_same_v<T, common::globalBase::tFlow> ||
+					                      std::is_same_v<T, common::acl::check_state_t> ||
 					                      std::is_same_v<T, common::acl::dump_t> ||
 					                      std::is_same_v<T, common::acl::hit_count_t>)
 					        {
@@ -936,9 +937,10 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 							        }
 						        }
 					        }
-					        // No specific logic needed for the rest of the actions like check_state_t or state_timeout_t
+					        // No specific logic needed for the rest of the actions like state_timeout_t
 					        // Most notably, we don't need counter_id for them since they are not actually presented as an action
-					        // shown in rules list (`yanet-cli fw list`)
+					        // that packet "goes through". In case of state_timeout_t, its optimized so the resulting timeout
+					        // is already presented in the "flow" action.
 				        },
 				        rule.action);
 
