@@ -1,10 +1,20 @@
 steps:
 - ipv4Update: "0.0.0.0/0 -> 200.0.0.1"
 - ipv6Update: "::/0 -> fe80::1"
+- checkCounters:
+    1: 0
+    2: 0
+    3: 0
+    4: 0
 - sendPackets:
   - port: kni0
     send: 001-send.pcap
     expect: 001-expect.pcap
+- checkCounters:
+    1: 6
+    2: 1 # packet went to dump
+    3: 1 # same went to allow
+    4: 4 # others are denied
 - dumpPackets:
   - ringTag: shm_2_0
     expect: 001-expect-dump-ring1.pcap
