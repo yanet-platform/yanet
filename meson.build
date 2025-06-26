@@ -72,6 +72,7 @@ pcapplusplus_options.add_cmake_defines({
   'PCAPPP_BUILD_EXAMPLES': 'OFF',
   'PCAPPP_BUILD_TESTS': 'OFF',
   'PCAPPP_INSTALL': 'OFF',
+  'PCAPPP_BUILD_REPRODUCIBLE': 'ON',
   'CMAKE_CXX_FLAGS': '-fexceptions',
 })
 
