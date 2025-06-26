@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/define.h"
 #include "common/traits.h"
 #include "common/type.h"
 #include "common/variant_trait_map.h"
@@ -50,18 +51,27 @@ struct dump_t
 
 struct check_state_t
 {
+	bool operator==(const check_state_t& o) const
+	{
+		return counter_id != o.counter_id;
+	}
+
+	bool operator!=(const check_state_t& o) const
+	{
+		return !operator==(o);
+	}
+
+	constexpr bool operator<(const check_state_t& o) const
+	{
+		return counter_id < o.counter_id;
+	}
+
+	SERIALIZABLE(counter_id);
+
 	// Unique identifier for hash calculation
 	static constexpr int64_t HASH_IDENTIFIER = 12345;
-
-	bool operator==([[maybe_unused]] const check_state_t& o) const
-	{
-		return true; // TODO: why do we need this operator?
-	}
-
-	constexpr bool operator<([[maybe_unused]] const check_state_t& o) const
-	{
-		return true; // TODO: why do we need this operator?
-	}
+	// Id of a related counter in aclCounters array in dataplane cWorker class
+	tCounterId counter_id;
 };
 
 struct state_timeout_t
@@ -214,15 +224,22 @@ struct FlowAction final
 struct CheckStateAction final
 {
 	static constexpr size_t MAX_COUNT = 1;
+	// Id of a related counter in aclCounters array in dataplane cWorker class
+	tCounterId counter_id{0};
 
-	CheckStateAction(const acl::check_state_t&) {};
+	CheckStateAction(const acl::check_state_t& check_state_action) :
+	        counter_id(check_state_action.counter_id) {};
 	CheckStateAction() = default;
 
 	[[nodiscard]] bool terminating() const { return false; }
 
+	SERIALIZABLE(counter_id);
+
 	[[nodiscard]] std::string to_string() const
 	{
-		return "CheckStateAction()";
+		std::ostringstream oss;
+		oss << "CheckStateAction(counter_id=" << counter_id << ")";
+		return oss.str();
 	}
 };
 
