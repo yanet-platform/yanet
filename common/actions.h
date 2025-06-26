@@ -261,15 +261,7 @@ struct HitCountAction final
 
 	[[nodiscard]] bool terminating() const { return false; }
 
-	void pop(stream_in_t& stream)
-	{
-		stream.pop(id);
-	}
-
-	void push(stream_out_t& stream) const
-	{
-		stream.push(id);
-	}
+	SERIALIZABLE(id);
 
 	[[nodiscard]] std::string to_string() const
 	{
