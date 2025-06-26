@@ -108,7 +108,7 @@ inline void FillAndPrintTable(const std::initializer_list<std::string_view>& hea
 {
 	TablePrinter table(config);
 
-	table.insert_row(headers.begin(), headers.end());
-	table.insert(data.begin(), data.end());
+	table.insert_row_from_range(headers.begin(), headers.end());
+	table.insert_from_range(data.begin(), data.end());
 	table.Print();
 }
