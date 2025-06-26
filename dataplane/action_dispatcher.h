@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base.h"
+#include "common/actions.h"
 #include "metadata.h"
 #include "worker.h"
 
@@ -56,6 +57,9 @@ struct ActionDispatcher
 			}
 
 			YANET_LOG_DEBUG("Check state was matched and state was%s found\n", flow ? "" : " not");
+
+			auto& action = std::get<common::CheckStateAction>(actions.check_state_path_last_raw_action());
+			worker->aclCounters[action.counter_id]++;
 
 			if (flow)
 			{
