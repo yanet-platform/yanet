@@ -4,6 +4,10 @@
 #include <netdb.h>
 #include <unordered_map>
 
+#include <csignal>
+#include <pcap/pcap.h>
+
+#include "common/define.h"
 #include "common/icontrolplane.h"
 #include "common/idataplane.h"
 #include "common/sdpclient.h"
@@ -12,6 +16,7 @@
 
 #include "helper.h"
 #include "table_printer.h"
+#include "tcpdump.h"
 
 namespace show
 {
@@ -727,6 +732,32 @@ inline void hitcount_dump(const std::string& source)
 	std::cout << "\n]\n";
 }
 
+// TODO: what if we call tcpdump read on other ring while this is busy-looping?
+// Or on the same ring? Some warning would be nice, I guess.
+inline void tcpdump(const std::string& mode, const std::string& target_dump_tag, std::optional<std::string> path)
+{
+	if (mode != "read" && mode != "follow")
+	{
+		YANET_LOG_ERROR("Unsupported mode '%s'. Supported modes are 'read' and 'follow'.\n", mode.c_str());
+		return;
+	}
+
+	if (target_dump_tag.empty())
+	{
+		YANET_LOG_ERROR("Ring tag should be specified\n");
+		return;
+	}
+
+	if (mode == "follow")
+	{
+		tcpdump_follow(target_dump_tag);
+	}
+	else
+	{
+		tcpdump_read(target_dump_tag, path);
+	}
+}
+
 inline void values()
 {
 	interface::controlPlane controlplane;
@@ -847,12 +878,12 @@ inline void shm_info()
 
 	FillAndPrintTable({"ring name",
 	                   "dump tag",
-	                   "dump size",
-	                   "dump count",
+	                   "dump config",
 	                   "core id",
 	                   "socket id",
 	                   "ipc key",
-	                   "offset"},
+	                   "offset",
+	                   "capacity"},
 	                  response);
 }
 

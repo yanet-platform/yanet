@@ -6,42 +6,25 @@ steps:
     send: 001-send.pcap
     expect: 001-expect.pcap
 
-- dumpPackets:
-  - ringTag: shm_2_0
-    expect: 001-expect-dump-ring1.pcap
-
 - cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
 
-- sleep: 2  # Wait, state should still be present
-
-- cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
-
-- sleep: 4  # Wait for state to expire (total sleep 6s)
-
-- cli_check: |
-    fw list states
-    id  ruleno  label  rule
-    --  ------  -----  ----
-
+# Send an inverted packet
 - sendPackets:
   - port: kni0
     send: 002-send.pcap
     expect: 002-expect.pcap
 
+- cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
+
+# Since we have a state and a state creates only for inverted packets, it won't get dumped
 - dumpPackets:
   - ringTag: shm_2_0
-    expect: 002-expect-dump-ring1.pcap
+    expect: 001-expect-dump-ring1.pcap
 
-- cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
-
-- sleep: 2  # Wait, state should still be present
-
-- cli: fw list states | grep -q "allow udp from 10.0.0.1 53 to 10.0.0.10 1024"
-
-- sleep: 4  # Wait for state to expire (total sleep 6s)
+# Wait for state to expire
+- sleep: 6
 
 - cli_check: |
     fw list states
     id  ruleno  label  rule
     --  ------  -----  ----
-

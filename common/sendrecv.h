@@ -56,40 +56,9 @@ static inline int sendAll(int clientSocket,
 }
 
 template<class Req>
-static int send(int clientSocket, const Req& request)
-{
-	if constexpr (std::is_convertible_v<Req&, ::google::protobuf::Message&>)
-	{
-#if GOOGLE_PROTOBUF_VERSION < 3001000
-		uint64_t size = request.ByteSize();
-#else
-		uint64_t size = request.ByteSizeLong();
-#endif
-		std::vector<char> buf(size);
-
-		if (!request.SerializeToArray(buf.data(), size))
-		{
-			return EBADMSG;
-		}
-
-		return (sendAll(clientSocket, (const char*)&size, sizeof(size)) ||
-		        sendAll(clientSocket, buf.data(), size));
-	}
-	else
-	{
-		common::stream_out_t stream;
-		stream.push(request);
-
-		uint64_t messageSize = stream.getBuffer().size();
-		return (sendAll(clientSocket, (const char*)&messageSize, sizeof(messageSize)) ||
-		        sendAll(clientSocket, (const char*)stream.getBuffer().data(), messageSize));
-	}
-}
-
-template<class Req>
 static int send(int clientSocket, Req&& request)
 {
-	if constexpr (std::is_convertible_v<Req&, ::google::protobuf::Message&>)
+	if constexpr (std::is_base_of_v<::google::protobuf::Message, std::decay_t<Req>>)
 	{
 #if GOOGLE_PROTOBUF_VERSION < 3001000
 		uint64_t size = request.ByteSize();
@@ -109,7 +78,7 @@ static int send(int clientSocket, Req&& request)
 	else
 	{
 		common::stream_out_t stream;
-		stream.push(request);
+		stream.push(std::forward<Req>(request));
 
 		uint64_t messageSize = stream.getBuffer().size();
 		return (sendAll(clientSocket, (const char*)&messageSize, sizeof(messageSize)) ||
@@ -132,7 +101,7 @@ static inline Resp recv(int clientSocket) // unsafe
 	recvAll(clientSocket, (char*)buffer.data(), buffer.size());
 
 	Resp response;
-	if constexpr (std::is_convertible_v<Resp&, ::google::protobuf::Message&>)
+	if constexpr (std::is_base_of_v<::google::protobuf::Message, std::decay_t<Resp>>)
 	{
 		if (!response.ParseFromArray((char*)buffer.data(), buffer.size()))
 		{
@@ -153,19 +122,9 @@ static inline Resp recv(int clientSocket) // unsafe
 }
 
 template<class Resp, class Req>
-static inline Resp sendAndRecv(int clientSocket, const Req& request)
-{
-	if (auto err = send(clientSocket, request); err != 0)
-	{
-		throw std::string("send(): ") + strerror(err);
-	}
-	return recv<Resp>(clientSocket);
-}
-
-template<class Resp, class Req>
 static inline Resp sendAndRecv(int clientSocket, Req&& request)
 {
-	if (auto err = send(clientSocket, std::move(request)); err != 0)
+	if (auto err = send(clientSocket, std::forward<Req>(request)); err != 0)
 	{
 		throw std::string("send(): ") + strerror(err);
 	}

@@ -2,10 +2,50 @@
 
 #include <bitset>
 #include <iomanip>
+#include <string>
+#include <type_traits>
 #include <vector>
 
 namespace utils
 {
+
+template<typename Ptr>
+Ptr ShiftBuffer(Ptr buffer, std::size_t offset)
+{
+	static_assert(std::is_pointer<Ptr>::value,
+	              "ShiftBuffer<Ptr>: Ptr must be a pointer type");
+
+	// pick a byte* of the correct constness
+	using Pointee = typename std::remove_pointer<Ptr>::type;
+	using BytePtr = typename std::conditional<
+	        std::is_const<Pointee>::value,
+	        const std::byte*,
+	        std::byte*>::type;
+
+	BytePtr b = reinterpret_cast<BytePtr>(buffer);
+	b += offset;
+	return reinterpret_cast<Ptr>(b);
+}
+
+template<typename ResultPtr, typename InputPtr>
+ResultPtr ShiftBuffer(InputPtr buffer, std::size_t offset)
+{
+	static_assert(std::is_pointer<ResultPtr>::value,
+	              "ShiftBuffer<ResultPtr,InputPtr>: ResultPtr must be a pointer");
+	static_assert(std::is_pointer<InputPtr>::value,
+	              "ShiftBuffer<ResultPtr,InputPtr>: InputPtr must be a pointer");
+
+	// same BytePtr choosing trick
+	using InPointee = typename std::remove_pointer<InputPtr>::type;
+	using BytePtr = typename std::conditional<
+	        std::is_const<InPointee>::value,
+	        const std::byte*,
+	        std::byte*>::type;
+
+	BytePtr b = reinterpret_cast<BytePtr>(buffer);
+	b += offset;
+	return reinterpret_cast<ResultPtr>(b);
+}
 
 // Utility to calculate percentage
 // TODO C++20: use std::type_identity_t to establish non-deduced context

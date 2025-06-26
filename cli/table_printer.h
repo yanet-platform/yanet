@@ -67,7 +67,7 @@ public:
 	/**
 	 * Insert values from a container as many rows
 	 *
-	 * Useful when we have a container of containers like the "responce"
+	 * Useful when we have a container of containers like the "response"
 	 * object obtained from controlplane
 	 *
 	 * Disable this function if the iterator's value_type is a char, otherwise

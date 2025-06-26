@@ -3,6 +3,7 @@
 #include <bitset>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <limits>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -38,6 +39,7 @@
 #include "common/utils.h"
 #include "dataplane.h"
 #include "dataplane/sdpserver.h"
+#include "dump_rings.h"
 #include "globalbase.h"
 #include "sock_dev.h"
 #include "work_runner.h"
@@ -1574,87 +1576,62 @@ eResult cDataPlane::initSharedMemory()
 	return common::sdp::SdrSever::PrepareSharedMemoryData(sdp_data, workers_id, workers_gc_id, config.useHugeMem);
 }
 
-eResult cDataPlane::allocateSharedMemory()
+static int get_numa_node(unsigned int core_id)
 {
-	/// precalculation of shared memory size for each numa
-	std::map<tSocketId, uint64_t> number_of_workers_per_socket;
-	for (const auto& worker : config.workers)
+	int socket_id = numa_node_of_cpu(static_cast<int>(core_id));
+	if (socket_id == -1)
 	{
-		const int coreId = worker.first;
+		YADECAP_LOG_ERROR("numa_node_of_cpu error: %s\n", strerror(errno));
+		return 0; // Default to socket 0
+	}
+	return socket_id;
+}
 
-		auto socket_id = numa_node_of_cpu(coreId);
-		if (socket_id == -1)
-		{
-			YADECAP_LOG_ERROR("numa_node_of_cpu err: %s\n", strerror(errno));
-			socket_id = 0;
-		}
+static std::unordered_map<tSocketId, size_t> calculate_shared_memory_size(const tDataPlaneConfig& config)
+{
+	/// helper for calculation of shared memory size for each numa
+	std::unordered_map<tSocketId, uint64_t> workers_per_socket;
 
-		if (number_of_workers_per_socket.find(socket_id) == number_of_workers_per_socket.end())
-		{
-			number_of_workers_per_socket[socket_id] = 1;
-		}
-		else
-		{
-			number_of_workers_per_socket[socket_id]++;
-		}
+	for (const auto& [core_id, _] : config.workers)
+	{
+		GCC_BUG_UNUSED(_);
+		workers_per_socket[get_numa_node(core_id)]++;
 	}
 
 	/// slow worker
-	for (const auto& [coreId, _] : config.controlplane_workers)
+	for (const auto& [core_id, _] : config.controlplane_workers)
 	{
-		(void)_;
-
-		auto socket_id = numa_node_of_cpu(coreId);
-		if (socket_id == -1)
-		{
-			YADECAP_LOG_ERROR("numa_node_of_cpu err: %s\n", strerror(errno));
-			socket_id = 0;
-		}
-
-		if (number_of_workers_per_socket.find(socket_id) == number_of_workers_per_socket.end())
-		{
-			number_of_workers_per_socket[socket_id] = 1;
-		}
-		else
-		{
-			number_of_workers_per_socket[socket_id]++;
-		}
+		GCC_BUG_UNUSED(_);
+		workers_per_socket[get_numa_node(core_id)]++;
 	}
 
-	std::map<tSocketId, uint64_t> shm_size_per_socket;
+	std::unordered_map<tSocketId, size_t> shm_size_per_socket;
+
+	// Calculate sizes based on shared memory configuration
 	for (const auto& ring_cfg : config.shared_memory)
 	{
-		const auto& [dump_size, dump_count] = ring_cfg.second;
+		size_t size = dumprings::GetCapacity(ring_cfg.second);
 
-		auto unit_size = sizeof(sharedmemory::item_header_t) + dump_size;
-		if (unit_size % RTE_CACHE_LINE_SIZE != 0)
+		for (const auto& [socket_id, worker_count] : workers_per_socket)
 		{
-			unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
-		}
-
-		auto size = sizeof(sharedmemory::ring_header_t) + unit_size * dump_count;
-
-		for (const auto& [socket_id, num] : number_of_workers_per_socket)
-		{
-			auto it = shm_size_per_socket.find(socket_id);
-			if (it == shm_size_per_socket.end())
-			{
-				it = shm_size_per_socket.emplace_hint(it, socket_id, 0);
-			}
-			it->second += size * num;
+			shm_size_per_socket[socket_id] += size * worker_count;
 		}
 	}
 
-	for (const auto& [socket_id, num] : number_of_workers_per_socket)
+	// Add additional memory for performance-related data
+	for (const auto& [socket_id, worker_count] : workers_per_socket)
 	{
-		auto it = shm_size_per_socket.find(socket_id);
-		if (it == shm_size_per_socket.end())
-		{
-			it = shm_size_per_socket.emplace_hint(it, socket_id, 0);
-		}
-
-		it->second += sizeof(dataplane::perf::tsc_deltas) * (num + 1);
+		shm_size_per_socket[socket_id] += sizeof(dataplane::perf::tsc_deltas) * (worker_count + 1);
 	}
+
+	return shm_size_per_socket;
+}
+
+// FIXME: why is this class not using class SharedMemory from common/shared_memory.h?
+eResult cDataPlane::allocateSharedMemory()
+{
+	// shared memory size for each numa
+	std::unordered_map<tSocketId, size_t> shm_size_per_socket = calculate_shared_memory_size(config);
 
 	/// allocating IPC shared memory
 	key_t key = YANET_DEFAULT_IPC_SHMKEY;
@@ -1696,7 +1673,9 @@ eResult cDataPlane::allocateSharedMemory()
 			return eResult::errorInitSharedMemory;
 		}
 
-		shm_by_socket_id[socket_id] = std::make_tuple(key, shmaddr);
+		// TODO: mlock to lock shared memory to RAM to avoid page faults therefore increasing performance?
+
+		shm_by_socket_id[socket_id] = {key, shmaddr, 0};
 
 		key++;
 	}
@@ -1704,85 +1683,47 @@ eResult cDataPlane::allocateSharedMemory()
 	return eResult::success;
 }
 
+/// split memory per worker
 eResult cDataPlane::splitSharedMemoryPerWorkers()
 {
-	std::map<void*, uint64_t> offsets;
-	for (const auto& it : shm_by_socket_id)
-	{
-		const auto& addr = std::get<1>(it.second);
-		offsets[addr] = 0;
-	}
+	using namespace dumprings;
 
-	/// split memory per worker
 	for (cWorker* worker : workers_vector)
 	{
-		const auto& socket_id = worker->socketId;
+		tSocketId socket_id = worker->socketId;
+		tCoreId core_id = worker->coreId;
+
 		const auto& it = shm_by_socket_id.find(socket_id);
 		if (it == shm_by_socket_id.end())
 		{
+			// No shared memory allocated for this socket, skip this worker
 			continue;
 		}
 
-		const auto& [key, shm] = it->second;
+		auto& [key, shm, offset] = it->second;
 
 		int ring_id = 0;
 		for (const auto& [tag, ring_cfg] : config.shared_memory)
 		{
-			const auto& [dump_size, units_number] = ring_cfg;
+			auto memaddr = utils::ShiftBuffer(shm, offset);
+			worker->dump_rings[ring_id] = CreateSharedMemoryDumpRing(ring_cfg, memaddr);
 
-			auto unit_size = sizeof(sharedmemory::item_header_t) + dump_size;
-			if (unit_size % RTE_CACHE_LINE_SIZE != 0)
-			{
-				unit_size += RTE_CACHE_LINE_SIZE - unit_size % RTE_CACHE_LINE_SIZE; /// round up
-			}
+			std::string name = "shm_" + std::to_string(core_id) + "_" + std::to_string(ring_id);
 
-			auto size = sizeof(sharedmemory::ring_header_t) + unit_size * units_number;
-			if (size % RTE_CACHE_LINE_SIZE != 0)
-			{
-				size += RTE_CACHE_LINE_SIZE - size % RTE_CACHE_LINE_SIZE; /// round up
-			}
-
-			auto name = "shm_" + std::to_string(worker->coreId) + "_" + std::to_string(ring_id);
-
-			auto offset = offsets[shm];
-
-			auto memaddr = (void*)((intptr_t)shm + offset);
-
-			sharedmemory::cSharedMemory ring;
-
-			ring.init(memaddr, unit_size, units_number);
-
-			offsets[shm] += size;
-
-			worker->dumpRings[ring_id] = ring;
-
-			auto meta = common::idp::get_shm_info::dump_meta(name, tag, unit_size, units_number, worker->coreId, socket_id, key, offset);
-			dumps_meta.emplace_back(meta);
+			size_t capacity = GetCapacity(ring_cfg);
+			dumps_meta.emplace_back(name, tag, ring_cfg, core_id, socket_id, key, offset, capacity);
+			offset += capacity;
 
 			tag_to_id[tag] = ring_id;
 
 			ring_id++;
 		}
-	}
 
-	for (cWorker* worker : workers_vector)
-	{
-		const auto& socket_id = worker->socketId;
-		const auto& it = shm_by_socket_id.find(socket_id);
-		if (it == shm_by_socket_id.end())
-		{
-			continue;
-		}
-		const auto& [key, shm] = it->second;
+		auto memaddr = utils::ShiftBuffer(shm, offset);
+		worker->tsc_deltas = new (memaddr) dataplane::perf::tsc_deltas{};
 
-		auto offset = offsets[shm];
-		worker->tsc_deltas = reinterpret_cast<dataplane::perf::tsc_deltas*>(reinterpret_cast<intptr_t>(shm) + offset);
-		// Use value-initialization to reset the object
-		*worker->tsc_deltas = {};
-		offsets[shm] += sizeof(dataplane::perf::tsc_deltas);
-
-		auto meta = common::idp::get_shm_tsc_info::tsc_meta(worker->coreId, socket_id, key, offset);
-		tscs_meta.emplace_back(meta);
+		tscs_meta.emplace_back(core_id, socket_id, key, offset);
+		offset += sizeof(dataplane::perf::tsc_deltas);
 	}
 
 	return eResult::success;
@@ -2268,6 +2209,8 @@ eResult cDataPlane::parseSharedMemory(const nlohmann::json& json)
 		std::string tag = shmJson["tag"];
 		unsigned int size = shmJson["dump_size"];
 		unsigned int count = shmJson["dump_count"];
+		std::string format_str = shmJson.value("dump_format", "raw");
+		unsigned int pcap_files = shmJson.value("pcap_files", 1);
 
 		if (exist(config.shared_memory, tag))
 		{
@@ -2275,7 +2218,16 @@ eResult cDataPlane::parseSharedMemory(const nlohmann::json& json)
 			return eResult::invalidConfigurationFile;
 		}
 
-		config.shared_memory[tag] = {size, count};
+		if (format_str == "pcap" && pcap_files < 1)
+		{
+			YADECAP_LOG_ERROR("Ring '%s' cannot be configured to use pcap format "
+			                  "and have nonpositive pcap_files value (%u).\n",
+			                  tag.data(),
+			                  pcap_files);
+			return eResult::invalidConfigurationFile;
+		}
+
+		config.shared_memory[tag] = {format_str, size, count, pcap_files};
 	}
 
 	return eResult::success;
