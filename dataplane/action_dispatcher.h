@@ -88,6 +88,8 @@ struct ActionDispatcher
 			return;
 		}
 
+		args.worker->aclCounters[action.counter_id]++;
+
 		auto& ring = args.worker->dumpRings[ring_id];
 		ring.write(args.mbuf, flow.type);
 	}
@@ -151,6 +153,7 @@ struct ActionDispatcher
 		auto worker = args.worker;
 		auto mbuf = args.mbuf;
 
+		worker->aclCounters[action.counter_id]++;
 		worker->populate_hitcount_map(action.id, mbuf);
 	}
 };
