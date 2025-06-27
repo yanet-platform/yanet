@@ -48,7 +48,7 @@ struct ConnectionBucket
 
     void Lock()
     {
-        mutex.lock();
+        while(!mutex.try_lock());
     }
 
     void Unlock()

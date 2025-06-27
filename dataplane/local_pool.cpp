@@ -98,9 +98,10 @@ bool LocalPool::_TestFree()
 
 uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId client_port)
 {
-    std::lock_guard<std::shared_mutex> lock(mutex_);
+    while(!mutex_.try_lock());
     if (unlikely(!initialized_) || first_ == 0xffffffff)
     {
+        mutex_.unlock();
         return 0;
     }
 
@@ -118,6 +119,7 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId c
     free_addresses_--;
     used_addresses_++;
 
+    mutex_.unlock();
     return res;
 }
 
@@ -127,10 +129,12 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
     {
         return;
     }
-    std::lock_guard<std::shared_mutex> lock(mutex_);
+    while(!mutex_.try_lock());
+
     uint32_t idx = tuple_to_index(tuple);
     if (unlikely(idx > num_connections_ - 1))
     {
+        mutex_.unlock();
         return;
     }
 
@@ -146,6 +150,8 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
 
     free_addresses_++;
     used_addresses_--;
+
+    mutex_.unlock();
 }
 
 uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) const
@@ -154,12 +160,14 @@ uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) c
     {
         return 0;
     }
-    std::shared_lock<std::shared_mutex> lock(mutex_);
+    while(!mutex_.try_lock_shared());
+
     uint32_t idx = tuple_to_index(PackTuple(local_addr, local_port));
     local_addr = rte_be_to_cpu_32(local_addr);
     local_port = rte_be_to_cpu_16(local_port);
     if (unlikely(idx > num_connections_ - 1))
     {
+        mutex_.unlock();
         YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: out of range, local_addr=%s local_port=%d idx=%d num_connections_=%d\n", common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx, num_connections_);
         return 0;
     }
@@ -167,9 +175,12 @@ uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) c
     const ConnectionInfo& info = connection_queue_[idx];
     if (info.is_used == 0)
     {
+        mutex_.unlock();
         YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: not used, local_addr=%s local_port=%d idx=%d\n", common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx);
         return 0;
     }
+
+    mutex_.unlock();
     // YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: found, local_addr=%s local_port=%d idx=%d\n", common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx);
     return PackTuple(info.address, info.port);
 }
@@ -350,8 +361,12 @@ uint64_t LocalPool2::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId 
     uint32_t idx = worker_chunks_[worker_id];
     if (idx == 0xffffffff)
     {
-        std::lock_guard lock(mutex_);
-        if (first_ == 0xffffffff) return 0;
+        while(!mutex_.try_lock());
+        if (first_ == 0xffffffff)
+        {
+            mutex_.unlock();
+            return 0;
+        }
 
         idx = first_;
         first_ = chunk_queue_[idx].next_idx;
@@ -360,6 +375,7 @@ uint64_t LocalPool2::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId 
 
         worker_chunks_[worker_id] = idx;
         chunk_queue_[idx].offset = 0;    
+        mutex_.unlock();
     }
     
     ConnectionsChunk& chunk = chunk_queue_[idx];
@@ -369,10 +385,11 @@ uint64_t LocalPool2::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId 
     
     if (chunk.offset == chunk_size)
     {
-        std::lock_guard lock(mutex_);
+        while(!mutex_.try_lock());
         chunk.next_idx = free_first_;
         free_first_ = idx;
         worker_chunks_[worker_id] = 0xffffffff;
+        mutex_.unlock();
     }
     local_to_client_[local] = PackTuple(client_addr, client_port); 
 
@@ -398,9 +415,10 @@ void LocalPool2::Free(uint32_t worker_id, uint64_t tuple)
     uint32_t gc_chunk = gc_chunks_[worker_id];
     if (gc_chunk == 0xffffffff)
     {
-        std::lock_guard lock(mutex_);
+        while(!mutex_.try_lock());
         if (unlikely(free_first_ == 0xffffffff))
         {
+            mutex_.unlock();
             YANET_LOG_ERROR("No free chunks available\n");
             return;
         }
@@ -409,6 +427,7 @@ void LocalPool2::Free(uint32_t worker_id, uint64_t tuple)
         gc_chunks_[worker_id] = free_first_;
         free_first_ = chunk_queue_[gc_chunk].next_idx;
         chunk_queue_[gc_chunk].offset = 0;
+        mutex_.unlock();
     }
 
     ConnectionsChunk& chunk = chunk_queue_[gc_chunk];
@@ -417,7 +436,7 @@ void LocalPool2::Free(uint32_t worker_id, uint64_t tuple)
 
     if (chunk.offset == chunk_size)
     {
-        std::lock_guard lock(mutex_);
+        while(!mutex_.try_lock());
         if (last_ != 0xffffffff)
             chunk_queue_[last_].next_idx = gc_chunk;
         last_ = gc_chunk;
@@ -425,6 +444,7 @@ void LocalPool2::Free(uint32_t worker_id, uint64_t tuple)
             first_ = gc_chunk;
         gc_chunks_[worker_id] = 0xffffffff;
         chunk_queue_[last_].next_idx = 0xffffffff;
+        mutex_.unlock();
     }
 
     local_to_client_[idx] = 0;
