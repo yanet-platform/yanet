@@ -757,6 +757,29 @@ unwind_result unwind(const std::map<std::string, controlplane::base::acl_t>& acl
 	return result;
 }
 
+tCounterId get_or_create_counter_id(const ids_t& ids,
+                                    std::map<ids_t, uint32_t>& ids_map_map,
+                                    std::vector<ids_t>& ids_map,
+                                    std::set<ids_t>& ids_overflow)
+{
+	auto it = ids_map_map.find(ids);
+	if (it != ids_map_map.end())
+		return it->second;
+
+	if (ids_map.size() < YANET_CONFIG_ACL_COUNTERS_SIZE)
+	{
+		auto id = ids_map.size();
+		ids_map.push_back(ids);
+		ids_map_map.emplace(ids, id);
+		return id;
+	}
+	else
+	{
+		ids_overflow.insert(ids);
+		return 0;
+	}
+}
+
 std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::base::acl_t>& acls,
                                       const iface_map_t& iface_map,
                                       ref_t<filter_t> filter,
@@ -863,68 +886,63 @@ std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::
 			start_filter = start_filter & filter;
 
 			auto rules = unwind_rules(fw, dispatcher, start_filter, iface);
-			auto rules_iter = rules.begin();
-			while (rules_iter != rules.end())
+			for (auto rules_iter = rules.begin(); rules_iter != rules.end(); /* manual increment below */)
 			{
 				auto& rule = *rules_iter;
 				bool remove_rule = false;
 
-				if (std::holds_alternative<common::globalBase::tFlow>(rule.action))
-				{
-					auto& flow = std::get<common::globalBase::tFlow>(rule.action);
+				std::visit(
+				        [&](auto& action) {
+					        using T = std::decay_t<decltype(action)>;
 
-					if (rule.filter->recordstate)
-					{
-						flow.flags |= (int)common::globalBase::eFlowFlags::recordstate;
-					}
-					if (rule.log)
-					{
-						flow.flags |= (int)common::globalBase::eFlowFlags::log;
-					}
+					        // Assign counter_id to all relevant actions
+					        if constexpr (std::is_same_v<T, common::globalBase::tFlow> ||
+					                      std::is_same_v<T, common::acl::check_state_t> ||
+					                      std::is_same_v<T, common::acl::dump_t> ||
+					                      std::is_same_v<T, common::acl::hit_count_t>)
+					        {
+						        action.counter_id = get_or_create_counter_id(rule.ids, ids_map_map, result.ids_map, ids_overflow);
+					        }
 
-					auto it = ids_map_map.find(rule.ids);
-					if (it != ids_map_map.end())
-					{
-						flow.counter_id = it->second;
-					}
-					else
-					{
-						if (result.ids_map.size() < YANET_CONFIG_ACL_COUNTERS_SIZE)
-						{
-							auto id = result.ids_map.size();
-							flow.counter_id = id;
-							result.ids_map.push_back(rule.ids);
-							ids_map_map.emplace(rule.ids, id);
-						}
-						else
-						{
-							flow.counter_id = 0;
-							ids_overflow.insert(rule.ids);
-						}
-					}
-				}
-				else if (std::holds_alternative<common::acl::dump_t>(rule.action))
-				{
-					auto& action = std::get<common::acl::dump_t>(rule.action);
-					if (!action.dump_tag.empty())
-					{
-						if (result.dump_id_to_tag.size() >= YANET_CONFIG_DUMP_ID_TO_TAG_SIZE)
-						{
-							// We should remove this rule because the dump_id would exceed the limit
-							remove_rule = true;
-						}
-						else
-						{
-							auto it = result.tag_to_dump_id.find(action.dump_tag);
-							if (it == result.tag_to_dump_id.end())
-							{
-								result.dump_id_to_tag.emplace_back(action.dump_tag);
-								it = result.tag_to_dump_id.emplace_hint(it, action.dump_tag, result.dump_id_to_tag.size());
-							}
-							action.dump_id = it->second;
-						}
-					}
-				}
+					        if constexpr (std::is_same_v<T, common::globalBase::tFlow>)
+					        {
+						        if (rule.filter->recordstate)
+						        {
+							        action.flags |= (int)common::globalBase::eFlowFlags::recordstate;
+						        }
+						        if (rule.log)
+						        {
+							        action.flags |= (int)common::globalBase::eFlowFlags::log;
+						        }
+					        }
+					        else if constexpr (std::is_same_v<T, common::acl::dump_t>)
+					        {
+						        if (!action.dump_tag.empty())
+						        {
+							        if (result.dump_id_to_tag.size() >= YANET_CONFIG_DUMP_ID_TO_TAG_SIZE &&
+							            result.tag_to_dump_id.find(action.dump_tag) == result.tag_to_dump_id.end())
+							        {
+								        // We should remove this rule because the dump_id would exceed the limit
+								        remove_rule = true;
+							        }
+							        else
+							        {
+								        auto it = result.tag_to_dump_id.find(action.dump_tag);
+								        if (it == result.tag_to_dump_id.end())
+								        {
+									        result.dump_id_to_tag.emplace_back(action.dump_tag);
+									        it = result.tag_to_dump_id.emplace_hint(it, action.dump_tag, result.dump_id_to_tag.size());
+								        }
+								        action.dump_id = it->second;
+							        }
+						        }
+					        }
+					        // No specific logic needed for the rest of the actions like state_timeout_t
+					        // Most notably, we don't need counter_id for them since they are not actually presented as an action
+					        // that packet "goes through". In case of state_timeout_t, its optimized so the resulting timeout
+					        // is already presented in the "flow" action.
+				        },
+				        rule.action);
 
 				if (remove_rule)
 					rules_iter = rules.erase(rules_iter);

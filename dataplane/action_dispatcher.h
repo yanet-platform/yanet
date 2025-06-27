@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base.h"
+#include "common/actions.h"
 #include "metadata.h"
 #include "worker.h"
 
@@ -57,6 +58,9 @@ struct ActionDispatcher
 
 			YANET_LOG_DEBUG("Check state was matched and state was%s found\n", flow ? "" : " not");
 
+			auto& action = std::get<common::CheckStateAction>(actions.check_state_path_last_raw_action());
+			worker->aclCounters[action.counter_id]++;
+
 			if (flow)
 			{
 				execute_path(actions.check_state_path(), flow.value(), args);
@@ -87,6 +91,8 @@ struct ActionDispatcher
 		{
 			return;
 		}
+
+		args.worker->aclCounters[action.counter_id]++;
 
 		auto& ring = args.worker->dumpRings[ring_id];
 		ring.write(args.mbuf, flow.type);
@@ -151,6 +157,7 @@ struct ActionDispatcher
 		auto worker = args.worker;
 		auto mbuf = args.mbuf;
 
+		worker->aclCounters[action.counter_id]++;
 		worker->populate_hitcount_map(action.id, mbuf);
 	}
 };
