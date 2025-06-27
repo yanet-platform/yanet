@@ -344,6 +344,8 @@ public:
         if (data.idx == Bucket::bucket_size)
         {
             bucket->Unlock();
+            data.bucket = nullptr;
+            data.connection = nullptr;
             return TableSearchResult::Overflow;
         }
 
