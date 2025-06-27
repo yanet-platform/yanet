@@ -13,19 +13,15 @@ static uint32_t const mss_tab_values_[] = { 536, 1300, 1440, 1460 };
 
 uint32_t SynCookies::MssToTable(uint32_t mss)
 {
-    uint32_t result = 0;
-    for (uint32_t index = 1; index < 4; index++)
+    uint32_t index;
+    for (index = 3; index; index--)
     {
-        if (mss_tab_values_[index] <= mss)
-        {
-            result = index;
-        }
-        else
+        if (mss >= mss_tab_values_[index])
         {
             break;
         }
     }
-    return result;
+    return index;
 }
 
 uint32_t SynCookies::MssFromTable(uint32_t table_value)
