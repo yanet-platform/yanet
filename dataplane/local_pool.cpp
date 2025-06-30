@@ -19,7 +19,14 @@ bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
 
     tSocketId socket_id = 0; // todo !!!
     std::string name = "tcp_proxy.local_pools." + std::to_string(service_id);
-    connection_queue_ = memory_manager->create_static_array<ConnectionInfo>(name.data(), num_connections_, socket_id);
+    if (memory_manager != nullptr)
+    {
+        connection_queue_ = memory_manager->create_static_array<ConnectionInfo>(name.data(), num_connections_, socket_id);
+    }
+    else
+    {
+        connection_queue_ = (ConnectionInfo*)malloc(num_connections_ * sizeof(ConnectionInfo));
+    }
     if (connection_queue_ == nullptr)
     {
         num_connections_ = 0;
@@ -168,7 +175,7 @@ uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) c
     if (unlikely(idx > num_connections_ - 1))
     {
         mutex_.unlock();
-        YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: out of range, local_addr=%s local_port=%d idx=%d num_connections_=%d\n", common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx, num_connections_);
+        // YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: out of range, local_addr=%s local_port=%d idx=%d num_connections_=%d\n", common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx, num_connections_);
         return 0;
     }
 
@@ -176,7 +183,7 @@ uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) c
     if (info.is_used == 0)
     {
         mutex_.unlock();
-        YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: not used, local_addr=%s local_port=%d idx=%d\n", common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx);
+        // YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: not used, local_addr=%s local_port=%d idx=%d\n", common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx);
         return 0;
     }
 

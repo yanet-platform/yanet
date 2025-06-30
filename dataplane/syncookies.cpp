@@ -50,7 +50,7 @@ TcpOptions SynCookies::UnpackData(uint32_t data) {
 
 SynCookies::SynCookies() 
     : keys_{}, current_key_(1),
-    rd_(), gen_(rd_()), dist_(0, std::numeric_limits<uint32_t>::max()) 
+    /* rd_(), gen_(rd_()),*/ dist_(0, std::numeric_limits<uint32_t>::max()) 
 {
     #ifdef CONFIG_YADECAP_AUTOTEST
     keys_[0][0] = 0;

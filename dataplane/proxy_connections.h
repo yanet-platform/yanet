@@ -183,10 +183,24 @@ public:
             name = "tcp_proxy.connections." + std::to_string(service_id);
         else if constexpr (std::is_same_v<ConnectionInfo, SynConnection>)
             name = "tcp_proxy.syn_connections." + std::to_string(service_id);
-        buckets_ = memory_manager->create_static_array<Bucket>(name.data(), number_buckets, socket_id);
+        if (memory_manager != nullptr)
+        {
+            buckets_ = memory_manager->create_static_array<Bucket>(name.data(), number_buckets, socket_id);
+        }
+        else
+        {
+            buckets_ = (Bucket*)malloc(number_buckets * sizeof(Bucket));
+        }
         if (buckets_ == nullptr)
         {
             return false;
+        }
+        else if (memory_manager == nullptr)
+        {
+            for (uint32_t index = 0; index < number_buckets; index++)
+            {
+                new (&(buckets_[index])) Bucket();
+            }
         }
 
         number_buckets_ = number_buckets;

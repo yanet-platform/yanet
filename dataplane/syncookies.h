@@ -33,7 +33,7 @@ private:
     key128_t keys_[3];
     uint32_t current_key_ = 0;
     
-    std::random_device rd_;
+    // std::random_device rd_;
     std::mt19937 gen_;
     std::uniform_int_distribution<uint32_t> dist_;
 

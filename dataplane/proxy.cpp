@@ -463,11 +463,6 @@ void DebugPacket(const char* message, proxy_service_id_t service_id, const rte_i
 #endif
 }
 
-uint32_t BuildResult(uint32_t flags, ::proxy::service_counter counter)
-{
-    return flags | uint32_t(counter);
-}
-
 void SwapAddresses(rte_ipv4_hdr* ipv4_header)
 {
     rte_be32_t tmp = ipv4_header->src_addr;
