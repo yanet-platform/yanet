@@ -33,10 +33,6 @@ private:
     key128_t keys_[3];
     uint32_t current_key_ = 0;
     
-    // std::random_device rd_;
-    std::mt19937 gen_;
-    std::uniform_int_distribution<uint32_t> dist_;
-
     static constexpr uint32_t COOKIE_BITS = 24;
     static constexpr uint32_t COOKIE_MASK = (1 << COOKIE_BITS) - 1;
 

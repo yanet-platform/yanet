@@ -49,15 +49,17 @@ TcpOptions SynCookies::UnpackData(uint32_t data) {
 }
 
 SynCookies::SynCookies() 
-    : keys_{}, current_key_(1),
-    /* rd_(), gen_(rd_()),*/ dist_(0, std::numeric_limits<uint32_t>::max()) 
+    : keys_{}, current_key_(1)
 {
     #ifdef CONFIG_YADECAP_AUTOTEST
     keys_[0][0] = 0;
     keys_[0][1] = 0;
     #else
-    keys_[0][0] = dist_(gen_);
-    keys_[0][1] = dist_(gen_);
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
+    keys_[0][0] = dist(gen);
+    keys_[0][1] = dist(gen);
     #endif
     UpdateKeys();
 }
@@ -90,9 +92,12 @@ uint32_t SynCookies::CheckCookie(uint32_t cookie, uint32_t saddr, uint16_t sport
 
 void SynCookies::UpdateKeys()
 {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<uint64_t> dist(0, std::numeric_limits<uint64_t>::max());
     current_key_ = 3 - current_key_; // switch between 1 and 2
-    keys_[current_key_][0] = dist_(gen_);
-    keys_[current_key_][1] = dist_(gen_);
+    keys_[current_key_][0] = dist(gen);
+    keys_[current_key_][1] = dist(gen);
     
 #ifdef CONFIG_YADECAP_AUTOTEST
     keys_[current_key_][0] = 0;
