@@ -13,13 +13,12 @@
 namespace dataplane::proxy
 {
 
-class LocalPool
+class LocalPoolTest
 {
 public:
-    LocalPool() : initialized_(false) {}
+    LocalPoolTest();
+    ~LocalPoolTest();
     bool Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager);
-    bool _TestInit(const ipv4_prefix_t& prefix);
-    bool _TestFree();
 
     uint64_t Allocate(uint32_t worker_id, uint32_t client_addr, tPortId client_port);
     uint64_t FindClientByLocal(uint32_t local_addr, tPortId local_port) const;
@@ -36,7 +35,7 @@ private:
     bool initialized_;
     mutable std::shared_mutex mutex_;
     ipv4_prefix_t prefix_;
-
+    std::function<void()> destroy;
 
     struct ConnectionInfo
     {
@@ -81,7 +80,7 @@ public:
     }
 };
 
-class LocalPool2
+class LocalPool
 {
 public:
     constexpr static size_t chunk_size = 2047;
@@ -94,10 +93,9 @@ public:
         uint32_t connections[chunk_size];
     };
 
-    LocalPool2();
+    LocalPool();
+    ~LocalPool();
     bool Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager);
-    bool _TestInit(const ipv4_prefix_t& prefix);
-    bool _TestFree();
 
     uint64_t Allocate(uint32_t worker_id, uint32_t client_addr, tPortId client_port);
     uint64_t FindClientByLocal(uint32_t local_addr, tPortId local_port) const;
@@ -114,7 +112,7 @@ private:
     bool initialized_;
     mutable std::mutex mutex_;
     ipv4_prefix_t prefix_;
-
+    std::function<void()> destroy;
 
     ConnectionsChunk* chunk_queue_;
     uint32_t num_chunks_;
@@ -142,6 +140,16 @@ public:
     inline static void UnpackTuple(uint64_t tuple, uint32_t& addr, tPortId& port) {
         addr = tuple >> 16;
         port = tuple & 0xffff;
+    }
+
+    inline static void UnpackTupleSrc(uint64_t tuple, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) {
+        ipv4_header->src_addr = tuple >> 16;
+        tcp_header->src_port = tuple & 0xffff;
+    }
+
+    inline static void UnpackTupleDst(uint64_t tuple, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) {
+        ipv4_header->dst_addr = tuple >> 16;
+        tcp_header->dst_port = tuple & 0xffff;
     }
 };
 
