@@ -285,13 +285,13 @@ eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, 
 
     std::lock_guard guard(mutex_);
 
-    if (!service_connections_[service_id].Initialize(service_id, service.size_connections_table, memory_manager, service.upstream_addr, service.upstream_port))
+    if (!service_connections_[service_id].Init(service_id, service.size_connections_table, memory_manager, service.upstream_addr, service.upstream_port))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.ServiceConnections, service: %d\n", service_id);
         return eResult::errorAllocatingMemory;
     }
 
-    if (!syn_connections_[service_id].Initialize(service_id, service.size_syn_table, memory_manager, service.upstream_addr, service.upstream_port))
+    if (!syn_connections_[service_id].Init(service_id, service.size_syn_table, memory_manager, service.upstream_addr, service.upstream_port))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.SynConnections, service: %d\n", service_id);
         return eResult::errorAllocatingMemory;

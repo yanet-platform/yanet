@@ -23,7 +23,7 @@ TEST(ServiceConnectionsTest, Benchmark)
         {
             futures[j] = std::async(std::launch::async, [&]() -> std::chrono::duration<double> {
                 dataplane::proxy::ServiceConnections conn;
-                conn._TestInit(1, iterations);
+                conn.Init(1, iterations, nullptr, 0, 0);
             
                 std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
                 for (uint32_t i = 0; i < iterations; i++)
@@ -32,8 +32,6 @@ TEST(ServiceConnectionsTest, Benchmark)
                     conn.FindAndLock(i, 2, 7, data);
                 }
                 auto find_elapsed = std::chrono::steady_clock::now() - start;
-
-                conn._TestFree();
     
                 return find_elapsed;
             });
@@ -75,7 +73,7 @@ TEST(ServiceConnectionsTest, BenchmarkConcurrent)
         {
             futures[j] = std::async(std::launch::async, [&]() -> std::chrono::duration<double> {
                 dataplane::proxy::ServiceConnections conn;
-                conn._TestInit(1, iterations);
+                conn.Init(1, iterations, nullptr, 0, 0);
             
                 std::vector<std::future<void>> fs(access_concurrency);
                 std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
@@ -95,8 +93,6 @@ TEST(ServiceConnectionsTest, BenchmarkConcurrent)
                     f.get();
                 }
                 auto find_elapsed = std::chrono::steady_clock::now() - start;
-
-                conn._TestFree();
     
                 return find_elapsed;
             });
