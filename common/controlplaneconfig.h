@@ -319,7 +319,7 @@ public:
 	service_t() = default;
 
 	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, proto, upstream_addr, upstream_port, size_connections_table, 
-		size_syn_table, flow, upstream_net, blacklist, proxy_header, use_sack, mss, winscale, timestamps,
+		size_syn_table, flow, upstream_net, blacklist, send_proxy_header, use_sack, mss, winscale, timestamps,
 		ignore_size_update_detections, timeout_syn_rto, timeout_syn_recv, timeout_established);
 
 	using key_t = std::tuple<common::ip_address_t, tPortId, uint8_t>;
@@ -344,7 +344,7 @@ public:
 	common::globalBase::tFlow flow;
 	common::ipv4_prefix_t upstream_net;
 	std::set<common::ip_prefix_t> blacklist;
-	bool proxy_header;
+	bool send_proxy_header;
 
 	// tcp options
 	bool use_sack;
@@ -369,7 +369,7 @@ class config_t
 public:
 	config_t() = default;
 
-	SERIALIZABLE(services, size_connections_table, size_syn_table, nextModule, flow, upstream_net, blacklist, proxy_header,
+	SERIALIZABLE(services, size_connections_table, size_syn_table, nextModule, flow, upstream_net, blacklist, send_proxy_header,
 		use_sack, mss, winscale, timestamps, ignore_size_update_detections, timeout_syn_rto, timeout_syn_recv, timeout_established);
 
 public:
@@ -383,7 +383,7 @@ public:
 	common::globalBase::tFlow flow;
 	common::ipv4_prefix_t upstream_net;
 	std::set<common::ip_prefix_t> blacklist;
-	bool proxy_header;
+	bool send_proxy_header;
 
 	// tcp options
 	bool use_sack;

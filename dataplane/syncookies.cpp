@@ -100,6 +100,7 @@ void SynCookies::UpdateKeys()
     keys_[current_key_][1] = dist(gen);
     
 #ifdef CONFIG_YADECAP_AUTOTEST
+    current_key_ = 1;
     keys_[current_key_][0] = 0;
     keys_[current_key_][1] = 0;
 #endif

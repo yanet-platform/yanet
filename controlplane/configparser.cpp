@@ -1178,7 +1178,7 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 	proxy.nextModule = moduleJson["nextModule"];
 	proxy.upstream_net = moduleJson.value("upstreamNet", "");
 	LoadBlackList(moduleJson, rootFilePath, proxy.blacklist);
-	proxy.proxy_header = moduleJson.value("proxyHeader", YANET_PROXY_DEFAULT_USE_PROXY_HEADER);
+	proxy.send_proxy_header = moduleJson.value("proxyHeader", YANET_PROXY_DEFAULT_USE_PROXY_HEADER);
 
 	// tcp options
 	proxy.use_sack = moduleJson.value("useSack", YANET_PROXY_DEFAULT_USE_SACK);
@@ -1293,7 +1293,7 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 		service.upstream_net = proxy.upstream_net;
 		service.blacklist = proxy.blacklist;
 		LoadBlackList(service_json, rootFilePath, service.blacklist);
-		service.proxy_header = service_json.value("proxyHeader", proxy.proxy_header);
+		service.send_proxy_header = service_json.value("proxyHeader", proxy.send_proxy_header);
 
 		// tcp options
 		service.use_sack = service_json.value("useSack", proxy.use_sack);

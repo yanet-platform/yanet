@@ -6,6 +6,7 @@
 #include "common/idp.h"
 #include "common/static_vector.h"
 
+#include "base.h"
 #include "local_pool.h"
 #include "memory_manager.h"
 #include "proxy_connections.h"
@@ -75,7 +76,7 @@ class TcpConnectionStore
 {
 public:
     // Update
-    eResult proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, const common::ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager);
+    eResult proxy_service_update(const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager);
     void proxy_service_remove(proxy_service_id_t service_id);
 
     void CollectGarbage();
@@ -89,27 +90,10 @@ public:
     common::idp::proxy_tables::response GetTables(std::optional<proxy_service_id_t> service_id);
 
     // Actions from worker
-    bool ActionClientOnSyn(proxy_service_id_t service_id,
-	                   uint32_t worker_id,
-	                   const dataplane::globalBase::proxy_service_t& service,
-	                   rte_mbuf* mbuf,
-	                   uint64_t* counters);
-
-    bool ActionClientOnAck(proxy_service_id_t service_id,
-	                   uint32_t worker_id,
-	                   const dataplane::globalBase::proxy_service_t& service,
-	                   rte_mbuf* mbuf,
-	                   uint64_t* counters);
-
-    bool ActionServiceOnSynAck(proxy_service_id_t service_id,
-	                       const dataplane::globalBase::proxy_service_t& service,
-	                       rte_mbuf* mbuf,
-	                       uint64_t* counters);
-
-    bool ActionServiceOnAck(proxy_service_id_t service_id,
-	                    const dataplane::globalBase::proxy_service_t& service,
-	                    rte_mbuf* mbuf,
-	                    uint64_t* counters);
+    bool ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id);
+    bool ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id);
+    bool ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters);
+    bool ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters);
 
     uint32_t current_time_sec;
     uint64_t current_time_ms;

@@ -486,7 +486,7 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		}
 		else if (type == common::idp::updateGlobalBase::requestType::proxy_service_remove)
 		{
-			result = proxy_service_remove(std::get<common::idp::updateGlobalBase::proxy_or_service_remove::request>(data));
+			result = proxy_service_remove(std::get<common::idp::updateGlobalBase::proxy_service_remove::request>(data));
 		}
 		else
 		{
@@ -2617,12 +2617,10 @@ eResult generation::update_host_config(const common::idp::updateGlobalBase::upda
 
 eResult generation::proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request)
 {
+	const auto [counter_id, service_info] = request;
+
 	proxy_enabled = 1;
-
-	auto [counter_id, service_info] = request;
-	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, counter_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
-	// 	service_id, counter_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port, proxy_header, size_connections_table, size_syn_table);
-
+	proxy_flow = service_info.flow;
 
 	if (service_info.service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
 	{
@@ -2637,20 +2635,39 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 
 	auto& service = proxy_services[service_info.service_id];
 
-	service.flow = service_info.flow;
+	service.service_id = service_info.service_id;
+	service.counter_id = counter_id;
+
+	// proxy and service address, port
 	service.proxy_addr = ipv4_address_t::convert(service_info.proxy_addr.get_ipv4()).address;
 	service.proxy_port = rte_cpu_to_be_16(service_info.proxy_port);
 	service.upstream_addr = ipv4_address_t::convert(service_info.upstream_addr.get_ipv4()).address;
 	service.upstream_port = rte_cpu_to_be_16(service_info.upstream_port);
-	service.counter_id = counter_id;
-	service.send_proxy_header = service_info.proxy_header;	// !!!!
+
+	// pool_prefix
+	service.pool_prefix.address = ipv4_address_t::convert(service_info.upstream_net.address());
+    service.pool_prefix.address.address = rte_be_to_cpu_32(service.pool_prefix.address.address);
+    service.pool_prefix.mask = service_info.upstream_net.mask();
+
+	// sizes of tables
 	service.size_connections_table = service_info.size_connections_table;
 	service.size_syn_table = service_info.size_syn_table;
+
+	service.send_proxy_header = service_info.send_proxy_header;
+
+	// tcp options
 	service.use_sack = service_info.use_sack;
 	service.mss = service_info.mss;
 	service.winscale = service_info.winscale;
 	service.timestamps = service_info.timestamps;
 	service.ignore_size_update_detections = service_info.ignore_size_update_detections;
+
+	// timeouts
+	service.timeout_syn_rto = 1000 * service_info.timeout_syn_rto;
+	service.timeout_syn_recv = 1000 * service_info.timeout_syn_recv;
+	service.timeout_established = 1000 * service_info.timeout_established;
+
+	// initialize proxy header structure
 	rte_memcpy(service.proxy_header.signature, dataplane::proxy::PROXY_V2_SIGNATURE, 12);
 	service.proxy_header.version_cmd = (dataplane::proxy::PROXY_VERSION_V2 << 4) + dataplane::proxy::PROXY_CMD_LOCAL;
 	service.proxy_header.af_proto = (dataplane::proxy::PROXY_AF_INET << 4) + dataplane::proxy::PROXY_PROTO_STREAM;
@@ -2658,15 +2675,10 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.proxy_header.dst_addr = service.proxy_addr;
 	service.proxy_header.dst_port = service.proxy_port;
 
-	service.timeout_syn_rto = service_info.timeout_syn_rto;
-	service.timeout_syn_recv = service_info.timeout_syn_recv;
-	service.timeout_established = service_info.timeout_established;
-
-
-	return tcp_connection_store->proxy_service_update(service_info.service_id, service, service_info.upstream_net, &dataPlane->memory_manager);
+	return tcp_connection_store->proxy_service_update(service, &dataPlane->memory_manager);
 }
 
-eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request)
+eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::proxy_service_remove::request& request)
 {
 	auto [service_id] = request;
 	// YANET_LOG_WARNING("proxy_service_remove: service_id=%d\n", service_id);

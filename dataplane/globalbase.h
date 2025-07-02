@@ -195,7 +195,7 @@ protected:
 	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 	eResult update_host_config(const common::idp::updateGlobalBase::update_host_config::request& request);
 	eResult proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request);
-	eResult proxy_service_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request);
+	eResult proxy_service_remove(const common::idp::updateGlobalBase::proxy_service_remove::request& request);
 
 	void evaluate_service_ring();
 	inline uint64_t count_real_connections(uint32_t counter_id);
@@ -260,6 +260,7 @@ public: ///< @todo
 	uint8_t tun64_enabled;
 	uint8_t early_decap_enabled;
 	uint8_t proxy_enabled;
+	common::globalBase::tFlow proxy_flow;
 
 	uint32_t serial;
 

@@ -42,7 +42,7 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
             proxy_service_id_t service_id = iter_prev.second.service_id;
             service_counters.remove(service_id);
             globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_service_remove,
-	                    common::idp::updateGlobalBase::proxy_or_service_remove::request{service_id});
+	                    common::idp::updateGlobalBase::proxy_service_remove::request{service_id});
         }
     }
 
@@ -85,9 +85,8 @@ void proxy_t::compile(common::idp::updateGlobalBase::request& globalbase,
         if (requestType == common::idp::updateGlobalBase::requestType::proxy_service_update)
         {
             auto& request_update = std::get<common::idp::updateGlobalBase::proxy_service_update::request>(request);
-            proxy_service_id_t service_id = std::get<0>(request_update);
-            tCounterId counter_id = service_counters.get_id(service_id);
-            std::get<0>(request_update) = counter_id;
+            auto& [counter_id, service] = request_update;
+            counter_id = service_counters.get_id(service.service_id);
         }
     }
 }

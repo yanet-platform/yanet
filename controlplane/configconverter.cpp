@@ -807,7 +807,6 @@ void config_converter_t::processProxy()
 					service.service_id = id_for_new;
 					used_service_ids.insert(id_for_new);
 					found = true;
-					YANET_LOG_WARNING("\tset id=%d, service=%s\n", id_for_new, std::get<0>(service_key).toString().c_str());
 					break;
 				}
 				if (!found)
@@ -1970,7 +1969,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 	for (const auto& iter_service : proxy.services)
 	{
 		const controlplane::proxy::service_t& service = iter_service.second;
-		YANET_LOG_WARNING("\t\t acl_rules_proxy service_id=%d, proxy_addr=%s\n", service.service_id, service.proxy_addr.toString().c_str());
+		// YANET_LOG_WARNING("\t\t acl_rules_proxy service_id=%d, proxy_addr=%s\n", service.service_id, service.proxy_addr.toString().c_str());
 		controlplane::base::acl_rule_network_ipv4_t client_rule_network({common::ipv4_prefix_default}, {common::ipv4_prefix_t(service.proxy_addr)});
 		controlplane::base::acl_rule_transport_tcp_t client_rule_transport{range_t{0x0000, 0xFFFF}, range_t{service.proxy_port}};
 		

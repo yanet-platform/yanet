@@ -313,7 +313,7 @@ using request = std::tuple<
         std::vector<balancer_real_id_t>>; ///< service real binding
 }
 
-namespace proxy_or_service_remove
+namespace proxy_service_remove
 {
 using request = std::tuple<proxy_id_t>;
 }
@@ -548,7 +548,7 @@ using requestVariant = std::variant<std::tuple<>,
                                     tun64mappings_update::request,
                                     update_balancer::request,
                                     update_balancer_services::request,
-                                    proxy_or_service_remove::request,
+                                    proxy_service_remove::request,
                                     proxy_service_update::request,
                                     route_tunnel_weight_update::request,
                                     acl_network_ipv4_source::request, /// + acl_network_ipv4_destination, acl_network_ipv6_source, acl_network_ipv6_destination

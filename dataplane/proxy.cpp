@@ -3,6 +3,7 @@
 #include "common/counters.h"
 
 #include "common.h"
+#include "globalbase.h"
 #include "metadata.h"
 #include "proxy.h"
 #include "syncookies.h"
@@ -264,13 +265,16 @@ std::string TcpOptions::DebugInfo() const
 
 // Update
 
-eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, const common::ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager)
+eResult TcpConnectionStore::proxy_service_update(const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager)
 {
+    proxy_service_id_t service_id = service.service_id;
+
+    common::ipv4_prefix_t upstream_net(service.pool_prefix.address.address, service.pool_prefix.mask);
     YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, upstream=%s:%d, prefix=%s, send_proxy_header=%d\n", 
         service_id, common::ipv4_address_t(rte_cpu_to_be_32(service.proxy_addr)).toString().c_str(), rte_cpu_to_be_16(service.proxy_port),
-        common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(service.upstream_port), prefix.toString().c_str(),
+        common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(service.upstream_port), upstream_net.toString().c_str(),
         service.send_proxy_header);
-    YANET_LOG_WARNING("\t\tsize_connections_table=%d, size_syn_table=%d, flow=%s\n", service.size_connections_table, service.size_syn_table, service.flow.to_string().c_str());
+    YANET_LOG_WARNING("\t\tsize_connections_table=%d, size_syn_table=%d, counter_id=%d\n", service.size_connections_table, service.size_syn_table, service.counter_id);
     YANET_LOG_WARNING("\t\ttimeouts: syn_rto=%d, syn_recv=%d, established=%d\n", service.timeout_syn_rto, service.timeout_syn_recv, service.timeout_established);
     YANET_LOG_WARNING("\t\tuse_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", service.use_sack, service.mss, service.winscale, service.timestamps);
 
@@ -288,11 +292,7 @@ eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, 
         return eResult::errorAllocatingMemory;
     }
 
-    ipv4_prefix_t pool_prefix;
-    pool_prefix.address = ipv4_address_t::convert(prefix.address());
-    pool_prefix.address.address = rte_be_to_cpu_32(pool_prefix.address.address);
-    pool_prefix.mask = prefix.mask();
-    if (!local_pools_[service_id].Init(service_id, pool_prefix, memory_manager))
+    if (!local_pools_[service_id].Init(service_id, service.pool_prefix, memory_manager))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.LocalPool, service: %d\n", service_id);
         return eResult::errorAllocatingMemory;
@@ -553,13 +553,17 @@ void ActionClientOnSynPrepareSynToService(const dataplane::globalBase::proxy_ser
 }
 
 // Action from worker
-bool TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
-                                           uint32_t worker_id,
-                                           const dataplane::globalBase::proxy_service_t& service,
-                                           rte_mbuf* mbuf,
-                                           uint64_t* counters)
+bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+	
+    proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
+    const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
+
+	counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_in]++;
+    counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_in] += mbuf->pkt_len;
+    counters[service.counter_id + (tCounterId)::proxy::service_counter::syn_count]++;
+
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_client_syn", service_id, ipv4_header, tcp_header);
@@ -570,7 +574,7 @@ bool TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
     {
         case TableSearchResult::Overflow:
         {
-            counters[static_cast<uint32_t>(::proxy::service_counter::service_bucket_overflow)]++;
+            counters[service.counter_id + (tCounterId)::proxy::service_counter::service_bucket_overflow]++;
             action = false;
             break;
         }
@@ -597,8 +601,8 @@ bool TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
                 {
                     uint32_t cookie = BuildSynCookieAndFillTcpOptionsAnswer(service_id, service, mbuf, &ipv4_header, &tcp_header);
                     ActionClientOnSynPrepareSynToClient(ipv4_header, tcp_header, cookie);
-                    counters[static_cast<uint32_t>(::proxy::service_counter::packets_out)]++;
-				    counters[static_cast<uint32_t>(::proxy::service_counter::bytes_out)] += mbuf->pkt_len;
+                    counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
+				    counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;
                     break;
                 }
                 case TableSearchResult::Found:
@@ -611,7 +615,7 @@ bool TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
                     uint64_t local = local_pools_[service_id].Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
                     if (local == 0)
                     {
-                        counters[static_cast<uint32_t>(::proxy::service_counter::failed_local_pool_allocation)]++;
+                        counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
                         action = false;
                     }
                     else
@@ -621,7 +625,7 @@ bool TcpConnectionStore::ActionClientOnSyn(proxy_service_id_t service_id,
                         syn_connection_data.connection->client_start_seq = tcp_header->sent_seq;
 
                         ActionClientOnSynPrepareSynToService(service, ipv4_header, tcp_header, local);
-                        counters[static_cast<uint32_t>(::proxy::service_counter::new_syn_connections)]++;
+                        counters[service.counter_id + (tCounterId)::proxy::service_counter::new_syn_connections]++;
                     }
                     break;
                 }
@@ -684,13 +688,15 @@ uint32_t TcpConnectionStore::CheckSynCookie(proxy_service_id_t service_id, const
     return cookie_data;
 }
 
-bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
-                                           uint32_t worker_id,
-                                           const dataplane::globalBase::proxy_service_t& service,
-                                           rte_mbuf* mbuf,
-                                           uint64_t* counters)
+bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+    proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
+    const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
+
+    counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_in]++;
+    counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_in] += mbuf->pkt_len;
+
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_client_ack", service_id, ipv4_header, tcp_header);
@@ -701,7 +707,7 @@ bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
     {
         case TableSearchResult::Overflow:
         {
-            counters[static_cast<uint32_t>(::proxy::service_counter::service_bucket_overflow)]++;
+            counters[service.counter_id + (tCounterId)::proxy::service_counter::service_bucket_overflow]++;
             action = false;
             break;
         }
@@ -718,7 +724,7 @@ bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                 // todo - add check + only syn-cookie
                 if (service.ignore_size_update_detections)
                 {
-                    counters[static_cast<uint32_t>(::proxy::service_counter::ignored_size_update_detections)]++;
+                    counters[service.counter_id + (tCounterId)::proxy::service_counter::ignored_size_update_detections]++;
                     action = false;
                 }
                 else
@@ -803,7 +809,7 @@ bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                 {
                     // ack, but server didn't answer
                     syn_connection_data.Unlock();
-                    counters[static_cast<uint32_t>(::proxy::service_counter::ack_without_service_answer)]++;
+                    counters[service.counter_id + (tCounterId)::proxy::service_counter::ack_without_service_answer]++;
                     action = false;
                 }
                 else
@@ -825,7 +831,7 @@ bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                             AddProxyHeader(service, mbuf, metadata, &ipv4_header, &tcp_header, src_addr, src_port);
                     }
 
-                    counters[static_cast<uint32_t>(::proxy::service_counter::new_connections)]++;
+                    counters[service.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
                 }
             }
             else
@@ -837,7 +843,7 @@ bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                 uint32_t cookie_data = CheckSynCookie(service_id, service, ipv4_header, tcp_header);
                 if (cookie_data == 0)
                 {
-                    counters[static_cast<uint32_t>(::proxy::service_counter::failed_check_syn_cookie)]++;
+                    counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
                     action = true;
                 }
                 else
@@ -846,7 +852,7 @@ bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                     uint64_t local = local_pools_[service_id].Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
                     if (local == 0)
                     {
-                        counters[static_cast<uint32_t>(::proxy::service_counter::failed_local_pool_allocation)]++;
+                        counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
                         action = false;
                     }
                     else
@@ -885,7 +891,7 @@ bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
                         tcp_header->recv_ack = 0;
                         tcp_header->tcp_flags = TCP_SYN_FLAG;
 
-                        counters[static_cast<uint32_t>(::proxy::service_counter::new_connections)]++;
+                        counters[service.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
                     }
                 }
             }
@@ -906,12 +912,12 @@ bool TcpConnectionStore::ActionClientOnAck(proxy_service_id_t service_id,
     return action;
 }
 
-bool TcpConnectionStore::ActionServiceOnSynAck(proxy_service_id_t service_id,
-                                               const dataplane::globalBase::proxy_service_t& service,
-                                               rte_mbuf* mbuf,
-                                               uint64_t* counters)
+bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+    proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
+    const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
+
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_server_syn_ack", service_id, ipv4_header, tcp_header);
@@ -919,7 +925,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(proxy_service_id_t service_id,
     uint64_t client_info = local_pools_[service_id].FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
-        counters[static_cast<uint32_t>(::proxy::service_counter::failed_local_pool_search)]++;
+        counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
         return false;
     }
     uint32_t client_addr;
@@ -944,6 +950,9 @@ bool TcpConnectionStore::ActionServiceOnSynAck(proxy_service_id_t service_id,
         tcp_header->dst_port = client_port;
         UpdateCheckSums(ipv4_header, tcp_header);
 
+        counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
+        counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;			
+
         return true;
     }
     syn_connection_data.Unlock();
@@ -952,7 +961,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(proxy_service_id_t service_id,
     if (service_connections_[service_id].FindAndLock(client_addr, client_port, current_time_ms, service_connection_data) != TableSearchResult::Found)
     {
         service_connection_data.Unlock();
-        counters[static_cast<uint32_t>(::proxy::service_counter::failed_answer_service_syn_ack)]++;
+        counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_answer_service_syn_ack]++;
         return false;
     }
 
@@ -985,7 +994,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(proxy_service_id_t service_id,
 #endif
             tcp_options.timestamp_echo = service_connection_data.connection->timestamp_client_last;
             service_connection_data.connection->flags |= Connection::flag_timestamp_fail;
-            counters[static_cast<uint32_t>(::proxy::service_counter::error_service_config_timestamps)]++;
+            counters[service.counter_id + (tCounterId)::proxy::service_counter::error_service_config_timestamps]++;
         }
 
         tcp_options.sack_permitted = false;
@@ -1010,7 +1019,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(proxy_service_id_t service_id,
         {
             // error, server does not support SACK, although the configuration file states that it supports
             service_connection_data.connection->flags |= Connection::flag_clear_sack;
-            counters[static_cast<uint32_t>(::proxy::service_counter::error_service_config_sack)]++;
+            counters[service.counter_id + (tCounterId)::proxy::service_counter::error_service_config_sack]++;
         }
     }
 
@@ -1023,15 +1032,18 @@ bool TcpConnectionStore::ActionServiceOnSynAck(proxy_service_id_t service_id,
     
     UpdateCheckSums(ipv4_header, tcp_header);
 
+    counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
+    counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;			
+
     return action;
 }
 
-bool TcpConnectionStore::ActionServiceOnAck(proxy_service_id_t service_id,
-                                            const dataplane::globalBase::proxy_service_t& service,
-                                            rte_mbuf* mbuf,
-                                            uint64_t* counters)
+bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+    proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
+    const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
+
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_server_ack", service_id, ipv4_header, tcp_header);
@@ -1039,7 +1051,7 @@ bool TcpConnectionStore::ActionServiceOnAck(proxy_service_id_t service_id,
     uint64_t client_info = local_pools_[service_id].FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
-        counters[static_cast<uint32_t>(::proxy::service_counter::failed_local_pool_search)]++;
+        counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
         return false;
     }
     uint32_t client_addr;
@@ -1050,7 +1062,7 @@ bool TcpConnectionStore::ActionServiceOnAck(proxy_service_id_t service_id,
     if (service_connections_[service_id].FindAndLock(client_addr, client_port, current_time_ms, service_connection_data) != TableSearchResult::Found)
     {
         service_connection_data.Unlock();
-        counters[static_cast<uint32_t>(::proxy::service_counter::failed_search_client_service_ack)]++;
+        counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_search_client_service_ack]++;
         return false;
     }
 
@@ -1085,6 +1097,9 @@ bool TcpConnectionStore::ActionServiceOnAck(proxy_service_id_t service_id,
     tcp_header->src_port = service.proxy_port;
 
     UpdateCheckSums(ipv4_header, tcp_header);
+
+    counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
+    counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;			
 
     return true;
 }
