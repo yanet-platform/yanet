@@ -264,22 +264,13 @@ std::string TcpOptions::DebugInfo() const
 
 // Update
 
-void TcpConnectionStore::proxy_update(proxy_id_t proxy_id, const dataplane::globalBase::proxy_t& proxy)
-{
-    YANET_LOG_WARNING("proxy_update: proxy_id=%d, flow=%s\n", proxy_id, proxy.flow.to_string().c_str());
-    next_flow_ = proxy.flow;
-}
-
-void TcpConnectionStore::proxy_remove(proxy_id_t proxy_id)
-{
-    YANET_LOG_WARNING("proxy_remove: proxy_id=%d\n", proxy_id);
-}
-
 eResult TcpConnectionStore::proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, const common::ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager)
 {
-    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, upstream=%s:%d, prefix=%s, send_proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
+    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, upstream=%s:%d, prefix=%s, send_proxy_header=%d\n", 
         service_id, common::ipv4_address_t(rte_cpu_to_be_32(service.proxy_addr)).toString().c_str(), rte_cpu_to_be_16(service.proxy_port),
-        common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(service.upstream_port), prefix.toString().c_str(), service.send_proxy_header, service.size_connections_table, service.size_syn_table);
+        common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(service.upstream_port), prefix.toString().c_str(),
+        service.send_proxy_header);
+    YANET_LOG_WARNING("\t\tsize_connections_table=%d, size_syn_table=%d, flow=%s\n", service.size_connections_table, service.size_syn_table, service.flow.to_string().c_str());
     YANET_LOG_WARNING("\t\ttimeouts: syn_rto=%d, syn_recv=%d, established=%d\n", service.timeout_syn_rto, service.timeout_syn_recv, service.timeout_established);
     YANET_LOG_WARNING("\t\tuse_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", service.use_sack, service.mss, service.winscale, service.timestamps);
 

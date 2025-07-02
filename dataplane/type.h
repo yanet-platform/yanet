@@ -434,11 +434,6 @@ struct balancer_t
 	common::globalBase::tFlow flow;
 };
 
-struct proxy_t
-{
-	common::globalBase::tFlow flow;
-};
-
 struct proxy_service_t
 {
 	uint32_t proxy_addr;
@@ -455,6 +450,7 @@ struct proxy_service_t
 	bool timestamps;
 	bool ignore_size_update_detections;
 	proxy::proxy_v2_ipv4_hdr proxy_header;
+	common::globalBase::tFlow flow;
 
 	uint32_t timeout_syn_rto;
 	uint32_t timeout_syn_recv;

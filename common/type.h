@@ -2175,6 +2175,7 @@ union tFlowData
 	nat46clat_id_t nat46clat_id;
 	dregress_id_t dregressId;
 	tun64_id_t tun64Id;
+	proxy_service_id_t proxy_service_id;
 
 	struct
 	{
@@ -2187,12 +2188,6 @@ union tFlowData
 		balancer_id_t id : 8;
 		balancer_service_id_t service_id : 24;
 	} balancer;
-
-	struct
-	{
-		proxy_id_t id : 8;
-		proxy_service_id_t service_id : 24;
-	} proxy;
 
 	struct
 	{

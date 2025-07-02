@@ -75,8 +75,6 @@ class TcpConnectionStore
 {
 public:
     // Update
-    void proxy_update(proxy_id_t proxy_id, const dataplane::globalBase::proxy_t& proxy);
-    void proxy_remove(proxy_id_t proxy_id);
     eResult proxy_service_update(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, const common::ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager);
     void proxy_service_remove(proxy_service_id_t service_id);
 

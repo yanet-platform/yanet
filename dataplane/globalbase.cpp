@@ -480,14 +480,6 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		{
 			result = update_host_config(std::get<common::idp::updateGlobalBase::update_host_config::request>(data));
 		}
-		else if (type == common::idp::updateGlobalBase::requestType::proxy_update)
-		{
-			result = proxy_update(std::get<common::idp::updateGlobalBase::proxy_update::request>(data));
-		}
-		else if (type == common::idp::updateGlobalBase::requestType::proxy_remove)
-		{
-			result = proxy_remove(std::get<common::idp::updateGlobalBase::proxy_or_service_remove::request>(data));
-		}
 		else if (type == common::idp::updateGlobalBase::requestType::proxy_service_update)
 		{
 			result = proxy_service_update(std::get<common::idp::updateGlobalBase::proxy_service_update::request>(data));
@@ -651,11 +643,6 @@ eResult generation::clear()
 	for (auto& balancer : balancers)
 	{
 		balancer = dataplane::globalBase::balancer_t();
-	}
-
-	for (auto& proxy : proxies)
-	{
-		proxy = dataplane::globalBase::proxy_t();
 	}
 
 	for (auto& service : proxy_services)
@@ -860,12 +847,7 @@ static bool checkFlow(const common::globalBase::tFlow& flow)
 			 flow.type == common::globalBase::eFlowType::proxy_server_ack ||
 			 flow.type == common::globalBase::eFlowType::proxy_client_icmp)
 	{
-		if (flow.data.proxy.id >= YANET_CONFIG_PROXIES_SIZE)
-		{
-			return false;
-		}
-
-		if (flow.data.proxy.service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+		if (flow.data.proxy_service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
 		{
 			return false;
 		}
@@ -2633,60 +2615,18 @@ eResult generation::update_host_config(const common::idp::updateGlobalBase::upda
 	return result;
 }
 
-eResult generation::proxy_update(const common::idp::updateGlobalBase::proxy_update::request& request)
-{
-	auto [proxy_id, flow] = request;
-	// YANET_LOG_WARNING("proxy_update: proxy_id=%d, syn_type=%s, max_local_addresses=%d, mem_size_syn=%d, mem_size_connections=%d, timeout_syn=%d, timeout_connection=%d, timeout_fin=%d, flow=%s\n",
-	// 	proxy_id, from_proxy_type(syn_type), max_local_addresses, mem_size_syn, mem_size_connections, timeout_syn, timeout_connection, timeout_fin, flow.to_string().c_str());
-
-
-	if (proxy_id >= YANET_CONFIG_PROXIES_SIZE)
-	{
-		YADECAP_LOG_ERROR("invalid proxy_id: '%u'\n", proxy_id);
-		return eResult::invalidId;
-	}
-	if (flow.type != common::globalBase::eFlowType::route &&
-		flow.type != common::globalBase::eFlowType::controlPlane &&
-		flow.type != common::globalBase::eFlowType::drop)
-	{
-		YADECAP_LOG_ERROR("invalid flow\n");
-		return eResult::invalidFlow;
-	}
-	if (!checkFlow(flow))
-	{
-		YADECAP_LOG_ERROR("invalid flow\n");
-		return eResult::invalidFlow;
-	}
-
-	auto& proxy = proxies[proxy_id];
-
-	proxy.flow = flow;
-
-	proxy_enabled = 1;
-
-	tcp_connection_store->proxy_update(proxy_id, proxy);
-
-	return eResult::success;
-}
-
-eResult generation::proxy_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request)
-{
-	auto [proxy_id] = request;
-	// YANET_LOG_WARNING("proxy_remove: proxy_id=%d\n", proxy_id);
-	tcp_connection_store->proxy_remove(proxy_id);
-	return eResult::success;
-}
-
 eResult generation::proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request)
 {
-	auto [service_id, counter_id, proxy_addr, proxy_port, upstream_addr, upstream_port, prefix, send_proxy_header, size_connections_table, size_syn_table, use_sack, mss, winscale, timestamps, ignore_size_update_detections, timeout_syn_rto, timeout_syn_recv, timeout_established] = request;
+	proxy_enabled = 1;
+
+	auto [counter_id, service_info] = request;
 	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, counter_id=%d, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d, proxy_header=%d, size_connections_table=%d, size_syn_table=%d\n",
 	// 	service_id, counter_id, proxy_addr.toString().c_str(), proxy_port, service_addr.toString().c_str(), service_port, proxy_header, size_connections_table, size_syn_table);
 
 
-	if (service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+	if (service_info.service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
 	{
-		YADECAP_LOG_ERROR("invalid proxy_service_id: '%u'\n", service_id);
+		YADECAP_LOG_ERROR("invalid proxy_service_id: '%u'\n", service_info.service_id);
 		return eResult::invalidId;
 	}
 	if (counter_id + (tCounterId)::proxy::service_counter::size > YANET_CONFIG_COUNTERS_SIZE)
@@ -2695,21 +2635,22 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 		return eResult::invalidId;
 	}
 
-	auto& service = proxy_services[service_id];
+	auto& service = proxy_services[service_info.service_id];
 
-	service.proxy_addr = ipv4_address_t::convert(proxy_addr.get_ipv4()).address;
-	service.proxy_port = rte_cpu_to_be_16(proxy_port);
-	service.upstream_addr = ipv4_address_t::convert(upstream_addr.get_ipv4()).address;
-	service.upstream_port = rte_cpu_to_be_16(upstream_port);
+	service.flow = service_info.flow;
+	service.proxy_addr = ipv4_address_t::convert(service_info.proxy_addr.get_ipv4()).address;
+	service.proxy_port = rte_cpu_to_be_16(service_info.proxy_port);
+	service.upstream_addr = ipv4_address_t::convert(service_info.upstream_addr.get_ipv4()).address;
+	service.upstream_port = rte_cpu_to_be_16(service_info.upstream_port);
 	service.counter_id = counter_id;
-	service.send_proxy_header = send_proxy_header;
-	service.size_connections_table = size_connections_table;
-	service.size_syn_table = size_syn_table;
-	service.use_sack = use_sack;
-	service.mss = mss;
-	service.winscale = winscale;
-	service.timestamps = timestamps;
-	service.ignore_size_update_detections = ignore_size_update_detections;
+	service.send_proxy_header = service_info.proxy_header;	// !!!!
+	service.size_connections_table = service_info.size_connections_table;
+	service.size_syn_table = service_info.size_syn_table;
+	service.use_sack = service_info.use_sack;
+	service.mss = service_info.mss;
+	service.winscale = service_info.winscale;
+	service.timestamps = service_info.timestamps;
+	service.ignore_size_update_detections = service_info.ignore_size_update_detections;
 	rte_memcpy(service.proxy_header.signature, dataplane::proxy::PROXY_V2_SIGNATURE, 12);
 	service.proxy_header.version_cmd = (dataplane::proxy::PROXY_VERSION_V2 << 4) + dataplane::proxy::PROXY_CMD_LOCAL;
 	service.proxy_header.af_proto = (dataplane::proxy::PROXY_AF_INET << 4) + dataplane::proxy::PROXY_PROTO_STREAM;
@@ -2717,12 +2658,12 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.proxy_header.dst_addr = service.proxy_addr;
 	service.proxy_header.dst_port = service.proxy_port;
 
-	service.timeout_syn_rto = timeout_syn_rto;
-	service.timeout_syn_recv = timeout_syn_recv;
-	service.timeout_established = timeout_established;
+	service.timeout_syn_rto = service_info.timeout_syn_rto;
+	service.timeout_syn_recv = service_info.timeout_syn_recv;
+	service.timeout_established = service_info.timeout_established;
 
 
-	return tcp_connection_store->proxy_service_update(service_id, service, prefix, &dataPlane->memory_manager);
+	return tcp_connection_store->proxy_service_update(service_info.service_id, service, service_info.upstream_net, &dataPlane->memory_manager);
 }
 
 eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::proxy_or_service_remove::request& request)

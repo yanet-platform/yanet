@@ -318,33 +318,49 @@ class service_t
 public:
 	service_t() = default;
 
-	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, upstream_addr, upstream_port, blacklist, proxy_header, size_connections_table, size_syn_table, use_sack, mss, winscale, timestamps, ignore_size_update_detections, timeout_syn_rto, timeout_syn_recv, timeout_established);
+	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, proto, upstream_addr, upstream_port, size_connections_table, 
+		size_syn_table, flow, upstream_net, blacklist, proxy_header, use_sack, mss, winscale, timestamps,
+		ignore_size_update_detections, timeout_syn_rto, timeout_syn_recv, timeout_established);
+
+	using key_t = std::tuple<common::ip_address_t, tPortId, uint8_t>;
 
 public:
 	proxy_service_id_t service_id;
 	std::string service;
-    // "proto": "tcp",
+	
+	// key: proxy address, port and protocol
 	common::ip_address_t proxy_addr;
     tPortId proxy_port;
+	uint8_t proto;
+
+	// service address, port
     common::ip_address_t upstream_addr;
     tPortId upstream_port;
-    std::set<common::ip_prefix_t> blacklist;
-	bool proxy_header;
+
+	// sizes of tables
 	uint32_t size_connections_table;
 	uint32_t size_syn_table;
+
+	common::globalBase::tFlow flow;
+	common::ipv4_prefix_t upstream_net;
+	std::set<common::ip_prefix_t> blacklist;
+	bool proxy_header;
+
+	// tcp options
 	bool use_sack;
 	uint32_t mss;
 	uint32_t winscale;
 	bool timestamps;
 	bool ignore_size_update_detections;
 
+	// timeouts
 	uint32_t timeout_syn_rto;
 	uint32_t timeout_syn_recv;
 	uint32_t timeout_established;
 
-	std::pair<common::ip_address_t, tPortId> Key() const
+	key_t Key() const
 	{
-		return {proxy_addr, proxy_port};
+		return {proxy_addr, proxy_port, proto};
 	}
 };
 
@@ -353,36 +369,33 @@ class config_t
 public:
 	config_t() = default;
 
-	SERIALIZABLE(proxy_id, services, upstream_net, use_sack, mss, winscale, timestamps, ignore_size_update_detections, timeout_syn_rto, timeout_syn_recv, timeout_established, nextModule, flow);
+	SERIALIZABLE(services, size_connections_table, size_syn_table, nextModule, flow, upstream_net, blacklist, proxy_header,
+		use_sack, mss, winscale, timestamps, ignore_size_update_detections, timeout_syn_rto, timeout_syn_recv, timeout_established);
 
 public:
-	proxy_id_t proxy_id;
+	std::map<service_t::key_t, service_t> services;
 
+	// sizes of tables
+	uint32_t size_connections_table;
+	uint32_t size_syn_table;
+
+	std::string nextModule;
+	common::globalBase::tFlow flow;
 	common::ipv4_prefix_t upstream_net;
+	std::set<common::ip_prefix_t> blacklist;
+	bool proxy_header;
 
-	std::vector<service_t> services;
-
+	// tcp options
 	bool use_sack;
 	uint32_t mss;
 	uint32_t winscale;
 	bool timestamps;
 	bool ignore_size_update_detections;
 	
+	// timeouts
 	uint32_t timeout_syn_rto;
 	uint32_t timeout_syn_recv;
 	uint32_t timeout_established;
-
-	std::string nextModule;
-	common::globalBase::tFlow flow;
-
-	std::map<std::pair<common::ip_address_t, tPortId>, const service_t*> BuildMapServices() const {
-		std::map<std::pair<common::ip_address_t, tPortId>, const service_t*> result;
-		for (const auto& service : services)
-		{
-			result[{service.proxy_addr, service.proxy_port}] = &service;
-		}
-		return result;
-	}
 };
 
 }

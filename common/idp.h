@@ -13,6 +13,7 @@
 #include "acl.h"
 #include "balancer.h"
 #include "common/actions.h"
+#include "common/controlplaneconfig.h"
 #include "config.h"
 #include "memory_manager.h"
 #include "neighbor.h"
@@ -138,8 +139,6 @@ enum class requestType : uint32_t
 	updateNat64statelessTranslation,
 	update_balancer,
 	update_balancer_services,
-        proxy_update,
-        proxy_remove,
         proxy_service_update,
         proxy_service_remove,
 	route_lpm_update,
@@ -314,13 +313,6 @@ using request = std::tuple<
         std::vector<balancer_real_id_t>>; ///< service real binding
 }
 
-namespace proxy_update
-{
-using request = std::tuple<proxy_id_t,
-                           common::globalBase::tFlow ///< Flow
-                           >;
-}
-
 namespace proxy_or_service_remove
 {
 using request = std::tuple<proxy_id_t>;
@@ -328,24 +320,8 @@ using request = std::tuple<proxy_id_t>;
 
 namespace proxy_service_update
 {
-using request = std::tuple<proxy_service_id_t,
-                           tCounterId, ///< counter id;
-                           common::ip_address_t, ///< proxy_addr;
-                           tPortId, ///< proxy_port;
-                           common::ip_address_t, ///< upstream_addr;
-                           tPortId, ///< upstream_port;
-                           common::ipv4_prefix_t, ///< prefix
-                           bool, ///< proxy_header;
-                           uint32_t, ///< size_connections_table;
-                           uint32_t, ///< size_syn_table;
-                           bool, ///< use_sack;
-                           uint32_t, ///< mss;
-                           uint32_t, ///< winscale;
-                           bool, ///< timestamps;
-                           bool, ///< ignore_size_update_detections;
-                           uint32_t, ///< timeout_syn_rto
-                           uint32_t, ///< timeout_syn_recv
-                           uint32_t>; ///< timeout_established
+using request = std::tuple<tCounterId, ///< counter id;
+                           controlplane::proxy::service_t>; ///< service
 }
 
 namespace update_early_decap_flags
@@ -572,7 +548,6 @@ using requestVariant = std::variant<std::tuple<>,
                                     tun64mappings_update::request,
                                     update_balancer::request,
                                     update_balancer_services::request,
-                                    proxy_update::request,
                                     proxy_or_service_remove::request,
                                     proxy_service_update::request,
                                     route_tunnel_weight_update::request,

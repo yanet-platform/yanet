@@ -1104,65 +1104,99 @@ void config_parser_t::loadConfig_nat46clat(controlplane::base_t& baseNext,
 	nat46clat.nat46clat_id = nat46clat_id;
 }
 
+void CheckRequiredParameters(const nlohmann::json& moduleJson, const std::vector<std::string>& required_parameters)
+{
+	for (const auto& parameter : required_parameters)
+	{
+		if (!exist(moduleJson, parameter))
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "parameter not found: " + parameter);
+		}
+	}
+}
+
+uint32_t TimeoutValue(const nlohmann::json& moduleJson, const std::string& name, uint32_t default_value)
+{
+	return (exist(moduleJson, "timeouts") ? moduleJson["timeouts"].value(name, default_value) : default_value);
+}
+
+void LoadBlackList(const nlohmann::json& moduleJson, const std::string& rootFilePath, std::set<common::ip_prefix_t>& blacklist)
+{
+	if (!exist(moduleJson, "blacklist"))
+	{
+		return;
+	}
+
+	auto json_blacklist = moduleJson["blacklist"];
+	if (json_blacklist.is_string())
+	{
+		std::string includePath = json_blacklist;
+		if (includePath.find("/") != 0) ///< relative path
+		{
+			includePath = dirname(rootFilePath) + "/" + includePath;
+		}
+		std::ifstream includeFileStream(includePath);
+		if (!includeFileStream.is_open())
+		{
+			throw error_result_t(eResult::errorOpenFile, "can't open file " + includePath);
+		}
+		std::string prefix;
+		while (std::getline(includeFileStream, prefix))
+		{
+			blacklist.insert(common::ip_prefix_t(prefix));
+		}
+	}
+	else
+	{
+		for (const auto& prefix : json_blacklist)
+		{
+			blacklist.insert(common::ip_prefix_t(prefix));
+		}
+	}
+}
+
+bool IsPower2(uint32_t value)
+{
+	return (value != 0) && ((value & (value - 1)) == 0);
+}
+
 void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
                                        const std::string& moduleId,
                                        const nlohmann::json& moduleJson,
                                        const std::string& rootFilePath,
                                        const std::map<std::string, nlohmann::json>& jsons)
 {
-	proxy_id_t proxy_id = baseNext.proxies.size() + 1;
+	std::vector<std::string> required_parameters = {"upstreamNet", "services", "nextModule"};
+	CheckRequiredParameters(moduleJson, required_parameters);
 
 	auto& proxy = baseNext.proxies[moduleId];
 
-	proxy.upstream_net = moduleJson.value("upstreamNet", "");
-	
-	if (exist(moduleJson, "timeouts"))
-	{
-		proxy.timeout_syn_rto = moduleJson["timeouts"].value("SYNRTO", YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO);
-		proxy.timeout_syn_recv = moduleJson["timeouts"].value("SYNRecv", YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV);
-		proxy.timeout_established = moduleJson["timeouts"].value("established", YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED);
-	} 
-	else
-	{
-		proxy.timeout_syn_rto = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO;
-		proxy.timeout_syn_recv = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV;
-		proxy.timeout_established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED;
-	}
+	// sizes of tables
+	proxy.size_connections_table = moduleJson.value("sizeConnectionsTable", 0);
+	proxy.size_syn_table = moduleJson.value("sizeSYNTable", 0);
 
+	proxy.nextModule = moduleJson["nextModule"];
+	proxy.upstream_net = moduleJson.value("upstreamNet", "");
+	LoadBlackList(moduleJson, rootFilePath, proxy.blacklist);
+	proxy.proxy_header = moduleJson.value("proxyHeader", YANET_PROXY_DEFAULT_USE_PROXY_HEADER);
+
+	// tcp options
 	proxy.use_sack = moduleJson.value("useSack", YANET_PROXY_DEFAULT_USE_SACK);
 	proxy.mss = moduleJson.value("mss", YANET_PROXY_DEFAULT_MSS);
 	proxy.winscale = moduleJson.value("winscale", YANET_PROXY_DEFAULT_WINSCALE);
 	proxy.timestamps = moduleJson.value("timestamps", YANET_PROXY_DEFAULT_USE_TIMESTAMPS);
 	proxy.ignore_size_update_detections = moduleJson.value("ignoreSizeUpdateDetections", false);
 
-	if (exist(moduleJson, "services"))
-	{
-		loadConfig_proxy_services(baseNext,
-		                          proxy,
-		                          moduleJson["services"],
-		                          rootFilePath,
-		                          jsons);
-	}
+	// timeouts	
+	proxy.timeout_syn_rto = TimeoutValue(moduleJson, "SYNRTO", YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO);
+	proxy.timeout_syn_recv = TimeoutValue(moduleJson, "SYNRecv", YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV);
+	proxy.timeout_established = TimeoutValue(moduleJson, "established", YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED);
 
-	proxy.proxy_id = proxy_id;
-	proxy.nextModule = moduleJson.value("nextModule", "");
-
-	// YANET_LOG_WARNING("loadConfig_proxy proxy_id=%d, syn_type=%s\n", proxy.proxy_id, controlplane::proxy::from_proxy_type(proxy.syn_type));
-	// YANET_LOG_WARNING("\tmax_local_addresses=%d, mem_size_syn=%d, mem_size_connections=%d, timeout_syn=%d, timeout_connection=%d, timeout_fin=%d\n",
-	// 	proxy.max_local_addresses, proxy.mem_size_syn, proxy.mem_size_connections, proxy.timeout_syn, proxy.timeout_connection, proxy.timeout_fin);
-	// for (const auto& local_prefix : proxy.local_pool)
-	// {
-	// 	YANET_LOG_WARNING("\tlocal prefix: %s\n", local_prefix.toString().c_str());
-	// }
-	// for (const auto& service : proxy.services)
-	// {
-	// 	YANET_LOG_WARNING("\tservice service_id=%d, name=%s, proxy_addr=%s, proxy_port=%d, service_addr=%s, service_port=%d\n",
-	// 		service.service_id, service.service.c_str(), service.proxy_addr.toString().c_str(), service.proxy_port, service.service_addr.toString().c_str(), service.service_port);
-	// 	for (auto& prefix : service.blacklist)
-	// 	{
-	// 		YANET_LOG_WARNING("\t\tblacklist: %s\n", prefix.toString().c_str());
-	// 	}
-	// }
+	loadConfig_proxy_services(baseNext,
+								proxy,
+								moduleJson["services"],
+								rootFilePath,
+								jsons);
 }
 
 void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
@@ -1214,7 +1248,7 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 		return;
 	}
 
-
+	std::set<controlplane::proxy::service_t::key_t> upstreams;
 	for (const auto& service_json : json)
 	{
 		if (baseNext.services_count >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
@@ -1222,85 +1256,70 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 			throw error_result_t(eResult::invalidConfigurationFile, "too many services");
 		}
 
+		std::vector<std::string> required_parameters = {"proxyAddress", "proxyPort", "proto", "service", "upstreamAddress", "upstreamPort"};
+		CheckRequiredParameters(service_json, required_parameters);
+
 		controlplane::proxy::service_t service;
+
 		service.service_id = baseNext.proxy_services_count + 1;
+		service.service = service_json["service"];
 
-		std::vector<std::string> required_parameters = {"proxyAddress", "proxyPort", "upstreamAddress", "upstreamPort", "sizeConnectionsTable", "sizeSYNTable"};
-		for (const auto& parameter : required_parameters)
-		{
-			if (!exist(service_json, parameter))
-			{
-				throw error_result_t(eResult::invalidConfigurationFile, "parameter not found: " + parameter);
-			}
-		}
-
-		service.service = service_json.value("service", "");
+		// key: proxy address, port and protocol
 		service.proxy_addr = common::ip_address_t(service_json["proxyAddress"]);
 		service.proxy_port = service_json["proxyPort"];
+		std::string str_proto = service_json["proto"];
+		service.proto = controlplane::balancer::to_proto(str_proto);
+		if (service.proto == 0)
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "bad value proto: " + str_proto);
+		}
+
+		// service address, port
 		service.upstream_addr = common::ip_address_t(service_json["upstreamAddress"]);
 		service.upstream_port = service_json["upstreamPort"];
-		service.proxy_header = service_json.value("proxyHeader", true);
-		service.size_connections_table = service_json["sizeConnectionsTable"];
-		if ((service.size_connections_table & (service.size_connections_table - 1)) != 0)
+
+		// sizes of tables
+		service.size_connections_table = service_json.value("sizeConnectionsTable", proxy.size_connections_table);
+		service.size_syn_table = service_json.value("sizeSYNTable", proxy.size_syn_table);
+		if (!IsPower2(service.size_connections_table))
 		{
 			throw error_result_t(eResult::invalidConfigurationFile, "sizeConnectionsTable must be power of 2");
 		}
-		service.size_syn_table = service_json.value("sizeSYNTable", 0);
-		if ((service.size_syn_table & (service.size_syn_table - 1)) != 0)
+		if ((service.size_syn_table != 0) && !IsPower2(service.size_syn_table))
 		{
-			throw error_result_t(eResult::invalidConfigurationFile, "sizeSYNTable must be power of 2");
+			throw error_result_t(eResult::invalidConfigurationFile, "sizeSYNTable must be 0 or power of 2");
 		}
+
+		service.upstream_net = proxy.upstream_net;
+		service.blacklist = proxy.blacklist;
+		LoadBlackList(service_json, rootFilePath, service.blacklist);
+		service.proxy_header = service_json.value("proxyHeader", proxy.proxy_header);
+
+		// tcp options
 		service.use_sack = service_json.value("useSack", proxy.use_sack);
 		service.mss = service_json.value("mss", proxy.mss);
 		service.winscale = service_json.value("winscale", proxy.winscale);
 		service.timestamps = service_json.value("timestamps", proxy.timestamps);
 		service.ignore_size_update_detections = service_json.value("ignoreSizeUpdateDetections", proxy.ignore_size_update_detections);
 
-		if (exist(service_json, "timeouts"))
-		{
-			service.timeout_syn_rto = service_json["timeouts"].value("SYNRTO", proxy.timeout_syn_rto);
-			service.timeout_syn_recv = service_json["timeouts"].value("SYNRecv", proxy.timeout_syn_recv);
-			service.timeout_established = service_json["timeouts"].value("established", proxy.timeout_established);
-		}
-		else
-		{
-			service.timeout_syn_rto = proxy.timeout_syn_rto;
-			service.timeout_syn_recv = proxy.timeout_syn_recv;
-			service.timeout_established = proxy.timeout_established;
-		}
+		// timeouts	
+		service.timeout_syn_rto = TimeoutValue(service_json, "SYNRTO", proxy.timeout_syn_rto);
+		service.timeout_syn_recv = TimeoutValue(service_json, "SYNRecv", proxy.timeout_syn_recv);
+		service.timeout_established = TimeoutValue(service_json, "established", proxy.timeout_established);
 
-		if (exist(service_json, "blacklist"))
+		// check duplicates
+		if (proxy.services.find(service.Key()) != proxy.services.end())
 		{
-			auto json_blacklist = service_json["blacklist"];
-			if (json_blacklist.is_string())
-			{
-				std::string includePath = json_blacklist;
-				if (includePath.find("/") != 0) ///< relative path
-				{
-					includePath = dirname(rootFilePath) + "/" + includePath;
-				}
-				std::ifstream includeFileStream(includePath);
-				if (!includeFileStream.is_open())
-				{
-					throw error_result_t(eResult::errorOpenFile, "can't open file " + includePath);
-				}
-				std::string prefix;
-				while (std::getline(includeFileStream, prefix))
-				{
-					service.blacklist.insert(common::ip_prefix_t(prefix));
-				}
-			}
-			else
-			{
-				for (const auto& prefix : json_blacklist)
-				{
-					service.blacklist.insert(common::ip_prefix_t(prefix));
-				}
-			}
+			throw error_result_t(eResult::invalidConfigurationFile, "Duplicate service: " + service.proxy_addr.toString());
 		}
+		controlplane::proxy::service_t::key_t upstream = {service.upstream_addr, service.upstream_port, service.proto};
+		if (upstreams.find(upstream) != upstreams.end())
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "Duplicate upstream: " + service.upstream_addr.toString());
+		}
+		upstreams.insert(upstream);
 
-		proxy.services.push_back(std::move(service));
-
+		proxy.services[service.Key()] = std::move(service);
 		baseNext.proxy_services_count++;
 	}
 }

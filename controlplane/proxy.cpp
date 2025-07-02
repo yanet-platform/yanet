@@ -1,5 +1,6 @@
-#include "proxy.h"
 #include "controlplane.h"
+#include "errors.h"
+#include "proxy.h"
 
 eResult proxy_t::init()
 {
@@ -29,72 +30,38 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
 {
 	generations_config.next().update(base_prev, base_next);
 
-    // remove old proxies
-    for (const auto& [module_name, config] : base_prev.proxies)
+    std::map<controlplane::proxy::service_t::key_t, controlplane::proxy::service_t> empty;
+    auto& services_prev = (base_prev.proxies.empty() ? empty : base_prev.proxies.begin()->second.services);
+    auto& services_next = (base_next.proxies.empty() ? empty : base_next.proxies.begin()->second.services);
+
+    for (const auto& iter_prev : services_prev)
     {
-        if (base_next.proxies.find(module_name) == base_next.proxies.end())
+        if (services_next.find(iter_prev.first) == services_next.end())
         {
-            std::optional<proxy_id_t> proxy_id = RemoveModule(globalbase, module_name);
-            if (proxy_id.has_value())
-            {
-                for (const auto& service : config.services)
-                {
-                    RemoveService(globalbase, *proxy_id, service);
-                }
-            }
+            // service removed
+            proxy_service_id_t service_id = iter_prev.second.service_id;
+            service_counters.remove(service_id);
+            globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_service_remove,
+	                    common::idp::updateGlobalBase::proxy_or_service_remove::request{service_id});
         }
     }
 
-    // add new proxies and update existing
-    for (const auto& [module_name, config] : base_next.proxies)
+    for (auto& iter_next : services_next)
     {
-        auto iter_prev = base_prev.proxies.find(module_name);
-        if (iter_prev == base_prev.proxies.end())
+        const controlplane::proxy::service_t& service = iter_next.second;
+        const auto iter_prev = services_prev.find(iter_next.first);
+        if (iter_prev == services_prev.end())
         {
-            // new
-            std::optional<proxy_id_t> proxy_id = AddModule(globalbase, module_name, config);
-            if (proxy_id.has_value())
-            {
-                for (const auto& service : config.services)
-                {
-                    AddService(globalbase, *proxy_id, service, config.upstream_net);
-                }
-            }
+            // new service
+            service_counters.insert(service.service_id);
+            AddRequestUpdateService(globalbase, service);
         }
         else
         {
-            // existing
-            std::optional<proxy_id_t> proxy_id = UpdateModule(globalbase, module_name, config);
-            if (!proxy_id.has_value())
+            // check, is service changed
+            if (service.as_tuple() != iter_prev->second.as_tuple())
             {
-                continue;
-            }
-
-            auto services_prev = iter_prev->second.BuildMapServices();
-            auto services_next = config.BuildMapServices();
-
-            // remove old services
-            for (auto iter_serv_prev : services_prev)
-            {
-                if (services_next.find(iter_serv_prev.first) == services_next.end())
-                {
-                    RemoveService(globalbase, *proxy_id, *iter_serv_prev.second);
-                }
-            }
-
-            for (auto iter_serv_next : services_next)
-            {
-                auto iter_serv_prev = services_prev.find(iter_serv_next.first);
-                if (iter_serv_prev == services_prev.end())
-                {
-                    // new
-                    AddService(globalbase, *proxy_id, *iter_serv_next.second, config.upstream_net);
-                }
-                else
-                {
-                    // existing
-                    UpdateService(globalbase, *proxy_id, *iter_serv_next.second, config.upstream_net);
-                }
+                AddRequestUpdateService(globalbase, service);
             }
         }
     }
@@ -120,135 +87,15 @@ void proxy_t::compile(common::idp::updateGlobalBase::request& globalbase,
             auto& request_update = std::get<common::idp::updateGlobalBase::proxy_service_update::request>(request);
             proxy_service_id_t service_id = std::get<0>(request_update);
             tCounterId counter_id = service_counters.get_id(service_id);
-            std::get<1>(request_update) = counter_id;
-            // YANET_LOG_WARNING("For service %d counter id: %d\n", service_id, counter_id);
+            std::get<0>(request_update) = counter_id;
         }
     }
 }
 
-std::optional<proxy_id_t> proxy_t::AddModule(common::idp::updateGlobalBase::request& globalbase, const std::string& module_name, const controlplane::proxy::config_t& config)
-{
-    std::optional<proxy_id_t> proxy_id = proxy_assigner.Assign();
-    if (!proxy_id.has_value())
-    {
-        YANET_LOG_ERROR("Can't assign id for proxy module: %s\n", module_name.c_str());
-    }
-    else
-    {
-        modules[module_name] = *proxy_id;
-        // YANET_LOG_WARNING("MODULE add: %s, ID=%d\n", module_name.c_str(), *proxy_id);
-        AddRequestUpdateProxy(globalbase, *proxy_id, config);
-    }
-    return proxy_id;
-}
-
-std::optional<proxy_id_t> proxy_t::UpdateModule(common::idp::updateGlobalBase::request& globalbase, const std::string& module_name, const controlplane::proxy::config_t& config)
-{
-    auto iter = modules.find(module_name);
-    if (iter == modules.end())
-    {
-        YANET_LOG_ERROR("not found module: %s\n", module_name.c_str());
-        return std::nullopt;
-    }
-    proxy_id_t proxy_id = iter->second;
-    // YANET_LOG_WARNING("MODULE update: %s, ID=%d\n", module_name.c_str(), proxy_id);
-    AddRequestUpdateProxy(globalbase, proxy_id, config);
-    return proxy_id;
-}
-
-std::optional<proxy_id_t> proxy_t::RemoveModule(common::idp::updateGlobalBase::request& globalbase, const std::string& module_name)
-{
-    auto iter = modules.find(module_name);
-    if (iter == modules.end())
-    {
-        YANET_LOG_ERROR("not found module: %s\n", module_name.c_str());
-        return std::nullopt;
-    }
-    proxy_id_t proxy_id = iter->second;
-
-    proxy_assigner.Free(proxy_id);
-    modules.erase(module_name);
-    // YANET_LOG_WARNING("MODULE remove: %s, ID=%d\n", module_name.c_str(), proxy_id);
-    globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_remove,
-                            common::idp::updateGlobalBase::proxy_or_service_remove::request{proxy_id});
-    return proxy_id;
-}
-
-void proxy_t::AddService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service, const common::ipv4_prefix_t& prefix)
-{
-    std::optional<proxy_id_t> service_id = services_assigner.Assign();
-    if (!service_id.has_value())
-    {
-        YANET_LOG_ERROR("Can't assign id for service: %s\n", service.service.c_str());
-        return;
-    }
-    service_counters.insert(*service_id);
-    services[service.Key()] = *service_id;
-    // YANET_LOG_WARNING("SERVICE add: %s:%d, IDs=%d to IDp=%d\n", service.proxy_addr.toString().c_str(), service.proxy_port, *service_id, proxy_id);
-    AddRequestUpdateService(globalbase, proxy_id, *service_id, service, prefix);
-}
-
-void proxy_t::UpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service, const common::ipv4_prefix_t& prefix)
-{
-    auto iter = services.find(service.Key());
-    if (iter == services.end())
-    {
-        YANET_LOG_ERROR("not found service\n");
-        return;
-    }
-    proxy_id_t service_id = iter->second;
-
-    // YANET_LOG_WARNING("SERVICE update: %s:%d, ID=%d\n", service.proxy_addr.toString().c_str(), service.proxy_port, service_id);
-    AddRequestUpdateService(globalbase, proxy_id, service_id, service, prefix);
-}
-
-void proxy_t::RemoveService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::service_t& service)
-{
-    auto iter = services.find(service.Key());
-    if (iter == services.end())
-    {
-        YANET_LOG_ERROR("not found service\n");
-        return;
-    }
-    proxy_service_id_t service_id = iter->second;
-
-    service_counters.remove(service_id);
-
-    services.erase(service.Key());
-    services_assigner.Free(service_id);
-    // YANET_LOG_WARNING("SERVICE remove: %s:%d, ID=%d\n", service.proxy_addr.toString().c_str(), service.proxy_port, service_id);
-    globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_service_remove,
-	                    common::idp::updateGlobalBase::proxy_or_service_remove::request{service_id});
-}
-
-void proxy_t::AddRequestUpdateProxy(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, const controlplane::proxy::config_t& config)
-{
-	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_update,
-	                        common::idp::updateGlobalBase::proxy_update::request{proxy_id,
-	                                                                             config.flow});
-}
-
-void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& globalbase, proxy_id_t proxy_id, proxy_service_id_t service_id, const controlplane::proxy::service_t& config, const common::ipv4_prefix_t& prefix)
+void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& globalbase, const controlplane::proxy::service_t& service)
 {
 	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_service_update,
-	                        common::idp::updateGlobalBase::proxy_service_update::request{service_id,
-	                                                                                     0,
-	                                                                                     config.proxy_addr,
-	                                                                                     config.proxy_port,
-	                                                                                     config.upstream_addr,
-	                                                                                     config.upstream_port,
-                                                                                         prefix,
-	                                                                                     config.proxy_header,
-	                                                                                     config.size_connections_table,
-	                                                                                     config.size_syn_table,
-	                                                                                     config.use_sack,
-	                                                                                     config.mss,
-	                                                                                     config.winscale,
-                                                                                         config.timestamps,
-	                                                                                     config.ignore_size_update_detections,
-                                                                                         config.timeout_syn_rto,
-                                                                                         config.timeout_syn_recv,
-                                                                                         config.timeout_established,});
+	                        common::idp::updateGlobalBase::proxy_service_update::request{0, service});
 }
 
 void proxy_t::counters_gc_thread()
@@ -274,8 +121,9 @@ common::icp::proxy_counters::response proxy_t::proxy_counters() const
 
 	for (auto& [module, config] : config_proxies)
 	{
-		for (controlplane::proxy::service_t& service : config.services)
+		for (const auto& iter_service : config.services)
 		{
+            const controlplane::proxy::service_t& service = iter_service.second;
             proxy_service_id_t service_id = service.service_id;
             std::string service_name = service.service;
             std::array<uint64_t, num_counters> counts;

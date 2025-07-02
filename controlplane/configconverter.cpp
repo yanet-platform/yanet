@@ -322,8 +322,6 @@ void config_converter_t::convertToFlow(const std::string& nextModule,
 			throw error_result_t(eResult::invalidFlow, "invalid nextModule: " + nextModule);
 		}
 
-		flow.data.proxy.id = it->second.proxy_id;
-
 		if (entry == "client_syn")
 		{
 			flow.type = common::globalBase::eFlowType::proxy_client_syn;
@@ -736,14 +734,14 @@ void config_converter_t::processBalancer()
 	
 void config_converter_t::processProxy()
 {
+	if (baseNext.proxies.size() > 1)
+	{
+		throw error_result_t(eResult::invalidProxyId, "No more than one proxy module is allowed");
+	}
+
 	for (auto& [moduleName, proxy] : baseNext.proxies)
 	{
 		GCC_BUG_UNUSED(moduleName);
-
-		if (proxy.proxy_id >= YANET_CONFIG_PROXIES_SIZE)
-		{
-			throw error_result_t(eResult::invalidProxyId, "invalid ProxyId: " + std::to_string(proxy.proxy_id));
-		}
 
 		convertToFlow(proxy.nextModule, proxy.flow);
 
@@ -761,14 +759,66 @@ void config_converter_t::processProxy()
 			throw error_result_t(eResult::invalidFlow, "empty local pool for proxy");
 		}
 
-		for (const auto& service : proxy.services)
+		for (auto& iter_service : proxy.services)
 		{
+			controlplane::proxy::service_t& service = iter_service.second;
 			if (service.service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
 			{
 				throw error_result_t(eResult::invalidConfigurationFile, "too many services");
 			}
+			service.flow = proxy.flow;
 		}
 	}
+
+	// get service_id from old proxy services
+	std::set<proxy_service_id_t> used_service_ids;
+	std::map<controlplane::proxy::service_t::key_t, proxy_service_id_t> old_services_ids;
+	for (const auto& iter_proxy : controlplane_ptr->base.proxies)
+	{
+		for (const auto& [service_key, service] : iter_proxy.second.services)
+		{
+			GCC_BUG_UNUSED(service_key);
+			used_service_ids.insert(service.service_id);
+			old_services_ids[service.Key()] = service.service_id;
+		}
+	}
+
+	// set service_id for proxy services
+	proxy_service_id_t id_for_new = 1;
+	for (auto& iter_proxy : baseNext.proxies)
+	{
+		for (auto& [service_key, service] : iter_proxy.second.services)
+		{
+			auto iter_base = old_services_ids.find(service_key);
+			if (iter_base != old_services_ids.end())
+			{
+				service.service_id = iter_base->second;
+			}
+			else
+			{
+				bool found = false;
+				while (id_for_new < YANET_CONFIG_PROXY_SERVICES_SIZE)
+				{
+					if (used_service_ids.find(id_for_new) != used_service_ids.end())
+					{
+						id_for_new++;
+						continue;
+					}
+					service.service_id = id_for_new;
+					used_service_ids.insert(id_for_new);
+					found = true;
+					YANET_LOG_WARNING("\tset id=%d, service=%s\n", id_for_new, std::get<0>(service_key).toString().c_str());
+					break;
+				}
+				if (!found)
+				{
+					throw error_result_t(eResult::invalidConfigurationFile, "can't get free id for proxy service");
+				}
+
+			}
+		}
+	}
+
 	/// continue in proxy::compile()
 }
 
@@ -1917,8 +1967,9 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 {
 	const auto& proxy = baseNext.proxies.at(nextModule);
 
-	for (const auto& service : proxy.services)
+	for (const auto& iter_service : proxy.services)
 	{
+		const controlplane::proxy::service_t& service = iter_service.second;
 		YANET_LOG_WARNING("\t\t acl_rules_proxy service_id=%d, proxy_addr=%s\n", service.service_id, service.proxy_addr.toString().c_str());
 		controlplane::base::acl_rule_network_ipv4_t client_rule_network({common::ipv4_prefix_default}, {common::ipv4_prefix_t(service.proxy_addr)});
 		controlplane::base::acl_rule_transport_tcp_t client_rule_transport{range_t{0x0000, 0xFFFF}, range_t{service.proxy_port}};
@@ -1934,7 +1985,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// client_syn
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_syn");	
-			flow.data.proxy.service_id = service.service_id;
+			flow.data.proxy_service_id = service.service_id;
 			client_rule_transport.flags = {TCP_SYN_FLAG, TCP_ACK_FLAG};
 			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
 		}
@@ -1942,7 +1993,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// client_ack
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_ack");	
-			flow.data.proxy.service_id = service.service_id;
+			flow.data.proxy_service_id = service.service_id;
 			client_rule_transport.flags = {0, TCP_SYN_FLAG};
 			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
 		}
@@ -1950,7 +2001,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// client_icmp
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_icmp");	
-			flow.data.proxy.service_id = service.service_id;
+			flow.data.proxy_service_id = service.service_id;
 			ranges_t ping_types(values_t({ICMP_ECHO}));
 			ranges_t ping_codes(values_t({ICMP_ECHOREPLY}));
 			controlplane::base::acl_rule_transport_icmpv4_t rule_ping(ping_types, ping_codes);
@@ -1963,7 +2014,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// server_syn_ack
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "server_syn_ack");	
-			flow.data.proxy.service_id = service.service_id;
+			flow.data.proxy_service_id = service.service_id;
 			server_rule_transport.flags = {TCP_SYN_FLAG | TCP_ACK_FLAG , 0};
 			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
 		}
@@ -1971,7 +2022,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// server_ack
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "server_ack");	
-			flow.data.proxy.service_id = service.service_id;
+			flow.data.proxy_service_id = service.service_id;
 			server_rule_transport.flags = {TCP_ACK_FLAG, TCP_SYN_FLAG};
 			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
 		}

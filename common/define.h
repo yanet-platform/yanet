@@ -110,6 +110,7 @@ extern LogPriority logPriority;
 #define YANET_BALANCER_PURE_L3 ((uint8_t)(1u << 2))
 #define YANET_BALANCER_PURE_ROUND_ROBIN ((uint8_t)(1u << 3))
 
+#define YANET_PROXY_DEFAULT_USE_PROXY_HEADER ((bool)(true))
 #define YANET_PROXY_DEFAULT_MSS ((uint32_t)(1460))
 #define YANET_PROXY_DEFAULT_USE_SACK ((bool)(true))
 #define YANET_PROXY_DEFAULT_WINSCALE ((uint32_t)(14))

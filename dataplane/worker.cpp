@@ -6143,10 +6143,8 @@ inline void cWorker::proxy_client_syn_handle()
 		rte_mbuf* mbuf = proxy_client_syn_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		proxy_id_t proxy_id = metadata->flow.data.proxy.id;
-		proxy_service_id_t service_id = metadata->flow.data.proxy.service_id;
+		proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
 
-		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[proxy_id];
 		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
 		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
@@ -6155,7 +6153,7 @@ inline void cWorker::proxy_client_syn_handle()
 
 		if (tcp_connection_store->ActionClientOnSyn(service_id, proxy_worker_id, service, mbuf, &counters[service.counter_id]))
 		{
-			proxy_flow(mbuf, proxy.flow);
+			proxy_flow(mbuf, service.flow);
 		}
 		else
 		{
@@ -6187,10 +6185,8 @@ inline void cWorker::proxy_client_ack_handle()
 		rte_mbuf* mbuf = proxy_client_ack_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		proxy_id_t proxy_id = metadata->flow.data.proxy.id;
-		proxy_service_id_t service_id = metadata->flow.data.proxy.service_id;
+		proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
 
-		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[proxy_id];
 		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
 		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
@@ -6198,7 +6194,7 @@ inline void cWorker::proxy_client_ack_handle()
 
 		if (tcp_connection_store->ActionClientOnAck(service_id, proxy_worker_id, service, mbuf, &counters[service.counter_id]))
 		{
-			proxy_flow(mbuf, proxy.flow);
+			proxy_flow(mbuf, service.flow);
 		}
 		else
 		{
@@ -6228,17 +6224,15 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		rte_mbuf* mbuf = proxy_server_syn_ack_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		proxy_id_t proxy_id = metadata->flow.data.proxy.id;
-		proxy_service_id_t service_id = metadata->flow.data.proxy.service_id;
+		proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
 
-		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[proxy_id];
 		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
 		if (tcp_connection_store->ActionServiceOnSynAck(service_id, service, mbuf, &counters[service.counter_id]))
 		{
 			counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
 			counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;			
-			proxy_flow(mbuf, proxy.flow);
+			proxy_flow(mbuf, service.flow);
 		}
 		else
 		{
@@ -6268,17 +6262,15 @@ inline void cWorker::proxy_server_ack_handle()
 		rte_mbuf* mbuf = proxy_server_ack_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		proxy_id_t proxy_id = metadata->flow.data.proxy.id;
-		proxy_service_id_t service_id = metadata->flow.data.proxy.service_id;
+		proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
 
-		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[proxy_id];
 		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
 		if (tcp_connection_store->ActionServiceOnAck(service_id, service, mbuf, &counters[service.counter_id]))
 		{
 			counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
 			counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;			
-			proxy_flow(mbuf, proxy.flow);
+			proxy_flow(mbuf, service.flow);
 		}
 		else
 		{
@@ -6310,8 +6302,7 @@ inline void cWorker::proxy_client_icmp_handle()
 		rte_mbuf* mbuf = proxy_client_icmp_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 
-		const dataplane::globalBase::proxy_t& proxy = base.globalBase->proxies[metadata->flow.data.proxy.id];
-		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[metadata->flow.data.proxy.service_id];
+		const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[metadata->flow.data.proxy_service_id];
 
 		icmpv4_header_t* icmpHeader = rte_pktmbuf_mtod_offset(mbuf, icmpv4_header_t*, metadata->transport_headerOffset);
 
@@ -6319,9 +6310,9 @@ inline void cWorker::proxy_client_icmp_handle()
 		icmpHeader->code = 0;
 
 		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-		YANET_LOG_WARNING("ping %s -> %s\n",
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(),
-				common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str());
+		// YANET_LOG_WARNING("ping %s -> %s\n",
+		// 		common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(),
+		// 		common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str());
 
 		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
 		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_in] += mbuf->pkt_len;
@@ -6346,7 +6337,7 @@ inline void cWorker::proxy_client_icmp_handle()
 		// todo:
 		// counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_generated_echo_reply_ipv4]++;
 
-		proxy_flow(mbuf, proxy.flow);
+		proxy_flow(mbuf, service.flow);
 	}
 
 	proxy_client_icmp_stack.clear();
