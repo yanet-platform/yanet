@@ -43,7 +43,7 @@ WriteTest("001", data_type1)
 
 # 002 - Error in SACK config - the server does not support SACK, although the configuration file states that it supports
 
-SYN_COOKIE2 = 0x3cc824ba
+SYN_COOKIE2 = 0x46964916
 test_002 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT)
 
 data_type2 = [
@@ -74,7 +74,7 @@ PORT_CLIENT_TS = 12500
 
 # ts1 - Client does not support timestamps
 
-SYN_COOKIE_TS_1 = 0xb58bffac
+SYN_COOKIE_TS_1 = 0x391dfefa
 test_ts1 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE_TS_1, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT_TS)
 
 # The first client packet does not contain timestamps, the proxy response should not contain timestamps
@@ -89,7 +89,7 @@ WriteTest("003_ts_1", data_type_ts_1)
 
 # ts2 - Client supports timestamps, but on proxy - disabled
 
-SYN_COOKIE_TS_2 = 0xc32c1f9c
+SYN_COOKIE_TS_2 = 0x535e3eda
 test_ts2 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER3, ip_proxy=IP_SERVER3, start_seq_to_client=SYN_COOKIE_TS_2, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT_TS+1)
 
 # The first client packet contains timestamps, but timestamps disabled on proxy, the proxy response should not contain timestamps
@@ -104,7 +104,7 @@ WriteTest("003_ts_2", data_type_ts_2)
 
 # ts3 - Client and proxy supports timestamps, but service does not
 
-SYN_COOKIE_TS_3 = 0x61c4400c
+SYN_COOKIE_TS_3 = 0x908e7fba
 test_ts3 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER2, ip_proxy=IP_SERVER2, start_seq_to_client=SYN_COOKIE_TS_3, port_proxy=PORT_PROXY_INT + 1, cport=PORT_CLIENT_TS+2)
 
 data_type_ts_3 = [
