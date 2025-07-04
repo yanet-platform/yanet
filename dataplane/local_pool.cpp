@@ -3,6 +3,8 @@
 namespace dataplane::proxy
 {
 
+constexpr uint32_t NULL_CHUNK = 0xffffffff;
+
 bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager)
 {
     if (initialized_)
@@ -53,7 +55,7 @@ bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
             .connections = {}
         };
     }
-    chunk_queue_[local_info_->num_free_chunks - 1].next_idx = 0xffffffff;
+    chunk_queue_[local_info_->num_free_chunks - 1].next_idx = NULL_CHUNK;
 
     for(uint32_t i = local_info_->first; i < local_info_->last + 1; i++)
     {
@@ -66,14 +68,14 @@ bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
             chunk_queue_[i].connections[j] = (i - local_info_->first) * chunk_size + j;
         }
     }
-    chunk_queue_[local_info_->last].next_idx = 0xffffffff;
+    chunk_queue_[local_info_->last].next_idx = NULL_CHUNK;
 
     for (uint32_t i = 0; i < max_workers; i++)
     {
-        local_info_->worker_chunks[i] = 0xffffffff;
-        local_info_->gc_chunks[i] = 0xffffffff;
+        local_info_->worker_chunks[i] = NULL_CHUNK;
+        local_info_->gc_chunks[i] = NULL_CHUNK;
     }
-    local_info_->gc_chunks[max_workers] = 0xffffffff;
+    local_info_->gc_chunks[max_workers] = NULL_CHUNK;
 
     local_info_->free_addresses = local_info_->num_chunks * chunk_size;
     local_info_->used_addresses = 0;
@@ -88,10 +90,10 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId c
     if (unlikely(!initialized_)) return 0;
 
     uint32_t idx = local_info_->worker_chunks[worker_id];
-    if (idx == 0xffffffff)
+    if (idx == NULL_CHUNK)
     {
         while(!local_info_->mutex.try_lock());
-        if (local_info_->first == 0xffffffff)
+        if (local_info_->first == NULL_CHUNK)
         {
             local_info_->mutex.unlock();
             return 0;
@@ -99,8 +101,8 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId c
 
         idx = local_info_->first;
         local_info_->first = chunk_queue_[idx].next_idx;
-        if (local_info_->first == 0xffffffff)
-            local_info_->last = 0xffffffff;
+        if (local_info_->first == NULL_CHUNK)
+            local_info_->last = NULL_CHUNK;
 
         local_info_->worker_chunks[worker_id] = idx;
         chunk_queue_[idx].offset = 0;    
@@ -117,7 +119,7 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId c
         while(!local_info_->mutex.try_lock());
         chunk.next_idx = local_info_->free_first;
         local_info_->free_first = idx;
-        local_info_->worker_chunks[worker_id] = 0xffffffff;
+        local_info_->worker_chunks[worker_id] = NULL_CHUNK;
         local_info_->mutex.unlock();
     }
     local_to_client_[local] = PackTuple(client_addr, client_port); 
@@ -142,10 +144,10 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
     }
 
     uint32_t gc_chunk = local_info_->gc_chunks[worker_id];
-    if (gc_chunk == 0xffffffff)
+    if (gc_chunk == NULL_CHUNK)
     {
         while(!local_info_->mutex.try_lock());
-        if (unlikely(local_info_->free_first == 0xffffffff))
+        if (unlikely(local_info_->free_first == NULL_CHUNK))
         {
             local_info_->mutex.unlock();
             YANET_LOG_ERROR("No free chunks available\n");
@@ -166,13 +168,13 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
     if (chunk.offset == chunk_size)
     {
         while(!local_info_->mutex.try_lock());
-        if (local_info_->last != 0xffffffff)
+        if (local_info_->last != NULL_CHUNK)
             chunk_queue_[local_info_->last].next_idx = gc_chunk;
         local_info_->last = gc_chunk;
-        if (local_info_->first == 0xffffffff)
+        if (local_info_->first == NULL_CHUNK)
             local_info_->first = gc_chunk;
-        local_info_->gc_chunks[worker_id] = 0xffffffff;
-        chunk_queue_[local_info_->last].next_idx = 0xffffffff;
+        local_info_->gc_chunks[worker_id] = NULL_CHUNK;
+        chunk_queue_[local_info_->last].next_idx = NULL_CHUNK;
         local_info_->mutex.unlock();
     }
 
