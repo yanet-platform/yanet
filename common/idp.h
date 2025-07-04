@@ -83,7 +83,6 @@ enum class requestType : uint32_t
 	memory_manager_stats,
         proxy_connections,
         proxy_syn,
-        proxy_local_pool,
         proxy_tables,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
@@ -800,10 +799,9 @@ using response = std::vector<state>;
 
 namespace proxy_connections
 {
-using request = std::tuple<std::optional<proxy_service_id_t>>; ///< proxy_service_id
+using request = proxy_service_id_t; ///< proxy_service_id
 
-using connection = std::tuple<proxy_service_id_t, ///< proxy_service_id
-                              uint32_t, ///< src_addr
+using connection = std::tuple<uint32_t, ///< src_addr
                               uint16_t, ///< src_port
                               uint32_t, ///< local_addr
                               uint16_t>; ///< local_port
@@ -813,26 +811,14 @@ using response = std::vector<connection>;
 
 namespace proxy_syn
 {
-using request = std::tuple<std::optional<proxy_service_id_t>>; ///< proxy_service_id
+using request = proxy_service_id_t; ///< proxy_service_id
 
-using connection = std::tuple<proxy_service_id_t, ///< proxy_service_id
-                              uint32_t, ///< src_addr
-                              uint16_t>; ///< src_port
+using connection = std::tuple<uint32_t, ///< src_addr
+                              uint16_t, ///< src_port
+                              uint32_t, ///< local_addr
+                              uint16_t>; ///< local_port
 
 using response = std::vector<connection>;        
-}
-
-namespace proxy_local_pool
-{
-using request = std::tuple<std::optional<proxy_service_id_t>>;
-
-using prefix = std::tuple<proxy_service_id_t, ///< proxy_service_id
-                          common::ip_prefix_t, ///< prefix
-                          uint32_t, ///< total addresses
-                          uint32_t, ///< free addresses
-                          uint32_t>; ///< used addresses
-
-using response = std::vector<prefix>;
 }
 
 namespace proxy_tables
@@ -840,10 +826,14 @@ namespace proxy_tables
 using request = std::tuple<std::optional<proxy_service_id_t>>;
 
 using tables = std::tuple<proxy_service_id_t, ///< proxy_service_id
-                        size_t, ///< connections
-                        size_t, ///< max connections
-                        size_t, ///< syn connections
-                        size_t>; ///< max syn connections
+                          size_t, ///< connections
+                          size_t, ///< max connections
+                          size_t, ///< syn connections
+                          size_t, ///< max syn connections
+                          common::ip_prefix_t, ///< local pool prefix
+                          uint32_t, ///< total addresses
+                          uint32_t, ///< free addresses
+                          uint32_t>; ///< used addresses
 
 using response = std::vector<tables>;
 }
@@ -1116,7 +1106,5 @@ using response = std::variant<std::tuple<>,
                               neighbor_stats::response,
                               memory_manager_stats::response,
                               proxy_connections::response,
-                              proxy_syn::response,
-                              proxy_local_pool::response,
                               proxy_tables::response>;
 }

@@ -219,7 +219,10 @@ public:
             bucket.Lock();
             for (uint32_t i = 0; i < Bucket::bucket_size; i++)
             {
-                func(bucket, i);
+                if (bucket.addresses[i] != 0)
+                {
+                    func(bucket, i);
+                }
             }
             bucket.Unlock();
         }

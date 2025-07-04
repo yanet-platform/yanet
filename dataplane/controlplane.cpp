@@ -994,20 +994,14 @@ common::idp::balancer_real_connections::response cControlPlane::balancer_real_co
 
 common::idp::proxy_connections::response cControlPlane::proxy_connections(const common::idp::proxy_connections::request& request)
 {
-	auto [service_id] = request;
+	auto service_id = request;
 	return dataPlane->tcp_connection_store.GetConnections(service_id);
 }
 
 common::idp::proxy_syn::response cControlPlane::proxy_syn(const common::idp::proxy_syn::request& request)
 {
-	auto [service_id] = request;
+	auto service_id = request;
 	return dataPlane->tcp_connection_store.GetSyn(service_id);
-}
-
-common::idp::proxy_local_pool::response cControlPlane::proxy_local_pool(const common::idp::proxy_local_pool::request& request)
-{
-	auto [service_id] = request;
-	return dataPlane->tcp_connection_store.GetLocalPool(service_id);
 }
 
 common::idp::proxy_tables::response cControlPlane::proxy_tables(const common::idp::proxy_tables::request& request)

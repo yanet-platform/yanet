@@ -211,13 +211,18 @@ uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) c
     return client;
 }
 
-void LocalPool::GetLocalPool(proxy_service_id_t service_id, common::idp::proxy_local_pool::response& response) const {
+LocalPoolStat LocalPool::GetStat() const {
+    LocalPoolStat stat;
     if (unlikely(!initialized_))
     {
-        return;
+        return stat;
     }
 
-    response.emplace_back(service_id, common::ipv4_prefix_t{prefix_.address.address, prefix_.mask}, local_info_->num_chunks * chunk_size, local_info_->free_addresses, local_info_->used_addresses);
+    stat.prefix = common::ipv4_prefix_t{prefix_.address.address, prefix_.mask};
+    stat.total_addresses = local_info_->num_chunks * chunk_size;
+    stat.free_addresses = local_info_->free_addresses;
+    stat.used_addresses = local_info_->used_addresses;
+    return stat;
 }
 
 inline uint64_t LocalPool::index_to_tuple(uint32_t index) const

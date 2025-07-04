@@ -13,6 +13,14 @@
 namespace dataplane::proxy
 {
 
+struct LocalPoolStat
+{
+    common::ipv4_prefix_t prefix;
+    uint32_t total_addresses;
+    uint32_t free_addresses;
+    uint32_t used_addresses;
+};
+
 class LocalPool
 {
 public:
@@ -32,7 +40,7 @@ public:
     uint64_t FindClientByLocal(uint32_t local_addr, tPortId local_port) const;
     void Free(uint32_t worker_id, uint64_t tuple);
 
-    void GetLocalPool(proxy_service_id_t service_id, common::idp::proxy_local_pool::response& response) const;
+    LocalPoolStat GetStat() const;
 
     constexpr static size_t max_workers = 128;
     constexpr static uint16_t min_port = 32768;

@@ -279,8 +279,6 @@ eResult TcpConnectionStore::ServiceUpdate(proxy_service_t& service, dataplane::m
     // YANET_LOG_WARNING("\t\tuse_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", service.use_sack, service.mss, service.winscale, service.timestamps);
 	// YANET_LOG_WARNING("\t\t!!!!! currentGlobalBaseId=%d, first_state_update_global_base=%d\n", currentGlobalBaseId, first_state_update_global_base);
 
-    std::lock_guard guard(mutex_);
-
     uint8_t newGlobalBaseId = currentGlobalBaseId ^ 1;
     eResult result;
     if (first_state_update_global_base)
@@ -319,112 +317,33 @@ void TcpConnectionStore::ServiceRemove(proxy_service_t& service, dataplane::memo
 void TcpConnectionStore::CollectGarbage()
 {
     // YANET_LOG_WARNING("TcpConnectionStore::CollectGarbage: current_time=%d\n", current_time);
-    // uint64_t current_time = current_time_ms;
-    // std::lock_guard guard(mutex_);
-    // for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-    // {
-    //     // syn_connections_[index].CollectGarbage(current_time, local_pools_[index]);
-    //     // service_connections_[index].CollectGarbage(current_time, local_pools_[index]);
-    // }
+    uint64_t current_time = current_time_ms;
+    for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+    {
+        updater_proxy_tables[index].CollectGarbage(current_time);
+    }
 }
 
 void TcpConnectionStore::UpdateSynCookieKeys()
 {
     // YANET_LOG_WARNING("TcpConnectionStore::UpdateSynCookieKeys\n");
-    std::lock_guard guard(mutex_);
     for (uint32_t i = 0; i < YANET_CONFIG_PROXY_SERVICES_SIZE; i++)
         syn_cookies_[i].UpdateKeys();
 }
 
 // Info
 
-common::idp::proxy_connections::response TcpConnectionStore::GetConnections(std::optional<proxy_service_id_t> service_id)
+common::idp::proxy_connections::response TcpConnectionStore::GetConnections(proxy_service_id_t service_id)
 {
     common::idp::proxy_connections::response response;
-    // uint64_t current_time = current_time_ms;
-    // std::lock_guard guard(mutex_);
-
-    // if (!service_id.has_value())
-    // {
-    //     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-    //     {
-    //         service_connections_[index].GetConnections([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx) {
-    //             Connection& connection = bucket.connections[conn_idx];
-    //             if (connection.local != 0 && !bucket.IsExpired(conn_idx, current_time))
-    //             {
-    //                 uint32_t local_addr;
-    //                 uint16_t local_port;
-    //                 ServiceConnections::Unpack(connection.local, local_addr, local_port);
-    //                 response.emplace_back(index, bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port);
-    //             }
-    //         });
-    //     }
-    // }
-    // else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
-    // {
-    //     service_connections_[*service_id].GetConnections([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx) {
-    //         Connection& connection = bucket.connections[conn_idx];
-    //         if (connection.local != 0 && !bucket.IsExpired(conn_idx, current_time))
-    //         {
-    //             uint32_t local_addr;
-    //             uint16_t local_port;
-    //             ServiceConnections::Unpack(connection.local, local_addr, local_port);
-    //             response.emplace_back(*service_id, bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port);
-    //         }
-    //     });
-    // }
-
+    updater_proxy_tables[service_id].FillConnections(current_time_ms, response);
     return response;
 }
 
-common::idp::proxy_syn::response TcpConnectionStore::GetSyn(std::optional<proxy_service_id_t> service_id)
+common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t service_id)
 {
     common::idp::proxy_syn::response response;
-    // uint64_t current_time = current_time_ms;
-    // std::lock_guard guard(mutex_);
-    
-    // if (!service_id.has_value())
-    // {
-    //     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-    //     {
-    //         syn_connections_[index].GetConnections([&](ServiceSynConnections::Bucket& bucket, uint32_t conn_idx) {
-    //             if (!bucket.IsExpired(conn_idx, current_time, TIMEOUT_SYN))
-    //             {
-    //                 response.emplace_back(index, bucket.addresses[conn_idx], bucket.ports[conn_idx]);
-    //             }
-    //         });
-    //     }
-    // }
-    // else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
-    // {
-    //     syn_connections_[*service_id].GetConnections([&](ServiceSynConnections::Bucket& bucket, uint32_t conn_idx) {
-    //         if (!bucket.IsExpired(conn_idx, current_time, TIMEOUT_SYN))
-    //         {
-    //             response.emplace_back(*service_id, bucket.addresses[conn_idx], bucket.ports[conn_idx]);
-    //         }
-    //     });
-    // }
-
-    return response;
-}
-
-common::idp::proxy_local_pool::response TcpConnectionStore::GetLocalPool(std::optional<proxy_service_id_t> service_id)
-{
-    common::idp::proxy_local_pool::response response;
-    // std::lock_guard guard(mutex_);
-
-    // if (!service_id.has_value())
-    // {
-    //     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-    //     {
-    //         local_pools_[index].GetLocalPool(index, response);
-    //     }
-    // }
-    // else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
-    // {
-    //     local_pools_[*service_id].GetLocalPool(*service_id, response);
-    // }
-
+    updater_proxy_tables[service_id].FillSynConnections(current_time_ms, response);
     return response;
 }
 
@@ -432,24 +351,17 @@ common::idp::proxy_tables::response TcpConnectionStore::GetTables(std::optional<
 {
     common::idp::proxy_tables::response response;
 
-    // if (!service_id.has_value())
-    // {
-    //     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-    //     {
-    //         if (service_connections_[index].IsInitialized())
-    //         {
-    //             response.emplace_back(index,
-    //                               service_connections_[index].Size(), service_connections_[index].Capacity(),
-    //                               syn_connections_[index].Size(), syn_connections_[index].Capacity());
-    //         }
-    //     }
-    // }
-    // else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
-    // {
-    //     return {{*service_id,
-    //             service_connections_[*service_id].Size(), service_connections_[*service_id].Capacity(), 
-    //             syn_connections_[*service_id].Size(), syn_connections_[*service_id].Capacity()}};
-    // }
+    if (!service_id.has_value())
+    {
+        for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+        {
+            updater_proxy_tables[index].GetTables(index, response);
+        }
+    }
+    else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    {
+        updater_proxy_tables[*service_id].GetTables(*service_id, response);
+    }
 
     return response;
 }
@@ -1186,18 +1098,27 @@ UpdaterProxyTables::UpdaterProxyTables()
 {
     // tables[0] = ProxyTables();
     // tables[1] = ProxyTables();
+    active_index = 0;
 }
 
 eResult UpdaterProxyTables::FirstUpdate(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager, const proxy_service_t& service)
 {
+    std::lock_guard<std::mutex> guard(mutex);
+
     YANET_LOG_WARNING("First update, activate: %d\n", new_index);
-    if (!tables[new_index].NeedUpdate(service))
+    eResult result = eResult::success;
+    if (tables[new_index].NeedUpdate(service))
     {
-        return eResult::success;
+        tables[new_index].ClearIfNotEqual(tables[old_index], memory_manager);
+        result = tables[new_index].Allocate(memory_manager, service);
     }
 
-    tables[new_index].ClearIfNotEqual(tables[old_index], memory_manager);
-    return tables[new_index].Allocate(memory_manager, service);
+    if (result == eResult::success)
+    {
+        active_index = new_index;
+    }
+    
+    return result;
 }
 
 eResult UpdaterProxyTables::SecondUpdate(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager)
@@ -1210,13 +1131,61 @@ eResult UpdaterProxyTables::SecondUpdate(uint8_t old_index, uint8_t new_index, d
 
 void UpdaterProxyTables::FirstRemove(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager)
 {
+    std::lock_guard<std::mutex> guard(mutex);
     tables[new_index].ClearIfNotEqual(tables[old_index], memory_manager);
     tables[new_index].ClearLinks();
+    active_index = new_index;
 }
 
 void UpdaterProxyTables::SecondRemove(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager)
 {
     tables[new_index].ClearIfNotEqual(tables[old_index], memory_manager);
+}
+
+void UpdaterProxyTables::FillConnections(uint64_t current_time, common::idp::proxy_connections::response& response)
+{
+    std::lock_guard<std::mutex> guard(mutex);
+	tables[active_index].service_connections.GetConnections([&, current_time](ServiceConnections::Bucket& bucket, uint32_t conn_idx) {
+        Connection& connection = bucket.connections[conn_idx];
+        uint32_t local_addr;
+        uint16_t local_port;
+        ServiceConnections::Unpack(connection.local, local_addr, local_port);
+        response.emplace_back(bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port);
+	});
+}
+
+void UpdaterProxyTables::FillSynConnections(uint64_t current_time, common::idp::proxy_syn::response& response)
+{
+	std::lock_guard<std::mutex> guard(mutex);
+	tables[active_index].syn_connections.GetConnections([&, current_time](ServiceSynConnections::Bucket& bucket, uint32_t conn_idx) {
+        SynConnection& connection = bucket.connections[conn_idx];
+        uint32_t local_addr;
+        uint16_t local_port;
+        ServiceConnections::Unpack(connection.local, local_addr, local_port);
+        response.emplace_back(bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port);
+	});
+}
+
+void UpdaterProxyTables::CollectGarbage(uint64_t current_time)
+{
+    std::lock_guard<std::mutex> guard(mutex);
+    tables[active_index].service_connections.CollectGarbage(current_time, tables[active_index].local_pool);
+    tables[active_index].syn_connections.CollectGarbage(current_time, tables[active_index].local_pool);
+}
+
+void UpdaterProxyTables::GetTables(proxy_service_id_t service_id, common::idp::proxy_tables::response& response)
+{
+    std::lock_guard<std::mutex> guard(mutex);
+    const ProxyTables& current = tables[active_index];
+    if (current.service_connections.Size() != 0)
+    {
+        LocalPoolStat stat = tables[active_index].local_pool.GetStat();
+
+        response.emplace_back(service_id,
+            current.service_connections.Size(), current.service_connections.Capacity(),
+            current.syn_connections.Size(), current.syn_connections.Capacity(),
+            stat.prefix, stat.total_addresses, stat.free_addresses, stat.used_addresses);
+    }
 }
 
 bool ProxyTables::NeedUpdate(const proxy_service_t& service)

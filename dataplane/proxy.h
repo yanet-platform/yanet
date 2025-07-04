@@ -41,6 +41,8 @@ struct ProxyTables
 struct UpdaterProxyTables
 {
     ProxyTables tables[2];
+    uint8_t active_index;
+    std::mutex mutex;
 
     UpdaterProxyTables();
     eResult FirstUpdate(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager, const proxy_service_t& service);
@@ -48,6 +50,11 @@ struct UpdaterProxyTables
     void FirstRemove(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager);
     void SecondRemove(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager);
 
+    void FillConnections(uint64_t current_time, common::idp::proxy_connections::response& response);
+    void FillSynConnections(uint64_t current_time, common::idp::proxy_syn::response& response);
+    void GetTables(proxy_service_id_t service_id, common::idp::proxy_tables::response& response);
+
+    void CollectGarbage(uint64_t current_time);
 };
 
 struct proxy_service_t
@@ -145,9 +152,8 @@ public:
     void UpdateSynCookieKeys();
 
     // Info
-    common::idp::proxy_connections::response GetConnections(std::optional<proxy_service_id_t> service_id);
-    common::idp::proxy_syn::response GetSyn(std::optional<proxy_service_id_t> service_id);
-    common::idp::proxy_local_pool::response GetLocalPool(std::optional<proxy_service_id_t> service_id);
+    common::idp::proxy_connections::response GetConnections(proxy_service_id_t service_id);
+    common::idp::proxy_syn::response GetSyn(proxy_service_id_t service_id);
     common::idp::proxy_tables::response GetTables(std::optional<proxy_service_id_t> service_id);
 
     // Actions from worker
@@ -162,7 +168,6 @@ public:
     void GetDataForRetramsits(uint32_t before_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
 
 private:
-    std::mutex mutex_;
     SynCookies syn_cookies_[YANET_CONFIG_PROXY_SERVICES_SIZE];
     UpdaterProxyTables updater_proxy_tables[YANET_CONFIG_PROXY_SERVICES_SIZE];
 
