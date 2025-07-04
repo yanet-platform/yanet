@@ -244,7 +244,7 @@ public: ///< @todo
 	tNat64stateless nat64statelesses[CONFIG_YADECAP_NAT64STATELESSES_SIZE];
 	nat46clat_t nat46clats[YANET_CONFIG_NAT46CLATS_SIZE];
 	balancer_t balancers[YANET_CONFIG_BALANCERS_SIZE];
-	proxy_service_t proxy_services[YANET_CONFIG_PROXY_SERVICES_SIZE];
+	dataplane::proxy::proxy_service_t proxy_services[YANET_CONFIG_PROXY_SERVICES_SIZE];
 	dregress_t dregresses[CONFIG_YADECAP_DREGRESS_SIZE]; ///< @todo: slow global base
 	fw_state_sync_config_t fw_state_sync_configs[CONFIG_YADECAP_ACLS_SIZE];
 	tun64_t tun64tunnels[CONFIG_YADECAP_TUN64_SIZE];

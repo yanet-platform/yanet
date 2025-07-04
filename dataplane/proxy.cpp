@@ -265,7 +265,7 @@ std::string TcpOptions::DebugInfo() const
 
 // Update
 
-eResult TcpConnectionStore::proxy_service_update(const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager)
+eResult TcpConnectionStore::ServiceUpdate(proxy_service_t& service, dataplane::memory_manager* memory_manager, uint8_t currentGlobalBaseId, bool first_state_update_global_base)
 {
     proxy_service_id_t service_id = service.service_id;
 
@@ -274,48 +274,58 @@ eResult TcpConnectionStore::proxy_service_update(const dataplane::globalBase::pr
         service_id, common::ipv4_address_t(rte_cpu_to_be_32(service.proxy_addr)).toString().c_str(), rte_cpu_to_be_16(service.proxy_port),
         common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(service.upstream_port), upstream_net.toString().c_str(),
         service.send_proxy_header);
-    YANET_LOG_WARNING("\t\tsize_connections_table=%d, size_syn_table=%d, counter_id=%d\n", service.size_connections_table, service.size_syn_table, service.counter_id);
-    YANET_LOG_WARNING("\t\ttimeouts: syn_rto=%d, syn_recv=%d, established=%d\n", service.timeout_syn_rto, service.timeout_syn_recv, service.timeout_established);
-    YANET_LOG_WARNING("\t\tuse_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", service.use_sack, service.mss, service.winscale, service.timestamps);
+    // YANET_LOG_WARNING("\t\tsize_connections_table=%d, size_syn_table=%d, counter_id=%d\n", service.size_connections_table, service.size_syn_table, service.counter_id);
+    // YANET_LOG_WARNING("\t\ttimeouts: syn_rto=%d, syn_recv=%d, established=%d\n", service.timeout_syn_rto, service.timeout_syn_recv, service.timeout_established);
+    // YANET_LOG_WARNING("\t\tuse_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", service.use_sack, service.mss, service.winscale, service.timestamps);
+	// YANET_LOG_WARNING("\t\t!!!!! currentGlobalBaseId=%d, first_state_update_global_base=%d\n", currentGlobalBaseId, first_state_update_global_base);
 
     std::lock_guard guard(mutex_);
 
-    if (!service_connections_[service_id].Init(service_id, service.size_connections_table, memory_manager, service.upstream_addr, service.upstream_port))
+    uint8_t newGlobalBaseId = currentGlobalBaseId ^ 1;
+    eResult result;
+    if (first_state_update_global_base)
     {
-        YANET_LOG_ERROR("Error initialization TcpProxy.ServiceConnections, service: %d\n", service_id);
-        return eResult::errorAllocatingMemory;
+        result = updater_proxy_tables[service_id].FirstUpdate(currentGlobalBaseId, newGlobalBaseId, memory_manager, service);
+    }
+    else
+    {
+        result = updater_proxy_tables[service_id].SecondUpdate(currentGlobalBaseId, newGlobalBaseId, memory_manager);
     }
 
-    if (!syn_connections_[service_id].Init(service_id, service.size_syn_table, memory_manager, service.upstream_addr, service.upstream_port))
+    if (result != eResult::success)
     {
-        YANET_LOG_ERROR("Error initialization TcpProxy.SynConnections, service: %d\n", service_id);
-        return eResult::errorAllocatingMemory;
+        return result;
     }
-
-    if (!local_pools_[service_id].Init(service_id, service.pool_prefix, memory_manager))
-    {
-        YANET_LOG_ERROR("Error initialization TcpProxy.LocalPool, service: %d\n", service_id);
-        return eResult::errorAllocatingMemory;
-    }
+    service.tables.CopyFrom(updater_proxy_tables[service_id].tables[newGlobalBaseId]);
 
     return eResult::success;
 }
 
-void TcpConnectionStore::proxy_service_remove(proxy_service_id_t service_id)
+void TcpConnectionStore::ServiceRemove(proxy_service_t& service, dataplane::memory_manager* memory_manager, uint8_t currentGlobalBaseId, bool first_state_update_global_base)
 {
-    YANET_LOG_WARNING("proxy_service_remove: service_id=%d\n", service_id);
+    YANET_LOG_WARNING("proxy_service_remove: service_id=%d\n", service.service_id);
+    uint8_t newGlobalBaseId = currentGlobalBaseId ^ 1;
+    if (first_state_update_global_base)
+    {
+        updater_proxy_tables[service.service_id].FirstRemove(currentGlobalBaseId, newGlobalBaseId, memory_manager);
+    }
+    else
+    {
+        updater_proxy_tables[service.service_id].SecondRemove(currentGlobalBaseId, newGlobalBaseId, memory_manager);
+    }
+    service.tables.ClearLinks();
 }
 
 void TcpConnectionStore::CollectGarbage()
 {
     // YANET_LOG_WARNING("TcpConnectionStore::CollectGarbage: current_time=%d\n", current_time);
-    uint64_t current_time = current_time_ms;
-    std::lock_guard guard(mutex_);
-    for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-    {
-        syn_connections_[index].CollectGarbage(current_time, local_pools_[index]);
-        service_connections_[index].CollectGarbage(current_time, local_pools_[index]);
-    }
+    // uint64_t current_time = current_time_ms;
+    // std::lock_guard guard(mutex_);
+    // for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+    // {
+    //     // syn_connections_[index].CollectGarbage(current_time, local_pools_[index]);
+    //     // service_connections_[index].CollectGarbage(current_time, local_pools_[index]);
+    // }
 }
 
 void TcpConnectionStore::UpdateSynCookieKeys()
@@ -331,38 +341,38 @@ void TcpConnectionStore::UpdateSynCookieKeys()
 common::idp::proxy_connections::response TcpConnectionStore::GetConnections(std::optional<proxy_service_id_t> service_id)
 {
     common::idp::proxy_connections::response response;
-    uint64_t current_time = current_time_ms;
-    std::lock_guard guard(mutex_);
+    // uint64_t current_time = current_time_ms;
+    // std::lock_guard guard(mutex_);
 
-    if (!service_id.has_value())
-    {
-        for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-        {
-            service_connections_[index].GetConnections([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx) {
-                Connection& connection = bucket.connections[conn_idx];
-                if (connection.local != 0 && !bucket.IsExpired(conn_idx, current_time))
-                {
-                    uint32_t local_addr;
-                    uint16_t local_port;
-                    ServiceConnections::Unpack(connection.local, local_addr, local_port);
-                    response.emplace_back(index, bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port);
-                }
-            });
-        }
-    }
-    else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
-    {
-        service_connections_[*service_id].GetConnections([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx) {
-            Connection& connection = bucket.connections[conn_idx];
-            if (connection.local != 0 && !bucket.IsExpired(conn_idx, current_time))
-            {
-                uint32_t local_addr;
-                uint16_t local_port;
-                ServiceConnections::Unpack(connection.local, local_addr, local_port);
-                response.emplace_back(*service_id, bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port);
-            }
-        });
-    }
+    // if (!service_id.has_value())
+    // {
+    //     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+    //     {
+    //         service_connections_[index].GetConnections([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx) {
+    //             Connection& connection = bucket.connections[conn_idx];
+    //             if (connection.local != 0 && !bucket.IsExpired(conn_idx, current_time))
+    //             {
+    //                 uint32_t local_addr;
+    //                 uint16_t local_port;
+    //                 ServiceConnections::Unpack(connection.local, local_addr, local_port);
+    //                 response.emplace_back(index, bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port);
+    //             }
+    //         });
+    //     }
+    // }
+    // else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    // {
+    //     service_connections_[*service_id].GetConnections([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx) {
+    //         Connection& connection = bucket.connections[conn_idx];
+    //         if (connection.local != 0 && !bucket.IsExpired(conn_idx, current_time))
+    //         {
+    //             uint32_t local_addr;
+    //             uint16_t local_port;
+    //             ServiceConnections::Unpack(connection.local, local_addr, local_port);
+    //             response.emplace_back(*service_id, bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port);
+    //         }
+    //     });
+    // }
 
     return response;
 }
@@ -370,30 +380,30 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(std:
 common::idp::proxy_syn::response TcpConnectionStore::GetSyn(std::optional<proxy_service_id_t> service_id)
 {
     common::idp::proxy_syn::response response;
-    uint64_t current_time = current_time_ms;
-    std::lock_guard guard(mutex_);
+    // uint64_t current_time = current_time_ms;
+    // std::lock_guard guard(mutex_);
     
-    if (!service_id.has_value())
-    {
-        for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-        {
-            syn_connections_[index].GetConnections([&](ServiceSynConnections::Bucket& bucket, uint32_t conn_idx) {
-                if (!bucket.IsExpired(conn_idx, current_time, TIMEOUT_SYN))
-                {
-                    response.emplace_back(index, bucket.addresses[conn_idx], bucket.ports[conn_idx]);
-                }
-            });
-        }
-    }
-    else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
-    {
-        syn_connections_[*service_id].GetConnections([&](ServiceSynConnections::Bucket& bucket, uint32_t conn_idx) {
-            if (!bucket.IsExpired(conn_idx, current_time, TIMEOUT_SYN))
-            {
-                response.emplace_back(*service_id, bucket.addresses[conn_idx], bucket.ports[conn_idx]);
-            }
-        });
-    }
+    // if (!service_id.has_value())
+    // {
+    //     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+    //     {
+    //         syn_connections_[index].GetConnections([&](ServiceSynConnections::Bucket& bucket, uint32_t conn_idx) {
+    //             if (!bucket.IsExpired(conn_idx, current_time, TIMEOUT_SYN))
+    //             {
+    //                 response.emplace_back(index, bucket.addresses[conn_idx], bucket.ports[conn_idx]);
+    //             }
+    //         });
+    //     }
+    // }
+    // else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    // {
+    //     syn_connections_[*service_id].GetConnections([&](ServiceSynConnections::Bucket& bucket, uint32_t conn_idx) {
+    //         if (!bucket.IsExpired(conn_idx, current_time, TIMEOUT_SYN))
+    //         {
+    //             response.emplace_back(*service_id, bucket.addresses[conn_idx], bucket.ports[conn_idx]);
+    //         }
+    //     });
+    // }
 
     return response;
 }
@@ -401,19 +411,19 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(std::optional<proxy_
 common::idp::proxy_local_pool::response TcpConnectionStore::GetLocalPool(std::optional<proxy_service_id_t> service_id)
 {
     common::idp::proxy_local_pool::response response;
-    std::lock_guard guard(mutex_);
+    // std::lock_guard guard(mutex_);
 
-    if (!service_id.has_value())
-    {
-        for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-        {
-            local_pools_[index].GetLocalPool(index, response);
-        }
-    }
-    else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
-    {
-        local_pools_[*service_id].GetLocalPool(*service_id, response);
-    }
+    // if (!service_id.has_value())
+    // {
+    //     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+    //     {
+    //         local_pools_[index].GetLocalPool(index, response);
+    //     }
+    // }
+    // else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    // {
+    //     local_pools_[*service_id].GetLocalPool(*service_id, response);
+    // }
 
     return response;
 }
@@ -422,24 +432,24 @@ common::idp::proxy_tables::response TcpConnectionStore::GetTables(std::optional<
 {
     common::idp::proxy_tables::response response;
 
-    if (!service_id.has_value())
-    {
-        for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-        {
-            if (service_connections_[index].IsInitialized())
-            {
-                response.emplace_back(index,
-                                  service_connections_[index].Size(), service_connections_[index].Capacity(),
-                                  syn_connections_[index].Size(), syn_connections_[index].Capacity());
-            }
-        }
-    }
-    else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
-    {
-        return {{*service_id,
-                service_connections_[*service_id].Size(), service_connections_[*service_id].Capacity(), 
-                syn_connections_[*service_id].Size(), syn_connections_[*service_id].Capacity()}};
-    }
+    // if (!service_id.has_value())
+    // {
+    //     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+    //     {
+    //         if (service_connections_[index].IsInitialized())
+    //         {
+    //             response.emplace_back(index,
+    //                               service_connections_[index].Size(), service_connections_[index].Capacity(),
+    //                               syn_connections_[index].Size(), syn_connections_[index].Capacity());
+    //         }
+    //     }
+    // }
+    // else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    // {
+    //     return {{*service_id,
+    //             service_connections_[*service_id].Size(), service_connections_[*service_id].Capacity(), 
+    //             syn_connections_[*service_id].Size(), syn_connections_[*service_id].Capacity()}};
+    // }
 
     return response;
 }
@@ -492,7 +502,7 @@ bool NonEmptyTcpData(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
     return (rte_be_to_cpu_16(ipv4_header->total_length) != sizeof(rte_ipv4_hdr) + tcp_header_len);
 }
 
-uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
+uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(proxy_service_id_t service_id, const proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
 {
     size_t tcp_header_len = ((*tcp_header)->data_off >> 4) << 2;
     TcpOptions tcp_options;
@@ -539,7 +549,7 @@ void ActionClientOnSynPrepareSynToClient(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr*
     SwapPorts(tcp_header);
 }
 
-void ActionClientOnSynPrepareSynToService(const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t local)
+void ActionClientOnSynPrepareSynToService(const proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t local)
 {
     LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
     if (service.send_proxy_header)
@@ -558,7 +568,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 	
     proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
-    const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
+    dataplane::proxy::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
 	counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_in]++;
     counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_in] += mbuf->pkt_len;
@@ -570,7 +580,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
     bool action = true;
 
     ServiceConnectionData service_connection_data;
-    switch (service_connections_[service_id].FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, service_connection_data))
+    switch (service.tables.service_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, service_connection_data))
     {
         case TableSearchResult::Overflow:
         {
@@ -595,7 +605,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
         case TableSearchResult::NotFound:
         {
             SynConnectionData syn_connection_data;
-            switch (syn_connections_[service_id].FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data))
+            switch (service.tables.syn_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data))
             {
                 case TableSearchResult::Overflow:
                 {
@@ -612,7 +622,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
                 }
                 case TableSearchResult::NotFound:
                 {
-                    uint64_t local = local_pools_[service_id].Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
+                    uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
                     if (local == 0)
                     {
                         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
@@ -644,7 +654,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
     return action;
 }
 
-void AddProxyHeader(const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, dataplane::metadata* metadata,
+void AddProxyHeader(const proxy_service_t& service, rte_mbuf* mbuf, dataplane::metadata* metadata,
     rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header, uint32_t src_addr, uint16_t src_port)
 {
     size_t tcp_header_len = ((*tcp_header)->data_off >> 4) << 2;
@@ -675,7 +685,7 @@ void AddProxyHeader(const dataplane::globalBase::proxy_service_t& service, rte_m
     proxy_header->src_port = src_port;    
 }
 
-uint32_t TcpConnectionStore::CheckSynCookie(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
+uint32_t TcpConnectionStore::CheckSynCookie(proxy_service_id_t service_id, const proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
 {
     if (!service.ignore_size_update_detections && 
         // ACK's seq has the same evenness bit as SYN's seq(encoded into cookie)
@@ -696,7 +706,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
     proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
-    const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
+    dataplane::proxy::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
     counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_in]++;
     counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_in] += mbuf->pkt_len;
@@ -707,7 +717,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
     bool action = true;
 
     ServiceConnectionData service_connection_data;
-    switch (service_connections_[service_id].FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, service_connection_data))
+    switch (service.tables.service_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, service_connection_data))
     {
         case TableSearchResult::Overflow:
         {
@@ -807,7 +817,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
             uint32_t flags = (NonEmptyTcpData(ipv4_header, tcp_header) ? Connection::flag_nonempty_ack_from_client : 0);
 
             SynConnectionData syn_connection_data;
-            if (syn_connections_[service_id].FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data) == TableSearchResult::Found)
+            if (service.tables.syn_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data) == TableSearchResult::Found)
             {
                 if (!syn_connection_data.connection->server_answer)
                 {
@@ -853,7 +863,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                 else
                 {
                     // get from local
-                    uint64_t local = local_pools_[service_id].Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
+                    uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
                     if (local == 0)
                     {
                         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
@@ -920,13 +930,13 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
     proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
-    const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
+    dataplane::proxy::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_server_syn_ack", service_id, ipv4_header, tcp_header);
 
-    uint64_t client_info = local_pools_[service_id].FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
+    uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
@@ -937,7 +947,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     LocalPool::UnpackTuple(client_info, client_addr, client_port);
 
     SynConnectionData syn_connection_data;
-    if (syn_connections_[service_id].FindAndLock(client_addr, client_port, current_time_ms, syn_connection_data) == TableSearchResult::Found)
+    if (service.tables.syn_connections.FindAndLock(client_addr, client_port, current_time_ms, syn_connection_data) == TableSearchResult::Found)
     {
         syn_connection_data.connection->server_answer = true;
         syn_connection_data.Unlock();
@@ -962,7 +972,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     syn_connection_data.Unlock();
 
     ServiceConnectionData service_connection_data;
-    if (service_connections_[service_id].FindAndLock(client_addr, client_port, current_time_ms, service_connection_data) != TableSearchResult::Found)
+    if (service.tables.service_connections.FindAndLock(client_addr, client_port, current_time_ms, service_connection_data) != TableSearchResult::Found)
     {
         service_connection_data.Unlock();
         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_answer_service_syn_ack]++;
@@ -1046,13 +1056,13 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
     proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
-    const dataplane::globalBase::proxy_service_t& service = base.globalBase->proxy_services[service_id];
+    dataplane::proxy::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_server_ack", service_id, ipv4_header, tcp_header);
 
-    uint64_t client_info = local_pools_[service_id].FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
+    uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
@@ -1063,7 +1073,7 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
     LocalPool::UnpackTuple(client_info, client_addr, client_port);
 
     ServiceConnectionData service_connection_data;
-    if (service_connections_[service_id].FindAndLock(client_addr, client_port, current_time_ms, service_connection_data) != TableSearchResult::Found)
+    if (service.tables.service_connections.FindAndLock(client_addr, client_port, current_time_ms, service_connection_data) != TableSearchResult::Found)
     {
         service_connection_data.Unlock();
         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_search_client_service_ack]++;
@@ -1111,57 +1121,152 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
 void TcpConnectionStore::GetDataForRetramsits(uint32_t before_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send)
 {
     // YANET_LOG_WARNING("TcpConnectionStore::GetDataForRetramsits\n");
-    uint32_t count = 0;
-    for (uint32_t index_service = 0; (index_service < YANET_CONFIG_PROXY_SERVICES_SIZE) && (rte_ring_empty(ring_retransmit_free) == 0) && count < MAX_COUNT_RETRANSMITS_ALL_SERVICES; index_service++)
+//     uint32_t count = 0;
+//     for (uint32_t index_service = 0; (index_service < YANET_CONFIG_PROXY_SERVICES_SIZE) && (rte_ring_empty(ring_retransmit_free) == 0) && count < MAX_COUNT_RETRANSMITS_ALL_SERVICES; index_service++)
+//     {
+//         count += service_connections_[index_start_check_retransmits_].GetDataForRetramsits([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx, uint64_t service_key) -> bool {
+//             Connection& connection = bucket.connections[conn_idx];
+//             if ((ServiceConnections::Pack(bucket.addresses[conn_idx], bucket.ports[conn_idx]) != 0) && (bucket.last_times[conn_idx] != 0) && (bucket.last_times[conn_idx] <= before_time) && 
+//                 ((connection.flags & Connection::flag_from_synkookie) != 0) && ((connection.flags & Connection::flag_sent_rentransmit_syn_to_server) == 0) &&
+//                 ((connection.flags & Connection::flag_nonempty_ack_from_client) == 0)) {
+//                 DataForRetransmit* data;
+//                 if (rte_ring_dequeue(ring_retransmit_free, (void**)&data) != 0)
+//                 {
+//                     return true;
+//                 }
+
+//                 TcpOptions tcp_options = SynCookies::UnpackData(connection.cookie_data);
+//                 tcp_options.timestamp_value = connection.timestamp_client_last;
+//                 tcp_options.timestamp_echo = 0;
+
+//                 data->tcp_options_len = tcp_options.WriteBuffer(data->tcp_options_data);
+
+// #ifdef TCP_PROXY_DEBUG
+//                 YANET_LOG_WARNING("Add to retransmit, cookie_data=%d, tcp_options=%s, flags=%u\n", connection.cookie_data, tcp_options.DebugInfo().c_str(), connection.flags);
+// #endif
+
+//                 data->service_id = index_start_check_retransmits_;
+//                 ServiceConnections::Unpack(connection.local, data->src, data->sport);
+//                 ServiceConnections::Unpack(service_key, data->dst, data->dport);
+//                 data->client_start_seq = connection.client_start_seq;
+//                 data->flow = next_flow_;
+
+//                 if (rte_ring_enqueue(ring_retransmit_send, (void*)data) != 0)
+//                 {
+//                     return true;
+//                 }
+
+//                 connection.flags |= Connection::flag_sent_rentransmit_syn_to_server;
+
+//                 count++;
+//                 if (count >= MAX_COUNT_RETRANSMITS_PER_SERVICE) {
+//                     return true;
+//                 }
+//             }
+//             return false;
+//         });
+
+//         index_start_check_retransmits_++;
+//         if (index_start_check_retransmits_ >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+//         {
+//             index_start_check_retransmits_ = 0;
+//         }
+//     }
+}
+
+TcpConnectionStore::TcpConnectionStore()
+{
+    for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
     {
-        count += service_connections_[index_start_check_retransmits_].GetDataForRetramsits([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx, uint64_t service_key) -> bool {
-            Connection& connection = bucket.connections[conn_idx];
-            if ((ServiceConnections::Pack(bucket.addresses[conn_idx], bucket.ports[conn_idx]) != 0) && (bucket.last_times[conn_idx] != 0) && (bucket.last_times[conn_idx] <= before_time) && 
-                ((connection.flags & Connection::flag_from_synkookie) != 0) && ((connection.flags & Connection::flag_sent_rentransmit_syn_to_server) == 0) &&
-                ((connection.flags & Connection::flag_nonempty_ack_from_client) == 0)) {
-                DataForRetransmit* data;
-                if (rte_ring_dequeue(ring_retransmit_free, (void**)&data) != 0)
-                {
-                    return true;
-                }
-
-                TcpOptions tcp_options = SynCookies::UnpackData(connection.cookie_data);
-                tcp_options.timestamp_value = connection.timestamp_client_last;
-                tcp_options.timestamp_echo = 0;
-
-                data->tcp_options_len = tcp_options.WriteBuffer(data->tcp_options_data);
-
-#ifdef TCP_PROXY_DEBUG
-                YANET_LOG_WARNING("Add to retransmit, cookie_data=%d, tcp_options=%s, flags=%u\n", connection.cookie_data, tcp_options.DebugInfo().c_str(), connection.flags);
-#endif
-
-                data->service_id = service_key;
-                ServiceConnections::Unpack(connection.local, data->src, data->sport);
-                ServiceConnections::Unpack(service_key, data->dst, data->dport);
-                data->client_start_seq = connection.client_start_seq;
-                data->flow = next_flow_;
-
-                if (rte_ring_enqueue(ring_retransmit_send, (void*)data) != 0)
-                {
-                    return true;
-                }
-
-                connection.flags |= Connection::flag_sent_rentransmit_syn_to_server;
-
-                count++;
-                if (count >= MAX_COUNT_RETRANSMITS_PER_SERVICE) {
-                    return true;
-                }
-            }
-            return false;
-        });
-
-        index_start_check_retransmits_++;
-        if (index_start_check_retransmits_ > YANET_CONFIG_PROXY_SERVICES_SIZE)
-        {
-            index_start_check_retransmits_ = 0;
-        }
+        // updater_proxy_tables[index] = UpdaterProxyTables();
     }
+}
+
+UpdaterProxyTables::UpdaterProxyTables()
+{
+    // tables[0] = ProxyTables();
+    // tables[1] = ProxyTables();
+}
+
+eResult UpdaterProxyTables::FirstUpdate(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager, const proxy_service_t& service)
+{
+    YANET_LOG_WARNING("First update, activate: %d\n", new_index);
+    if (!tables[new_index].NeedUpdate(service))
+    {
+        return eResult::success;
+    }
+
+    tables[new_index].ClearIfNotEqual(tables[old_index], memory_manager);
+    return tables[new_index].Allocate(memory_manager, service);
+}
+
+eResult UpdaterProxyTables::SecondUpdate(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager)
+{
+    YANET_LOG_WARNING("Second update, move: %d->%d\n", old_index, new_index);
+    tables[new_index].ClearIfNotEqual(tables[old_index], memory_manager);
+    tables[new_index].CopyFrom(tables[old_index]);
+    return eResult::success;
+}
+
+void UpdaterProxyTables::FirstRemove(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager)
+{
+    tables[new_index].ClearIfNotEqual(tables[old_index], memory_manager);
+    tables[new_index].ClearLinks();
+}
+
+void UpdaterProxyTables::SecondRemove(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager)
+{
+    tables[new_index].ClearIfNotEqual(tables[old_index], memory_manager);
+}
+
+bool ProxyTables::NeedUpdate(const proxy_service_t& service)
+{
+    return service_connections.NeedUpdate(service.size_connections_table) || syn_connections.NeedUpdate(service.size_syn_table) || local_pool.NeedUpdate(service.pool_prefix);
+}
+
+void ProxyTables::ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager)
+{
+    service_connections.ClearIfNotEqual(other.service_connections, memory_manager);
+    syn_connections.ClearIfNotEqual(other.syn_connections, memory_manager);
+    local_pool.ClearIfNotEqual(other.local_pool, memory_manager);
+}
+
+eResult ProxyTables::Allocate(dataplane::memory_manager* memory_manager, const proxy_service_t& service)
+{
+    if (!service_connections.Init(service.service_id, service.size_connections_table, memory_manager, service.upstream_addr, service.upstream_port))
+    {
+        YANET_LOG_ERROR("Error initialization TcpProxy.ServiceConnections, service: %d\n", service.service_id);
+        return eResult::errorAllocatingMemory;
+    }
+
+    if (!syn_connections.Init(service.service_id, service.size_syn_table, memory_manager, service.upstream_addr, service.upstream_port))
+    {
+        YANET_LOG_ERROR("Error initialization TcpProxy.SynConnections, service: %d\n", service.service_id);
+        return eResult::errorAllocatingMemory;
+    }
+
+    
+    if (!local_pool.Init(service.service_id, service.pool_prefix, memory_manager))
+    {
+        YANET_LOG_ERROR("Error initialization TcpProxy.LocalPool, service: %d\n", service.service_id);
+        return eResult::errorAllocatingMemory;
+    }
+
+    return eResult::success;
+}
+
+void ProxyTables::CopyFrom(const ProxyTables& other)
+{
+    service_connections.CopyFrom(other.service_connections);
+    syn_connections.CopyFrom(other.syn_connections);
+    local_pool.CopyFrom(other.local_pool);
+}
+
+void ProxyTables::ClearLinks()
+{
+    service_connections.ClearLinks();
+    syn_connections.ClearLinks();
+    local_pool.ClearLinks();
 }
 
 }

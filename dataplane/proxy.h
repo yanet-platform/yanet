@@ -23,6 +23,67 @@
 namespace dataplane::proxy
 {
 
+struct proxy_service_t;
+
+struct ProxyTables
+{
+    dataplane::proxy::LocalPool local_pool;
+    dataplane::proxy::ServiceConnections service_connections;
+    dataplane::proxy::ServiceSynConnections syn_connections;
+
+    bool NeedUpdate(const proxy_service_t& service);
+    void ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager);
+    eResult Allocate(dataplane::memory_manager* memory_manager, const proxy_service_t& service);
+    void CopyFrom(const ProxyTables& other);    
+    void ClearLinks();
+};
+
+struct UpdaterProxyTables
+{
+    ProxyTables tables[2];
+
+    UpdaterProxyTables();
+    eResult FirstUpdate(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager, const proxy_service_t& service);
+    eResult SecondUpdate(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager);
+    void FirstRemove(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager);
+    void SecondRemove(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager);
+
+};
+
+struct proxy_service_t
+{
+	proxy_service_id_t service_id;
+	tCounterId counter_id;
+
+	// proxy and service address, port
+	uint32_t proxy_addr;
+	tPortId proxy_port;
+	uint32_t upstream_addr;
+	tPortId upstream_port;
+
+	// sizes of tables
+	uint32_t size_connections_table;
+	uint32_t size_syn_table;
+
+	ipv4_prefix_t pool_prefix;
+	bool send_proxy_header;
+	proxy::proxy_v2_ipv4_hdr proxy_header;
+
+	// tcp options
+	bool use_sack;
+	uint32_t mss;
+	uint32_t winscale;
+	bool timestamps;
+	bool ignore_size_update_detections;
+
+	// timeouts
+	uint32_t timeout_syn_rto;
+	uint32_t timeout_syn_recv;
+	uint32_t timeout_established;
+
+	ProxyTables tables;
+};
+
 struct TcpOptions
 {
     uint32_t timestamp_value;
@@ -57,8 +118,6 @@ private:
     bool CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected);
 };
 
-// ----------------------------------------------------------------------------
-
 struct DataForRetransmit
 {
     proxy_service_id_t service_id;
@@ -75,9 +134,11 @@ struct DataForRetransmit
 class TcpConnectionStore
 {
 public:
+    TcpConnectionStore();
+
     // Update
-    eResult proxy_service_update(const dataplane::globalBase::proxy_service_t& service, dataplane::memory_manager* memory_manager);
-    void proxy_service_remove(proxy_service_id_t service_id);
+    eResult ServiceUpdate(proxy_service_t& service, dataplane::memory_manager* memory_manager, uint8_t currentGlobalBaseId, bool first_state_update_global_base);
+    void ServiceRemove(proxy_service_t& service, dataplane::memory_manager* memory_manager, uint8_t currentGlobalBaseId, bool first_state_update_global_base);
 
     void CollectGarbage();
 
@@ -103,16 +164,13 @@ public:
 private:
     std::mutex mutex_;
     SynCookies syn_cookies_[YANET_CONFIG_PROXY_SERVICES_SIZE];
-
-    LocalPool local_pools_[YANET_CONFIG_PROXY_SERVICES_SIZE];
-    ServiceConnections service_connections_[YANET_CONFIG_PROXY_SERVICES_SIZE];
-    ServiceSynConnections syn_connections_[YANET_CONFIG_PROXY_SERVICES_SIZE];
+    UpdaterProxyTables updater_proxy_tables[YANET_CONFIG_PROXY_SERVICES_SIZE];
 
     uint32_t index_start_check_retransmits_ = 0;
     common::globalBase::tFlow next_flow_;
 
-    uint32_t BuildSynCookieAndFillTcpOptionsAnswer(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header);
-    uint32_t CheckSynCookie(proxy_service_id_t service_id, const dataplane::globalBase::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
+    uint32_t BuildSynCookieAndFillTcpOptionsAnswer(proxy_service_id_t service_id, const proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header);
+    uint32_t CheckSynCookie(proxy_service_id_t service_id, const proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
 };
 
 }

@@ -42,6 +42,7 @@ common::idp::updateGlobalBase::response cControlPlane::updateGlobalBase(const co
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
 	auto result = eResult::success;
+	dataPlane->set_worker_base_state_update(true);
 	for (auto& iter : dataPlane->globalBases)
 	{
 		auto* globalBaseNext = iter.second[dataPlane->currentGlobalBaseId ^ 1];
@@ -69,6 +70,7 @@ common::idp::updateGlobalBase::response cControlPlane::updateGlobalBase(const co
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
 	result = eResult::success;
+	dataPlane->set_worker_base_state_update(false);
 	for (auto& iter : dataPlane->globalBases)
 	{
 		auto* globalBaseNext = iter.second[dataPlane->currentGlobalBaseId ^ 1];

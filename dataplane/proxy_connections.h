@@ -156,14 +156,6 @@ class ConnectionsTable
 {
 public:
     using Bucket = ConnectionBucket<ConnectionInfo>;
-    
-    ~ConnectionsTable()
-    {
-        if (initialized_) destroy();
-        buckets_ = nullptr;
-        number_buckets_ = 0;
-        initialized_ = false;
-    }
 
     bool Init(proxy_service_id_t service_id, uint32_t number_connections, dataplane::memory_manager* memory_manager, uint32_t service_addr, uint16_t service_port)
     {
@@ -175,7 +167,6 @@ public:
             if (number_connections == 0) {
                 number_buckets_ = 0;
                 initialized_ = true;
-                service_id_ = service_id;
                 service_key_ = Pack(service_addr, rte_cpu_to_be_16(service_port));
                 return true;
             }
@@ -191,19 +182,13 @@ public:
         name = "tcp_proxy.syn_connections." + std::to_string(service_id);
         if (memory_manager != nullptr)
         {
-            size_t mem_size = number_buckets * sizeof(Bucket);
-            YANET_LOG_WARNING("ConnectionsTable::Initialize number_connections=%d, number_buckets=%d, mem_size=%ld\n", number_connections, number_buckets, mem_size);
+            // size_t mem_size = number_buckets * sizeof(Bucket);
+            // YANET_LOG_WARNING("ConnectionsTable::Initialize number_connections=%d, number_buckets=%d, mem_size=%ld\n", number_connections, number_buckets, mem_size);
             buckets_ = memory_manager->create_static_array<Bucket>(name.data(), number_buckets, socket_id);
-            destroy = [this, memory_manager](){
-                memory_manager->destroy(buckets_);
-            };
         }
         else
         {
             buckets_ = new Bucket[number_buckets];
-            destroy = [this](){
-                delete[] buckets_;
-            };
         }
         if (buckets_ == nullptr)
         {
@@ -219,7 +204,6 @@ public:
 
         number_buckets_ = number_buckets;
         initialized_ = true;
-        service_id_ = service_id;
         service_key_ = Pack(service_addr, rte_cpu_to_be_16(service_port));
 
         return true;
@@ -369,14 +353,42 @@ public:
         addr = key >> 16;
     }
 
+    bool NeedUpdate(uint32_t number_connections)
+    {
+        return (number_buckets_ != number_connections / Bucket::bucket_size) || !initialized_;
+    }
+
+    void ClearIfNotEqual(const ConnectionsTable& other, dataplane::memory_manager* memory_manager)
+    {
+        // YANET_LOG_WARNING("\t\tClearIfNotEqual buckets_=%p, other.buckets_=%p\n", buckets_, other.buckets_);
+        if (buckets_ != other.buckets_ && buckets_ != nullptr)
+        {
+            // todo info
+            memory_manager->destroy(buckets_);
+            ClearLinks();
+        }
+    }
+
+    void CopyFrom(const ConnectionsTable& other)
+    {
+        buckets_ = other.buckets_;
+        number_buckets_ = other.number_buckets_;
+        initialized_ = other.initialized_;
+        service_key_ = other.service_key_;
+    }
+
+    void ClearLinks()
+    {
+        buckets_ = nullptr;
+        number_buckets_ = 0;
+        initialized_ = false;
+    }
+
 private:
     Bucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;
     bool initialized_ = false;
-    proxy_service_id_t service_id_;
     uint64_t service_key_;
-
-    std::function<void()> destroy;
 };
 
 using ServiceConnections = ConnectionsTable<Connection>;

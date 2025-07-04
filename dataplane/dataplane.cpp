@@ -2014,6 +2014,11 @@ void cDataPlane::switch_worker_base()
 	controlPlane->switchBase();
 }
 
+void cDataPlane::set_worker_base_state_update(bool first_state)
+{
+	first_state_update_global_base = first_state;
+}
+
 eResult cDataPlane::parseConfig(const std::string& configFilePath)
 {
 	eResult result = eResult::success;

@@ -434,38 +434,6 @@ struct balancer_t
 	common::globalBase::tFlow flow;
 };
 
-struct proxy_service_t
-{
-	proxy_service_id_t service_id;
-	tCounterId counter_id;
-
-	// proxy and service address, port
-	uint32_t proxy_addr;
-	tPortId proxy_port;
-	uint32_t upstream_addr;
-	tPortId upstream_port;
-
-	// sizes of tables
-	uint32_t size_connections_table;
-	uint32_t size_syn_table;
-
-	ipv4_prefix_t pool_prefix;
-	bool send_proxy_header;
-	proxy::proxy_v2_ipv4_hdr proxy_header;
-
-	// tcp options
-	bool use_sack;
-	uint32_t mss;
-	uint32_t winscale;
-	bool timestamps;
-	bool ignore_size_update_detections;
-
-	// timeouts
-	uint32_t timeout_syn_rto;
-	uint32_t timeout_syn_recv;
-	uint32_t timeout_established;
-};
-
 struct dregress_t
 {
 	/// @todo: uint8_t enabled;

@@ -135,6 +135,7 @@ public:
 	void run_on_worker_gc(const tSocketId socket_id, const std::function<bool()>& callback);
 
 	void switch_worker_base();
+	void set_worker_base_state_update(bool first_state);
 
 	inline uint32_t get_current_time() const
 	{
@@ -233,6 +234,7 @@ protected:
 
 	std::mutex currentGlobalBaseId_mutex;
 	uint8_t currentGlobalBaseId;
+	bool first_state_update_global_base;
 
 	// tcp proxy
 	rte_ring* ring_retransmit_free_;

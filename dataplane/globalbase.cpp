@@ -645,9 +645,10 @@ eResult generation::clear()
 		balancer = dataplane::globalBase::balancer_t();
 	}
 
-	for (auto& service : proxy_services)
+	for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
 	{
-		service = dataplane::globalBase::proxy_service_t();
+		proxy_services[index] = dataplane::proxy::proxy_service_t();
+		proxy_services[index].service_id = index;
 	}
 
 	tun64_enabled = 0;
@@ -2675,13 +2676,14 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.proxy_header.dst_addr = service.proxy_addr;
 	service.proxy_header.dst_port = service.proxy_port;
 
-	return tcp_connection_store->proxy_service_update(service, &dataPlane->memory_manager);
+	return tcp_connection_store->ServiceUpdate(service, &dataPlane->memory_manager, dataPlane->currentGlobalBaseId, dataPlane->first_state_update_global_base);
 }
 
 eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::proxy_service_remove::request& request)
 {
 	auto [service_id] = request;
-	// YANET_LOG_WARNING("proxy_service_remove: service_id=%d\n", service_id);
-	tcp_connection_store->proxy_service_remove(service_id);
+	YANET_LOG_WARNING("proxy_service_remove: service_id=%d\n", service_id);
+	auto& service = proxy_services[service_id];
+	tcp_connection_store->ServiceRemove(service, &dataPlane->memory_manager, dataPlane->currentGlobalBaseId, dataPlane->first_state_update_global_base);
 	return eResult::success;
 }
