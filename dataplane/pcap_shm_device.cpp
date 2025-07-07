@@ -326,7 +326,7 @@ bool PcapShmWriterDevice::WritePacketForFollow(RawPacket const& packet)
 	if (total_record_size > shm_size_)
 	{
 		YANET_LOG_WARNING("Packet record size %zu (header %zu + payload %zu) "
-		                  "exceeds SHM Follow buffer capacity %zu. Skipping packet.",
+		                  "exceeds SHM Follow buffer capacity %zu. Skipping packet.\n",
 		                  total_record_size,
 		                  on_disk_hdr_len,
 		                  payload_len,
