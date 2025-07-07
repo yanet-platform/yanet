@@ -96,10 +96,9 @@ bool initialize_shm_rings(
 
 		if (dump_config.format != tDataPlaneConfig::DumpFormat::kPcap)
 		{
-			YANET_LOG_ERROR("Asked to follow dump ring %s, but it "
-			                "is not configured to pcap format. "
-			                "Double-check dataplane.conf \"sharedMemory\" section\n",
-			                target_dump_tag.c_str());
+			std::cerr << "Asked to follow dump ring " << target_dump_tag
+			          << ", but it is not configured to pcap format. "
+			          << "Double-check dataplane.conf \"sharedMemory\" section" << std::endl;
 			continue;
 		}
 
@@ -109,20 +108,18 @@ bool initialize_shm_rings(
 			int shm_id = shmget(ipc_key, 0, 0);
 			if (shm_id == -1)
 			{
-				YANET_LOG_ERROR("shmget failed for IPC key %d (ring '%s'): %s. Skipping.\n",
-				                ipc_key,
-				                ring_name.c_str(),
-				                strerror(errno));
+				std::cerr << "shmget failed for IPC key " << ipc_key
+				          << " (ring '" << ring_name << "'): "
+				          << strerror(errno) << ". Skipping." << std::endl;
 				continue;
 			}
 			shm_base = shmat(shm_id, nullptr, 0);
 			if (shm_base == reinterpret_cast<void*>(-1))
 			{
-				YANET_LOG_ERROR("shmat failed for IPC key %d, SHM ID %d (ring '%s'): %s. Skipping.\n",
-				                ipc_key,
-				                shm_id,
-				                ring_name.c_str(),
-				                strerror(errno));
+				std::cerr << "shmat failed for IPC key " << ipc_key
+				          << ", SHM ID " << shm_id
+				          << " (ring '" << ring_name << "'): "
+				          << strerror(errno) << ". Skipping." << std::endl;
 				continue;
 			}
 			out_mapped_shm_base_ptrs[ipc_key] = shm_base;
@@ -137,10 +134,9 @@ bool initialize_shm_rings(
 
 		if (capacity <= sizeof(RingMeta))
 		{
-			YANET_LOG_ERROR("Ring '%s' capacity %zu is too small (must be > %zu). Skipping.\n",
-			                ring_name.c_str(),
-			                capacity,
-			                sizeof(RingMeta));
+			std::cerr << "Ring '" << ring_name << "' capacity " << capacity
+			          << " is too small (must be > " << sizeof(RingMeta)
+			          << "). Skipping." << std::endl;
 			continue;
 		}
 		uint8_t* data_buf = ShiftBuffer(ring_shm_start, sizeof(RingMeta));
@@ -183,19 +179,16 @@ bool write_pcap_global_header()
 	size_t bytes_written = fwrite(&header, 1, sizeof(header), stdout);
 	if (bytes_written != sizeof(header))
 	{
-		YANET_LOG_ERROR("Failed to write pcap global header to stdout. Expected %zu, wrote %zu. "
-		                "Error: %s (errno %d).\n",
-		                sizeof(header),
-		                bytes_written,
-		                strerror(errno),
-		                errno);
+		std::cerr << "Failed to write pcap global header to stdout. Expected " << sizeof(header)
+		          << ", wrote " << bytes_written
+		          << ". Error: " << strerror(errno)
+		          << " (errno " << errno << ")." << std::endl;
 		return false;
 	}
 	if (fflush(stdout) != 0)
 	{
-		YANET_LOG_ERROR("fflush(stdout) after global header write failed: %s (errno %d).\n",
-		                strerror(errno),
-		                errno);
+		std::cerr << "fflush(stdout) after global header write failed: " << strerror(errno)
+		          << " (errno " << errno << ")." << std::endl;
 		return false;
 	}
 	return true;
@@ -276,12 +269,10 @@ bool write_pcap_record_to_stdout(const RingView& ring, size_t record_len)
 
 	if (bytes_written != record_len)
 	{
-		YANET_LOG_ERROR("Failed to write full pcap record to stdout. Expected %zu, wrote %zu. "
-		                "Error: %s (errno %d).\n",
-		                record_len,
-		                bytes_written,
-		                strerror(errno),
-		                errno);
+		std::cerr << "Failed to write full pcap record to stdout. Expected " << record_len
+		          << ", wrote " << bytes_written
+		          << ". Error: " << strerror(errno)
+		          << " (errno " << errno << ")." << std::endl;
 		return false;
 	}
 	return true;
@@ -322,7 +313,7 @@ bool process_ring_packets(RingView& ring, bool& stdout_bad, size_t& packets_writ
 		{
 			if (ferror(stdout))
 			{
-				YANET_LOG_ERROR("stdout is in an error state. Halting output.\n");
+				std::cerr << "stdout is in an error state. Halting output." << std::endl;
 				stdout_bad = true;
 			}
 			break;
@@ -344,7 +335,7 @@ void set_signal_handler()
 	sigint_action_setup.sa_flags = 0;
 	if (sigaction(SIGINT, &sigint_action_setup, nullptr) == -1)
 	{
-		YANET_LOG_ERROR("Failed to set SIGINT handler: %s. Proceeding without graceful Ctrl-C.\n", strerror(errno));
+		std::cerr << "Failed to set SIGINT handler: " << strerror(errno) << ". Proceeding without graceful Ctrl-C." << std::endl;
 	}
 }
 
@@ -362,7 +353,7 @@ inline void tcpdump_follow(const std::string& target_dump_tag)
 		for (auto const& [key, ptr] : shm_segments)
 		{
 			if (ptr && ptr != reinterpret_cast<void*>(-1) && shmdt(ptr) == -1)
-				YANET_LOG_ERROR("shmdt failed for IPC key %d during cleanup: %s\n", key, strerror(errno));
+				std::cerr << "shmdt failed for IPC key " << key << " during cleanup: " << strerror(errno) << std::endl;
 		}
 		shm_segments.clear();
 	};
@@ -372,13 +363,13 @@ inline void tcpdump_follow(const std::string& target_dump_tag)
 
 	if (!initialize_shm_rings(target_dump_tag, shm_info, dataplane, rings, shm_segments))
 	{
-		YANET_LOG_ERROR("No matching PCAP rings found for tag '%s' or failed to initialize any.\n", target_dump_tag.c_str());
+		std::cerr << "ERROR: No matching PCAP rings found for tag '" << target_dump_tag << "' or failed to initialize any." << std::endl;
 		return;
 	}
 
 	if (!write_pcap_global_header())
 	{
-		YANET_LOG_ERROR("Failed to write PCAP global header. Aborting.\n");
+		std::cerr << "ERROR: Failed to write PCAP global header. Aborting." << std::endl;
 		return;
 	}
 
@@ -412,10 +403,10 @@ inline void tcpdump_follow(const std::string& target_dump_tag)
 		{
 			if (fflush(stdout) != 0 && !stdout_has_error)
 			{
-				YANET_LOG_ERROR("fflush(stdout) in main loop failed: %s (errno %d).\n", strerror(errno), errno);
+				std::cerr << "ERROR: fflush(stdout) in main loop failed: " << strerror(errno) << " (errno " << errno << ")." << std::endl;
 				if (ferror(stdout)) // Double check stream error state
 				{
-					YANET_LOG_ERROR("stdout is confirmed in an error state after loop flush. Halting output.\n");
+					std::cerr << "ERROR: stdout is confirmed in an error state after loop flush. Halting output." << std::endl;
 					stdout_has_error = true;
 				}
 			}
@@ -433,7 +424,7 @@ inline void tcpdump_follow(const std::string& target_dump_tag)
 	std::cerr << "\nCapture "
 	          << (g_stop_flag.load(std::memory_order_acquire) ? "stopped by user." : "terminated.")
 	          << (stdout_has_error ? " Due to stdout error." : "")
-	          << " Final stats:" << std::endl;
+	          << ". Final stats:" << std::endl;
 	std::cerr << "  Total packets successfully written: " << total_packets_written << std::endl;
 	std::cerr << "  Total bytes successfully written to stdout: " << total_bytes_written << std::endl;
 
@@ -469,10 +460,9 @@ inline void tcpdump_read(const std::string& target_dump_tag, std::optional<std::
 
 		if (dump_config.format != tDataPlaneConfig::DumpFormat::kPcap)
 		{
-			YANET_LOG_ERROR("Asked to dump pcap files for dump tag %s, but provided "
-			                "ring is not configured to pcap format. "
-			                "Double-check dataplane.conf \"sharedMemory\" section\n",
-			                target_dump_tag.c_str());
+			std::cerr << "ERROR: Asked to dump pcap files for dump tag " << target_dump_tag << ", but provided "
+			          << "ring is not configured to pcap format. "
+			          << "Double-check dataplane.conf \"sharedMemory\" section\n";
 			return;
 		}
 
@@ -484,8 +474,7 @@ inline void tcpdump_read(const std::string& target_dump_tag, std::optional<std::
 
 	if (first_ring)
 	{
-		YANET_LOG_ERROR("Asked to dump pcap files for dump ring %s, but such ring was not found\n",
-		                target_dump_tag.c_str());
+		std::cerr << "ERROR: Asked to dump pcap files for dump ring " << target_dump_tag << ", but such ring was not found\n";
 	}
 
 	if (created_files.empty())
