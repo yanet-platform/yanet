@@ -293,6 +293,29 @@ bool process_ring_packets(RingView& ring, bool& stdout_bad, size_t& packets_writ
 	bool data_was_written = false;
 	uint64_t writer_after_pos = ring.meta->after.load(std::memory_order_acquire);
 
+	// Calculate how much data is theoretically available
+	uint64_t data_available = writer_after_pos - ring.reader_pos;
+
+	// If the amount of unread data exceeds the buffer's capacity, the writer has
+	// lapped us. The data at our current reader_pos is overwritten and invalid.
+	if (data_available > ring.size)
+	{
+		uint64_t bytes_lost = data_available - ring.size;
+
+		std::cerr << "[Ring " << ring.desc.tag
+		          << "] Reader is too slow and was lapped by the writer. "
+		          << "Available data (" << data_available
+		          << ") > buffer size (" << ring.size << "). "
+		          << "Jumping forward and skipping " << bytes_lost
+		          << " bytes to avoid corruption." << std::endl;
+
+		// The only safe action is to jump our read pointer to the writer's current
+		// position. This discards all the packets we missed.
+		ring.reader_pos = writer_after_pos;
+
+		return false;
+	}
+
 	while (ring.reader_pos < writer_after_pos && !stdout_bad)
 	{
 		PcapOnDiskRecordHeader record_hdr;
