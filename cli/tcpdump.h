@@ -425,7 +425,7 @@ inline void tcpdump_follow(const std::string& target_dump_tag)
 			// No data from any ring in this cycle, and not stopping yet. Pause briefly.
 			if (!g_stop_flag.load(std::memory_order_relaxed) && !stdout_has_error)
 			{
-				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				std::this_thread::sleep_for(std::chrono::microseconds(1));
 			}
 		}
 	}
