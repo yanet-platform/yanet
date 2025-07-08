@@ -388,6 +388,11 @@ public:
         initialized_ = false;
     }
 
+    void Debug(const std::string& message) const
+    {
+        YANET_LOG_WARNING("%s: initialized_=%d, number_buckets_=%d, buckets_=%p\n", message.c_str(), initialized_, number_buckets_, buckets_);
+    }
+
 private:
     Bucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;

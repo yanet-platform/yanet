@@ -292,6 +292,7 @@ eResult TcpConnectionStore::ServiceUpdate(proxy_service_t& service, dataplane::m
 
     if (result != eResult::success)
     {
+        YANET_LOG_WARNING("Error ServiceUpdate\n");
         return result;
     }
     service.tables.CopyFrom(updater_proxy_tables[service_id].tables[newGlobalBaseId]);
@@ -1092,14 +1093,14 @@ TcpConnectionStore::TcpConnectionStore()
 {
     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
     {
-        // updater_proxy_tables[index] = UpdaterProxyTables();
+        new (&updater_proxy_tables[index]) UpdaterProxyTables();
     }
 }
 
 UpdaterProxyTables::UpdaterProxyTables()
 {
-    // tables[0] = ProxyTables();
-    // tables[1] = ProxyTables();
+    new (&tables[0]) ProxyTables();
+    new (&tables[1]) ProxyTables();
     active_index = 0;
 }
 
