@@ -79,7 +79,8 @@ constexpr std::array names = std::array{"packets_in",
                                         "error_service_config_timestamps",
                                         "error_service_config_sack",
                                         "error_service_config_mss",
-                                        "ack_without_service_answer"};
+                                        "ack_without_service_answer",
+										"ack_invalid_ack_number"};
 
 enum class service_counter : tCounterId
 {
@@ -102,6 +103,7 @@ enum class service_counter : tCounterId
 	error_service_config_sack,
 	error_service_config_mss,
 	ack_without_service_answer,
+	ack_invalid_ack_number,
 	size
 };
 

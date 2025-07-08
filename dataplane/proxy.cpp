@@ -731,6 +731,14 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                     counters[service.counter_id + (tCounterId)::proxy::service_counter::ack_without_service_answer]++;
                     action = false;
                 }
+                else if (syn_connection_data.connection->server_seq != rte_be_to_cpu_32(tcp_header->recv_ack) - 1)
+                {
+                    // ack, but ack number is invalid
+                    // YANET_LOG_WARNING("Invalid ACK: server_seq=%u, ack=%u\n", syn_connection_data.connection->server_seq, rte_be_to_cpu_32(tcp_header->recv_ack));
+                    syn_connection_data.Unlock();
+                    counters[service.counter_id + (tCounterId)::proxy::service_counter::ack_invalid_ack_number]++;
+                    action = false;
+                }
                 else
                 {
                     uint32_t src_addr = ipv4_header->src_addr;
@@ -855,6 +863,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     if (service.tables.syn_connections.FindAndLock(client_addr, client_port, current_time_ms, syn_connection_data) == TableSearchResult::Found)
     {
         syn_connection_data.connection->server_answer = true;
+        syn_connection_data.connection->server_seq = rte_be_to_cpu_32(tcp_header->sent_seq);
         syn_connection_data.Unlock();
 
         if (service.send_proxy_header)

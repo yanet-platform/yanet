@@ -139,6 +139,7 @@ struct SynConnection
 {
     uint64_t local;     // ip + port from local pool
     uint32_t client_start_seq;  // SEQ received from client in first SYN packet
+    uint32_t server_seq; // SEQ received from server in SYNACK packet
     bool server_answer; // was received answer from server
 
     void Clear()

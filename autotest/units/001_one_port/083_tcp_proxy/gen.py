@@ -287,3 +287,23 @@ data_type8 = [
 ]
 
 WriteTest("008", data_type8)
+
+# 009 - Client send ACK with ack number not equal to seq+1 from server's SYNACK
+
+test_009 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT + 1, cport=PORT_CLIENT)
+
+data_type9 = [
+	(
+		test_009.FromClient((0, None), 'S', options=options_client_syn),
+		test_009.ToServer((0, None), 'S', options=options_client_syn)
+	),
+    (
+		test_009.FromServer((0, 1), 'AS', options=options_server_syn),
+		test_009.ToClient((0, 1), 'AS', options=options_server_syn)
+	),
+    (
+		test_009.FromClient((1, 123), 'A', raw=data_client1, options=options_client_ack),
+	)
+]
+
+WriteTest("009", data_type9)
