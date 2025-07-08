@@ -195,90 +195,6 @@ bool write_pcap_global_header()
 }
 
 /**
- * @brief Reads a PCAP record header from the ring buffer, handling potential wrap-around.
- *
- * @param ring The RingView to read from.
- * @param out_header Pointer to store the read header.
- *
- * @return True if a header was successfully read, false if not enough data.
- */
-bool read_pcap_record_header(RingView& ring, PcapOnDiskRecordHeader* out_header)
-{
-	constexpr size_t header_size = sizeof(PcapOnDiskRecordHeader);
-	uint64_t writer_pos = ring.meta->after.load(std::memory_order_acquire); // Re-check writer pos
-
-	if ((writer_pos - ring.reader_pos) < header_size)
-	{
-		// Not enough data for a full header yet
-		return false;
-	}
-
-	size_t offset = ring.reader_pos % ring.size;
-	size_t remaining = ring.size - offset;
-
-	if (header_size <= remaining)
-	{
-		memcpy(out_header, ShiftBuffer(ring.start, offset), header_size);
-	}
-	else
-	{
-		// Header wraps around the SHM buffer
-		memcpy(out_header, ShiftBuffer(ring.start, offset), remaining);
-		memcpy(ShiftBuffer(out_header, remaining), ring.start, header_size - remaining);
-	}
-	return true;
-}
-
-/**
- * @brief Writes a complete PCAP record (header + payload) from the ring buffer to stdout.
- *
- * @param ring The RingView containing the record data (reader_pos points to start of record).
- * @param record_len Total length of the on-disk record (header + captured payload).
- */
-bool write_pcap_record_to_stdout(const RingView& ring, size_t record_len)
-{
-	size_t offset = ring.reader_pos % ring.size;
-	size_t remaining = ring.size - offset;
-	size_t bytes_written = 0;
-
-	if (record_len <= remaining)
-	{
-		bytes_written += fwrite(ShiftBuffer(ring.start, offset), 1, record_len, stdout);
-	}
-	else
-	{
-		// Record wraps
-		size_t first_part_len = remaining;
-		if (first_part_len > 0)
-		{
-			// Ensure there's something to write in the first part
-			bytes_written += fwrite(ShiftBuffer(ring.start, offset), 1, first_part_len, stdout);
-		}
-
-		if (bytes_written == first_part_len)
-		{
-			// If first part succeeded (or was zero length and succeeded)
-			size_t second_part_len = record_len - first_part_len;
-			if (second_part_len > 0)
-			{
-				// Ensure there's something to write in the second part
-				bytes_written += fwrite(ring.start, 1, second_part_len, stdout);
-			}
-		}
-	}
-
-	if (bytes_written != record_len)
-	{
-		std::cerr << "Failed to write full pcap record to stdout. Expected " << record_len
-		          << ", wrote " << bytes_written
-		          << ". Error: " << strerror(errno)
-		          << " (errno " << errno << ")." << std::endl;
-		return false;
-	}
-	return true;
-}
-
-/**
  * @brief Processes available packets from a single ring.
  *
  * @param ring The RingView to process.
@@ -286,67 +202,91 @@ bool write_pcap_record_to_stdout(const RingView& ring, size_t record_len)
  * @param packets_written_this_loop Counter for packets written in current main loop iteration.
  * @param bytes_written Counter for bytes written in current main loop iteration.
  *
+ * @note To prevent race conditions with blocking writes (e.g., to a full
+ * pipe), this function first copies all available data from the shared memory
+ * ring into a temporary local buffer. All subsequent parsing
+ * and writing to stdout is performed on this safe, local buffer.
+ *
  * @return True if any data was written from this ring, false otherwise.
  */
 bool process_ring_packets(RingView& ring, bool& stdout_bad, size_t& packets_written_this_loop, size_t& bytes_written)
 {
-	bool data_was_written = false;
 	uint64_t writer_after_pos = ring.meta->after.load(std::memory_order_acquire);
-
-	// Calculate how much data is theoretically available
 	uint64_t data_available = writer_after_pos - ring.reader_pos;
 
-	// If the amount of unread data exceeds the buffer's capacity, the writer has
-	// lapped us. The data at our current reader_pos is overwritten and invalid.
-	if (data_available > ring.size)
+	if (data_available == 0)
 	{
-		uint64_t bytes_lost = data_available - ring.size;
-
-		std::cerr << "[Ring " << ring.desc.tag
-		          << "] Reader is too slow and was lapped by the writer. "
-		          << "Available data (" << data_available
-		          << ") > buffer size (" << ring.size << "). "
-		          << "Jumping forward and skipping " << bytes_lost
-		          << " bytes to avoid corruption." << std::endl;
-
-		// The only safe action is to jump our read pointer to the writer's current
-		// position. This discards all the packets we missed.
-		ring.reader_pos = writer_after_pos;
-
 		return false;
 	}
 
-	while (ring.reader_pos < writer_after_pos && !stdout_bad)
+	if (data_available > ring.size)
 	{
-		PcapOnDiskRecordHeader record_hdr;
-		// Not enough data for a header
-		if (!read_pcap_record_header(ring, &record_hdr))
+		uint64_t bytes_lost = data_available - ring.size;
+		std::cerr << "[Ring " << ring.desc.tag
+		          << "] Reader is too slow and was lapped by the writer. "
+		          << "Approximately " << bytes_lost << " bytes lost. "
+		          << "Jumping forward to avoid corruption." << std::endl;
+		ring.reader_pos = writer_after_pos;
+		return false;
+	}
+
+	// Copy ALL available data to a local buffer at once.
+	std::vector<uint8_t> local_buffer(data_available);
+	size_t shm_offset = ring.reader_pos % ring.size;
+	size_t remaining_in_shm = ring.size - shm_offset;
+
+	if (data_available <= remaining_in_shm)
+	{
+		memcpy(local_buffer.data(), ShiftBuffer(ring.start, shm_offset), data_available);
+	}
+	else
+	{
+		memcpy(local_buffer.data(), ShiftBuffer(ring.start, shm_offset), remaining_in_shm);
+		memcpy(local_buffer.data() + remaining_in_shm, ring.start, data_available - remaining_in_shm);
+	}
+
+	// Now, process the safe local buffer, writing packets to stdout.
+	bool data_was_written = false;
+	uint64_t processed_bytes = 0;
+	while (processed_bytes < data_available)
+	{
+		if ((data_available - processed_bytes) < sizeof(PcapOnDiskRecordHeader))
 		{
 			break;
 		}
 
-		const size_t record_len = sizeof(PcapOnDiskRecordHeader) + record_hdr.incl_len;
-		// Not enough data for the full record as per header
-		if ((writer_after_pos - ring.reader_pos) < record_len)
+		unsigned char* start = ShiftBuffer(local_buffer.data(), processed_bytes);
+		auto* record_hdr = reinterpret_cast<PcapOnDiskRecordHeader*>(start);
+		const size_t record_len = sizeof(PcapOnDiskRecordHeader) + record_hdr->incl_len;
+
+		// Incomplete packet data, writer might have been interrupted.
+		if ((data_available - processed_bytes) < record_len)
 		{
 			break;
 		}
 
-		if (!write_pcap_record_to_stdout(ring, record_len))
+		size_t written = fwrite(start, 1, record_len, stdout);
+		if (written != record_len)
 		{
 			if (ferror(stdout))
 			{
 				std::cerr << "stdout is in an error state. Halting output." << std::endl;
 				stdout_bad = true;
 			}
-			break;
+
+			ring.reader_pos += processed_bytes;
+			bytes_written += processed_bytes;
+			return data_was_written;
 		}
 
-		ring.reader_pos += record_len;
-		data_was_written = true;
+		processed_bytes += record_len;
 		packets_written_this_loop++;
-		bytes_written += record_len;
+		data_was_written = true;
 	}
+
+	ring.reader_pos += processed_bytes;
+	bytes_written += processed_bytes;
+
 	return data_was_written;
 }
 
