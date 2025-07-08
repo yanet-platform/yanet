@@ -297,6 +297,12 @@ public:
         return count;
     }
 
+    bool WasRecentlyOverflowed(uint32_t addr, uint16_t port, uint64_t current_time)
+    {
+        uint64_t key = Hash(addr, port);
+        return number_buckets_ == 0 || current_time - buckets_[key & (number_buckets_ - 1)].time_overflow < TIMEOUT_BUCKET_OVERFLOW;
+    }
+
     TableSearchResult FindAndLock(uint32_t addr, uint16_t port, uint64_t current_time, ConnectionData<ConnectionInfo>& data)
     {
         data.bucket = nullptr;

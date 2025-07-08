@@ -737,60 +737,67 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
             {
                 syn_connection_data.Unlock();
 
-                // try check cookie
-                // todo - check time overflow
-                uint32_t cookie_data = CheckSynCookie(service_id, service, ipv4_header, tcp_header);
-                if (cookie_data == 0)
+                if (unlikely(!service.tables.syn_connections.WasRecentlyOverflowed(ipv4_header->src_addr, tcp_header->src_port, current_time_ms)))
                 {
-                    counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
-                    action = true;
+                    action = false;
                 }
                 else
                 {
-                    // get from local
-                    uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
-                    if (local == 0)
+                    // try check cookie
+                    // todo - check time overflow
+                    uint32_t cookie_data = CheckSynCookie(service_id, service, ipv4_header, tcp_header);
+                    if (cookie_data == 0)
                     {
-                        counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
-                        action = false;
+                        counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
+                        action = true;
                     }
                     else
                     {
-                        size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
-                        TcpOptions tcp_options;
-                        memset(&tcp_options, 0, sizeof(tcp_options));
-                        tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
-
-                        // Add to connections
-                        service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
-                        LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
-                        service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
-                        service_connection_data.connection->proxy_start_seq = rte_be_to_cpu_32(tcp_header->recv_ack) - 1;
-                        service_connection_data.connection->client_start_seq = sub_cpu_32(tcp_header->sent_seq, 1);
-                        service_connection_data.connection->timestamp_proxy_first = tcp_options.timestamp_echo;
-                        service_connection_data.connection->timestamp_client_last = tcp_options.timestamp_value;
-                        service_connection_data.connection->cookie_data = cookie_data;
-
-                        tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, 1 + (service.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
-
-                        TcpOptions cookie_options = SynCookies::UnpackData(cookie_data);
-                        if (tcp_options.timestamp_value != 0 && service.timestamps)
+                        // get from local
+                        uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
+                        if (local == 0)
                         {
-                            cookie_options.timestamp_value = tcp_options.timestamp_value;
+                            counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
+                            action = false;
                         }
                         else
                         {
-                            cookie_options.timestamp_value = 0;
-                            flags |= Connection::flag_no_timestamps;
+                            size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+                            TcpOptions tcp_options;
+                            memset(&tcp_options, 0, sizeof(tcp_options));
+                            tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+    
+                            // Add to connections
+                            service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
+                            LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
+                            service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
+                            service_connection_data.connection->proxy_start_seq = rte_be_to_cpu_32(tcp_header->recv_ack) - 1;
+                            service_connection_data.connection->client_start_seq = sub_cpu_32(tcp_header->sent_seq, 1);
+                            service_connection_data.connection->timestamp_proxy_first = tcp_options.timestamp_echo;
+                            service_connection_data.connection->timestamp_client_last = tcp_options.timestamp_value;
+                            service_connection_data.connection->cookie_data = cookie_data;
+    
+                            tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, 1 + (service.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
+    
+                            TcpOptions cookie_options = SynCookies::UnpackData(cookie_data);
+                            if (tcp_options.timestamp_value != 0 && service.timestamps)
+                            {
+                                cookie_options.timestamp_value = tcp_options.timestamp_value;
+                            }
+                            else
+                            {
+                                cookie_options.timestamp_value = 0;
+                                flags |= Connection::flag_no_timestamps;
+                            }
+                            service_connection_data.connection->flags = Connection::flag_from_synkookie | flags;
+    
+                            cookie_options.Write(mbuf, &ipv4_header, &tcp_header);
+                            ipv4_header->time_to_live = 64;
+                            tcp_header->recv_ack = 0;
+                            tcp_header->tcp_flags = TCP_SYN_FLAG;
+    
+                            counters[service.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
                         }
-                        service_connection_data.connection->flags = Connection::flag_from_synkookie | flags;
-
-                        cookie_options.Write(mbuf, &ipv4_header, &tcp_header);
-                        ipv4_header->time_to_live = 64;
-                        tcp_header->recv_ack = 0;
-                        tcp_header->tcp_flags = TCP_SYN_FLAG;
-
-                        counters[service.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
                     }
                 }
             }
