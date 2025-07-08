@@ -11,6 +11,8 @@ namespace dataplane::proxy
 #define TIMEOUT_ACK 10000 // todo
 #define TIMEOUT_SYN 3000 // todo - to config
 
+#define TIMEOUT_BUCKET_OVERFLOW 1000
+
 template<typename ConnectionInfo>
 struct ConnectionBucket
 {
@@ -303,9 +305,15 @@ public:
         {
             return TableSearchResult::Overflow;
         }
-
+        
         uint64_t key = Hash(addr, port);
         Bucket* bucket = &buckets_[key & (number_buckets_ - 1)];
+
+        if constexpr (std::is_same_v<ConnectionInfo, SynConnection>)
+        {
+            if (current_time - bucket->time_overflow < TIMEOUT_BUCKET_OVERFLOW)
+                return TableSearchResult::Overflow;
+        }
 
         data.bucket = bucket;
         data.idx = Bucket::bucket_size;
@@ -332,6 +340,7 @@ public:
 
         if (data.idx == Bucket::bucket_size)
         {
+            bucket->time_overflow = current_time;
             bucket->Unlock();
             data.bucket = nullptr;
             data.connection = nullptr;
