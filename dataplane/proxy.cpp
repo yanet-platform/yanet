@@ -485,72 +485,43 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
     DebugPacket("proxy_client_syn", service_id, ipv4_header, tcp_header);
     bool action = true;
 
-    ServiceConnectionData service_connection_data;
-    switch (service.tables.service_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, service_connection_data))
+    SynConnectionData syn_connection_data;
+    switch (service.tables.syn_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data))
     {
         case TableSearchResult::Overflow:
         {
-            counters[service.counter_id + (tCounterId)::proxy::service_counter::service_bucket_overflow]++;
-            action = false;
+            uint32_t cookie = BuildSynCookieAndFillTcpOptionsAnswer(service_id, service, mbuf, &ipv4_header, &tcp_header);
+            ActionClientOnSynPrepareSynToClient(ipv4_header, tcp_header, cookie);
+            counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
+            counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;
             break;
         }
         case TableSearchResult::Found:
         {
-            if (!service_connection_data.connection->CreatedFromSynCookie())
-            {
-                // todo
-                action = false;
-            }
-            else
-            {
-                // todo
-                action = false;
-            }
+            ActionClientOnSynPrepareSynToService(service, ipv4_header, tcp_header, syn_connection_data.connection->local);
             break;
         }
         case TableSearchResult::NotFound:
         {
-            SynConnectionData syn_connection_data;
-            switch (service.tables.syn_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data))
+            uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
+            if (local == 0)
             {
-                case TableSearchResult::Overflow:
-                {
-                    uint32_t cookie = BuildSynCookieAndFillTcpOptionsAnswer(service_id, service, mbuf, &ipv4_header, &tcp_header);
-                    ActionClientOnSynPrepareSynToClient(ipv4_header, tcp_header, cookie);
-                    counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
-				    counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;
-                    break;
-                }
-                case TableSearchResult::Found:
-                {
-                    ActionClientOnSynPrepareSynToService(service, ipv4_header, tcp_header, syn_connection_data.connection->local);
-                    break;
-                }
-                case TableSearchResult::NotFound:
-                {
-                    uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
-                    if (local == 0)
-                    {
-                        counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
-                        action = false;
-                    }
-                    else
-                    {
-                        syn_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
-                        syn_connection_data.connection->local = local;
-                        syn_connection_data.connection->client_start_seq = tcp_header->sent_seq;
-
-                        ActionClientOnSynPrepareSynToService(service, ipv4_header, tcp_header, local);
-                        counters[service.counter_id + (tCounterId)::proxy::service_counter::new_syn_connections]++;
-                    }
-                    break;
-                }
+                counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
+                action = false;
             }
-            syn_connection_data.Unlock();
+            else
+            {
+                syn_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
+                syn_connection_data.connection->local = local;
+                syn_connection_data.connection->client_start_seq = tcp_header->sent_seq;
+
+                ActionClientOnSynPrepareSynToService(service, ipv4_header, tcp_header, local);
+                counters[service.counter_id + (tCounterId)::proxy::service_counter::new_syn_connections]++;
+            }
             break;
         }
     }
-    service_connection_data.Unlock();
+    syn_connection_data.Unlock();
 
     if (action)
     {
