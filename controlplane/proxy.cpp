@@ -9,6 +9,15 @@ eResult proxy_t::init()
     controlPlane->register_command(common::icp::requestType::proxy_counters, [this]() {
 		return proxy_counters();
 	});
+    controlPlane->register_command(common::icp::requestType::proxy_connections, [this](const common::icp::request& request) {
+        return proxy_connections(std::get<common::icp::proxy_connections::request>(std::get<1>(request)));
+    });
+    controlPlane->register_command(common::icp::requestType::proxy_syn, [this](const common::icp::request& request) {
+        return proxy_syn(std::get<common::icp::proxy_syn::request>(std::get<1>(request)));
+    });
+    controlPlane->register_command(common::icp::requestType::proxy_tables, [this](const common::icp::request& request) {
+        return proxy_tables(std::get<common::icp::proxy_tables::request>(std::get<1>(request)));
+    });
 
     controlPlane->register_service(this);
 
@@ -139,4 +148,88 @@ common::icp::proxy_counters::response proxy_t::proxy_counters() const
 	}
 
 	return response;
+}
+
+common::icp::proxy_connections::response proxy_t::proxy_connections(const common::icp::proxy_connections::request& request) const
+{
+    common::icp::proxy_connections::response response;
+    const std::string& service_name = request;
+
+    generations_config.current_lock();
+    std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
+    generations_config.current_unlock();
+
+    for (auto& [module, config] : config_proxies)
+    {
+        for (const auto& iter_service : config.services)
+        {
+            const controlplane::proxy::service_t& service = iter_service.second;
+            if (service.service.find(service_name) != std::string::npos)
+            {
+                const auto& connections = dataplane.proxy_connections(service.service_id);
+                for (const auto& connection : connections)
+                    response.push_back(std::tuple_cat(std::make_tuple(service.service), connection));
+            }
+        }
+    }
+
+    return response;
+}
+
+common::icp::proxy_syn::response proxy_t::proxy_syn(const common::icp::proxy_syn::request& request) const
+{
+    common::icp::proxy_syn::response response;
+    const std::string& service_name = request;
+
+    generations_config.current_lock();
+    std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
+    generations_config.current_unlock();
+
+    for (auto& [module, config] : config_proxies)
+    {
+        for (const auto& iter_service : config.services)
+        {
+            const controlplane::proxy::service_t& service = iter_service.second;
+            if (service.service.find(service_name) != std::string::npos)
+            {
+                const auto& syns = dataplane.proxy_syn(service.service_id);
+                for (const auto& syn : syns)
+                    response.push_back(std::tuple_cat(std::make_tuple(service.service), syn));
+            }
+        }
+    }
+
+    return response;
+}
+
+common::icp::proxy_tables::response proxy_t::proxy_tables(const common::icp::proxy_tables::request& request) const
+{
+    common::icp::proxy_tables::response response;
+    const std::optional<std::string>& service_name = request;
+
+    generations_config.current_lock();
+    std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
+    generations_config.current_unlock();
+
+    std::vector<std::pair<proxy_service_id_t, std::string>> services;
+    for (auto& [module, config] : config_proxies)
+    {
+        for (const auto& iter_service : config.services)
+        {
+            const controlplane::proxy::service_t& service = iter_service.second;
+            if (service_name.has_value())
+            {
+                if (service.service.find(*service_name) != std::string::npos)
+                {
+                    services.emplace_back(service.service_id, service.service);
+                }
+            }
+            else
+            {
+                services.emplace_back(service.service_id, service.service);
+            }
+        }
+    }
+
+    return dataplane.proxy_tables(services);
 }

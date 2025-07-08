@@ -1006,8 +1006,7 @@ common::idp::proxy_syn::response cControlPlane::proxy_syn(const common::idp::pro
 
 common::idp::proxy_tables::response cControlPlane::proxy_tables(const common::idp::proxy_tables::request& request)
 {
-	auto [service_id] = request;
-	return dataPlane->tcp_connection_store.GetTables(service_id);
+	return dataPlane->tcp_connection_store.GetTables(request);
 }
 
 eResult cControlPlane::unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request)

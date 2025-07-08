@@ -27,52 +27,55 @@ void counters()
     table.Print();
 }
 
-void connections(proxy_service_id_t service_id)
+void connections(std::string service_name)
 {
-	interface::dataPlane dataplane;
-	const auto response = dataplane.proxy_connections(service_id);
+	interface::controlPlane controlplane;
+	const auto response = controlplane.proxy_connections(service_name);
 
 	TablePrinter table;
-	table.insert_row("src_addr",
+	table.insert_row("service_name",
+					 "src_addr",
 	                 "src_port",
 	                 "local_addr",
 	                 "local_port");
 
-	for (const auto& [src_addr, src_port, local_addr, local_port] : response)
+	for (const auto& [service_name, src_addr, src_port, local_addr, local_port] : response)
 	{
-		table.insert_row(common::ipv4_address_t(rte_cpu_to_be_32(src_addr)).toString(), rte_cpu_to_be_16(src_port), common::ipv4_address_t(rte_cpu_to_be_32(local_addr)).toString(), rte_cpu_to_be_16(local_port));
+		table.insert_row(service_name, common::ipv4_address_t(rte_cpu_to_be_32(src_addr)).toString(), rte_cpu_to_be_16(src_port), common::ipv4_address_t(rte_cpu_to_be_32(local_addr)).toString(), rte_cpu_to_be_16(local_port));
 	}
 
 	table.Print();
 }
 
-void syn(proxy_service_id_t service_id)
+void syn(std::string service_name)
 {
-	interface::dataPlane dataplane;
-	const auto response = dataplane.proxy_syn(service_id);
-	YANET_LOG_WARNING("\tsyn service_id=%d, response.size()=%ld\n", service_id, response.size());
+	interface::controlPlane controlplane;
+	const auto response = controlplane.proxy_syn(service_name);
+	// YANET_LOG_WARNING("\tsyn service_name=%s, response.size()=%ld\n", service_name.c_str(), response.size());
 
 	TablePrinter table;
-	table.insert_row("src_addr",
+	table.insert_row("service_name",
+					 "src_addr",
 	                 "src_port",
 	                 "local_addr",
 	                 "local_port");
 
-	for (const auto& [src_addr, src_port, local_addr, local_port] : response)
+	for (const auto& [service_name, src_addr, src_port, local_addr, local_port] : response)
 	{
-		table.insert_row(common::ipv4_address_t(rte_cpu_to_be_32(src_addr)).toString(), rte_cpu_to_be_16(src_port), common::ipv4_address_t(rte_cpu_to_be_32(local_addr)).toString(), rte_cpu_to_be_16(local_port));
+		table.insert_row(service_name, common::ipv4_address_t(rte_cpu_to_be_32(src_addr)).toString(), rte_cpu_to_be_16(src_port), common::ipv4_address_t(rte_cpu_to_be_32(local_addr)).toString(), rte_cpu_to_be_16(local_port));
 	}
 
 	table.Print();
 }
 
-void tables(std::optional<proxy_service_id_t> service_id)
+void tables(std::optional<std::string> service_name)
 {
-	interface::dataPlane dataplane;
-	const auto response = dataplane.proxy_tables(service_id);
+	interface::controlPlane controlplane;
+	const auto response = controlplane.proxy_tables(service_name);
 
 	TablePrinter table;
 	table.insert_row("service_id",
+					 "service_name",
 					 "connections",
 					 "max_connections",
 					 "syn_connections",
@@ -81,9 +84,9 @@ void tables(std::optional<proxy_service_id_t> service_id)
 					 "total_addresses",
 					 "free_addresses",
 					 "used_addresses");
-	for (const auto& [service_id, connections, max_connections, syn_connections, max_syn_connections, prefix, total_addresses, free_addresses, used_addresses] : response)
+	for (const auto& [service_id, service_name, connections, max_connections, syn_connections, max_syn_connections, prefix, total_addresses, free_addresses, used_addresses] : response)
 	{
-		table.insert_row(service_id, connections, max_connections, syn_connections, max_syn_connections, prefix, total_addresses, free_addresses, used_addresses);
+		table.insert_row(service_id, service_name, connections, max_connections, syn_connections, max_syn_connections, prefix, total_addresses, free_addresses, used_addresses);
 	}
 
 	table.Print();

@@ -823,9 +823,10 @@ using response = std::vector<connection>;
 
 namespace proxy_tables
 {
-using request = std::tuple<std::optional<proxy_service_id_t>>;
+using request = std::vector<std::pair<proxy_service_id_t, std::string>>;
 
 using tables = std::tuple<proxy_service_id_t, ///< proxy_service_id
+                          std::string, ///< service_name
                           size_t, ///< connections
                           size_t, ///< max connections
                           size_t, ///< syn connections
@@ -1072,7 +1073,8 @@ using request = std::tuple<requestType,
                                         neighbor_insert::request,
                                         neighbor_remove::request,
                                         neighbor_update_interfaces::request,
-                                        memory_manager_update::request>>;
+                                        memory_manager_update::request,
+                                        proxy_tables::request>>;
 
 using response = std::variant<std::tuple<>,
                               updateGlobalBase::response, ///< + others which have eResult as response

@@ -89,6 +89,9 @@ enum class requestType : uint32_t
 	route_counters,
 	route_tunnel_counters,
         proxy_counters,
+        proxy_connections,
+        proxy_syn,
+        proxy_tables,
 	size // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -230,6 +233,12 @@ inline const char* requestType_toString(requestType t)
 			return "route_tunnel_counters";
                 case requestType::proxy_counters:
 			return "proxy_counters";
+                case requestType::proxy_connections:
+                        return "proxy_connections";
+                case requestType::proxy_syn:
+                        return "proxy_syn";
+                case requestType::proxy_tables:
+                        return "proxy_tables";
 		case requestType::size:
 			return "unknown";
 	}
@@ -958,6 +967,50 @@ using response = std::vector<std::tuple<proxy_service_id_t, ///< service_id
                                         std::array<uint64_t, proxy::names.size()>>>;
 }
 
+namespace proxy_connections
+{
+using request = std::string; ///< service_name
+
+using connection = std::tuple<std::string, ///< service_name
+                              uint32_t, ///< src_addr
+                              uint16_t, ///< src_port
+                              uint32_t, ///< local_addr
+                              uint16_t>; ///< local_port
+
+using response = std::vector<connection>;
+}
+
+namespace proxy_syn
+{
+using request = std::string; ///< service_name
+
+using connection = std::tuple<std::string, ///< service_name
+                              uint32_t, ///< src_addr
+                              uint16_t, ///< src_port
+                              uint32_t, ///< local_addr
+                              uint16_t>; ///< local_port
+
+using response = std::vector<connection>;        
+}
+
+namespace proxy_tables
+{
+using request = std::optional<std::string>; ///< service_name
+
+using tables = std::tuple<proxy_service_id_t, ///< proxy_service_id
+                          std::string, ///< service_name
+                          size_t, ///< connections
+                          size_t, ///< max connections
+                          size_t, ///< syn connections
+                          size_t, ///< max syn connections
+                          common::ip_prefix_t, ///< local pool prefix
+                          uint32_t, ///< total addresses
+                          uint32_t, ///< free addresses
+                          uint32_t>; ///< used addresses
+
+using response = std::vector<tables>;
+}
+
 using request = std::tuple<requestType,
                            std::variant<std::tuple<>,
                                         acl_unwind::request,
@@ -973,7 +1026,8 @@ using request = std::tuple<requestType,
                                         getAclConfig::request,
                                         getFwList::request,
                                         loadConfig::request,
-                                        convert::request>>;
+                                        convert::request,
+                                        proxy_tables::request>>;
 
 using response = std::variant<std::tuple<>,
                               telegraf_unsafe::response,
@@ -1029,5 +1083,7 @@ using response = std::variant<std::tuple<>,
                               nat46clat_stats::response,
                               convert::response,
                               counters_stat::response,
-                              proxy_counters::response>;
+                              proxy_counters::response,
+                              proxy_connections::response,
+                              proxy_tables::response>;
 }

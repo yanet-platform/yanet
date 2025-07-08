@@ -159,6 +159,21 @@ public:
 		return get<common::icp::requestType::proxy_counters, common::icp::proxy_counters::response>();
 	}
 
+	auto proxy_connections(const common::icp::proxy_connections::request& request) const
+	{
+		return get<common::icp::requestType::proxy_connections, common::icp::proxy_connections::response>(request);
+	}
+
+	auto proxy_syn(const common::icp::proxy_syn::request& request) const
+	{
+		return get<common::icp::requestType::proxy_syn, common::icp::proxy_syn::response>(request);
+	}
+
+	auto proxy_tables(const common::icp::proxy_tables::request& request) const
+	{
+		return get<common::icp::requestType::proxy_tables, common::icp::proxy_tables::response>(request);
+	}
+
 	auto acl_unwind(const common::icp::acl_unwind::request& request) const
 	{
 		return get<common::icp::requestType::acl_unwind, common::icp::acl_unwind::response>(request);

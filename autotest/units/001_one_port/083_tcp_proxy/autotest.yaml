@@ -47,13 +47,13 @@ steps:
 - cli:
   - proxy counters
   - proxy tables
-  - proxy connections 5
-  - proxy syn 6
+  - proxy connections type
+  - proxy syn type
 
 - sleep: 5
 
 - cli:
-  - proxy connections 5
+  - proxy connections type
   - rib static remove default 10.0.1.0/24 10.0.1.1
   - rib static remove default 10.0.2.0/24 10.0.2.1
   - rib prefixes

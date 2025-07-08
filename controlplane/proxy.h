@@ -54,6 +54,9 @@ protected:
     void AddRequestUpdateService(common::idp::updateGlobalBase::request& globalbase, const controlplane::proxy::service_t& service);
     void counters_gc_thread();
     common::icp::proxy_counters::response proxy_counters() const;
+	common::icp::proxy_connections::response proxy_connections(const common::icp::proxy_connections::request& request) const;
+	common::icp::proxy_syn::response proxy_syn(const common::icp::proxy_syn::request& request) const;
+	common::icp::proxy_tables::response proxy_tables(const common::icp::proxy_tables::request& request) const;
 
     std::map<std::string, proxy_id_t> modules;
     std::map<std::tuple<common::ip_address_t, tPortId, uint8_t>, proxy_service_id_t> services;

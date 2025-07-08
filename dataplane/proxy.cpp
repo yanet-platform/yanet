@@ -347,20 +347,13 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t s
     return response;
 }
 
-common::idp::proxy_tables::response TcpConnectionStore::GetTables(std::optional<proxy_service_id_t> service_id)
+common::idp::proxy_tables::response TcpConnectionStore::GetTables(const std::vector<std::pair<proxy_service_id_t, std::string>>& services)
 {
     common::idp::proxy_tables::response response;
 
-    if (!service_id.has_value())
+    for (const auto& [service_id, service_name] : services)
     {
-        for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
-        {
-            updater_proxy_tables[index].GetTables(index, response);
-        }
-    }
-    else if (*service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
-    {
-        updater_proxy_tables[*service_id].GetTables(*service_id, response);
+        updater_proxy_tables[service_id].GetTables(service_id, service_name, response);
     }
 
     return response;
@@ -1173,7 +1166,7 @@ void UpdaterProxyTables::CollectGarbage(uint64_t current_time)
     tables[active_index].syn_connections.CollectGarbage(current_time, tables[active_index].local_pool);
 }
 
-void UpdaterProxyTables::GetTables(proxy_service_id_t service_id, common::idp::proxy_tables::response& response)
+void UpdaterProxyTables::GetTables(proxy_service_id_t service_id, const std::string& service_name, common::idp::proxy_tables::response& response)
 {
     std::lock_guard<std::mutex> guard(mutex);
     const ProxyTables& current = tables[active_index];
@@ -1181,7 +1174,7 @@ void UpdaterProxyTables::GetTables(proxy_service_id_t service_id, common::idp::p
     {
         LocalPoolStat stat = tables[active_index].local_pool.GetStat();
 
-        response.emplace_back(service_id,
+        response.emplace_back(service_id, service_name,
             current.service_connections.Size(), current.service_connections.Capacity(),
             current.syn_connections.Size(), current.syn_connections.Capacity(),
             stat.prefix, stat.total_addresses, stat.free_addresses, stat.used_addresses);

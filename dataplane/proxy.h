@@ -52,7 +52,7 @@ struct UpdaterProxyTables
 
     void FillConnections(uint64_t current_time, common::idp::proxy_connections::response& response);
     void FillSynConnections(uint64_t current_time, common::idp::proxy_syn::response& response);
-    void GetTables(proxy_service_id_t service_id, common::idp::proxy_tables::response& response);
+    void GetTables(proxy_service_id_t service_id, const std::string& service_name, common::idp::proxy_tables::response& response);
 
     void CollectGarbage(uint64_t current_time);
 };
@@ -154,7 +154,7 @@ public:
     // Info
     common::idp::proxy_connections::response GetConnections(proxy_service_id_t service_id);
     common::idp::proxy_syn::response GetSyn(proxy_service_id_t service_id);
-    common::idp::proxy_tables::response GetTables(std::optional<proxy_service_id_t> service_id);
+    common::idp::proxy_tables::response GetTables(const std::vector<std::pair<proxy_service_id_t, std::string>>& services);
 
     // Actions from worker
     bool ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id);
