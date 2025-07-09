@@ -17,6 +17,7 @@
 #include "common.h"
 #include "dump_rings.h"
 #include "globalbase.h"
+#include "rte_branch_prediction.h"
 #include "samples.h"
 
 namespace dataplane
@@ -242,6 +243,44 @@ public:
 	const dataplane::base::generation& CurrentBase() { return bases[localBaseId & 1]; }
 	void IncrementCounter(common::globalBase::static_counter_type type) { counters[(uint32_t)type]++; }
 	[[nodiscard]] uint32_t CurrentTime() const { return basePermanently.globalBaseAtomic->currentTime; }
+
+	/**
+	 * Returns a NUMA-local wall-clock timestamp anchor.
+	 *
+	 * This function is the reader-side of a seqlock, providing lock-free,
+	 * thread-safe access to the timestamp data updated by a background thread.
+	 * Latency is about (~10-20ns)
+	 *
+	 * The seqlock logic is as follows:
+	 * 1. Read the sequence number (seq1).
+	 * 2. If seq1 is odd, the writer is busy, so retry.
+	 * 3. Copy the 32-byte anchor data.
+	 * 4. Read the sequence number again (seq2).
+	 * 5. If seq1 == seq2, the data copy is consistent. Otherwise, a write
+	 *    occurred during our read, so we loop and retry.
+	 */
+	[[nodiscard]] dataplane::globalBase::atomic::WallclockAnchor WallclockAnchor() const
+	{
+		using WallclockAnchor = dataplane::globalBase::atomic::WallclockAnchor;
+		const auto& wd = basePermanently.globalBaseAtomic->wallclock;
+
+		WallclockAnchor copy;
+		uint64_t seq1 = 0, seq2 = 0;
+		do
+		{
+			seq1 = wd.seq.load(std::memory_order_acquire);
+			if (seq1 & 1)
+			{
+				rte_pause();
+				continue;
+			}
+			copy = wd.anchor;
+			seq2 = wd.seq.load(std::memory_order_acquire);
+
+		} while (unlikely(seq1 != seq2));
+
+		return copy;
+	}
 
 	friend class cDataPlane;
 	friend class cReport;
