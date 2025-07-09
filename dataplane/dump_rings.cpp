@@ -5,7 +5,6 @@
 #include "metadata.h"
 
 #include "MBufRawPacket.h"
-#include <iostream>
 
 namespace dumprings
 {
@@ -17,7 +16,7 @@ RingRaw::RingRaw(void* memory, size_t max_pkt_size, size_t pkt_count) :
 	ring_->header.after = 0;
 }
 
-void RingRaw::Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, [[maybe_unused]] uint32_t time)
+void RingRaw::Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor)
 {
 	// Each ring has its own header, the header contains absolute position
 	// to which next packet should be written. Position has two state:
@@ -110,13 +109,35 @@ public:
 	}
 };
 
-void RingPcap::Write(rte_mbuf* mbuf, [[maybe_unused]] common::globalBase::eFlowType flow_type, uint32_t time)
+static timespec fast_wall_timestamp(const WallclockAnchor& anchor)
 {
-	timespec ts = {.tv_sec = time, .tv_nsec = 0};
-	MBufRawPacketCopy raw_packet(mbuf, ts);
+	constexpr uint64_t NSEC_PER_SEC = 1'000'000'000ULL;
 
-	// TODO: can I do this, or should I use time obtained from basePermanently.globalBaseAtomic->currentTime like I do now?
-	/* timespec_get(&ts, TIME_UTC); */
+	uint64_t current_tsc = rte_get_tsc_cycles();
+	uint64_t delta_cycles = (current_tsc > anchor.tsc0) ? (current_tsc - anchor.tsc0) : 0;
+
+	// Use a 128-bit intermediate to prevent overflow when multiplying by a billion.
+	auto delta_ns_128 = static_cast<unsigned __int128>(delta_cycles * NSEC_PER_SEC);
+	uint64_t delta_ns = delta_ns_128 / anchor.hz;
+
+	timespec ts = anchor.wall0;
+
+	ts.tv_sec += static_cast<__time_t>(delta_ns / NSEC_PER_SEC);
+	ts.tv_nsec += static_cast<long>(delta_ns % NSEC_PER_SEC);
+
+	// Normalize tv_nsec to be within the valid [0, 999999999] range.
+	if (unlikely(static_cast<uint64_t>(ts.tv_nsec) >= NSEC_PER_SEC))
+	{
+		ts.tv_sec++;
+		ts.tv_nsec -= NSEC_PER_SEC;
+	}
+
+	return ts;
+}
+
+void RingPcap::Write(rte_mbuf* mbuf, [[maybe_unused]] common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor)
+{
+	MBufRawPacketCopy raw_packet(mbuf, fast_wall_timestamp(anchor));
 
 	dev_.WritePacket(raw_packet);
 }

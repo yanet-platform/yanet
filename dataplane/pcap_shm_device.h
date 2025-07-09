@@ -264,7 +264,7 @@ public:
 	 * @param[in] nanosecondsPrecision A boolean indicating whether to write timestamps in
 	 * nano-precision. If set to false, timestamps will be written in micro-precision.
 	 */
-	PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t pcap_files, LinkLayerType link_layer_type = LINKTYPE_ETHERNET, bool nanoseconds_precision = false);
+	PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t pcap_files, LinkLayerType link_layer_type = LINKTYPE_ETHERNET, bool nanoseconds_precision = true);
 
 	~PcapShmWriterDevice() override;
 

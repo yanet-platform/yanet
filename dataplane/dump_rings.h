@@ -7,12 +7,14 @@
 
 #include "config.h"
 #include "pcap_shm_device.h"
+#include "globalbase.h"
 
 namespace dumprings
 {
 using Format = tDataPlaneConfig::DumpFormat;
 using Config = tDataPlaneConfig::DumpConfig;
 using Filenames = std::vector<std::string>;
+using WallclockAnchor = dataplane::globalBase::atomic::WallclockAnchor;
 
 class RingBase
 {
@@ -24,7 +26,7 @@ class RingBase
 public:
 	virtual ~RingBase() = default;
 
-	virtual void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, uint32_t time) = 0;
+	virtual void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor) = 0;
 
 	[[nodiscard]] virtual bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const = 0;
 
@@ -81,7 +83,7 @@ public:
 
 	~RingRaw() override = default;
 
-	void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, uint32_t time) override;
+	void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor) override;
 
 	[[nodiscard]] bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const override;
 
@@ -126,7 +128,7 @@ public:
 
 	~RingPcap() override = default;
 
-	void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, uint32_t time) override;
+	void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor) override;
 
 	[[nodiscard]] bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const override;
 
