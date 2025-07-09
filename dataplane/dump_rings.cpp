@@ -68,15 +68,10 @@ size_t RingRaw::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 	return PacketBufferRing::GetCapacity(max_pkt_size, pkt_count);
 }
 
-RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count, size_t file_count) :
-        dev_(memory, GetCapacity(max_pkt_size, pkt_count), file_count)
+RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count) :
+        dev_(memory, GetCapacity(max_pkt_size, pkt_count))
 {
-	dev_.open();
-}
-
-void RingPcap::Clean()
-{
-	dev_.Clean();
+	dev_.Open();
 }
 
 /**
@@ -88,7 +83,7 @@ void RingPcap::Clean()
  * was protected, plus is requires to build PcapPlusPlus with DPDK support,
  * which is unnecessary for such a small change.
  */
-class MBufRawPacketCopy : public pcpp::RawPacket
+class MBufRawPacketCopy final : public pcpp::RawPacket
 {
 	void SetMBuf(rte_mbuf* mbuf, timespec timestamp)
 	{
@@ -98,7 +93,10 @@ class MBufRawPacketCopy : public pcpp::RawPacket
 			return;
 		}
 
-		initWithRawData(rte_pktmbuf_mtod(mbuf, const uint8_t*), rte_pktmbuf_pkt_len(mbuf), timestamp, pcpp::LINKTYPE_ETHERNET);
+		initWithRawData(rte_pktmbuf_mtod(mbuf, const uint8_t*),
+		                rte_pktmbuf_pkt_len(mbuf),
+		                timestamp,
+		                pcpp::LINKTYPE_ETHERNET);
 	}
 
 public:
@@ -142,27 +140,6 @@ void RingPcap::Write(rte_mbuf* mbuf, [[maybe_unused]] common::globalBase::eFlowT
 	dev_.WritePacket(raw_packet);
 }
 
-void RingPcap::Flush()
-{
-	dev_.Flush();
-}
-
-Filenames RingPcap::DumpPcapFilesToDisk(std::string_view prefix, std::string_view path)
-{
-	YANET_LOG_INFO("DumpRing %p was asked to dump it's contents to a file\n", this);
-	return dev_.DumpPcapFilesToDisk(prefix, path);
-}
-
-void RingPcap::SwitchToFollow()
-{
-	dev_.SwitchToFollow();
-}
-
-void RingPcap::FollowDone()
-{
-	dev_.FollowDone();
-}
-
 bool RingPcap::GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const
 {
 	return dev_.GetPacket(raw_packet, pkt_number);
@@ -186,8 +163,7 @@ size_t RingPcap::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 
 size_t GetCapacity(const Config& config)
 {
-	const auto& [format, max_pkt_size, pkt_count, file_count] = config;
-	GCC_BUG_UNUSED(file_count);
+	const auto& [format, max_pkt_size, pkt_count] = config;
 
 	switch (format)
 	{
@@ -203,14 +179,14 @@ size_t GetCapacity(const Config& config)
 
 std::unique_ptr<RingBase> CreateSharedMemoryDumpRing(const Config& config, void* memory)
 {
-	const auto& [format, max_pkt_size, pkt_count, file_count] = config;
+	const auto& [format, max_pkt_size, pkt_count] = config;
 
 	switch (format)
 	{
 		case Format::kRaw:
 			return std::make_unique<RingRaw>(memory, max_pkt_size, pkt_count);
 		case Format::kPcap:
-			return std::make_unique<RingPcap>(memory, max_pkt_size, pkt_count, file_count);
+			return std::make_unique<RingPcap>(memory, max_pkt_size, pkt_count);
 		default:
 			YANET_THROW("Invalid dump format");
 			std::abort();

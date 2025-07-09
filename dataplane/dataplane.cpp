@@ -2227,7 +2227,6 @@ eResult cDataPlane::parseSharedMemory(const nlohmann::json& json)
 		unsigned int size = shmJson["dump_size"];
 		unsigned int count = shmJson["dump_count"];
 		std::string format_str = shmJson.value("dump_format", "raw");
-		unsigned int pcap_files = shmJson.value("pcap_files", 1);
 
 		if (exist(config.shared_memory, tag))
 		{
@@ -2235,16 +2234,7 @@ eResult cDataPlane::parseSharedMemory(const nlohmann::json& json)
 			return eResult::invalidConfigurationFile;
 		}
 
-		if (format_str == "pcap" && pcap_files < 1)
-		{
-			YADECAP_LOG_ERROR("Ring '%s' cannot be configured to use pcap format "
-			                  "and have nonpositive pcap_files value (%u).\n",
-			                  tag.data(),
-			                  pcap_files);
-			return eResult::invalidConfigurationFile;
-		}
-
-		config.shared_memory[tag] = {format_str, size, count, pcap_files};
+		config.shared_memory[tag] = {format_str, size, count};
 	}
 
 	return eResult::success;
