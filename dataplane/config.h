@@ -21,23 +21,18 @@ struct tDataPlaneConfig
 		DumpFormat format;
 		unsigned int size;
 		unsigned int count;
-		// used only when format is kPcap
-		unsigned int pcap_files_count;
 
 		DumpConfig() :
-		        format(DumpFormat::kRaw), size(0), count(0), pcap_files_count(0)
-		{
-		}
+		        format(DumpFormat::kRaw), size(0), count(0) {}
 
-		DumpConfig(std::string_view format_str, unsigned int size, unsigned int count, unsigned int pcap_files_count) :
-		        format(StringToDumpFormat(format_str)), size(size), count(count), pcap_files_count(pcap_files_count)
-		{
-		}
+		DumpConfig(std::string_view format_str, unsigned int size, unsigned int count) :
+		        format(StringToDumpFormat(format_str)), size(size), count(count)
+		{}
 
 		[[nodiscard]] std::string ToString() const
 		{
 			std::ostringstream oss;
-			oss << DumpFormatToString(format) << " " << size << " " << count << " " << pcap_files_count;
+			oss << DumpFormatToString(format) << " " << size << " " << count;
 			return oss.str();
 		}
 	};

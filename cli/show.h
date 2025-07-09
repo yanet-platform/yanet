@@ -732,30 +732,17 @@ inline void hitcount_dump(const std::string& source)
 	std::cout << "\n]\n";
 }
 
-// TODO: what if we call tcpdump read on other ring while this is busy-looping?
+// TODO: what if we call tcpdump on other ring while this is busy-looping?
 // Or on the same ring? Some warning would be nice, I guess.
-inline void tcpdump(const std::string& mode, const std::string& target_dump_tag, std::optional<std::string> path)
+inline void tcpdump(const std::string& target_dump_tag)
 {
-	if (mode != "read" && mode != "follow")
-	{
-		YANET_LOG_ERROR("Unsupported mode '%s'. Supported modes are 'read' and 'follow'.\n", mode.c_str());
-		return;
-	}
-
 	if (target_dump_tag.empty())
 	{
 		YANET_LOG_ERROR("Ring tag should be specified\n");
 		return;
 	}
 
-	if (mode == "follow")
-	{
-		tcpdump_follow(target_dump_tag);
-	}
-	else
-	{
-		tcpdump_read(target_dump_tag, path);
-	}
+	tcpdump_follow(target_dump_tag);
 }
 
 inline void values()

@@ -190,7 +190,6 @@ eResult tAutotest::initSharedMemory()
 		void* memaddr = utils::ShiftBuffer(shm_by_key[ipc_key], offset);
 
 		dumpRings[ring_name] = dumprings::CreateSharedMemoryDumpRing(dump_config, memaddr);
-		dumpRingsDesc[ring_name] = {dump_tag, core_id, socket_id};
 	}
 
 	return eResult::success;
@@ -1946,7 +1945,8 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep, const std::string& 
 		DumpRingBasePtr& ring = it->second;
 
 		// Flush Dataplane's dump ring to make sure packets are up to date
-		dataPlane.flushDumpRing(dumpRingsDesc[tag]);
+		// TODO: not needed?
+		// dataPlane.flushDumpRing(dumpRingsDesc[tag]);
 
 		// Open pcap file using PcapPlusPlus
 		pcpp::IFileReaderDevice* reader = pcpp::IFileReaderDevice::getReader(expectFilePath);
@@ -2060,7 +2060,9 @@ void tAutotest::fflushSharedMemory()
 		GCC_BUG_UNUSED(ring_str);
 		ring->Clear();
 	}
-	dataPlane.clearWorkerDumpRings();
+	//FIXME: мне кажется это не нужно, потому что можно просто
+	//выставить каунтеры в ноль, т.к это ж одна shm, неважно.
+	// dataPlane.clearWorkerDumpRings();
 }
 
 } // namespace autotest

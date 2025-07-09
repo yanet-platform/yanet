@@ -2,7 +2,6 @@
 
 #include <cstdio>
 #include <pcap/pcap.h>
-#include <vector>
 
 #include "PcapDevice.h"
 #include "PcapFileDevice.h"
@@ -12,29 +11,23 @@ namespace pcpp
 {
 
 /**
- * @brief An abstract class representing a shared memory device for pcap data.
+ * @brief An abstract class for shared memory writer devices.
  *
- * This device provides a pcap-compatible interface for reading/writing packets,
- * but the underlying storage is a shared memory region rather than a file or a live network
- * interface.
- *
- * Derived classes must implement device-specific logic for reading/writing packets.
+ * A writer device provides methods to write packets into the shared memory region.
+ * These packets can later be read or dumped to disk by other utilities.
  */
-class IShmDevice : public IPcapDevice
+class IShmWriterDevice
 {
 protected:
 	void* shm_ptr_;
 	size_t shm_size_;
 
-	explicit IShmDevice(void* shm_ptr, size_t shm_size) :
-	        IPcapDevice(), shm_ptr_(shm_ptr), shm_size_(shm_size) {}
-
-	~IShmDevice() override
-	{
-		close();
-	}
+	explicit IShmWriterDevice(void* shm_ptr, size_t shm_size) :
+	        shm_ptr_(shm_ptr), shm_size_(shm_size) {}
 
 public:
+	virtual ~IShmWriterDevice() noexcept = 0;
+
 	/**
 	 * @return Pointer to the underlying shared memory region.
 	 */
@@ -52,35 +45,6 @@ public:
 	}
 
 	/**
-	 * @brief Close the device.
-	 *
-	 * This will release any pcap resources associated with it.
-	 */
-	void close() override
-	{
-		if (m_PcapDescriptor != nullptr)
-		{
-			m_PcapDescriptor = nullptr;
-		}
-		m_DeviceOpened = false;
-	}
-};
-
-/**
- * @brief An abstract class for shared memory writer devices.
- *
- * A writer device provides methods to write packets into the shared memory region.
- * These packets can later be read or dumped to disk by other utilities.
- */
-class IShmWriterDevice : public IShmDevice
-{
-protected:
-	IShmWriterDevice(void* shm_ptr, size_t shm_size);
-
-public:
-	~IShmWriterDevice() override = default;
-
-	/**
 	 * @brief Write a single RawPacket into the shared memory.
 	 *
 	 * @param[in] packet The packet to write.
@@ -88,74 +52,22 @@ public:
 	 * @return True if the packet was written successfully, false otherwise.
 	 */
 	[[nodiscard]] virtual bool WritePacket(RawPacket const& packet) = 0;
-
-	/**
-	 * @brief Write multiple RawPackets into the shared memory.
-	 *
-	 * @param[in] packets A vector of packet pointers to be written.
-	 *
-	 * @return True if all packets were written successfully, false otherwise.
-	 */
-	[[nodiscard]] virtual bool WritePackets(RawPacketVector const& packets) = 0;
 };
 
 /**
  * @brief A class for writing packets to a shared memory region in pcap format, using a ring-buffer
  * approach.
  *
- * The objective is to enable continuous packet capture while utilizing a limited amount of memory.
- * The approach adopted here is inspired by Wireshark's "multiple files, ring buffer" feature:
- *
- * Multiple files, ring buffer:
- * "Much like 'Multiple files continuous', reaching one of the multiple files switch conditions
- * (one of the 'Next file every …' values) will switch to the next file. This will be a newly
- * created file if the value of 'Ring buffer with n files' is not reached; otherwise, it will
- * replace the oldest of the formerly used files (thus forming a 'ring').
- *
- * This mode will limit the maximum disk usage, even for an unlimited amount of capture input data,
- * only keeping the latest captured data."
- * (Source: https://www.wireshark.org/docs/wsug_html_chunked/ChCapCaptureFiles.html)
- *
- * **Algorithm Behind Ring-Buffer Writing:**
- * The shared memory region is divided into multiple segments (each representing a 'virtual pcap
- * file'). Packets are written sequentially into the current segment. If there isn't enough space
- * for a new packet, the writer 'rotates' to the next segment.
- * - Suppose you have N segments.
- * - You write packets into segment 1 until it's almost full.
- * - If you can't fit a new packet, you move to segment 2, and continue writing there.
- * - Once you reach segment N and still have more packets, you wrap around to segment 1 again,
- *   overwriting old data.
- *
- * After all packets are written, `DumpPcapFilesToDisk()` can be used to extract each segment
- * into a standalone pcap file.
+ * TODO: add descr of a follow mode (the only mode left)
  */
-class PcapShmWriterDevice : public IShmWriterDevice
+class PcapShmWriterDevice final : public IShmWriterDevice
 {
 	LinkLayerType link_layer_type_;
 	FileTimestampPrecision precision_;
-
-	size_t pcap_files_; ///< Number of pcap segments
-	size_t current_segment_index_; ///< Current segment index we're writing to
-
-	struct SegmentInfo
-	{
-		void* start_ptr; ///< Pointer to the start of this segment in shared memory
-		size_t size; ///< Size of the segment
-		FILE* file; ///< FILE stream for this pcap segment
-		pcap_dumper_t* dumper; ///< pcap dumper for this pcap segment
-	};
-
-	std::vector<SegmentInfo> segments_;
+	bool device_opened_{};
 
 	using Meta = dumprings::RingMeta;
-	using RingMode = dumprings::RingMode;
 	Meta* meta; ///< points into the start of the given SHM page
-
-	/* Stops packets parsing */
-	void StopPackets();
-
-	/* Sets counters to zero */
-	void ResetMeta();
 
 	using PcapOnDiskRecordHeader = dumprings::PcapOnDiskRecordHeader;
 
@@ -164,91 +76,8 @@ class PcapShmWriterDevice : public IShmWriterDevice
 	 */
 	pcap_pkthdr CreatePacketHeader(const RawPacket& packet);
 
-	/**
-	 * @brief Rotate to the next segment if the current one doesn't have enough space.
-	 *
-	 * @return True if successful, false if fseek fails.
-	 */
-	bool RotateToNextSegment();
-
-	/**
-	 * @brief Ensures current segment has enough space for a new packet or rotates segment
-	 *
-	 * Performs two critical checks before packet writing:
-	 * 1. Validates the packet can fit in ANY segment by checking against the smallest segment size
-	 * 2. Checks if current segment has space, rotating to next segment if needed
-	 *
-	 * @see RotateToNextSegment()
-	 *
-	 * @param needed_size Total bytes required (pcap header + packet data)
-	 *
-	 * @return true if space is available (either existing or after successful rotation)
-	 */
-	bool EnsureSegmentCapacity(size_t needed_size);
-
-	/**
-	 * @brief Distribute the shared memory into multiple segments and initialize them as in-memory
-	 * pcap 'files'.
-	 *
-	 * This method divides the shared memory region into pcap_files_ segments,
-	 * ensuring all available memory is utilized. Each segment will have an equal base size,
-	 * except for the last segment which includes any remainder bytes. It then opens each segment as
-	 * an in-memory pcap 'file'.
-	 *
-	 * @return True if all segments were successfully initialized, false otherwise.
-	 */
-	bool FillSegments();
-
-	/**
-	 * Structure representing the location of a packet within the segmented memory.
-	 *
-	 * Used to track where a specific packet is located across the ring buffer segments.
-	 * Used only for tests in "GetPacket" method
-	 */
-	struct PacketLocation
-	{
-		size_t segment_index; ///< Index of the segment containing the packet
-		size_t packet_offset; ///< Offset within the segment where the packet is located
-		size_t total_packets; ///< Total packets counted during location search
-		bool found; ///< Whether the packet was found
-	};
-
-	/**
-	 * @brief Locates which segment contains the requested packet number.
-	 *
-	 * @param[in] pkt_number The sequence number of the packet to find.
-	 * @return PacketLocation structure containing segment index and offset if found.
-	 */
-	[[nodiscard]] PacketLocation LocatePacketInSegments(unsigned pkt_number) const;
-
-	/**
-	 * @brief Counts the number of packets in a specific segment.
-	 *
-	 * @param[in] segment The segment to count packets in.
-	 * @return Number of packets in segment.
-	 */
-	[[nodiscard]] int CountPacketsInSegment(const SegmentInfo& segment) const;
-
-	/**
-	 * @brief Reads a packet from a specific segment and offset.
-	 *
-	 * @param[out] raw_packet The RawPacket to populate.
-	 * @param[in] location The location information of the packet to read.
-	 * @return True if packet was successfully read, false otherwise.
-	 */
-	bool ReadPacketFromSegment(RawPacket& raw_packet, const PacketLocation& location) const;
-
-	using PcapReaderPtr = std::unique_ptr<pcap_t, void (*)(pcap_t*)>;
-
-	/**
-	 * @brief Creates a pcap reader for a memory segment
-	 *
-	 * @return std::unique_ptr<pcap_t> owning pcap reader
-	 */
-	[[nodiscard]] PcapReaderPtr CreatePcapReader(const SegmentInfo& segment) const;
-
-	bool WritePacketForRead(RawPacket const& packet);
-	bool WritePacketForFollow(RawPacket const& packet);
+	/* Sets counters to zero */
+	void ResetMeta();
 
 public:
 	static constexpr size_t kPcapFileHeaderSize = 24;
@@ -258,13 +87,15 @@ public:
 	 *
 	 * @param[in] shmPtr Pointer to the shared memory region.
 	 * @param[in] shmSize Size of the shared memory region.
-	 * @param[in] pcapFiles Number of 'pcap segments' to divide the shared memory into.
 	 * @param[in] linkLayerType The link layer type all packets in this region will be based on. The
 	 * default is Ethernet.
 	 * @param[in] nanosecondsPrecision A boolean indicating whether to write timestamps in
 	 * nano-precision. If set to false, timestamps will be written in micro-precision.
 	 */
-	PcapShmWriterDevice(void* shm_ptr, size_t shm_size, size_t pcap_files, LinkLayerType link_layer_type = LINKTYPE_ETHERNET, bool nanoseconds_precision = true);
+	PcapShmWriterDevice(void* shm_ptr,
+	                    size_t shm_size,
+	                    LinkLayerType link_layer_type = LINKTYPE_ETHERNET,
+	                    bool nanoseconds_precision = true);
 
 	~PcapShmWriterDevice() override;
 
@@ -272,72 +103,12 @@ public:
 	PcapShmWriterDevice(PcapShmWriterDevice const&) = delete;
 	PcapShmWriterDevice& operator=(PcapShmWriterDevice const&) = delete;
 
-	/**
-	 * @brief Dump each pcap segment from shared memory to a file on disk.
-	 *
-	 * @param filenamePrefix The prefix for the output pcap files, e.g. "capture_"
-	 *        will produce "capture_1.pcap", "capture_2.pcap", etc.
-	 * @param path Directory path where files should be created
-	 * @return list of filenames created
-	 */
-	std::vector<std::string> DumpPcapFilesToDisk(std::string_view prefix, std::string_view path);
-
-	/**
-	 * @brief Transitions the dump ring into 'follow' mode.
-	 *
-	 * This function prepares the shared memory ring for real-time packet streaming
-	 * by performing the following steps:
-	 *
-	 * 1. Switches the ring mode to `Stop` to prevent any new packets from being
-	 *    written during the transition.
-	 *
-	 * 2. Flushes all buffered libpcap dumper data to shared memory.
-	 *    This ensures that no internal buffers are flushed after meta is reset.
-	 *
-	 * 3. Resets the `before` and `after` offsets in the ring meta to zero.
-	 *    This provides a clean starting point for the reader.
-	 *
-	 * 4. Sets the ring mode to `Follow`, enabling the writer to begin writing
-	 *    packets using raw memcpy into SHM.
-	 *
-	 * Notes:
-	 * - The reader (see tcpdump_follow in cli/show.h) relies solely on `before` and `after` offsets,
-	 *   not on the `mode`. The mode is strictly for internal control in `WritePacket()`.
-	 */
-	void SwitchToFollow();
-
-	/**
-	 * @brief Ends the 'follow' mode and restores libpcap dumping.
-	 *
-	 * This function is used to gracefully exit the "follow" mode,
-	 * returning the ring to its default libpcap-based behavior.
-	 *
-	 * 1. Sets the ring mode to `Stop`, preventing any further packet writes.
-	 *
-	 * 2. Calls `Clean()`, which flushes and closes all pcap dumpers and FILE* handles,
-	 *    and resets internal state to a "closed" condition, then reopens it so we
-	 *    get normal 'read' mode.
-	 *
-	 * This function is triggered from `yanet-cli tcpdump follow` on Ctrl+C
-	 * to ensure shared memory is left in a valid state after live packet
-	 * streaming ends.
-	 */
-	void FollowDone();
-
-	bool open() override;
-
 	bool WritePacket(RawPacket const& packet) override;
-
-	bool WritePackets(RawPacketVector const& packets) override;
 
 	/**
 	 * @brief Retrieve a packet from the shared memory by its sequence number.
 	 *
 	 * This method is used only for tests, so we don't care too much about performance.
-	 *
-	 * Packets are stored in chronological order across segments, with the oldest packets
-	 * in the next segment after the current writing segment. This method locates and
-	 * reads the requested packet without interfering with the writer's state.
 	 *
 	 * @param[out] raw_packet The RawPacket to populate with the packet data.
 	 * @param[in] pkt_number The sequence number of the packet to retrieve (0 = oldest).
@@ -345,27 +116,17 @@ public:
 	 */
 	bool GetPacket(RawPacket& raw_packet, unsigned pkt_number) const;
 
-	/**
-	 * @brief Flush all pending writes to the shared memory segments.
-	 */
-	void Flush();
+	bool Open();
 
 	/**
 	 * @brief Close the device and free associated resources.
 	 */
-	void close() override;
+	void Close();
 
 	/**
 	 * @brief Clean internal state and reopen the device.
 	 */
 	void Clean();
-
-	/**
-	 * @brief Get statistics for packets written so far.
-	 *
-	 * @param[out] stats The PcapStats structure to fill.
-	 */
-	void getStatistics(PcapStats& stats) const override;
 };
 
 } // namespace pcpp

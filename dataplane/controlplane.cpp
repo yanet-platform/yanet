@@ -288,98 +288,6 @@ common::idp::getSlowWorkerStats::response cControlPlane::SlowWorkerStatsResponse
 	return response;
 }
 
-eResult cControlPlane::clearWorkerDumpRings()
-{
-	for (const cWorker* worker : dataPlane->workers_vector)
-	{
-		for (const auto& [tag, ring_cfg] : dataPlane->config.shared_memory)
-		{
-			GCC_BUG_UNUSED(ring_cfg);
-			YANET_LOG_DEBUG("Cleaning dataplane dump ring %s", tag.data());
-			worker->dump_rings[dataPlane->tag_to_id[tag]]->Clear();
-		}
-	}
-
-	return eResult::success;
-}
-
-eResult cControlPlane::flushDumpRing(const common::idp::flushDumpRing::request& request)
-{
-	const auto& [tag, ring_core_id, ring_socket_id] = request.data;
-
-	for (cWorker* worker : dataPlane->workers_vector)
-	{
-		if (worker->coreId != ring_core_id || worker->socketId != ring_socket_id)
-			continue;
-
-		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[tag]];
-
-		ring->Flush();
-		return eResult::success;
-	}
-
-	YANET_LOG_WARNING("Asked to flush DumpRing %s within Worker[core_id = %d, socket_id = %d], "
-	                  "but such ring was not found.\n",
-	                  tag.data(),
-	                  ring_core_id,
-	                  ring_socket_id);
-
-	return eResult::invalidId;
-}
-
-eResult cControlPlane::switchToFollowDumpRing(const common::idp::switchToFollowDumpRing::request& request)
-{
-	const auto& [tag, ring_core_id, ring_socket_id] = request.data;
-
-	for (cWorker* worker : dataPlane->workers_vector)
-	{
-		if (worker->coreId != ring_core_id || worker->socketId != ring_socket_id)
-			continue;
-
-		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[tag]];
-
-		YANET_LOG_INFO("Switching mode of DumpRing %s within Worker[core_id = %d, socket_id = %d] "
-		               "to 'follow'\n",
-		               tag.data(),
-		               ring_core_id,
-		               ring_socket_id);
-		ring->SwitchToFollow();
-		return eResult::success;
-	}
-
-	YANET_LOG_WARNING("Asked to switch mode of DumpRing %s within Worker[core_id = %d, socket_id = %d] "
-	                  "to 'follow', but such ring was not found.\n",
-	                  tag.data(),
-	                  ring_core_id,
-	                  ring_socket_id);
-
-	return eResult::invalidId;
-}
-
-eResult cControlPlane::followDoneDumpRing(const common::idp::followDoneDumpRing::request& request)
-{
-	const auto& [tag, ring_core_id, ring_socket_id] = request.data;
-
-	for (cWorker* worker : dataPlane->workers_vector)
-	{
-		if (worker->coreId != ring_core_id || worker->socketId != ring_socket_id)
-			continue;
-
-		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[tag]];
-
-		ring->FollowDone();
-		return eResult::success;
-	}
-
-	YANET_LOG_WARNING("Asked to end 'follow' mode of DumpRing %s within Worker[core_id = %d, socket_id = %d], "
-	                  "but such ring was not found.\n",
-	                  tag.data(),
-	                  ring_core_id,
-	                  ring_socket_id);
-
-	return eResult::invalidId;
-}
-
 common::idp::get_worker_gc_stats::response cControlPlane::get_worker_gc_stats()
 {
 	common::idp::get_worker_gc_stats::response response;
@@ -868,30 +776,6 @@ common::idp::samples::response cControlPlane::samples()
 	}
 
 	return common::idp::samples::response(samples.begin(), samples.end());
-}
-
-common::idp::tcpdump::response cControlPlane::tcpdump(const common::idp::tcpdump::request& request)
-{
-	const auto& [ring_desc, prefix, path] = request;
-
-	for (cWorker* worker : dataPlane->workers_vector)
-	{
-		if (worker->coreId != ring_desc.core_id || worker->socketId != ring_desc.socket_id)
-			continue;
-
-		cWorker::DumpRingBasePtr& ring = worker->dump_rings[dataPlane->tag_to_id[ring_desc.tag]];
-
-		return ring->DumpPcapFilesToDisk(prefix, path);
-	}
-
-	YANET_LOG_WARNING("Asked to create pcap files from DumpRing %s within "
-	                  "Worker[core_id = %d, socket_id = %d], "
-	                  "but such ring was not found.\n",
-	                  ring_desc.tag.data(),
-	                  ring_desc.core_id,
-	                  ring_desc.socket_id);
-
-	return {};
 }
 
 common::idp::hitcount_dump::response cControlPlane::hitcount_dump()
