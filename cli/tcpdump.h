@@ -17,28 +17,6 @@ using dumprings::PcapOnDiskRecordHeader;
 using dumprings::RingMeta;
 using utils::ShiftBuffer;
 
-static void print_pcap_helper(const std::vector<std::string>& created_files)
-{
-	std::cout << "Created the following pcap files:\n";
-	for (const auto& file : created_files)
-	{
-		std::cout << "  " << file << "\n";
-	}
-
-	if (created_files.size() <= 1)
-	{
-		return;
-	}
-
-	std::cout << "\nTo combine them into a single pcap file for convenience, you can use:\n"
-	          << "  mergecap -w combined.pcap";
-	for (const auto& file : created_files)
-	{
-		std::cout << " " << file;
-	}
-	std::cout << "\n";
-}
-
 /* Stores information and state for a single shared memory ring being followed. */
 struct RingView
 {
@@ -66,7 +44,9 @@ void signal_handler_follow([[maybe_unused]] int sig)
 		std::cerr << "\nForcing exit..." << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
-	std::cerr << "\nCtrl-C received, graceful shutdown initiated... Press Ctrl-C again to force exit." << std::endl;
+	std::cerr << "\nCtrl-C received, graceful shutdown initiated... "
+	             "Press Ctrl-C again to force exit."
+	          << std::endl;
 }
 
 /**
@@ -144,8 +124,6 @@ bool initialize_shm_rings(
 
 		DumpRingDesc desc{dump_tag, core_id, socket_id};
 		out_rings.push_back({ring_meta, data_buf, data_buf_size, 0, desc});
-
-		dataplane.switchToFollowDumpRing(desc); // Notify writer
 	}
 
 	return !out_rings.empty();
@@ -167,6 +145,7 @@ bool initialize_shm_rings(
  */
 bool write_pcap_global_header()
 {
+	// TODO: make better? Dataplane by default writes packets in nanoseconds.
 	pcap_file_header header;
 	header.magic = 0xa1b2c3d4; // Standard for microsecond timestamps, little-endian
 	header.version_major = 2;
@@ -209,7 +188,10 @@ bool write_pcap_global_header()
  *
  * @return True if any data was written from this ring, false otherwise.
  */
-bool process_ring_packets(RingView& ring, bool& stdout_bad, size_t& packets_written_this_loop, size_t& bytes_written)
+bool process_ring_packets(RingView& ring,
+                          bool& stdout_bad,
+                          size_t& packets_written_this_loop,
+                          size_t& bytes_written)
 {
 	uint64_t writer_after_pos = ring.meta->after.load(std::memory_order_acquire);
 	uint64_t data_available = writer_after_pos - ring.reader_pos;
@@ -234,7 +216,9 @@ bool process_ring_packets(RingView& ring, bool& stdout_bad, size_t& packets_writ
 	std::vector<uint8_t> local_buffer(data_available);
 	size_t shm_offset = ring.reader_pos % ring.size;
 	size_t remaining_in_shm = ring.size - shm_offset;
+	// void* buffer_ptr = ShiftBuffer(ring.start, shm_offset);
 
+	//TODO: make better? Like std::copy or something..?
 	if (data_available <= remaining_in_shm)
 	{
 		memcpy(local_buffer.data(), ShiftBuffer(ring.start, shm_offset), data_available);
@@ -390,62 +374,4 @@ inline void tcpdump_follow(const std::string& target_dump_tag)
 	          << ". Final stats:" << std::endl;
 	std::cerr << "  Total packets successfully written: " << total_packets_written << std::endl;
 	std::cerr << "  Total bytes successfully written to stdout: " << total_bytes_written << std::endl;
-
-	for (const auto& ring : rings)
-	{
-		dataplane.followDoneDumpRing(ring.desc);
-	}
-}
-
-/**
- * @brief Dumps packets from shared memory rings configured in pcap mode.
- *
- * This function scans all known shared memory rings, and if a ring's tag matches the
- * provided `target_dump_tag` and it is configured in pcap format, the function dumps
- * packets to disk using the dataplane interface.
- *
- * @note If `path` is not provided, files will be dumped to `/tmp/`.
- *
- * @param target_dump_tag The tag of the dump ring to search for.
- * @param path Optional output directory for pcap files.
- */
-inline void tcpdump_read(const std::string& target_dump_tag, std::optional<std::string> path)
-{
-	interface::dataPlane dataplane;
-	const auto& shm_info = dataplane.get_shm_info();
-	bool first_ring = true;
-	std::vector<std::string> created_files;
-
-	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset, capacity] : shm_info)
-	{
-		if (target_dump_tag != dump_tag)
-			continue;
-
-		if (dump_config.format != tDataPlaneConfig::DumpFormat::kPcap)
-		{
-			std::cerr << "ERROR: Asked to dump pcap files for dump tag " << target_dump_tag << ", but provided "
-			          << "ring is not configured to pcap format. "
-			          << "Double-check dataplane.conf \"sharedMemory\" section\n";
-			return;
-		}
-
-		auto files = dataplane.tcpdump({dump_tag, core_id, socket_id, ring_name, path.value_or("/tmp/")});
-		created_files.insert(created_files.end(), files.begin(), files.end());
-
-		first_ring = false;
-	}
-
-	if (first_ring)
-	{
-		std::cerr << "ERROR: Asked to dump pcap files for dump ring " << target_dump_tag << ", but such ring was not found\n";
-	}
-
-	if (created_files.empty())
-	{
-		std::cout << "No pcap files were created. "
-		             "Please check yanet-dataplane logs for more details.\n";
-		return;
-	}
-
-	print_pcap_helper(created_files);
 }

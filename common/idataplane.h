@@ -55,26 +55,6 @@ public:
 		return get<common::idp::requestType::getSlowWorkerStats, common::idp::getSlowWorkerStats::response>();
 	}
 
-	auto clearWorkerDumpRings() const
-	{
-		return get<common::idp::requestType::clearWorkerDumpRings, eResult>();
-	}
-
-	auto flushDumpRing(const common::idp::flushDumpRing::request& request) const
-	{
-		return get<common::idp::requestType::flushDumpRing, eResult>(request);
-	}
-
-	auto switchToFollowDumpRing(const common::idp::switchToFollowDumpRing::request& request) const
-	{
-		return get<common::idp::requestType::switchToFollowDumpRing, eResult>(request);
-	}
-
-	auto followDoneDumpRing(const common::idp::followDoneDumpRing::request& request) const
-	{
-		return get<common::idp::requestType::followDoneDumpRing, eResult>(request);
-	}
-
 	auto get_worker_gc_stats() const
 	{
 		return get<common::idp::requestType::get_worker_gc_stats, common::idp::get_worker_gc_stats::response>();
@@ -178,11 +158,6 @@ public:
 	auto hitcount_dump() const
 	{
 		return get<common::idp::requestType::hitcount_dump, common::idp::hitcount_dump::response>();
-	}
-
-	auto tcpdump(const common::idp::tcpdump::request& request) const
-	{
-		return get<common::idp::requestType::tcpdump, common::idp::tcpdump::response>(request);
 	}
 
 	eResult debug_latch_update(const common::idp::debug_latch_update::request& request) const
