@@ -28,6 +28,17 @@ atomic::atomic(cDataPlane* dataPlane,
 	memset(physicalPort_flags, 0, sizeof(physicalPort_flags));
 	memset(counter_shifts, 0, sizeof(counter_shifts));
 	memset(gc_counter_shifts, 0, sizeof(gc_counter_shifts));
+
+	// Initialize the wallclock anchor for this specific NUMA node.
+	wallclock.seq.store(0, std::memory_order_relaxed);
+
+	WallclockAnchor a;
+	a.hz = rte_get_tsc_hz();
+	clock_gettime(CLOCK_REALTIME, &a.wall0);
+	rte_mb();
+	a.tsc0 = rte_get_tsc_cycles();
+
+	wallclock.anchor = a;
 }
 
 generation::generation(cDataPlane* dataPlane,

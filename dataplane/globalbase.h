@@ -127,6 +127,47 @@ public: ///< @todo
 	balancer::state_ht* balancer_state;
 
 	bool tsc_active_state;
+
+	/**
+	 * Holds a reference 'wall-clock' time and a corresponding
+	 * CPU Time-Stamp-Counter (TSC) value.
+	 * Allows fast timestamp calculation.
+	 */
+	struct WallclockAnchor
+	{
+		// A reference wall-clock time from clock_gettime(CLOCK_REALTIME)
+		timespec wall0;
+		// The TSC value at the moment wall0 was captured
+		uint64_t tsc0;
+		// The frequency of the TSC in cycles per second
+		uint64_t hz;
+	};
+
+	/**
+	 * Provides thread-safe, lock-free access to the WallclockAnchor (seqlock-protected).
+	 *
+	 * This is necessary because std::atomic<WallclockAnchor> is not lock-free
+	 * on this architecture (the struct is too large for a single atomic
+	 * hardware instruction). A seqlock provides high-performance, non-blocking
+	 * reads for multiple reader threads from a single writer thread.
+	 */
+	struct WallclockData
+	{
+		// Sequence counter for the seqlock. Even = stable, Odd = update in progress.
+		std::atomic<uint64_t> seq;
+		WallclockAnchor anchor;
+	};
+
+	static_assert(!std::atomic<WallclockAnchor>::is_always_lock_free,
+	              "WallclockAnchor is lock-free on this CPU / tool-chain!\n"
+	              "Drop the seqlock code-path and replace it with plain "
+	              "std::atomic<WallclockAnchor> loads / stores (see globalbase.h).\n"
+	              "Doing so removes the version-counter logic and saves ~5-8 ns per "
+	              "packet.");
+
+	// NUMA-local timestamp data, protected by a seqlock.
+	// Kept in its own cache line to prevent false sharing with other data.
+	alignas(RTE_CACHE_LINE_SIZE) WallclockData wallclock;
 };
 
 //

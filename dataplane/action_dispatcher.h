@@ -100,7 +100,7 @@ struct ActionDispatcher
 
 		// polymorphic, will execute either DumpRingRaw or DumpRingPcap method,
 		// likely to be devirtualized
-		worker->dump_rings[ring_id]->Write(args.mbuf, flow.type, worker->CurrentTime());
+		worker->dump_rings[ring_id]->Write(args.mbuf, flow.type, worker->WallclockAnchor());
 	}
 
 	static void execute(const common::StateTimeoutAction& action, const Flow& flow, const ActionDispatcherArgs& args)

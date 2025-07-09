@@ -1402,6 +1402,8 @@ void cDataPlane::init_worker_base()
 void cDataPlane::timestamp_thread()
 {
 	uint32_t prev_time = 0;
+	dataplane::globalBase::atomic::WallclockAnchor new_anchor;
+	new_anchor.hz = rte_get_tsc_hz();
 
 	for (;;)
 	{
@@ -1411,11 +1413,26 @@ void cDataPlane::timestamp_thread()
 		{
 			for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
 			{
-				GCC_BUG_UNUSED(socket_id);
 				globalbase_atomic->currentTime = current_time;
 			}
 
 			prev_time = current_time;
+		}
+
+		// Capture the new wall-clock time and the corresponding TSC value.
+		// This is the new reference point we will distribute to all workers.
+		clock_gettime(CLOCK_REALTIME, &new_anchor.wall0);
+		// Ensure clock_gettime completes before we read the TSC.
+		rte_mb();
+		new_anchor.tsc0 = rte_get_tsc_cycles();
+
+		for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
+		{
+			auto& wd = globalbase_atomic->wallclock;
+
+			wd.seq.fetch_add(1, std::memory_order_release);
+			wd.anchor = new_anchor;
+			wd.seq.fetch_add(1, std::memory_order_release);
 		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(500));
