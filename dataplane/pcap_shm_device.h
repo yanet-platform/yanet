@@ -55,8 +55,8 @@ public:
 };
 
 /**
- * @brief A class for writing packets to a shared memory region in pcap format, using a ring-buffer
- * approach.
+ * @brief A class for writing packets to a shared memory region in pcap format,
+ * using a ring-buffer approach.
  *
  * TODO: add descr of a follow mode (the only mode left)
  */
