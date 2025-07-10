@@ -5,6 +5,7 @@ dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('threads')
 
 sources = files('config.cpp',
+                'tcpdump.cpp',
                 'main.cpp')
 
 executable('yanet-cli',
