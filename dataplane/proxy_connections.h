@@ -160,6 +160,11 @@ class ConnectionsTable
 public:
     using Bucket = ConnectionBucket<ConnectionInfo>;
 
+    ~ConnectionsTable()
+    {
+        if (destroy) destroy();
+    }
+
     bool Init(proxy_service_id_t service_id, uint32_t number_connections, dataplane::memory_manager* memory_manager, uint32_t service_addr, uint16_t service_port)
     {
         if (initialized_)
@@ -192,6 +197,9 @@ public:
         else
         {
             buckets_ = new Bucket[number_buckets];
+            destroy = [this](){
+                delete[] buckets_;
+            };
         }
         if (buckets_ == nullptr)
         {
@@ -413,6 +421,8 @@ private:
     uint32_t number_buckets_ = 0;
     bool initialized_ = false;
     uint64_t service_key_;
+
+    std::function<void()> destroy;
 };
 
 using ServiceConnections = ConnectionsTable<Connection>;
