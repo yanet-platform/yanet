@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdio>
 #include <pcap/pcap.h>
 
@@ -6,24 +7,69 @@
 #include "rte_branch_prediction.h"
 #include "pcap_shm_device.h"
 
-namespace pcpp
+namespace dumprings
 {
 
 using utils::ShiftBuffer;
 
-IShmWriterDevice::~IShmWriterDevice() noexcept = default;
+bool PcapShmWriterDevice::InitMeta()
+{
+	meta_->after.store(0, std::memory_order_relaxed);
 
-PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr,
-                                         size_t shm_size,
-                                         LinkLayerType link_layer_type,
+	// create a “dead” pcap_t* that describes the capture format
+#if defined(PCAP_TSTAMP_PRECISION_NANO)
+	pcpp::internal::PcapHandle dead(pcap_open_dead_with_tstamp_precision(
+	        static_cast<int>(link_layer_type_),
+	        static_cast<int>(max_packet_size_),
+	        static_cast<unsigned int>(precision_)));
+#else
+	pcpp::internal::PcapHandle dead(pcap_open_dead(
+	        static_cast<int>(linkLayerType),
+	        static_cast<int>(max_pkt_size)));
+#endif
+	if (!dead)
+	{
+		YANET_LOG_ERROR("pcap_open_dead[_with_tstamp_precision] returned nullptr\n");
+		return false;
+	}
+
+	// have libpcap generate the 24-byte global header in-place
+	FILE* mem_file = fmemopen(&meta_->pcap_header, sizeof(meta_->pcap_header), "wb");
+	if (!mem_file)
+	{
+		YANET_LOG_ERROR("fmemopen() failed while initialising ring header\n");
+		return false;
+	}
+
+	pcap_dumper_t* dumper = pcap_dump_fopen(dead.get(), mem_file);
+	if (!dumper)
+	{
+		YANET_LOG_ERROR("pcap_dump_fopen() failed: %s\n", dead.getLastError());
+		fclose(mem_file);
+		return false;
+	}
+
+	pcap_dump_flush(dumper); // force-write the header bytes
+	pcap_dump_close(dumper); // Also closes the file
+
+	return true;
+}
+
+PcapShmWriterDevice::PcapShmWriterDevice(std::byte* shm_ptr,
+                                         size_t max_pkt_size,
+                                         size_t pkt_count,
+                                         pcpp::LinkLayerType link_layer_type,
                                          bool nanoseconds_precision) :
-        // Usable buffer starts after the meta
-        IShmWriterDevice(ShiftBuffer(shm_ptr, sizeof(Meta)), shm_size - sizeof(Meta)),
-        link_layer_type_(link_layer_type), meta(new (shm_ptr) Meta())
+        meta_(new(shm_ptr) Meta()),
+        slots_ptr_(ShiftBuffer(shm_ptr, sizeof(Meta))),
+        max_packet_size_(max_pkt_size),
+        packet_slot_size_(GetSlotSize(max_pkt_size)),
+        packet_count_(pkt_count),
+        link_layer_type_(link_layer_type)
 {
 #if defined(PCAP_TSTAMP_PRECISION_NANO)
-	precision_ = nanoseconds_precision ? FileTimestampPrecision::Nanoseconds
-	                                   : FileTimestampPrecision::Microseconds;
+	precision_ = nanoseconds_precision ? pcpp::FileTimestampPrecision::Nanoseconds
+	                                   : pcpp::FileTimestampPrecision::Microseconds;
 #else
 	if (nanoseconds_precision)
 	{
@@ -34,194 +80,103 @@ PcapShmWriterDevice::PcapShmWriterDevice(void* shm_ptr,
 	}
 	precision_ = FileTimestampPrecision::Microseconds;
 #endif
-}
-
-PcapShmWriterDevice::~PcapShmWriterDevice()
-{
-	Close();
-}
-
-void PcapShmWriterDevice::ResetMeta()
-{
-	meta->before.store(0, std::memory_order_relaxed);
-	meta->after.store(0, std::memory_order_relaxed);
-}
-
-bool PcapShmWriterDevice::Open()
-{
-	if (device_opened_)
-	{
-		return true;
-	}
 
 	switch (link_layer_type_)
 	{
-		case LINKTYPE_RAW:
-		case LINKTYPE_DLT_RAW2:
+		case pcpp::LINKTYPE_RAW:
+		case pcpp::LINKTYPE_DLT_RAW2:
 			YANET_LOG_ERROR("The only Raw IP link type supported in libpcap/WinPcap/Npcap is "
 			                "LINKTYPE_DLT_RAW1, please use that instead\n");
-			return false;
 		default:
 			break;
 	}
 
-	ResetMeta();
-
-	device_opened_ = true;
-
-	return device_opened_;
+	if (!InitMeta())
+	{
+		throw std::runtime_error("Failed to initialise PCAP ring header");
+	}
 }
 
-// TODO: Utilize this funciton... We set precision_ for a reason.
-pcap_pkthdr PcapShmWriterDevice::CreatePacketHeader(const RawPacket& packet)
+size_t PcapShmWriterDevice::GetRequiredShmSize(size_t max_pkt_size, size_t pkt_count)
 {
-	pcap_pkthdr pkt_hdr;
-	pkt_hdr.caplen = packet.getRawDataLen();
-	pkt_hdr.len = packet.getFrameLength();
+	return sizeof(Meta) + (GetSlotSize(max_pkt_size) * pkt_count);
+}
 
+std::byte* PcapShmWriterDevice::GetSlotPtr(uint64_t packet_number) const
+{
+	size_t slot_idx = packet_number % packet_count_;
+	return ShiftBuffer(slots_ptr_, slot_idx * packet_slot_size_);
+}
+
+void PcapShmWriterDevice::FillPacketHeader(PcapHeader* header, const pcpp::RawPacket& packet)
+{
+	pcap_pkthdr intermediate_hdr;
 	timespec packet_timestamp = packet.getPacketTimeStamp();
+
 #if defined(PCAP_TSTAMP_PRECISION_NANO)
-	if (precision_ != FileTimestampPrecision::Nanoseconds)
+	if (precision_ != pcpp::FileTimestampPrecision::Nanoseconds)
 	{
-		TIMESPEC_TO_TIMEVAL(&pkt_hdr.ts, &packet_timestamp);
+		TIMESPEC_TO_TIMEVAL(&intermediate_hdr.ts, &packet_timestamp);
+		header->ts_sec = intermediate_hdr.ts.tv_sec;
+		header->ts_usec = intermediate_hdr.ts.tv_usec;
 	}
 	else
 	{
-		pkt_hdr.ts.tv_sec = packet_timestamp.tv_sec;
-		pkt_hdr.ts.tv_usec = packet_timestamp.tv_nsec;
+		header->ts_sec = packet_timestamp.tv_sec;
+		header->ts_usec = packet_timestamp.tv_nsec;
 	}
 #else
-	TIMESPEC_TO_TIMEVAL(&pkt_hdr.ts, &packet_timestamp);
+	TIMESPEC_TO_TIMEVAL(&intermediate_hdr.ts, &packet_timestamp);
+	header->ts_sec = intermediate_hdr.ts.tv_sec;
+	header->ts_usec = intermediate_hdr.ts.tv_usec;
 #endif
 
-	return pkt_hdr;
+	header->orig_len = packet.getFrameLength();
+	header->incl_len = packet.getRawDataLen();
 }
 
-// bool PcapShmWriterDevice::WritePacketForRead(RawPacket const& packet)
-// {
-// 	const pcap_pkthdr pkt_hdr = CreatePacketHeader(packet);
-
-// 	// sizeof(PcapOnDiskRecordHeader) is different from sizeof(pcap_pkthdr)
-// 	size_t needed = sizeof(PcapOnDiskRecordHeader) + pkt_hdr.caplen;
-// 	if (!EnsureSegmentCapacity(needed))
-// 	{
-// 		return false;
-// 	}
-
-// 	pcap_dump(reinterpret_cast<uint8_t*>(segments_[current_segment_index_].dumper), &pkt_hdr, packet.getRawData());
-// 	return true;
-// }
-
-bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
+bool PcapShmWriterDevice::WritePacket(const pcpp::RawPacket& packet)
 {
-	if (unlikely(!device_opened_))
+	const size_t raw_data_len = packet.getRawDataLen();
+	if (unlikely(raw_data_len > max_packet_size_))
 	{
-		YANET_LOG_ERROR("Device not opened\n");
+		YANET_LOG_WARNING("Packet size %zu exceeds max slot data size %zu. Skipping.\n",
+		                  raw_data_len,
+		                  max_packet_size_);
 		return false;
 	}
 
-	if (unlikely(packet.getLinkLayerType() != link_layer_type_))
-	{
-		YANET_LOG_ERROR("Cannot write a packet with a different link layer type\n");
-		return false;
-	}
+	const uint64_t wpos = meta_->after.load(std::memory_order_relaxed);
 
-	PcapOnDiskRecordHeader disk_hdr;
-	timespec packet_timestamp = packet.getPacketTimeStamp();
+	std::byte* slot_ptr = GetSlotPtr(wpos);
+	auto* hdr = reinterpret_cast<PcapHeader*>(slot_ptr);
+	FillPacketHeader(hdr, packet);
 
-	//TODO: use CreatePacketHeader for this???
-	disk_hdr.ts_sec = static_cast<uint32_t>(packet_timestamp.tv_sec);
-	disk_hdr.ts_usec = static_cast<uint32_t>(packet_timestamp.tv_nsec / 1000);
-	disk_hdr.incl_len = packet.getRawDataLen();
-	disk_hdr.orig_len = packet.getFrameLength();
+	std::byte* data_ptr = ShiftBuffer(slot_ptr, sizeof(PcapHeader));
+	memcpy(data_ptr, packet.getRawData(), hdr->incl_len);
 
-	constexpr size_t on_disk_hdr_len = sizeof(PcapOnDiskRecordHeader);
-	const size_t payload_len = disk_hdr.incl_len;
-	const size_t total_record_size = on_disk_hdr_len + payload_len;
+	meta_->after.store(wpos + 1, std::memory_order_release);
 
-	// shm_size_ is the usable data area size (already excludes Meta).
-	// A single record cannot be larger than the entire usable ring buffer.
-	if (unlikely(total_record_size > shm_size_))
-	{
-		YANET_LOG_WARNING("Packet record size %zu (header %zu + payload %zu) "
-		                  "exceeds SHM Follow buffer capacity %zu. Skipping packet.\n",
-		                  total_record_size,
-		                  on_disk_hdr_len,
-		                  payload_len,
-		                  shm_size_);
-		return false;
-	}
-
-	uint64_t record_abs_start_offset = meta->before.fetch_add(total_record_size,
-	                                                          std::memory_order_relaxed);
-
-	auto* start = static_cast<uint8_t*>(shm_ptr_); // Base of SHM data area
-	size_t capacity = shm_size_; // Capacity of SHM data area
-
-	size_t hdr_offset = record_abs_start_offset % capacity;
-	size_t hdr_available = capacity - hdr_offset;
-
-	// Copy header
-	if (on_disk_hdr_len <= hdr_available)
-	{
-		memcpy(ShiftBuffer(start, hdr_offset), &disk_hdr, on_disk_hdr_len);
-	}
-	else
-	{
-		// Header wraps
-		memcpy(ShiftBuffer(start, hdr_offset), &disk_hdr, hdr_available);
-		memcpy(start, ShiftBuffer(&disk_hdr, hdr_available), on_disk_hdr_len - hdr_available);
-	}
-
-	// Copy payload
-	uint64_t payload_abs_start_offset = record_abs_start_offset + on_disk_hdr_len;
-	size_t payload_offset = payload_abs_start_offset % capacity;
-	size_t payload_available = capacity - payload_offset;
-	const uint8_t* data = packet.getRawData();
-
-	if (payload_len > 0) // Only copy if there's payload
-	{
-		if (payload_len <= payload_available)
-		{
-			memcpy(ShiftBuffer(start, payload_offset), data, payload_len);
-		}
-		else
-		{
-			// Payload wraps
-			memcpy(ShiftBuffer(start, payload_offset), data, payload_available);
-			memcpy(start, ShiftBuffer(data, payload_available), payload_len - payload_available);
-		}
-	}
-
-	meta->after.store(record_abs_start_offset + total_record_size, std::memory_order_release);
 	return true;
 }
 
-void PcapShmWriterDevice::Close()
+bool PcapShmWriterDevice::GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const
 {
-	if (!device_opened_)
-		return;
-
-	ResetMeta();
-
-	device_opened_ = false;
-}
-
-void PcapShmWriterDevice::Clean()
-{
-	Close();
-	Open();
-}
-
-bool PcapShmWriterDevice::GetPacket(RawPacket& raw_packet, unsigned pkt_number) const
-{
-	if (!device_opened_)
+	uint64_t last_packet_idx = meta_->after.load(std::memory_order_acquire);
+	if (last_packet_idx == 0 || pkt_number >= last_packet_idx)
 	{
 		return false;
 	}
 
-	// TODO: implement
+	const std::byte* slot_ptr = GetSlotPtr(pkt_number);
+
+	auto* data = ShiftBuffer<const uint8_t*, const std::byte*>(slot_ptr, sizeof(PcapHeader));
+	uint32_t size = reinterpret_cast<const PcapHeader*>(slot_ptr)->incl_len;
+	// We don't care about timestamp
+	timespec ts{};
+
+	raw_packet.initWithRawData(data, static_cast<int>(size), ts, link_layer_type_);
 	return true;
 }
 
-} // namespace pcpp
+} // namespace dumprings

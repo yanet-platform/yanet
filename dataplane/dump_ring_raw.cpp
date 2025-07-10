@@ -1,5 +1,4 @@
 #include "dump_rings.h"
-#include "RawPacket.h"
 #include "common/type.h"
 #include "common/utils.h"
 #include "metadata.h"
@@ -46,7 +45,7 @@ void RingRaw::Write(rte_mbuf* mbuf,
 	ring_->header.after++;
 }
 
-bool RingRaw::GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const
+bool RingRaw::GetPacket(RawPacket& raw_packet, unsigned pkt_number) const
 {
 	timespec empty_timespec{}; // RingRaw does not support timestamps
 
