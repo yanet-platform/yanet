@@ -129,7 +129,7 @@ bool PcapShmWriterDevice::WritePacket(RawPacket const& packet)
 	PcapOnDiskRecordHeader disk_hdr;
 	timespec packet_timestamp = packet.getPacketTimeStamp();
 
-	//TODO: use libpcap for this???
+	//TODO: use CreatePacketHeader for this???
 	disk_hdr.ts_sec = static_cast<uint32_t>(packet_timestamp.tv_sec);
 	disk_hdr.ts_usec = static_cast<uint32_t>(packet_timestamp.tv_nsec / 1000);
 	disk_hdr.incl_len = packet.getRawDataLen();

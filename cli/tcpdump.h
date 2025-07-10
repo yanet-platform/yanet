@@ -216,9 +216,7 @@ bool process_ring_packets(RingView& ring,
 	std::vector<uint8_t> local_buffer(data_available);
 	size_t shm_offset = ring.reader_pos % ring.size;
 	size_t remaining_in_shm = ring.size - shm_offset;
-	// void* buffer_ptr = ShiftBuffer(ring.start, shm_offset);
 
-	//TODO: make better? Like std::copy or something..?
 	if (data_available <= remaining_in_shm)
 	{
 		memcpy(local_buffer.data(), ShiftBuffer(ring.start, shm_offset), data_available);
