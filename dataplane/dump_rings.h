@@ -6,8 +6,8 @@
 #include "common/type.h"
 
 #include "config.h"
-#include "pcap_shm_device.h"
 #include "globalbase.h"
+#include "pcap_shm_device.h"
 
 namespace dumprings
 {
@@ -53,6 +53,10 @@ public:
 	}
 };
 
+size_t GetCapacity(const Config& config);
+
+std::unique_ptr<RingBase> CreateSharedMemoryDumpRing(const Config& config, void* memory);
+
 class RingRaw final : public RingBase
 {
 	using PacketBufferRing = common::PacketBufferRing;
@@ -89,9 +93,5 @@ public:
 
 	static size_t GetCapacity(size_t max_pkt_size, size_t pkt_count);
 };
-
-size_t GetCapacity(const Config& config);
-
-std::unique_ptr<RingBase> CreateSharedMemoryDumpRing(const Config& config, void* memory);
 
 } // namespace dumprings

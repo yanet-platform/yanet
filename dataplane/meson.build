@@ -1,5 +1,7 @@
 dataplane_common_sources = files(
     'dump_rings.cpp',
+    'dump_ring_raw.cpp',
+    'dump_ring_pcap.cpp',
     'pcap_shm_device.cpp'
 )
 
