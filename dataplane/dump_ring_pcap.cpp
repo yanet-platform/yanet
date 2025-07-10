@@ -4,15 +4,6 @@
 
 #include "MBufRawPacket.h"
 
-namespace dumprings
-{
-
-RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count) :
-        dev_(memory, GetCapacity(max_pkt_size, pkt_count))
-{
-	dev_.Open();
-}
-
 /**
  * @brief A complete copy of the PcapPlusPlus wrapper of the RawPacket class.
  *
@@ -72,12 +63,18 @@ static timespec fast_wall_timestamp(const WallclockAnchor& anchor)
 	return ts;
 }
 
+namespace dumprings
+{
+
+RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count) :
+        dev_(static_cast<std::byte*>(memory), max_pkt_size, pkt_count)
+{}
+
 void RingPcap::Write(rte_mbuf* mbuf,
                      [[maybe_unused]] common::globalBase::eFlowType flow_type,
                      const WallclockAnchor& anchor)
 {
 	MBufRawPacketCopy raw_packet(mbuf, fast_wall_timestamp(anchor));
-
 	dev_.WritePacket(raw_packet);
 }
 
@@ -88,18 +85,7 @@ bool RingPcap::GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const
 
 size_t RingPcap::GetCapacity(size_t max_pkt_size, size_t pkt_count)
 {
-	auto file_hdr_size = pcpp::PcapShmWriterDevice::kPcapFileHeaderSize;
-	auto pkt_hdr_size = sizeof(dumprings::PcapOnDiskRecordHeader);
-	auto meta_size = sizeof(RingMeta);
-
-	size_t capacity = meta_size + file_hdr_size + (pkt_hdr_size + max_pkt_size) * pkt_count;
-
-	if (capacity % RTE_CACHE_LINE_SIZE != 0)
-	{
-		capacity += RTE_CACHE_LINE_SIZE - capacity % RTE_CACHE_LINE_SIZE; /// round up
-	}
-
-	return capacity;
+	return PcapShmWriterDevice::GetRequiredShmSize(max_pkt_size, pkt_count);
 }
 
-} // namespace sharedmemory
+} // namespace dumprings

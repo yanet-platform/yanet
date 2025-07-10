@@ -9,25 +9,27 @@
 #include "globalbase.h"
 #include "pcap_shm_device.h"
 
+using WallclockAnchor = dataplane::globalBase::atomic::WallclockAnchor;
+
 namespace dumprings
 {
 using Format = tDataPlaneConfig::DumpFormat;
 using Config = tDataPlaneConfig::DumpConfig;
-using WallclockAnchor = dataplane::globalBase::atomic::WallclockAnchor;
+using RawPacket = pcpp::RawPacket;
 
 class RingBase
 {
 	// Current packet number that we will read next. It's used only by autotests
 	unsigned read_pkt_number = 0;
 
-	[[nodiscard]] virtual bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const = 0;
+	[[nodiscard]] virtual bool GetPacket(RawPacket& raw_packet, unsigned pkt_number) const = 0;
 
 public:
 	virtual ~RingBase() = default;
 
 	virtual void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor) = 0;
 
-	bool GetNextPacket(pcpp::RawPacket& raw_packet)
+	bool GetNextPacket(RawPacket& raw_packet)
 	{
 		raw_packet.clear();
 
@@ -73,14 +75,30 @@ public:
 
 	void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor) override;
 
-	[[nodiscard]] bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const override;
+	[[nodiscard]] bool GetPacket(RawPacket& raw_packet, unsigned pkt_number) const override;
 
 	static size_t GetCapacity(size_t max_pkt_size, size_t pkt_count);
 };
 
+/**
+ * A class for writing packets to a shared memory region in pcap format,
+ * using a slot-based ring-buffer.
+ *
+ * The shared memory is structured as follows:
+ * 1. A `dumprings::RingMeta` header containing the global PCAP file header
+ *    and the atomic `after` slot index.
+ * 2. An array of `N` fixed-size slots.
+ *
+ * Each slot contains:
+ * 1. A pcap packet header -- packet's timestamp and length.
+ * 2. The raw packet data, truncated to fit the slot size.
+ *
+ * The writer increments the `after` counter only after a slot is completely
+ * filled, making the entire slot atomically available to the reader.
+ */
 class RingPcap final : public RingBase
 {
-	pcpp::PcapShmWriterDevice dev_;
+	PcapShmWriterDevice dev_;
 
 public:
 	RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count);
@@ -89,7 +107,7 @@ public:
 
 	void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor) override;
 
-	[[nodiscard]] bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const override;
+	[[nodiscard]] bool GetPacket(RawPacket& raw_packet, unsigned pkt_number) const override;
 
 	static size_t GetCapacity(size_t max_pkt_size, size_t pkt_count);
 };

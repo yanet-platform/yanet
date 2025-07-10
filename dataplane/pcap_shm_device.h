@@ -3,130 +3,103 @@
 #include <cstdio>
 #include <pcap/pcap.h>
 
-#include "PcapDevice.h"
 #include "PcapFileDevice.h"
-#include "dump_rings_meta.h"
+#include "RawPacket.h"
+#include "pcap_dump_ring_meta.h"
 
-namespace pcpp
+namespace dumprings
 {
 
 /**
- * @brief An abstract class for shared memory writer devices.
+ * A class for writing packets to a shared memory region in pcap format,
+ * using a slot-based ring-buffer.
  *
- * A writer device provides methods to write packets into the shared memory region.
- * These packets can later be read or dumped to disk by other utilities.
+ * The shared memory is structured as follows:
+ * 1. A `dumprings::RingMeta` header containing the global PCAP file header
+ *    and the atomic `after` slot index.
+ * 2. An array of `N` fixed-size slots.
+ *
+ * Each slot contains:
+ * 1. A pcap packet header -- packet's timestamp and length.
+ * 2. The raw packet data, truncated to fit the slot size.
+ *
+ * The writer increments the `after` counter only after a slot is completely
+ * filled, making the entire slot atomically available to the reader.
  */
-class IShmWriterDevice
+class PcapShmWriterDevice
 {
-protected:
-	void* shm_ptr_;
-	size_t shm_size_;
+	using Meta = dumprings::PcapRingMeta;
+	using PcapHeader = dumprings::PcapHeader;
 
-	explicit IShmWriterDevice(void* shm_ptr, size_t shm_size) :
-	        shm_ptr_(shm_ptr), shm_size_(shm_size) {}
+	Meta* meta_; // points to the start of shm for this device
+	std::byte* slots_ptr_; // points to the start of slots
+
+	size_t max_packet_size_;
+	size_t packet_slot_size_;
+	size_t packet_count_;
+	pcpp::LinkLayerType link_layer_type_;
+	pcpp::FileTimestampPrecision precision_;
+
+	bool InitMeta();
+
+	/**
+	 * Fills a PcapHeader struct with data from a RawPacket.
+	 *
+	 * @param[out] header The PcapHeader to be filled.
+	 * @param[in] packet The source RawPacket.
+	 */
+	void FillPacketHeader(PcapHeader* header, const pcpp::RawPacket& packet);
+
+	/**
+	 * @brief Gets a raw pointer to a specific packet number in the shared memory.
+	 */
+	[[nodiscard]] std::byte* GetSlotPtr(uint64_t packet_number) const;
 
 public:
-	virtual ~IShmWriterDevice() noexcept = 0;
-
 	/**
-	 * @return Pointer to the underlying shared memory region.
+	 * @brief Calculates the total shared memory size required for a given
+	 * ring buffer configuration.
+	 * @param max_pkt_size The maximum size of a single packet's data.
+	 * @param pkt_count The number of packet slots in the ring buffer.
+	 * @return The total required memory in bytes.
 	 */
-	[[nodiscard]] void* GetShmPtr() const
-	{
-		return shm_ptr_;
-	}
-
-	/**
-	 * @return The size of the shared memory region in bytes.
-	 */
-	[[nodiscard]] size_t GetShmSize() const
-	{
-		return shm_size_;
-	}
-
-	/**
-	 * @brief Write a single RawPacket into the shared memory.
-	 *
-	 * @param[in] packet The packet to write.
-	 *
-	 * @return True if the packet was written successfully, false otherwise.
-	 */
-	[[nodiscard]] virtual bool WritePacket(RawPacket const& packet) = 0;
-};
-
-/**
- * @brief A class for writing packets to a shared memory region in pcap format,
- * using a ring-buffer approach.
- *
- * TODO: add descr of a follow mode (the only mode left)
- */
-class PcapShmWriterDevice final : public IShmWriterDevice
-{
-	LinkLayerType link_layer_type_;
-	FileTimestampPrecision precision_;
-	bool device_opened_{};
-
-	using Meta = dumprings::RingMeta;
-	Meta* meta; ///< points into the start of the given SHM page
-
-	using PcapOnDiskRecordHeader = dumprings::PcapOnDiskRecordHeader;
-
-	/*
-	 * @brief Helper to create libpcap's packet header from PcapPlusPlus's raw packet.
-	 */
-	pcap_pkthdr CreatePacketHeader(const RawPacket& packet);
-
-	/* Sets counters to zero */
-	void ResetMeta();
-
-public:
-	static constexpr size_t kPcapFileHeaderSize = 24;
+	static size_t GetRequiredShmSize(size_t max_pkt_size, size_t pkt_count);
 
 	/**
 	 * @brief Constructor for PcapShmWriterDevice
 	 *
-	 * @param[in] shmPtr Pointer to the shared memory region.
-	 * @param[in] shmSize Size of the shared memory region.
-	 * @param[in] linkLayerType The link layer type all packets in this region will be based on. The
-	 * default is Ethernet.
-	 * @param[in] nanosecondsPrecision A boolean indicating whether to write timestamps in
-	 * nano-precision. If set to false, timestamps will be written in micro-precision.
+	 * @param[in] shm_ptr Pointer to the shared memory region.
+	 * @param[in] shm_size Total size of the shared memory region.
+	 * @param[in] max_pkt_size The maximum size of data for a single packet.
+	 * @param[in] pkt_count The total number of packet slots in the buffer.
+	 * @param[in] link_layer_type The link layer type for the capture.
 	 */
-	PcapShmWriterDevice(void* shm_ptr,
-	                    size_t shm_size,
-	                    LinkLayerType link_layer_type = LINKTYPE_ETHERNET,
+	PcapShmWriterDevice(std::byte* shm_ptr,
+	                    size_t max_pkt_size,
+	                    size_t pkt_count,
+	                    pcpp::LinkLayerType link_layer_type = pcpp::LINKTYPE_ETHERNET,
 	                    bool nanoseconds_precision = true);
 
-	~PcapShmWriterDevice() override;
+	// Prevent copying and assignment.
+	PcapShmWriterDevice(const PcapShmWriterDevice&) = delete;
+	PcapShmWriterDevice& operator=(const PcapShmWriterDevice&) = delete;
 
-	// Prevent copying
-	PcapShmWriterDevice(PcapShmWriterDevice const&) = delete;
-	PcapShmWriterDevice& operator=(PcapShmWriterDevice const&) = delete;
-
-	bool WritePacket(RawPacket const& packet) override;
+	/**
+	 * @brief Writes a single RawPacket into the next available slot in the ring buffer.
+	 * @param[in] packet The packet to write.
+	 * @return True if the packet was written successfully, false otherwise.
+	 */
+	bool WritePacket(const pcpp::RawPacket& packet);
 
 	/**
 	 * @brief Retrieve a packet from the shared memory by its sequence number.
-	 *
-	 * This method is used only for tests, so we don't care too much about performance.
+	 * This method is intended for testing purposes. We don't care about
+	 * timestamp.
 	 *
 	 * @param[out] raw_packet The RawPacket to populate with the packet data.
-	 * @param[in] pkt_number The sequence number of the packet to retrieve (0 = oldest).
+	 * @param[in] pkt_number The absolute sequence number of the packet.
 	 * @return True if the packet was successfully retrieved, false otherwise.
 	 */
-	bool GetPacket(RawPacket& raw_packet, unsigned pkt_number) const;
-
-	bool Open();
-
-	/**
-	 * @brief Close the device and free associated resources.
-	 */
-	void Close();
-
-	/**
-	 * @brief Clean internal state and reopen the device.
-	 */
-	void Clean();
+	bool GetPacket(pcpp::RawPacket& raw_packet, unsigned pkt_number) const;
 };
-
-} // namespace pcpp
+}
