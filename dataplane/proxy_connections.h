@@ -28,13 +28,16 @@ struct ConnectionBucket
         }
     }
 
-    uint32_t addresses[bucket_size];
-    uint16_t ports[bucket_size];
+    // 128 bytes = 2 cache lines
     uint64_t last_times[bucket_size];
 
-    ConnectionInfo connections[bucket_size];
-    rte_spinlock_t spinlock;
+    // 104 bytes = 2 cache lines
+    uint32_t addresses[bucket_size];
+    uint16_t ports[bucket_size];
     uint32_t time_overflow;
+    rte_spinlock_t spinlock;
+
+    ConnectionInfo connections[bucket_size];
 
     void Clear(uint32_t idx)
     {
@@ -58,7 +61,7 @@ struct ConnectionBucket
     {
         rte_spinlock_unlock(&spinlock);
     }
-};
+} __rte_cache_aligned;
 
 template<typename ConnectionInfo>
 struct ConnectionData {
