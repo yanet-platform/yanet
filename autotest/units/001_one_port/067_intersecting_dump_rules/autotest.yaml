@@ -7,6 +7,6 @@ steps:
     expect: 001-expect.pcap
 - dumpPackets:
   - ringTag: shm_2_0
-    expect: 001-expect-dump-ring1.pcap
-  - ringTag: shm_2_1
     expect: 001-expect-dump-ring2.pcap
+  - ringTag: shm_2_1
+    expect: 001-expect-dump-ring1.pcap
