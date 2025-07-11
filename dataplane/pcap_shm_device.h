@@ -40,8 +40,6 @@ class PcapShmWriterDevice
 	pcpp::LinkLayerType link_layer_type_;
 	pcpp::FileTimestampPrecision precision_;
 
-	bool InitMeta();
-
 	/**
 	 * Fills a PcapHeader struct with data from a RawPacket.
 	 *
@@ -56,6 +54,8 @@ class PcapShmWriterDevice
 	[[nodiscard]] std::byte* GetSlotPtr(uint64_t packet_number) const;
 
 public:
+	bool InitMeta();
+
 	/**
 	 * @brief Calculates the total shared memory size required for a given
 	 * ring buffer configuration.

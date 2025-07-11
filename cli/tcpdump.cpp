@@ -239,7 +239,7 @@ void set_signal_handler()
 }
 }
 
-inline void tcpdump_follow(const std::string& target_dump_tag)
+void tcpdump_follow(const std::string& target_dump_tag)
 {
 	interface::dataPlane dataplane;
 	const auto& shm_info = dataplane.get_shm_info();

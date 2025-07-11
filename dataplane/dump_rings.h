@@ -29,6 +29,8 @@ public:
 
 	virtual void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor) = 0;
 
+	virtual void ResetState() = 0;
+
 	bool GetNextPacket(RawPacket& raw_packet)
 	{
 		raw_packet.clear();
@@ -52,6 +54,7 @@ public:
 	void Clear()
 	{
 		read_pkt_number = 0;
+		ResetState();
 	}
 };
 
@@ -72,6 +75,8 @@ public:
 	RingRaw(void* memory, size_t max_pkt_size, size_t pkt_count);
 
 	~RingRaw() override = default;
+
+	virtual void ResetState() override;
 
 	void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor) override;
 
@@ -104,6 +109,8 @@ public:
 	RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count);
 
 	~RingPcap() override = default;
+
+	virtual void ResetState() override;
 
 	void Write(rte_mbuf* mbuf, common::globalBase::eFlowType flow_type, const WallclockAnchor& anchor) override;
 
