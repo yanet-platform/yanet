@@ -70,6 +70,12 @@ RingPcap::RingPcap(void* memory, size_t max_pkt_size, size_t pkt_count) :
         dev_(static_cast<std::byte*>(memory), max_pkt_size, pkt_count)
 {}
 
+
+void RingPcap::ResetState()
+{
+	dev_.InitMeta();
+}
+
 void RingPcap::Write(rte_mbuf* mbuf,
                      [[maybe_unused]] common::globalBase::eFlowType flow_type,
                      const WallclockAnchor& anchor)

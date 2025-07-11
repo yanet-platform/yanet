@@ -13,6 +13,10 @@ RingRaw::RingRaw(void* memory, size_t max_pkt_size, size_t pkt_count) :
 	ring_->header.after = 0;
 }
 
+// Ring Raw has it's state entirely in shm, and the default values are zero
+// Autotests zero the shared memory, so this is the desired behavior
+void RingRaw::ResetState() {};
+
 void RingRaw::Write(rte_mbuf* mbuf,
                     common::globalBase::eFlowType flow_type,
                     [[maybe_unused]] const WallclockAnchor& anchor)
