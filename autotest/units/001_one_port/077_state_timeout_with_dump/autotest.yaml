@@ -20,6 +20,8 @@ steps:
 - dumpPackets:
   - ringTag: shm_2_0
     expect: 001-expect-dump-ring1.pcap
+  - ringTag: shm_2_1
+    expect: 001-expect-dump-ring1.pcap
 
 # Wait for state to expire
 - sleep: 6

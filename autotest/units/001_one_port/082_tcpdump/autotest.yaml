@@ -9,6 +9,8 @@ steps:
 - dumpPackets:
   - ringTag: shm_2_0
     expect: 001-expect-dump.pcap
+  - ringTag: shm_2_1
+    expect: 001-expect-dump.pcap
 
 - cli: show shm info
 

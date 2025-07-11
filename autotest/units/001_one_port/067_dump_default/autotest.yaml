@@ -6,15 +6,19 @@ steps:
     2: 0
     3: 0
     4: 0
+    5: 0
 - sendPackets:
   - port: kni0
     send: 001-send.pcap
     expect: 001-expect.pcap
 - checkCounters:
-    1: 6
-    2: 1 # packet went to dump
-    3: 1 # same went to allow
-    4: 4 # others are denied
+    1: 7
+    2: 1 # packet went to dump_raw
+    3: 1 # packet went to dump_pcap
+    4: 1 # same went to allow
+    5: 4 # others are denied
 - dumpPackets:
   - ringTag: shm_2_0
+    expect: 001-expect-dump-ring1.pcap
+  - ringTag: shm_2_1
     expect: 001-expect-dump-ring1.pcap
