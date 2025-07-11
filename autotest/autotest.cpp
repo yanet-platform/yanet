@@ -1944,10 +1944,6 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep, const std::string& 
 		}
 		DumpRingBasePtr& ring = it->second;
 
-		// Flush Dataplane's dump ring to make sure packets are up to date
-		// TODO: not needed?
-		// dataPlane.flushDumpRing(dumpRingsDesc[tag]);
-
 		// Open pcap file using PcapPlusPlus
 		pcpp::IFileReaderDevice* reader = pcpp::IFileReaderDevice::getReader(expectFilePath);
 		if (reader == nullptr)
@@ -2060,9 +2056,6 @@ void tAutotest::fflushSharedMemory()
 		GCC_BUG_UNUSED(ring_str);
 		ring->Clear();
 	}
-	//FIXME: мне кажется это не нужно, потому что можно просто
-	//выставить каунтеры в ноль, т.к это ж одна shm, неважно.
-	// dataPlane.clearWorkerDumpRings();
 }
 
 } // namespace autotest
