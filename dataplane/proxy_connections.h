@@ -20,6 +20,7 @@ struct ConnectionBucket
 
     ConnectionBucket()
     {
+        rte_spinlock_init(&spinlock);
         time_overflow = 0;
         for (uint32_t index = 0; index < bucket_size; index++)
         {
@@ -32,7 +33,7 @@ struct ConnectionBucket
     uint64_t last_times[bucket_size];
 
     ConnectionInfo connections[bucket_size];
-    std::mutex mutex;
+    rte_spinlock_t spinlock;
     uint32_t time_overflow;
 
     void Clear(uint32_t idx)
@@ -50,12 +51,12 @@ struct ConnectionBucket
 
     void Lock()
     {
-        while(!mutex.try_lock());
+        rte_spinlock_lock(&spinlock);
     }
 
     void Unlock()
     {
-        mutex.unlock();
+        rte_spinlock_unlock(&spinlock);
     }
 };
 
@@ -196,7 +197,7 @@ public:
         }
         else
         {
-            buckets_ = new Bucket[number_buckets];
+            buckets_ = new Bucket[number_buckets]{};
             destroy = [this](){
                 delete[] buckets_;
             };
@@ -204,13 +205,6 @@ public:
         if (buckets_ == nullptr)
         {
             return false;
-        }
-        else if (memory_manager == nullptr)
-        {
-            for (uint32_t index = 0; index < number_buckets; index++)
-            {
-                new (&(buckets_[index])) Bucket();
-            }
         }
 
         number_buckets_ = number_buckets;

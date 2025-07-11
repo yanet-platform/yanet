@@ -57,7 +57,7 @@ public:
 private:
     struct LocalInfo
     {
-        mutable std::mutex mutex;
+        mutable rte_spinlock_t spinlock;
         uint32_t num_chunks;
         uint32_t first;
         uint32_t last;

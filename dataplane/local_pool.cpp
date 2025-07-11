@@ -90,6 +90,8 @@ bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
     local_info_->free_addresses = local_info_->num_chunks * chunk_size;
     local_info_->used_addresses = 0;
 
+    rte_spinlock_init(&local_info_->spinlock);
+
     initialized_ = true;
 
     return true;
@@ -102,10 +104,10 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId c
     uint32_t idx = local_info_->worker_chunks[worker_id];
     if (idx == NULL_CHUNK)
     {
-        while(!local_info_->mutex.try_lock());
+        rte_spinlock_lock(&local_info_->spinlock);
         if (local_info_->first == NULL_CHUNK)
         {
-            local_info_->mutex.unlock();
+            rte_spinlock_unlock(&local_info_->spinlock);
             return 0;
         }
 
@@ -116,7 +118,7 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId c
 
         local_info_->worker_chunks[worker_id] = idx;
         chunk_queue_[idx].offset = 0;    
-        local_info_->mutex.unlock();
+        rte_spinlock_unlock(&local_info_->spinlock);
     }
     
     ConnectionsChunk& chunk = chunk_queue_[idx];
@@ -126,11 +128,11 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId c
     
     if (chunk.offset == chunk_size)
     {
-        while(!local_info_->mutex.try_lock());
+        rte_spinlock_lock(&local_info_->spinlock);
         chunk.next_idx = local_info_->free_first;
         local_info_->free_first = idx;
         local_info_->worker_chunks[worker_id] = NULL_CHUNK;
-        local_info_->mutex.unlock();
+        rte_spinlock_unlock(&local_info_->spinlock);
     }
     local_to_client_[local] = PackTuple(client_addr, client_port); 
 
@@ -156,10 +158,10 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
     uint32_t gc_chunk = local_info_->gc_chunks[worker_id];
     if (gc_chunk == NULL_CHUNK)
     {
-        while(!local_info_->mutex.try_lock());
+        rte_spinlock_lock(&local_info_->spinlock);
         if (unlikely(local_info_->free_first == NULL_CHUNK))
         {
-            local_info_->mutex.unlock();
+            rte_spinlock_unlock(&local_info_->spinlock);
             YANET_LOG_ERROR("No free chunks available\n");
             return;
         }
@@ -168,7 +170,7 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
         local_info_->gc_chunks[worker_id] = local_info_->free_first;
         local_info_->free_first = chunk_queue_[gc_chunk].next_idx;
         chunk_queue_[gc_chunk].offset = 0;
-        local_info_->mutex.unlock();
+        rte_spinlock_unlock(&local_info_->spinlock);
     }
 
     ConnectionsChunk& chunk = chunk_queue_[gc_chunk];
@@ -177,7 +179,7 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
 
     if (chunk.offset == chunk_size)
     {
-        while(!local_info_->mutex.try_lock());
+        rte_spinlock_lock(&local_info_->spinlock);
         if (local_info_->last != NULL_CHUNK)
             chunk_queue_[local_info_->last].next_idx = gc_chunk;
         local_info_->last = gc_chunk;
@@ -185,7 +187,7 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
             local_info_->first = gc_chunk;
         local_info_->gc_chunks[worker_id] = NULL_CHUNK;
         chunk_queue_[local_info_->last].next_idx = NULL_CHUNK;
-        local_info_->mutex.unlock();
+        rte_spinlock_unlock(&local_info_->spinlock);
     }
 
     local_to_client_[idx] = 0;
