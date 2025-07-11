@@ -1,0 +1,28 @@
+steps:
+- ipv4Update: "0.0.0.0/0 -> 10.0.0.2"
+
+- cli: fw show
+
+# Start the capture in the background
+- cli: tcpdump ring_pcap > /tmp/big_ring_capture.pcap &
+- cli: tcpdump small_ring_pcap > /tmp/small_ring_capture.pcap &
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+- sleep: 1
+
+# Stop the background processes. pkill sends SIGTERM by default,
+# which our signal handler in yanet-cli will catch for an exit.
+- shell_cli: pkill -f "yanet-cli tcpdump ring_pcap"
+- shell_cli: pkill -f "yanet-cli tcpdump small_ring_pcap"
+
+- cli: fw show
+
+- comparePcaps:
+  - expect: 001-expect-dump-big-ring.pcap
+    captured: /tmp/big_ring_capture.pcap
+  - expect: 001-expect-dump-small-ring.pcap
+    captured: /tmp/small_ring_capture.pcap
