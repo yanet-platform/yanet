@@ -13,7 +13,7 @@
 #include "common/define.h"
 
 constexpr auto YANET_TSC_BINS_SHIFT = 2;
-constexpr auto YANET_TSC_BINS_N = 4;
+constexpr auto YANET_TSC_BINS_N = 8;
 
 namespace dataplane::perf
 {

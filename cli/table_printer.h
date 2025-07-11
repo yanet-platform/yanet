@@ -89,6 +89,59 @@ public:
 
 		print_default();
 		table_.clear();
+		column_lengths_.clear();
+	}
+
+	void RemoveZeroColumns()
+	{
+		unsigned height = table_.size();
+		if (height == 0)
+		{
+			return;
+		}
+		unsigned width = table_[0].size();
+		if (width <= 2)
+		{
+			return;
+		}
+		std::vector<bool> non_zero(width, false);
+		non_zero[0] = true;
+		non_zero[1] = true;
+		for (unsigned row = 1; row < height; row++)
+		{
+			for (unsigned col = 2; col < width && col < table_[row].size(); col++)
+			{
+				if (table_[row][col] != "0")
+				{
+					non_zero[col] = true;
+				}
+			}
+		}
+
+		std::vector<size_t> column_lengths;
+		for (unsigned col = 0; col < column_lengths_.size() && col < width; col++)
+		{
+			if (non_zero[col])
+			{
+				column_lengths.push_back(column_lengths_[col]);
+			}
+		}
+		column_lengths_.swap(column_lengths);
+
+		std::vector<std::vector<std::string>> new_table;
+		for (const auto& row : table_)
+		{
+			std::vector<std::string> new_row;
+			for (unsigned col = 0; col < row.size() && col < width; col++)
+			{
+				if (non_zero[col])
+				{
+					new_row.push_back(row[col]);
+				}
+			}
+			new_table.push_back(std::move(new_row));
+		}
+		table_.swap(new_table);
 	}
 
 private:

@@ -190,10 +190,17 @@ struct tsc_monitoring_t
 		}
 	}
 
-	void monitor()
+	void monitor(bool summary)
 	{
 		connect_shm();
 		const int header_interval = 4;
+
+		uint64_t iter_num = 0;
+		std::vector<std::vector<uint64_t>> table_summary;
+		if (summary)
+		{
+			table_summary.resize(YANET_TSC_BINS_N);
+		}
 
 		for (int iter = 0;; ++iter)
 		{
@@ -201,19 +208,27 @@ struct tsc_monitoring_t
 
 			if (render_header)
 			{
-				insert_header();
+				insert_header(summary);
 			}
 
 			for (auto& [core_id, counter, previous_value, overflow_store] : worker_counters)
 			{
 				const auto& counter_copy = *counter;
+				iter_num = (counter->iter_num == 0 ? iter_num : counter->iter_num);
 				for (int bin = 0; bin < YANET_TSC_BINS_N; ++bin)
 				{
 					overflow_store.handle_overflow(counter_copy, previous_value, bin);
 
 					if (render_header)
 					{
-						insert_bin(counter_copy, overflow_store, bin, core_id);
+						if (!summary)
+						{
+							insert_bin(counter_copy, overflow_store, bin, core_id);
+						}
+						else
+						{
+							summary_bin(counter_copy, overflow_store, bin, table_summary);
+						}
 					}
 				}
 
@@ -222,6 +237,15 @@ struct tsc_monitoring_t
 
 			if (render_header)
 			{
+				if (summary)
+				{
+					fill_from_summary(iter_num, table_summary);
+					for (auto& row : table_summary)
+					{
+						row.assign(row.size(), 0);
+					}
+				}
+				table.RemoveZeroColumns();
 				table.Render();
 			}
 
@@ -325,9 +349,9 @@ private:
 	std::vector<std::tuple<uint32_t, tsc_deltas*, tsc_deltas, overflow_store>> worker_counters;
 	TablePrinter table;
 
-	void insert_header()
+	void insert_header(bool summary)
 	{
-		table.insert_row("core_id",
+		table.insert_row((summary ? "bin" : "core_id"),
 		                 "iter_num",
 		                 "logicalPort_ingress",
 		                 "acl_ingress4",
@@ -346,6 +370,11 @@ private:
 		                 "balancer",
 		                 "balancer_icmp_reply",
 		                 "balancer_icmp_forward",
+						 "proxy_c_syn",
+						 "proxy_c_ack",
+						 "proxy_s_syn_ack",
+						 "proxy_s_ack",
+						 "proxy_icmp",
 		                 "route_tunnel4",
 		                 "route_tunnel6",
 		                 "acl_egress4",
@@ -375,12 +404,67 @@ private:
 
 		table.insert_row(row.begin(), row.end());
 	}
+
+	void summary_bin(const tsc_deltas& cnt, const overflow_store& of_store, int bin, std::vector<std::vector<uint64_t>>& table_summary)
+	{
+		if (table_summary[bin].empty())
+		{
+			table_summary[bin] = std::vector<uint64_t>(std::tuple_size_v<decltype(cnt.as_tuple())>, 0);
+		}
+		
+		std::size_t index = 0;
+		auto op = [&](const auto& first, const auto& second) mutable {
+			table_summary[bin][index++] += first[bin] + second[bin];
+		};
+		utils::zip_apply(op, cnt.as_tuple(), of_store.as_tuple());
+	}
+
+	void fill_from_summary(uint64_t iter_num, const std::vector<std::vector<uint64_t>>& table_summary)
+	{
+		size_t columns = table_summary[0].size();
+		std::vector<uint64_t> total(columns);
+		std::vector<uint64_t> times(columns);
+
+		for (int bin = 0; bin < YANET_TSC_BINS_N; bin++)
+		{
+			std::vector<std::string> row(columns + 2);
+			row[0] = std::to_string(bin);
+			row[1] = (bin == 0 ? std::to_string(iter_num) : std::string{});
+			for (size_t index = 0; index < columns; index++)
+			{
+				row[2 + index] = std::to_string(table_summary[bin][index]);
+				total[index] += table_summary[bin][index];
+				times[index] += (table_summary[bin][index] << (2 * bin));
+			}
+			table.insert_row(row.begin(), row.end());
+		}
+
+		std::vector<std::string> row_total(columns + 2);
+		std::vector<std::string> row_times(columns + 2);
+		row_total[0] = "total";
+		row_times[0] = "time";
+
+		for (size_t index = 0; index < columns; index++)
+		{
+			row_total[2 + index] = std::to_string(total[index]);
+			row_times[2 + index] = std::to_string((total[index] == 0 ? 0 : times[index] / total[index]));
+		}
+
+		table.insert_row(row_total.begin(), row_total.end());
+		table.insert_row(row_times.begin(), row_times.end());
+	}
 };
 
 inline void tsc_monitoring()
 {
 	tsc_monitoring_t monitoring{};
-	monitoring.monitor();
+	monitoring.monitor(false);
+}
+
+inline void tsc_monitoring_summary()
+{
+	tsc_monitoring_t monitoring{};
+	monitoring.monitor(true);
 }
 
 }
