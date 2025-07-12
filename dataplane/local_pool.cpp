@@ -294,4 +294,16 @@ void LocalPool::ClearLinks()
     initialized_ = false;
 }
 
+std::string LocalPool::Debug() const
+{
+    if (!initialized_)
+    {
+        return "not initialized";
+    }
+
+    char loc_buf[256];
+    snprintf(loc_buf, sizeof(loc_buf), "chunk_queue=%p, local_to_client=%p, local_info=%p", chunk_queue_, local_to_client_, local_info_);
+    return std::string(loc_buf);
+}
+
 }

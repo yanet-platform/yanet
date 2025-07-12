@@ -362,6 +362,14 @@ public:
 	{
 		return {proxy_addr, proxy_port, proto};
 	}
+
+	void Debug() const
+	{
+	    YANET_LOG_WARNING("service_id=%d, service=%s, size_con=%d, size_syn=%d, proxy_header=%d\n", service_id, service.c_str(), size_connections_table, size_syn_table, send_proxy_header);
+    	YANET_LOG_WARNING("\tproxy=%s:%d, service=%s:%d, pool=%s\n", proxy_addr.toString().c_str(), proxy_port, upstream_addr.toString().c_str(), upstream_port, upstream_net.toString().c_str());
+		YANET_LOG_WARNING("\tTCP options: use_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", use_sack, mss, winscale, timestamps);
+    	YANET_LOG_WARNING("\tTimeouts: rto=%d, syn_recv=%d, established=%d\n", timeout_syn_rto, timeout_syn_recv, timeout_established);
+	}
 };
 
 class config_t

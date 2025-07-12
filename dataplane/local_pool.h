@@ -54,6 +54,8 @@ public:
     void CopyFrom(const LocalPool& other);
     void ClearLinks();
 
+    std::string Debug() const;
+
 private:
     struct LocalInfo
     {

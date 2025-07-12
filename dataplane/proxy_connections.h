@@ -413,6 +413,18 @@ public:
         YANET_LOG_WARNING("%s: initialized_=%d, number_buckets_=%d, buckets_=%p\n", message.c_str(), initialized_, number_buckets_, buckets_);
     }
 
+    std::string Debug() const
+    {
+        if (!initialized_)
+        {
+            return "not initialized";
+        }
+
+        char loc_buf[256];
+        snprintf(loc_buf, sizeof(loc_buf), "buckets=%d, pointer=%p", number_buckets_, buckets_);
+        return std::string(loc_buf);
+    }
+
 private:
     Bucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;

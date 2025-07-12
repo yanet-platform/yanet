@@ -63,16 +63,8 @@ void proxy_t::reload(const controlplane::base_t& base_prev,
         {
             // new service
             service_counters.insert(service.service_id);
-            AddRequestUpdateService(globalbase, service);
         }
-        else
-        {
-            // check, is service changed
-            if (service.as_tuple() != iter_prev->second.as_tuple())
-            {
-                AddRequestUpdateService(globalbase, service);
-            }
-        }
+        AddRequestUpdateService(globalbase, service);
     }
 
     service_counters.allocate();

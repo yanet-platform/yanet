@@ -270,14 +270,8 @@ eResult TcpConnectionStore::ServiceUpdate(proxy_service_t& service, dataplane::m
     proxy_service_id_t service_id = service.service_id;
 
     common::ipv4_prefix_t upstream_net(service.pool_prefix.address.address, service.pool_prefix.mask);
-    YANET_LOG_WARNING("proxy_service_update: service_id=%d, proxy=%s:%d, upstream=%s:%d, prefix=%s, send_proxy_header=%d\n", 
-        service_id, common::ipv4_address_t(rte_cpu_to_be_32(service.proxy_addr)).toString().c_str(), rte_cpu_to_be_16(service.proxy_port),
-        common::ipv4_address_t(rte_cpu_to_be_32(service.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(service.upstream_port), upstream_net.toString().c_str(),
-        service.send_proxy_header);
-    // YANET_LOG_WARNING("\t\tsize_connections_table=%d, size_syn_table=%d, counter_id=%d\n", service.size_connections_table, service.size_syn_table, service.counter_id);
-    // YANET_LOG_WARNING("\t\ttimeouts: syn_rto=%d, syn_recv=%d, established=%d\n", service.timeout_syn_rto, service.timeout_syn_recv, service.timeout_established);
-    // YANET_LOG_WARNING("\t\tuse_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", service.use_sack, service.mss, service.winscale, service.timestamps);
-	// YANET_LOG_WARNING("\t\t!!!!! currentGlobalBaseId=%d, first_state_update_global_base=%d\n", currentGlobalBaseId, first_state_update_global_base);
+    YANET_LOG_WARNING("proxy_service_update\n");
+    service.Debug();
 
     uint8_t newGlobalBaseId = currentGlobalBaseId ^ 1;
     eResult result;
@@ -1217,6 +1211,18 @@ void ProxyTables::ClearLinks()
     service_connections.ClearLinks();
     syn_connections.ClearLinks();
     local_pool.ClearLinks();
+}
+
+void proxy_service_t::Debug()
+{
+    YANET_LOG_WARNING("service_id=%d, counter_id=%d, size_con=%d, size_syn=%d, proxy_header=%d\n", service_id, counter_id, size_connections_table, size_syn_table, send_proxy_header);
+    YANET_LOG_WARNING("\tproxy=%s:%d, service=%s:%d, pool=%s\n",
+        common::ipv4_address_t(rte_cpu_to_be_32(proxy_addr)).toString().c_str(), rte_cpu_to_be_16(proxy_port),
+        common::ipv4_address_t(rte_cpu_to_be_32(upstream_addr)).toString().c_str(), rte_cpu_to_be_16(upstream_port),
+        common::ipv4_prefix_t(pool_prefix.address.address, pool_prefix.mask).toString().c_str());
+	YANET_LOG_WARNING("\tTCP options: use_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", use_sack, mss, winscale, timestamps);
+    YANET_LOG_WARNING("\tTimeouts: rto=%d, syn_recv=%d, established=%d\n", timeout_syn_rto, timeout_syn_recv, timeout_established);
+	YANET_LOG_WARNING("\tservice=[%s], syn=[%s], local=[%s]\n", tables.service_connections.Debug().c_str(), tables.syn_connections.Debug().c_str(), tables.local_pool.Debug().c_str());
 }
 
 }

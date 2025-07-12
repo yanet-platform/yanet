@@ -89,6 +89,8 @@ struct proxy_service_t
 	uint32_t timeout_established;
 
 	ProxyTables tables;
+
+    void Debug();
 };
 
 struct TcpOptions
