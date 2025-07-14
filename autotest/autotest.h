@@ -72,6 +72,7 @@ protected:
 	bool step_reload_async(const YAML::Node& yamlStep);
 	bool step_echo(const YAML::Node& yamlStep);
 	bool step_dumpPackets(const YAML::Node& yamlStep, const std::string& path);
+	bool step_comparePcaps(const YAML::Node& yamlStep, const std::string& path);
 
 	eResult initSockets();
 
