@@ -197,6 +197,21 @@ uint32_t TcpOptions::Size() const {
     return size;
 }
 
+uint32_t TcpOptions::WriteSYN(rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) const
+{
+    uint32_t len = WriteBuffer((uint8_t*)(tcp_header) + sizeof(rte_tcp_hdr));
+
+    tcp_header->data_off = ((sizeof(rte_tcp_hdr) + len) >> 2) << 4;
+    
+    uint16_t total_length = rte_ipv4_hdr_len(ipv4_header) + sizeof(rte_tcp_hdr) + len;
+    ipv4_header->total_length = rte_cpu_to_be_16(total_length);
+
+    mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + total_length;
+    mbuf->pkt_len = mbuf->data_len;
+
+    return len;
+}
+
 uint32_t TcpOptions::Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
@@ -402,17 +417,17 @@ bool NonEmptyTcpData(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
     return (rte_be_to_cpu_16(ipv4_header->total_length) != sizeof(rte_ipv4_hdr) + tcp_header_len);
 }
 
-uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(proxy_service_id_t service_id, const proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
+void TcpConnectionStore::PrepareSynToClient(proxy_service_id_t service_id, const proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
 {
-    size_t tcp_header_len = ((*tcp_header)->data_off >> 4) << 2;
+    size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
     TcpOptions tcp_options;
     memset(&tcp_options, 0, sizeof(tcp_options));
-    tcp_options.Read((uint8_t*)(*tcp_header) + sizeof(rte_tcp_hdr), tcp_header_len);
+    tcp_options.Read((uint8_t*)(tcp_header) + sizeof(rte_tcp_hdr), tcp_header_len);
     tcp_options.sack_permitted &= service.use_sack;
     tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
 
     uint32_t cookie_data = SynCookies::PackData(tcp_options);
-    uint32_t cookie = syn_cookies_[service_id].GetCookie((*ipv4_header)->src_addr, (*tcp_header)->src_port, (*tcp_header)->sent_seq, cookie_data);
+    uint32_t cookie = syn_cookies_[service_id].GetCookie(ipv4_header->src_addr, tcp_header->src_port, tcp_header->sent_seq, cookie_data);
     // YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, tcp_header->sent_seq);
 
     tcp_options.window_scaling = service.winscale;
@@ -433,13 +448,8 @@ uint32_t TcpConnectionStore::BuildSynCookieAndFillTcpOptionsAnswer(proxy_service
     {
         tcp_options.mss -= int(sizeof(proxy_v2_ipv4_hdr));
     }
-    tcp_options.Write(mbuf, ipv4_header, tcp_header);
+    tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
 
-    return cookie;
-}
-
-void ActionClientOnSynPrepareSynToClient(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint32_t cookie)
-{
     SwapAddresses(ipv4_header);
     ipv4_header->time_to_live = 64;
     tcp_header->recv_ack = add_cpu_32(tcp_header->sent_seq, 1);
@@ -449,7 +459,7 @@ void ActionClientOnSynPrepareSynToClient(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr*
     SwapPorts(tcp_header);
 }
 
-void ActionClientOnSynPrepareSynToService(const proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t local)
+void PrepareSynToService(const proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t local)
 {
     LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
     if (service.send_proxy_header)
@@ -485,8 +495,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
         case TableSearchResult::Overflow:
         {
             DebugPacket("\tsyn.FindAndLock=Overflow", service_id, ipv4_header, tcp_header);
-            uint32_t cookie = BuildSynCookieAndFillTcpOptionsAnswer(service_id, service, mbuf, &ipv4_header, &tcp_header);
-            ActionClientOnSynPrepareSynToClient(ipv4_header, tcp_header, cookie);
+            PrepareSynToClient(service_id, service, mbuf, ipv4_header, tcp_header);
             counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
             counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;
             break;
@@ -494,7 +503,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
         case TableSearchResult::Found:
         {
             DebugPacket("\tsyn.FindAndLock=Found", service_id, ipv4_header, tcp_header);
-            ActionClientOnSynPrepareSynToService(service, ipv4_header, tcp_header, syn_connection_data.connection->local);
+            PrepareSynToService(service, ipv4_header, tcp_header, syn_connection_data.connection->local);
             break;
         }
         case TableSearchResult::NotFound:
@@ -512,7 +521,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
                 syn_connection_data.connection->local = local;
                 syn_connection_data.connection->client_start_seq = tcp_header->sent_seq;
 
-                ActionClientOnSynPrepareSynToService(service, ipv4_header, tcp_header, local);
+                PrepareSynToService(service, ipv4_header, tcp_header, local);
                 counters[service.counter_id + (tCounterId)::proxy::service_counter::new_syn_connections]++;
             }
             break;
