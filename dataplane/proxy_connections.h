@@ -211,9 +211,9 @@ public:
         else
         {
             buckets_ = new Bucket[number_buckets]{};
-            // destroy = [this](){
-            //     delete[] buckets_;
-            // };
+            destroy = [this](){
+                delete[] buckets_;
+            };
         }
         if (buckets_ == nullptr)
         {

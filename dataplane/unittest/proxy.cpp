@@ -29,7 +29,7 @@ TEST(ServiceConnectionsTest, Benchmark)
                 for (uint32_t i = 0; i < iterations; i++)
                 {
                     dataplane::proxy::ConnectionData<dataplane::proxy::Connection> data;
-                    conn.FindAndLock(i, 2, 7, data);
+                    conn.FindAndLock(i, 2, 7, data, false);
                 }
                 auto find_elapsed = std::chrono::steady_clock::now() - start;
     
@@ -84,7 +84,7 @@ TEST(ServiceConnectionsTest, BenchmarkConcurrent)
                         for (unsigned int k = start; k < start + iter_per_future; k++)
                         {
                             dataplane::proxy::ConnectionData<dataplane::proxy::Connection> data;
-                            conn.FindAndLock(k, 2, 7, data);
+                            conn.FindAndLock(k, 2, 7, data, false);
                         }
                     });
                 }
