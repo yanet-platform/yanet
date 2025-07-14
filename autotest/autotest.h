@@ -64,6 +64,7 @@ protected:
 	bool step_rib_remove(const YAML::Node& yamlStep);
 	bool step_rib_clear(const YAML::Node& yamlStep);
 	bool step_cli(const YAML::Node& yamlStep, const std::string& path);
+	bool step_shell_cli(const YAML::Node& yamlStep);
 	bool step_clearFWState();
 	bool step_reload(const YAML::Node& yamlStep);
 	bool step_values(const YAML::Node& yamlStep);
