@@ -1514,6 +1514,12 @@ void tAutotest::mainThread()
 
 					result = step_dumpPackets(yamlStep["dumpPackets"], configFilePath);
 				}
+				else if (yamlStep["comparePcaps"])
+				{
+					YANET_LOG_DEBUG("step: comparePcaps\n");
+
+					result = step_comparePcaps(yamlStep["comparePcaps"], configFilePath);
+				}
 				else
 				{
 					YANET_LOG_ERROR("unknown step\n");
@@ -2052,6 +2058,121 @@ bool tAutotest::step_dumpPackets(const YAML::Node& yamlStep, const std::string& 
 		{
 			YANET_LOG_ERROR("dump [%s]: error: packet comparison failed\n", tag.data());
 			return success;
+		}
+	}
+
+	return true;
+}
+
+bool tAutotest::step_comparePcaps(const YAML::Node& yamlStep, const std::string& path)
+{
+	for (const auto& yamlComparison : yamlStep)
+	{
+		if (!yamlComparison["expect"] || !yamlComparison["captured"])
+		{
+			YANET_LOG_ERROR("comparePcaps: step must contain 'expect' and 'captured' keys.\n");
+			return false;
+		}
+
+		std::string captured_full_path = yamlComparison["captured"].as<std::string>();
+		std::string expect_relative_path = yamlComparison["expect"].as<std::string>();
+		std::string expect_full_path = path + "/" + expect_relative_path;
+
+		YANET_LOG_DEBUG("comparePcaps: Comparing '%s' (expected) vs '%s' (captured)\n",
+		                expect_full_path.c_str(),
+		                captured_full_path.c_str());
+
+		TextDumper dumper;
+		bool success = true;
+
+		// Use unique_ptr for automatic cleanup
+		auto reader_deleter = [](pcpp::IFileReaderDevice* r) { if (r) { r->close(); delete r; } };
+		std::unique_ptr<pcpp::IFileReaderDevice, decltype(reader_deleter)>
+		        expect_reader(pcpp::IFileReaderDevice::getReader(expect_full_path), reader_deleter);
+		std::unique_ptr<pcpp::IFileReaderDevice, decltype(reader_deleter)>
+		        captured_reader(pcpp::IFileReaderDevice::getReader(captured_full_path), reader_deleter);
+
+		if (!expect_reader || !expect_reader->open())
+		{
+			YANET_LOG_ERROR("comparePcaps: cannot open expected pcap file '%s'\n",
+			                expect_full_path.c_str());
+			return false;
+		}
+
+		if (!captured_reader || !captured_reader->open())
+		{
+			YANET_LOG_ERROR("comparePcaps: cannot open captured pcap file '%s'\n",
+			                captured_full_path.c_str());
+			return false;
+		}
+
+		uint32_t packet_num = 0;
+		while (true)
+		{
+			pcpp::RawPacket expected_pkt;
+			pcpp::RawPacket captured_pkt;
+
+			bool has_expected = expect_reader->getNextPacket(expected_pkt);
+			bool has_captured = captured_reader->getNextPacket(captured_pkt);
+
+			if (!has_expected && !has_captured)
+			{
+				YANET_LOG_DEBUG("comparePcaps: End of both files. Comparison successful.\n");
+				break; // Success
+			}
+
+			packet_num++;
+
+			if (has_expected && !has_captured)
+			{
+				success = false;
+				YANET_LOG_ERROR("comparePcaps: Mismatch. Captured file is shorter "
+								"than expected. Missing packet #%u.\n", packet_num);
+				break;
+			}
+
+			if (!has_expected && has_captured)
+			{
+				success = false;
+				YANET_LOG_ERROR("comparePcaps: Mismatch. Captured file is longer "
+								"than expected. Extra packet #%u found.\n", packet_num);
+				if (dumpPackets)
+				{
+					dumper.dump(nullptr,
+					            nullptr,
+					            captured_pkt.getRawData(),
+					            captured_pkt.getRawData() + captured_pkt.getRawDataLen());
+				}
+				break;
+			}
+
+			if (expected_pkt == captured_pkt)
+			{
+				YANET_LOG_DEBUG("comparePcaps: Packet #%u matches.\n", packet_num);
+				continue;
+			}
+
+			// If we reach here, the packets differ.
+			success = false;
+			YANET_LOG_ERROR("comparePcaps: Packet #%u does not match.\n", packet_num);
+
+			if (dumpPackets)
+			{
+				YANET_LOG_DEBUG("comparePcaps: Expected len: %u, Captured len: %u\n",
+				                expected_pkt.getRawDataLen(),
+				                captured_pkt.getRawDataLen());
+
+				dumper.dump(expected_pkt.getRawData(),
+				            expected_pkt.getRawData() + expected_pkt.getRawDataLen(),
+				            captured_pkt.getRawData(),
+				            captured_pkt.getRawData() + captured_pkt.getRawDataLen());
+			}
+			break; // Stop on the first mismatch
+		}
+
+		if (!success)
+		{
+			return false;
 		}
 	}
 
