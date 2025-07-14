@@ -1001,9 +1001,11 @@ void SlowWorker::SendRentransmits()
 		for (uint32_t index = 0; (index < MAX_COUNT_RETRANSMITS_ALL_SERVICES) && (rte_ring_dequeue(ring_retransmit_send_, (void**)&data) == 0); index++)
 		{
 			
+#ifdef TCP_PROXY_DEBUG
 			YANET_LOG_WARNING("!!!!  SlowWorker::SendRentransmits src=%x:%u, dst=%x:%u, client_start_seq=%u\n",
 				rte_be_to_cpu_32(data->src), rte_be_to_cpu_16(data->sport), rte_be_to_cpu_32(data->dst), rte_be_to_cpu_16(data->sport),
 				rte_be_to_cpu_32(data->client_start_seq));
+#endif
 
 			rte_mbuf* mbuf = rte_pktmbuf_alloc(mempool_);
 			if (mbuf == nullptr)

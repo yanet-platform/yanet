@@ -1186,6 +1186,7 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 	proxy.winscale = moduleJson.value("winscale", YANET_PROXY_DEFAULT_WINSCALE);
 	proxy.timestamps = moduleJson.value("timestamps", YANET_PROXY_DEFAULT_USE_TIMESTAMPS);
 	proxy.ignore_size_update_detections = moduleJson.value("ignoreSizeUpdateDetections", false);
+	proxy.dont_use_bucket_optimization = moduleJson.value("dontUseBucketOptimization", false);
 
 	// timeouts	
 	proxy.timeout_syn_rto = TimeoutValue(moduleJson, "SYNRTO", YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO);
@@ -1301,6 +1302,7 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 		service.winscale = service_json.value("winscale", proxy.winscale);
 		service.timestamps = service_json.value("timestamps", proxy.timestamps);
 		service.ignore_size_update_detections = service_json.value("ignoreSizeUpdateDetections", proxy.ignore_size_update_detections);
+		service.dont_use_bucket_optimization = service_json.value("ignoreSizeUpdateDetections", proxy.dont_use_bucket_optimization);
 
 		// timeouts	
 		service.timeout_syn_rto = TimeoutValue(service_json, "SYNRTO", proxy.timeout_syn_rto);

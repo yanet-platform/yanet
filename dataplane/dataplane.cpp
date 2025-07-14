@@ -1544,11 +1544,17 @@ void cDataPlane::start()
 	});
 
 	threads.emplace_back([this]() {
+		auto iter_bases = globalBases.begin();
 		for (;;)
 		{
-			// todo - time in ms
-			tcp_connection_store.GetDataForRetramsits(current_time - TIMEOUT_RETRANSMIT - 1, ring_retransmit_free_, ring_retransmit_send_);
-			std::this_thread::sleep_for(std::chrono::seconds(1));
+			bool work = true;
+			for (uint32_t index = 0; (index < YANET_CONFIG_PROXY_SERVICES_SIZE) && work; index++)
+			{
+				proxy_service_id_t service_id = tcp_connection_store.GetIndexServiceForNextRetransmit();
+				const dataplane::proxy::proxy_service_t& service = iter_bases->second[currentGlobalBaseId & 1]->proxy_services[service_id];;
+				work = tcp_connection_store.GetDataForRetramsits(service, ring_retransmit_free_, ring_retransmit_send_);
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		}
 	});
 
@@ -1556,7 +1562,7 @@ void cDataPlane::start()
 		for (;;)
 		{
 			tcp_connection_store.UpdateSynCookieKeys();
-			std::this_thread::sleep_for(std::chrono::seconds(30));
+			std::this_thread::sleep_for(std::chrono::seconds(3000));
 		}
 	});
 

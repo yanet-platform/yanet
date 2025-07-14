@@ -2662,6 +2662,7 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	service.winscale = service_info.winscale;
 	service.timestamps = service_info.timestamps;
 	service.ignore_size_update_detections = service_info.ignore_size_update_detections;
+	service.dont_use_bucket_optimization = service_info.dont_use_bucket_optimization;
 
 	// timeouts
 	service.timeout_syn_rto = 1000 * service_info.timeout_syn_rto;

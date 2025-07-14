@@ -480,10 +480,11 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
     bool action = true;
 
     SynConnectionData syn_connection_data;
-    switch (service.tables.syn_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data))
+    switch (service.tables.syn_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data, !service.dont_use_bucket_optimization))
     {
         case TableSearchResult::Overflow:
         {
+            DebugPacket("\tsyn.FindAndLock=Overflow", service_id, ipv4_header, tcp_header);
             uint32_t cookie = BuildSynCookieAndFillTcpOptionsAnswer(service_id, service, mbuf, &ipv4_header, &tcp_header);
             ActionClientOnSynPrepareSynToClient(ipv4_header, tcp_header, cookie);
             counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
@@ -492,11 +493,13 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
         }
         case TableSearchResult::Found:
         {
+            DebugPacket("\tsyn.FindAndLock=Found", service_id, ipv4_header, tcp_header);
             ActionClientOnSynPrepareSynToService(service, ipv4_header, tcp_header, syn_connection_data.connection->local);
             break;
         }
         case TableSearchResult::NotFound:
         {
+            DebugPacket("\tsyn.FindAndLock=NotFound", service_id, ipv4_header, tcp_header);
             uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
             if (local == 0)
             {
@@ -588,16 +591,18 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
     bool action = true;
 
     ServiceConnectionData service_connection_data;
-    switch (service.tables.service_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, service_connection_data))
+    switch (service.tables.service_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, service_connection_data, false))
     {
         case TableSearchResult::Overflow:
         {
+            DebugPacket("\tservice.FindAndLock=Overflow", service_id, ipv4_header, tcp_header);
             counters[service.counter_id + (tCounterId)::proxy::service_counter::service_bucket_overflow]++;
             action = false;
             break;
         }
         case TableSearchResult::Found:
         {
+            DebugPacket("\tservice.FindAndLock=Found", service_id, ipv4_header, tcp_header);
             // check non-empty tcp-data packet
             if (NonEmptyTcpData(ipv4_header, tcp_header))
             {
@@ -685,14 +690,17 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
         }
         case TableSearchResult::NotFound:
         {
+            DebugPacket("\tservice.FindAndLock=NotFound", service_id, ipv4_header, tcp_header);
             uint32_t flags = (NonEmptyTcpData(ipv4_header, tcp_header) ? Connection::flag_nonempty_ack_from_client : 0);
 
             SynConnectionData syn_connection_data;
-            if (service.tables.syn_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data) == TableSearchResult::Found)
+            if (service.tables.syn_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, current_time_ms, syn_connection_data, false) == TableSearchResult::Found)
             {
+                DebugPacket("\tsyn.FindAndLock=Found", service_id, ipv4_header, tcp_header);
                 if (!syn_connection_data.connection->server_answer)
                 {
                     // ack, but server didn't answer
+                    DebugPacket("\tno answer from server", service_id, ipv4_header, tcp_header);
                     syn_connection_data.Unlock();
                     counters[service.counter_id + (tCounterId)::proxy::service_counter::ack_without_service_answer]++;
                     action = false;
@@ -701,12 +709,14 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                 {
                     // ack, but ack number is invalid
                     // YANET_LOG_WARNING("Invalid ACK: server_seq=%u, ack=%u\n", syn_connection_data.connection->server_seq, rte_be_to_cpu_32(tcp_header->recv_ack));
+                    DebugPacket("\tbad ack", service_id, ipv4_header, tcp_header);
                     syn_connection_data.Unlock();
                     counters[service.counter_id + (tCounterId)::proxy::service_counter::ack_invalid_ack_number]++;
                     action = false;
                 }
                 else
                 {
+                    DebugPacket("\tadd to service", service_id, ipv4_header, tcp_header);
                     uint32_t src_addr = ipv4_header->src_addr;
                     uint16_t src_port = tcp_header->src_port;
                     service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
@@ -731,19 +741,21 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
             {
                 syn_connection_data.Unlock();
 
-                if (unlikely(!service.tables.syn_connections.WasRecentlyOverflowed(ipv4_header->src_addr, tcp_header->src_port, current_time_ms)))
-                {
-                    action = false;
-                }
-                else
-                {
+                // if (unlikely(!service.tables.syn_connections.WasRecentlyOverflowed(ipv4_header->src_addr, tcp_header->src_port, current_time_ms)))
+                // {
+                //     DebugPacket("!WasRecentlyOverflowed", service_id, ipv4_header, tcp_header);
+                //     action = false;
+                // }
+                // else
+                // {
                     // try check cookie
                     // todo - check time overflow
                     uint32_t cookie_data = CheckSynCookie(service_id, service, ipv4_header, tcp_header);
                     if (cookie_data == 0)
                     {
+                        DebugPacket("!CheckSynCookie", service_id, ipv4_header, tcp_header);
                         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
-                        action = true;
+                        action = false;
                     }
                     else
                     {
@@ -751,6 +763,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                         uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
                         if (local == 0)
                         {
+                            DebugPacket("!local_pool.Allocate", service_id, ipv4_header, tcp_header);
                             counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
                             action = false;
                         }
@@ -793,7 +806,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                             counters[service.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
                         }
                     }
-                }
+                // }
             }
                         
             break;
@@ -833,8 +846,9 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     LocalPool::UnpackTuple(client_info, client_addr, client_port);
 
     SynConnectionData syn_connection_data;
-    if (service.tables.syn_connections.FindAndLock(client_addr, client_port, current_time_ms, syn_connection_data) == TableSearchResult::Found)
+    if (service.tables.syn_connections.FindAndLock(client_addr, client_port, current_time_ms, syn_connection_data, false) == TableSearchResult::Found)
     {
+        DebugPacket("\tsyn.FindAndLock=Found", service_id, ipv4_header, tcp_header);
         syn_connection_data.connection->server_answer = true;
         syn_connection_data.connection->server_seq = rte_be_to_cpu_32(tcp_header->sent_seq);
         syn_connection_data.Unlock();
@@ -859,8 +873,9 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     syn_connection_data.Unlock();
 
     ServiceConnectionData service_connection_data;
-    if (service.tables.service_connections.FindAndLock(client_addr, client_port, current_time_ms, service_connection_data) != TableSearchResult::Found)
+    if (service.tables.service_connections.FindAndLock(client_addr, client_port, current_time_ms, service_connection_data, false) != TableSearchResult::Found)
     {
+        DebugPacket("\tservice.FindAndLock!=Found", service_id, ipv4_header, tcp_header);
         service_connection_data.Unlock();
         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_answer_service_syn_ack]++;
         return false;
@@ -960,7 +975,7 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
     LocalPool::UnpackTuple(client_info, client_addr, client_port);
 
     ServiceConnectionData service_connection_data;
-    if (service.tables.service_connections.FindAndLock(client_addr, client_port, current_time_ms, service_connection_data) != TableSearchResult::Found)
+    if (service.tables.service_connections.FindAndLock(client_addr, client_port, current_time_ms, service_connection_data, false) != TableSearchResult::Found)
     {
         service_connection_data.Unlock();
         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_search_client_service_ack]++;
@@ -1005,60 +1020,63 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
     return true;
 }
 
-void TcpConnectionStore::GetDataForRetramsits(uint32_t before_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send)
+bool TcpConnectionStore::GetDataForRetramsits(const proxy_service_t& service, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send)
 {
-    // YANET_LOG_WARNING("TcpConnectionStore::GetDataForRetramsits\n");
-//     uint32_t count = 0;
-//     for (uint32_t index_service = 0; (index_service < YANET_CONFIG_PROXY_SERVICES_SIZE) && (rte_ring_empty(ring_retransmit_free) == 0) && count < MAX_COUNT_RETRANSMITS_ALL_SERVICES; index_service++)
-//     {
-//         count += service_connections_[index_start_check_retransmits_].GetDataForRetramsits([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx, uint64_t service_key) -> bool {
-//             Connection& connection = bucket.connections[conn_idx];
-//             if ((ServiceConnections::Pack(bucket.addresses[conn_idx], bucket.ports[conn_idx]) != 0) && (bucket.last_times[conn_idx] != 0) && (bucket.last_times[conn_idx] <= before_time) && 
-//                 ((connection.flags & Connection::flag_from_synkookie) != 0) && ((connection.flags & Connection::flag_sent_rentransmit_syn_to_server) == 0) &&
-//                 ((connection.flags & Connection::flag_nonempty_ack_from_client) == 0)) {
-//                 DataForRetransmit* data;
-//                 if (rte_ring_dequeue(ring_retransmit_free, (void**)&data) != 0)
-//                 {
-//                     return true;
-//                 }
+    uint64_t current_time = current_time_ms;
+    return updater_proxy_tables[service.service_id].GetDataForRetramsits(service, next_flow_, current_time, ring_retransmit_free, ring_retransmit_send);
+}
 
-//                 TcpOptions tcp_options = SynCookies::UnpackData(connection.cookie_data);
-//                 tcp_options.timestamp_value = connection.timestamp_client_last;
-//                 tcp_options.timestamp_echo = 0;
+proxy_service_id_t TcpConnectionStore::GetIndexServiceForNextRetransmit()
+{
+    index_start_check_retransmits_++;
+    if (index_start_check_retransmits_ >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+    {
+        index_start_check_retransmits_ = 0;
+    }
+    return index_start_check_retransmits_;
+}
 
-//                 data->tcp_options_len = tcp_options.WriteBuffer(data->tcp_options_data);
+bool UpdaterProxyTables::GetDataForRetramsits(const proxy_service_t& service, common::globalBase::tFlow next_flow, uint64_t current_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send)
+{
+    bool result = true;
+    std::lock_guard<std::mutex> guard(mutex);
+    tables[active_index].service_connections.GetDataForRetramsits([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx, uint64_t service_key) -> bool {
+        Connection& connection = bucket.connections[conn_idx];
+        if ((bucket.last_times[conn_idx] + service.timeout_syn_rto <= current_time) && connection.UseForRetransmit()) {
+            DataForRetransmit* data;
+            if (rte_ring_dequeue(ring_retransmit_free, (void**)&data) != 0)
+            {
+                result = false;
+                return true;
+            }
 
-// #ifdef TCP_PROXY_DEBUG
-//                 YANET_LOG_WARNING("Add to retransmit, cookie_data=%d, tcp_options=%s, flags=%u\n", connection.cookie_data, tcp_options.DebugInfo().c_str(), connection.flags);
-// #endif
+            TcpOptions tcp_options = SynCookies::UnpackData(connection.cookie_data);
+            tcp_options.timestamp_value = connection.timestamp_client_last;
+            tcp_options.timestamp_echo = 0;
 
-//                 data->service_id = index_start_check_retransmits_;
-//                 ServiceConnections::Unpack(connection.local, data->src, data->sport);
-//                 ServiceConnections::Unpack(service_key, data->dst, data->dport);
-//                 data->client_start_seq = connection.client_start_seq;
-//                 data->flow = next_flow_;
+            data->tcp_options_len = tcp_options.WriteBuffer(data->tcp_options_data);
 
-//                 if (rte_ring_enqueue(ring_retransmit_send, (void*)data) != 0)
-//                 {
-//                     return true;
-//                 }
+#ifdef TCP_PROXY_DEBUG
+            YANET_LOG_WARNING("Add to retransmit, cookie_data=%d, tcp_options=%s, flags=%u\n", connection.cookie_data, tcp_options.DebugInfo().c_str(), connection.flags);
+#endif
 
-//                 connection.flags |= Connection::flag_sent_rentransmit_syn_to_server;
+            data->service_id = service.service_id;
+            ServiceConnections::Unpack(connection.local, data->src, data->sport);
+            ServiceConnections::Unpack(service_key, data->dst, data->dport);
+            data->client_start_seq = connection.client_start_seq;
+            data->flow = next_flow;
 
-//                 count++;
-//                 if (count >= MAX_COUNT_RETRANSMITS_PER_SERVICE) {
-//                     return true;
-//                 }
-//             }
-//             return false;
-//         });
+            if (rte_ring_enqueue(ring_retransmit_send, (void*)data) != 0)
+            {
+                result = false;
+                return true;
+            }
 
-//         index_start_check_retransmits_++;
-//         if (index_start_check_retransmits_ >= YANET_CONFIG_PROXY_SERVICES_SIZE)
-//         {
-//             index_start_check_retransmits_ = 0;
-//         }
-//     }
+            connection.flags |= Connection::flag_sent_rentransmit_syn_to_server;
+        };
+        return false;
+    });
+    return result;
 }
 
 TcpConnectionStore::TcpConnectionStore()

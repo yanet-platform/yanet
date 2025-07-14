@@ -8,7 +8,7 @@
 namespace dataplane::proxy
 {
 
-#define TIMEOUT_ACK 10000 // todo
+#define TIMEOUT_ACK 30000 // todo
 #define TIMEOUT_SYN 3000 // todo - to config
 
 #define TIMEOUT_BUCKET_OVERFLOW 1000
@@ -139,6 +139,16 @@ struct Connection
     {
         return (flags & flag_from_synkookie) != 0;
     }
+
+    bool UseForRetransmit()
+    {
+        if (((flags & flag_from_synkookie) != 0) && ((flags & flag_sent_rentransmit_syn_to_server) == 0) &&
+                ((flags & flag_nonempty_ack_from_client) == 0)) {
+            flags |= flag_nonempty_ack_from_client;
+            return true;
+        }
+        return false;
+    }
 };
 
 struct SynConnection
@@ -201,9 +211,9 @@ public:
         else
         {
             buckets_ = new Bucket[number_buckets]{};
-            destroy = [this](){
-                delete[] buckets_;
-            };
+            // destroy = [this](){
+            //     delete[] buckets_;
+            // };
         }
         if (buckets_ == nullptr)
         {
@@ -238,6 +248,8 @@ public:
 
     void CollectGarbage(uint64_t current_time, LocalPool& local_pool)
     {
+        if (unlikely(!initialized_)) return;
+
         for (uint32_t index = 0; index < number_buckets_; index++)
         {
             Bucket& bucket = buckets_[index];
@@ -285,6 +297,8 @@ public:
 
     uint32_t GetDataForRetramsits(std::function<bool(Bucket&, uint32_t, uint64_t)> func)
     {
+        if (unlikely(!initialized_)) return 0;
+        
         uint32_t count = 0;
         bool stop = false;
         for (uint32_t index = 0; (index < number_buckets_) && !stop; index++)
@@ -293,7 +307,7 @@ public:
             bucket.Lock();
             for (uint32_t i = 0; i < Bucket::bucket_size; i++)
             {
-                if (func(bucket, i, service_key_)) 
+                if (bucket.addresses[i] != 0 && func(bucket, i, service_key_)) 
                     break;
             }
             bucket.Unlock();
@@ -308,7 +322,7 @@ public:
         return number_buckets_ == 0 || current_time - buckets_[key & (number_buckets_ - 1)].time_overflow < TIMEOUT_BUCKET_OVERFLOW;
     }
 
-    TableSearchResult FindAndLock(uint32_t addr, uint16_t port, uint64_t current_time, ConnectionData<ConnectionInfo>& data)
+    TableSearchResult FindAndLock(uint32_t addr, uint16_t port, uint64_t current_time, ConnectionData<ConnectionInfo>& data, bool first_overflow_check)
     {
         data.bucket = nullptr;
         data.connection = nullptr;
@@ -320,7 +334,7 @@ public:
         uint64_t key = Hash(addr, port);
         Bucket* bucket = &buckets_[key & (number_buckets_ - 1)];
 
-        if constexpr (std::is_same_v<ConnectionInfo, SynConnection>)
+        if (first_overflow_check)
         {
             if (current_time - bucket->time_overflow < TIMEOUT_BUCKET_OVERFLOW)
                 return TableSearchResult::Overflow;

@@ -55,6 +55,7 @@ struct UpdaterProxyTables
     void GetTables(proxy_service_id_t service_id, const std::string& service_name, common::idp::proxy_tables::response& response);
 
     void CollectGarbage(uint64_t current_time);
+    bool GetDataForRetramsits(const proxy_service_t& service, common::globalBase::tFlow next_flow, uint64_t current_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
 };
 
 struct proxy_service_t
@@ -82,6 +83,7 @@ struct proxy_service_t
 	uint32_t winscale;
 	bool timestamps;
 	bool ignore_size_update_detections;
+    bool dont_use_bucket_optimization;
 
 	// timeouts
 	uint32_t timeout_syn_rto;
@@ -167,13 +169,14 @@ public:
     uint32_t current_time_sec;
     uint64_t current_time_ms;
 
-    void GetDataForRetramsits(uint32_t before_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
+    bool GetDataForRetramsits(const proxy_service_t& service, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
+    proxy_service_id_t GetIndexServiceForNextRetransmit();
 
 private:
     SynCookies syn_cookies_[YANET_CONFIG_PROXY_SERVICES_SIZE];
     UpdaterProxyTables updater_proxy_tables[YANET_CONFIG_PROXY_SERVICES_SIZE];
 
-    uint32_t index_start_check_retransmits_ = 0;
+    proxy_service_id_t index_start_check_retransmits_ = YANET_CONFIG_PROXY_SERVICES_SIZE;
     common::globalBase::tFlow next_flow_;
 
     uint32_t BuildSynCookieAndFillTcpOptionsAnswer(proxy_service_id_t service_id, const proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header);
