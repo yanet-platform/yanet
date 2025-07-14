@@ -1257,6 +1257,13 @@ bool tAutotest::step_cli(const YAML::Node& yamlStep, const std::string& path)
 	return true;
 }
 
+bool tAutotest::step_shell_cli(const YAML::Node& yamlStep)
+{
+	std::string cli_command = yamlStep.as<std::string>();
+	YANET_LOG_DEBUG("%s\n", cli_command.data());
+	return system(cli_command.data());
+}
+
 bool tAutotest::step_clearFWState()
 {
 	controlPlane.clearFWState();
@@ -1446,6 +1453,12 @@ void tAutotest::mainThread()
 					YANET_LOG_DEBUG("step: cli\n");
 
 					result = step_cli(yamlStep["cli"], configFilePath);
+				}
+				else if (yamlStep["shell_cli"])
+				{
+					YANET_LOG_DEBUG("step: shell_cli\n");
+
+					result = step_shell_cli(yamlStep["shell_cli"]);
 				}
 				else if (yamlStep["clearFWState"])
 				{
