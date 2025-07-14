@@ -2127,7 +2127,8 @@ bool tAutotest::step_comparePcaps(const YAML::Node& yamlStep, const std::string&
 			{
 				success = false;
 				YANET_LOG_ERROR("comparePcaps: Mismatch. Captured file is shorter "
-								"than expected. Missing packet #%u.\n", packet_num);
+				                "than expected. Missing packet #%u.\n",
+				                packet_num);
 				break;
 			}
 
@@ -2135,7 +2136,8 @@ bool tAutotest::step_comparePcaps(const YAML::Node& yamlStep, const std::string&
 			{
 				success = false;
 				YANET_LOG_ERROR("comparePcaps: Mismatch. Captured file is longer "
-								"than expected. Extra packet #%u found.\n", packet_num);
+				                "than expected. Extra packet #%u found.\n",
+				                packet_num);
 				if (dumpPackets)
 				{
 					dumper.dump(nullptr,
