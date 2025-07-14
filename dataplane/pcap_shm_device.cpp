@@ -4,8 +4,8 @@
 
 #include "common/define.h"
 #include "common/utils.h"
-#include "rte_branch_prediction.h"
 #include "pcap_shm_device.h"
+#include "rte_branch_prediction.h"
 
 namespace dumprings
 {

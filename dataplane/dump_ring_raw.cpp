@@ -1,6 +1,6 @@
-#include "dump_rings.h"
 #include "common/type.h"
 #include "common/utils.h"
+#include "dump_rings.h"
 #include "metadata.h"
 
 namespace dumprings
