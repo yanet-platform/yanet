@@ -110,7 +110,7 @@ struct TcpOptions
     uint32_t sack_start[TCP_OPTIONS_MAX_SACK_COUNT];
     uint32_t sack_finish[TCP_OPTIONS_MAX_SACK_COUNT];
 
-    bool Read(uint8_t* data, uint32_t len);
+    bool Read(rte_tcp_hdr* tcp_header);
     void ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header);
     uint32_t WriteSYN(rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) const;
     uint32_t Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const;

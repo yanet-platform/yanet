@@ -29,8 +29,12 @@ inline uint16_t shift_cpu_16(uint16_t value, int32_t shift)
     return rte_cpu_to_be_16(std::min(result, 0xffffu));
 }
 
-bool TcpOptions::Read(uint8_t* data, uint32_t len)
+bool TcpOptions::Read(rte_tcp_hdr* tcp_header)
 {
+    size_t tcp_header_len = std::max(sizeof(rte_tcp_hdr), (size_t)(tcp_header->data_off >> 4) << 2);
+    uint8_t* data = (uint8_t*)tcp_header + sizeof(rte_tcp_hdr);
+    uint32_t len = tcp_header_len - sizeof(rte_tcp_hdr);
+
     uint32_t index = 0;
     while (index < len)
     {
@@ -88,7 +92,7 @@ bool TcpOptions::Read(uint8_t* data, uint32_t len)
 
 void TcpOptions::ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header)
 {
-    size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
+    size_t tcp_header_len = std::max(sizeof(rte_tcp_hdr), (size_t)(tcp_header->data_off >> 4) << 2);
     uint8_t* options = (uint8_t*)tcp_header + sizeof(rte_tcp_hdr);
     uint32_t len = tcp_header_len - sizeof(rte_tcp_hdr);
 
@@ -403,10 +407,9 @@ void UpdateCheckSums(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
 
 void DecreaseMssInTcpOptions(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
 {
-	size_t tcp_header_len = ((*tcp_header)->data_off >> 4) << 2;
 	TcpOptions tcp_options;
 	memset(&tcp_options, 0, sizeof(tcp_options));
-	tcp_options.Read((uint8_t*)(*tcp_header) + sizeof(rte_tcp_hdr), tcp_header_len);
+	tcp_options.Read(*tcp_header);
 	tcp_options.mss -= int(sizeof(proxy_v2_ipv4_hdr));
 	tcp_options.Write(mbuf, ipv4_header, tcp_header);
 }
@@ -419,10 +422,9 @@ bool NonEmptyTcpData(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
 
 void TcpConnectionStore::PrepareSynToClient(proxy_service_id_t service_id, const proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
 {
-    size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
     TcpOptions tcp_options;
     memset(&tcp_options, 0, sizeof(tcp_options));
-    tcp_options.Read((uint8_t*)(tcp_header) + sizeof(rte_tcp_hdr), tcp_header_len);
+    tcp_options.Read(tcp_header);
     tcp_options.sack_permitted &= service.use_sack;
     tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
 
@@ -628,10 +630,9 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                 }
                 else
                 {
-                    size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
                     TcpOptions tcp_options;
                     memset(&tcp_options, 0, sizeof(tcp_options));
-                    tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+                    tcp_options.Read(tcp_header);
 
                     LocalPool::UnpackTupleSrc(service_connection_data.connection->local, ipv4_header, tcp_header);
                     tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, (service.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
@@ -778,10 +779,9 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                         }
                         else
                         {
-                            size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
                             TcpOptions tcp_options;
                             memset(&tcp_options, 0, sizeof(tcp_options));
-                            tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+                            tcp_options.Read(tcp_header);
     
                             // Add to connections
                             service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
@@ -898,10 +898,9 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     }
     else
     {
-        size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
         TcpOptions tcp_options;
         memset(&tcp_options, 0, sizeof(tcp_options));
-        tcp_options.Read((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_header_len);
+        tcp_options.Read(tcp_header);
 
         bool old_sack_permitted = tcp_options.sack_permitted;
         service_connection_data.connection->window_size_shift = (int)tcp_options.window_scaling - (int)service.winscale;
