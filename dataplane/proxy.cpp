@@ -871,7 +871,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
             if (!tcp_options.Read(tcp_header))
                 counters[service.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
             tcp_options.mss -= int(sizeof(proxy_v2_ipv4_hdr));
-            tcp_options.Write(mbuf, &ipv4_header, &tcp_header);
+            tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
         }
 
         ipv4_header->src_addr = service.proxy_addr;
@@ -930,7 +930,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
         tcp_options.sack_permitted = false;
         tcp_options.mss = 0;
         tcp_options.window_scaling = 0;
-        tcp_options.Write(mbuf, &ipv4_header, &tcp_header);
+        tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
 
         
         tcp_header->rx_win = shift_cpu_16(tcp_header->rx_win, service_connection_data.connection->window_size_shift);
