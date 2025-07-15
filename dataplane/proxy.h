@@ -111,7 +111,7 @@ struct TcpOptions
     uint32_t sack_finish[TCP_OPTIONS_MAX_SACK_COUNT];
 
     bool Read(rte_tcp_hdr* tcp_header);
-    void ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header);
+    bool ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header);
     uint32_t WriteSYN(rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) const;
     uint32_t Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const;
     uint32_t WriteBuffer(uint8_t* data) const;
@@ -183,7 +183,8 @@ private:
     proxy_service_id_t index_start_check_retransmits_ = YANET_CONFIG_PROXY_SERVICES_SIZE;
     common::globalBase::tFlow next_flow_;
 
-    void PrepareSynToClient(proxy_service_id_t service_id, const proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
+    void PrepareSynToClient(proxy_service_id_t service_id, const proxy_service_t& service,
+                            rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t* counters);
     uint32_t CheckSynCookie(proxy_service_id_t service_id, const proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
 };
 

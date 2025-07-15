@@ -90,7 +90,7 @@ bool TcpOptions::Read(rte_tcp_hdr* tcp_header)
     return true;
 }
 
-void TcpOptions::ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header)
+bool TcpOptions::ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header)
 {
     size_t tcp_header_len = std::max(sizeof(rte_tcp_hdr), (size_t)(tcp_header->data_off >> 4) << 2);
     uint8_t* options = (uint8_t*)tcp_header + sizeof(rte_tcp_hdr);
@@ -104,6 +104,9 @@ void TcpOptions::ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header)
         {
         case TCP_OPTION_KIND_TS:
         {
+            if (!CheckSize(index_read, len, options, TCP_OPTION_TS_LEN)) {
+                return false;
+            }
             timestamp_value = rte_be_to_cpu_32(*((uint32_t*)(options + index_read + 2)));
             timestamp_echo = rte_be_to_cpu_32(*((uint32_t*)(options + index_read + 6)));
             index_read += TCP_OPTION_TS_LEN;
@@ -113,6 +116,9 @@ void TcpOptions::ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header)
         {
             if (sack_count < TCP_OPTIONS_MAX_SACK_COUNT)
             {
+                if (!CheckSize(index_read, len, options, TCP_OPTION_SACK_LEN)) {
+                    return false;
+                }
                 sack_start[sack_count] = rte_be_to_cpu_32(*((uint32_t*)(options + index_read + 2)));
                 sack_finish[sack_count] = rte_be_to_cpu_32(*((uint32_t*)(options + index_read + 6)));
                 sack_count++;
@@ -124,12 +130,12 @@ void TcpOptions::ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header)
             index_read += TCP_OPTION_NOP_LEN;
             break;
         case TCP_OPTION_KIND_EOL:
-            return;
+            return true;
         default:
             index_read += options[index_read + 1];
         }
     }    
-
+    return true;
 }
 
 uint32_t TcpOptions::WriteBuffer(uint8_t* data) const
@@ -219,7 +225,7 @@ uint32_t TcpOptions::WriteSYN(rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp
 uint32_t TcpOptions::Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-    size_t tcp_header_len_old = ((*tcp_header)->data_off >> 4) << 2;
+    size_t tcp_header_len_old = std::max(sizeof(rte_tcp_hdr), (size_t)((*tcp_header)->data_off >> 4) << 2);
     uint16_t tcp_data_len = rte_be_to_cpu_16((*ipv4_header)->total_length) - rte_ipv4_hdr_len(*ipv4_header) - tcp_header_len_old;
 
     uint32_t old_opts_size = tcp_header_len_old - sizeof(rte_tcp_hdr);
@@ -405,26 +411,19 @@ void UpdateCheckSums(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
     tcp_header->cksum = rte_ipv4_udptcp_cksum((rte_ipv4_hdr*)ipv4_header, tcp_header);
 }
 
-void DecreaseMssInTcpOptions(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
-{
-	TcpOptions tcp_options;
-	memset(&tcp_options, 0, sizeof(tcp_options));
-	tcp_options.Read(*tcp_header);
-	tcp_options.mss -= int(sizeof(proxy_v2_ipv4_hdr));
-	tcp_options.Write(mbuf, ipv4_header, tcp_header);
-}
-
 bool NonEmptyTcpData(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
 {
     size_t tcp_header_len = (tcp_header->data_off >> 4) << 2;
     return (rte_be_to_cpu_16(ipv4_header->total_length) != sizeof(rte_ipv4_hdr) + tcp_header_len);
 }
 
-void TcpConnectionStore::PrepareSynToClient(proxy_service_id_t service_id, const proxy_service_t& service, rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
+void TcpConnectionStore::PrepareSynToClient(proxy_service_id_t service_id, const proxy_service_t& service,
+                                            rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t* counters)
 {
     TcpOptions tcp_options;
     memset(&tcp_options, 0, sizeof(tcp_options));
-    tcp_options.Read(tcp_header);
+    if (!tcp_options.Read(tcp_header))
+        counters[service.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
     tcp_options.sack_permitted &= service.use_sack;
     tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.mss);
 
@@ -497,7 +496,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
         case TableSearchResult::Overflow:
         {
             DebugPacket("\tsyn.FindAndLock=Overflow", service_id, ipv4_header, tcp_header);
-            PrepareSynToClient(service_id, service, mbuf, ipv4_header, tcp_header);
+            PrepareSynToClient(service_id, service, mbuf, ipv4_header, tcp_header, counters);
             counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
             counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;
             break;
@@ -632,7 +631,8 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                 {
                     TcpOptions tcp_options;
                     memset(&tcp_options, 0, sizeof(tcp_options));
-                    tcp_options.Read(tcp_header);
+                    if (!tcp_options.Read(tcp_header))
+                        counters[service.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
 
                     LocalPool::UnpackTupleSrc(service_connection_data.connection->local, ipv4_header, tcp_header);
                     tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, (service.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
@@ -659,7 +659,8 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                 
                 TcpOptions tcp_options;
                 memset(&tcp_options, 0, sizeof(tcp_options));
-                tcp_options.ReadOnlyTimestampsAndSack(tcp_header);
+                if (!tcp_options.ReadOnlyTimestampsAndSack(tcp_header))
+                    counters[service.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
                 // YANET_LOG_WARNING("\t\t!!!! ReadOnlyTimestampsAndSack, timestamp=(%u, %u), sack_count=%d\n", tcp_options.timestamp_value, tcp_options.timestamp_echo, tcp_options.sack_count);
                 
                 // work with SACK
@@ -781,7 +782,8 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                         {
                             TcpOptions tcp_options;
                             memset(&tcp_options, 0, sizeof(tcp_options));
-                            tcp_options.Read(tcp_header);
+                            if (!tcp_options.Read(tcp_header))
+                                counters[service.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
     
                             // Add to connections
                             service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
@@ -865,7 +867,11 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
         if (service.send_proxy_header)
         {
             tcp_header->recv_ack = add_cpu_32(tcp_header->recv_ack, sizeof(proxy_v2_ipv4_hdr));
-            DecreaseMssInTcpOptions(mbuf, &ipv4_header, &tcp_header);
+            TcpOptions tcp_options{};
+            if (!tcp_options.Read(tcp_header))
+                counters[service.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
+            tcp_options.mss -= int(sizeof(proxy_v2_ipv4_hdr));
+            tcp_options.Write(mbuf, &ipv4_header, &tcp_header);
         }
 
         ipv4_header->src_addr = service.proxy_addr;
@@ -898,9 +904,9 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     }
     else
     {
-        TcpOptions tcp_options;
-        memset(&tcp_options, 0, sizeof(tcp_options));
-        tcp_options.Read(tcp_header);
+        TcpOptions tcp_options{};
+        if (!tcp_options.Read(tcp_header))
+            counters[service.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
 
         bool old_sack_permitted = tcp_options.sack_permitted;
         service_connection_data.connection->window_size_shift = (int)tcp_options.window_scaling - (int)service.winscale;
@@ -996,7 +1002,8 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
 
         TcpOptions tcp_options;
         memset(&tcp_options, 0, sizeof(tcp_options));
-        tcp_options.ReadOnlyTimestampsAndSack(tcp_header);
+        if (!tcp_options.ReadOnlyTimestampsAndSack(tcp_header))
+            counters[service.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
         if (tcp_options.timestamp_value != 0)
         {
             tcp_options.timestamp_value += service_connection_data.connection->timestamp_shift;
