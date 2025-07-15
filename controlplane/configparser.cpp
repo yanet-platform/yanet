@@ -1187,6 +1187,7 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 	proxy.timestamps = moduleJson.value("timestamps", YANET_PROXY_DEFAULT_USE_TIMESTAMPS);
 	proxy.ignore_size_update_detections = moduleJson.value("ignoreSizeUpdateDetections", false);
 	proxy.dont_use_bucket_optimization = moduleJson.value("dontUseBucketOptimization", false);
+	proxy.ignore_check_client_first_ack = moduleJson.value("ignoreCheckClientFirstAck", false);
 
 	// timeouts	
 	proxy.timeout_syn_rto = TimeoutValue(moduleJson, "SYNRTO", YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO);
@@ -1302,7 +1303,8 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 		service.winscale = service_json.value("winscale", proxy.winscale);
 		service.timestamps = service_json.value("timestamps", proxy.timestamps);
 		service.ignore_size_update_detections = service_json.value("ignoreSizeUpdateDetections", proxy.ignore_size_update_detections);
-		service.dont_use_bucket_optimization = service_json.value("ignoreSizeUpdateDetections", proxy.dont_use_bucket_optimization);
+		service.dont_use_bucket_optimization = service_json.value("dontUseBucketOptimization", proxy.dont_use_bucket_optimization);
+		service.ignore_check_client_first_ack = service_json.value("ignoreCheckClientFirstAck", proxy.ignore_check_client_first_ack);
 
 		// timeouts	
 		service.timeout_syn_rto = TimeoutValue(service_json, "SYNRTO", proxy.timeout_syn_rto);

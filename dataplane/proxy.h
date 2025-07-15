@@ -82,8 +82,11 @@ struct proxy_service_t
 	uint32_t mss;
 	uint32_t winscale;
 	bool timestamps;
+
+    // temp - develop
 	bool ignore_size_update_detections;
     bool dont_use_bucket_optimization;
+    bool ignore_check_client_first_ack;
 
 	// timeouts
 	uint32_t timeout_syn_rto;

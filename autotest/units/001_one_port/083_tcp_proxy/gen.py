@@ -235,7 +235,7 @@ WriteTest("006", data_type5)
 
 # 007 - Client send SYN, service don't answer, client send ACK
 
-test_007 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT + 1, cport=PORT_CLIENT)
+test_007 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT + 1, cport=PORT_CLIENT + 1)
 
 data_type7 = [
 	(
@@ -290,7 +290,7 @@ WriteTest("008", data_type8)
 
 # 009 - Client send ACK with ack number not equal to seq+1 from server's SYNACK
 
-test_009 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT + 1, cport=PORT_CLIENT)
+test_009 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT + 2, cport=PORT_CLIENT + 2)
 
 data_type9 = [
 	(

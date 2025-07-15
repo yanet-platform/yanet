@@ -320,7 +320,7 @@ public:
 
 	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, proto, upstream_addr, upstream_port, size_connections_table, 
 		size_syn_table, flow, upstream_net, blacklist, send_proxy_header, use_sack, mss, winscale, timestamps,
-		ignore_size_update_detections, dont_use_bucket_optimization, timeout_syn_rto, timeout_syn_recv, timeout_established);
+		ignore_size_update_detections, dont_use_bucket_optimization, ignore_check_client_first_ack, timeout_syn_rto, timeout_syn_recv, timeout_established);
 
 	using key_t = std::tuple<common::ip_address_t, tPortId, uint8_t>;
 
@@ -351,8 +351,11 @@ public:
 	uint32_t mss;
 	uint32_t winscale;
 	bool timestamps;
+
+	// temp - develop
 	bool ignore_size_update_detections;
 	bool dont_use_bucket_optimization;
+	bool ignore_check_client_first_ack;
 
 	// timeouts
 	uint32_t timeout_syn_rto;
@@ -379,7 +382,7 @@ public:
 	config_t() = default;
 
 	SERIALIZABLE(services, size_connections_table, size_syn_table, nextModule, flow, upstream_net, blacklist, send_proxy_header,
-		use_sack, mss, winscale, timestamps, ignore_size_update_detections, dont_use_bucket_optimization,
+		use_sack, mss, winscale, timestamps, ignore_size_update_detections, dont_use_bucket_optimization, ignore_check_client_first_ack,
 		timeout_syn_rto, timeout_syn_recv, timeout_established);
 
 public:
@@ -400,8 +403,11 @@ public:
 	uint32_t mss;
 	uint32_t winscale;
 	bool timestamps;
+	
+	// temp - develop
 	bool ignore_size_update_detections;
 	bool dont_use_bucket_optimization;
+	bool ignore_check_client_first_ack;
 	
 	// timeouts
 	uint32_t timeout_syn_rto;

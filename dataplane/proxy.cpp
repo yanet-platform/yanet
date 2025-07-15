@@ -705,7 +705,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                     counters[service.counter_id + (tCounterId)::proxy::service_counter::ack_without_service_answer]++;
                     action = false;
                 }
-                else if (syn_connection_data.connection->server_seq != rte_be_to_cpu_32(tcp_header->recv_ack) - 1)
+                else if (!service.ignore_check_client_first_ack && (syn_connection_data.connection->server_seq != rte_be_to_cpu_32(tcp_header->recv_ack) - 1))
                 {
                     // ack, but ack number is invalid
                     // YANET_LOG_WARNING("Invalid ACK: server_seq=%u, ack=%u\n", syn_connection_data.connection->server_seq, rte_be_to_cpu_32(tcp_header->recv_ack));
@@ -1240,6 +1240,7 @@ void proxy_service_t::Debug()
         common::ipv4_prefix_t(pool_prefix.address.address, pool_prefix.mask).toString().c_str());
 	YANET_LOG_WARNING("\tTCP options: use_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", use_sack, mss, winscale, timestamps);
     YANET_LOG_WARNING("\tTimeouts: rto=%d, syn_recv=%d, established=%d\n", timeout_syn_rto, timeout_syn_recv, timeout_established);
+    YANET_LOG_WARNING("\tDebug: ignore_size_update_detections=%d, dont_use_bucket_optimization=%d, ignore_check_client_first_ack=%d\n", ignore_size_update_detections, dont_use_bucket_optimization, ignore_check_client_first_ack);
 	YANET_LOG_WARNING("\tservice=[%s], syn=[%s], local=[%s]\n", tables.service_connections.Debug().c_str(), tables.syn_connections.Debug().c_str(), tables.local_pool.Debug().c_str());
 }
 

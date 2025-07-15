@@ -5,6 +5,7 @@ import sys
 sys.path.insert(1, '../083_tcp_proxy')
 
 from proxy_test import *
+from scapy.all import *
 
 IP_SERVER1 = "10.0.4.1"
 IP_SERVER2 = "10.0.4.2"
@@ -132,3 +133,35 @@ data_type_ts_3 = [
 ]
 
 WriteTest("003_ts_3", data_type_ts_3)
+
+
+# Corrupted tcp header
+
+def BuildBrokenSynPacket():
+    def write(buf, index, value, size):
+        for i in range(size):
+            buf[index + size - i - 1] = value % 256
+            value //= 256
+        
+    tcp_data = ([0] * 20)
+    write(tcp_data, 0, PORT_CLIENT_TS, 2) # source port
+    write(tcp_data, 2, ProxyTest.PORT_PROXY_EXT, 2) # dest port
+    write(tcp_data, 4, ProxyTest.START_CLIENT_SEQ, 4) # seq
+    tcp_data[12] = 0x40 # header size - 4 < 5 - incorrect
+    tcp_data[13] = 0x02 # syn flag
+    write(tcp_data, 14, 8192, 2) # window size
+    
+    request = Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY) \
+        / Dot1Q(vlan=100) \
+        / IP(src=IP_CLIENT, dst=IP_SERVER2, ttl=64, proto=6) \
+        / Raw(bytes(tcp_data))
+    
+    answer = Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT) \
+        / Dot1Q(vlan=100) \
+        / IP(src=IP_SERVER2, dst=IP_CLIENT, ttl=63, proto=6) \
+        / TCP(sport=ProxyTest.PORT_PROXY_EXT, dport=PORT_CLIENT_TS, flags='AS', window=0, seq=0x391dfe9c, ack=ProxyTest.START_CLIENT_SEQ+1, options=[('WScale', 14)])
+    
+    return (request, answer)
+
+data_type_corrupted = [(BuildBrokenSynPacket())]
+WriteTest("004_corrupted", data_type_corrupted)

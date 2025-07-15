@@ -28,6 +28,11 @@ steps:
     send: 003_ts_3-send.pcap
     expect: 003_ts_3-expect.pcap
 
+- sendPackets:
+  - port: kni0
+    send: 004_corrupted-send.pcap
+    expect: 004_corrupted-expect.pcap
+
 - cli:
   - rib static remove default 10.0.4.0/24 10.0.4.1
   - rib static remove default 10.0.2.0/24 10.0.2.1
