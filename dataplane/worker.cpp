@@ -470,6 +470,16 @@ inline void cWorker::translation_ipv4_to_ipv6(rte_mbuf* mbuf,
 		rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
 		checksum_before = yanet_checksum(&ipv4_header->src_addr, 8);
 
+		// For UDP packets, always recalculate checksum if checksum in ipv4 packet is 0x0000
+		if (metadata->transport_headerType == IPPROTO_UDP)
+		{
+			rte_udp_hdr* udp_header = rte_pktmbuf_mtod_offset(mbuf, rte_udp_hdr*, metadata->transport_headerOffset);
+			if (udp_header->dgram_cksum == 0)
+			{
+				udp_header->dgram_cksum = rte_ipv4_udptcp_cksum(ipv4_header, udp_header);
+			}
+		}
+
 		uint16_t ipv6_header_size = sizeof(rte_ipv6_hdr) + ((metadata->network_flags & YANET_NETWORK_FLAG_FRAGMENT) ? sizeof(ipv6_extension_fragment_t) : 0);
 		uint16_t ipv4_header_size = (metadata->transport_headerOffset - metadata->network_headerOffset);
 
