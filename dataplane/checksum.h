@@ -133,14 +133,11 @@ inline void yanet_udp_checksum_v6_to_v4(rte_udp_hdr* udpHeader,
                                         uint16_t checksum6,
                                         uint16_t checksum4)
 {
-	if (udpHeader->dgram_cksum)
-	{
-		uint16_t csum = ~udpHeader->dgram_cksum;
-		csum = csum_minus(csum, checksum6);
-		csum = csum_plus(csum, checksum4);
-		csum = ~csum;
-		udpHeader->dgram_cksum = csum ?: 0xffff;
-	}
+	uint16_t csum = ~udpHeader->dgram_cksum;
+	csum = csum_minus(csum, checksum6);
+	csum = csum_plus(csum, checksum4);
+	csum = ~csum;
+	udpHeader->dgram_cksum = csum ?: 0xffff;
 }
 
 inline void yanet_icmp_checksum_v6_to_v4(icmpv6_header_t* icmpHeader,
@@ -167,14 +164,11 @@ inline void yanet_udp_checksum_v4_to_v6(rte_udp_hdr* udpHeader,
                                         uint16_t checksum4,
                                         uint16_t checksum6)
 {
-	if (udpHeader->dgram_cksum)
-	{
-		uint16_t csum = ~udpHeader->dgram_cksum;
-		csum = csum_minus(csum, checksum4);
-		csum = csum_plus(csum, checksum6);
-		csum = ~csum;
-		udpHeader->dgram_cksum = csum ?: 0xffff;
-	}
+	uint16_t csum = ~udpHeader->dgram_cksum;
+	csum = csum_minus(csum, checksum4);
+	csum = csum_plus(csum, checksum6);
+	csum = ~csum;
+	udpHeader->dgram_cksum = csum ?: 0xffff;
 }
 
 inline void yanet_icmp_checksum_v4_to_v6(icmpv4_header_t* icmpHeader,
