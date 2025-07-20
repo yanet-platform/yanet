@@ -19,6 +19,7 @@
 #include "neighbor.h"
 #include "proxy.h"
 #include "rib.h"
+#include "ringlog.h"
 #include "route.h"
 #include "show.h"
 #include "telegraf.h"
@@ -156,7 +157,15 @@ std::vector<std::tuple<std::string,
 
                     {"latch update dataplane", "<latch name> <state>", [](const auto& args) { Call(latch::dataplane_update, args); }},
                     {},
-                    {"convert logical_module", "", [](const auto& args) { Call(convert::logical_module, args); }}};
+                    {"convert logical_module", "", [](const auto& args) { Call(convert::logical_module, args); }},
+                    {},
+                    {"ringlog enable", "<value>", [](const auto& args) { Call(ringlog::enable, args); }},
+                    {"ringlog disable", "", [](const auto& args) { Call(ringlog::disable, args); }},
+                    {"ringlog print", "", [](const auto& args) { Call(ringlog::print, args); }},
+                    {"workerstat enable", "", [](const auto& args) { Call(workerstat::enable, args); }},
+                    {"workerstat disable", "", [](const auto& args) { Call(workerstat::disable, args); }},
+                    {"workerstat print", "", [](const auto& args) { Call(workerstat::print, args); }},
+                };
 
 void printUsage()
 {

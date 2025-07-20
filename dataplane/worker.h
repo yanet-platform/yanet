@@ -9,6 +9,7 @@
 #include <rte_ring.h>
 
 #include "common/result.h"
+#include "common/ringlog.h"
 #include "common/sdpcommon.h"
 #include "common/tsc_deltas.h"
 #include "common/type.h"
@@ -388,6 +389,9 @@ protected:
 	uint64_t* counters; // YANET_CONFIG_COUNTERS_SIZE
 	uint64_t* aclCounters; // YANET_CONFIG_ACL_COUNTERS_SIZE
 	uint64_t roundRobinCounter;
+
+	common::ringlog::LogInfo ringLog;
+	uint32_t* handlerStat;
 
 	// will decrease with each new packet sent to slow worker, replenishes each N mseconds
 	int32_t packetsToSWNPRemainder;

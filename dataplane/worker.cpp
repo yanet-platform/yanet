@@ -49,6 +49,8 @@ cWorker::cWorker(cDataPlane* dataPlane) :
         ring_toFreePackets(nullptr),
         ring_log(nullptr),
         roundRobinCounter(0),
+		ringLog{0, nullptr},
+		handlerStat(nullptr),
         packetsToSWNPRemainder(dataPlane->config.SWNormalPriorityRateLimitPerWorker)
 {
 }
@@ -264,6 +266,8 @@ void cWorker::FillMetadataWorkerCounters(common::sdp::MetadataWorker& metadata)
 	metadata.start_bursts = common::sdp::SdrSever::GetStartData((CONFIG_YADECAP_MBUFS_BURST_SIZE + 1) * sizeof(uint64_t), metadata.size);
 	metadata.start_stats = common::sdp::SdrSever::GetStartData(sizeof(common::worker::stats::common), metadata.size);
 	metadata.start_stats_ports = common::sdp::SdrSever::GetStartData(sizeof(common::worker::stats::port[CONFIG_YADECAP_PORTS_SIZE]), metadata.size);
+	metadata.start_ring_log = common::sdp::SdrSever::GetStartData(RINGLOG_SIZE_PER_WORKER * sizeof(common::ringlog::LogRecord), metadata.size);
+	metadata.start_workers_stats = common::sdp::SdrSever::GetStartData(WORKER_HANDLER_STAT_SIZE * sizeof(uint32_t), metadata.size);
 
 	// stats
 	std::map<std::string, uint64_t> counters_stats;
@@ -352,6 +356,8 @@ void cWorker::SetBufferForCounters(void* buffer, const common::sdp::MetadataWork
 	bursts = common::sdp::ShiftBuffer<uint64_t*>(buffer, metadata.start_bursts);
 	stats = common::sdp::ShiftBuffer<common::worker::stats::common*>(buffer, metadata.start_stats);
 	statsPorts = common::sdp::ShiftBuffer<common::worker::stats::port*>(buffer, metadata.start_stats_ports);
+	ringLog.records = common::sdp::ShiftBuffer<common::ringlog::LogRecord*>(buffer, metadata.start_ring_log);
+	handlerStat = common::sdp::ShiftBuffer<uint32_t*>(buffer, metadata.start_workers_stats);
 }
 
 void cWorker::SetTcpConnectionStore(dataplane::proxy::TcpConnectionStore* store)
@@ -820,6 +826,7 @@ inline void cWorker::handlePackets()
 	}
 
 	auto stack_size = logicalPort_ingress_stack.mbufsCount;
+	auto handler_stat_size = stack_size;
 	logicalPort_ingress_handle();
 	tsc_deltas->write(tsc_start, stack_size, tsc_deltas->logicalPort_ingress_handle, base_values.logicalPort_ingress_handle);
 
@@ -979,6 +986,12 @@ inline void cWorker::handlePackets()
 	tsc_deltas->write(tsc_start, stack_size, tsc_deltas->controlPlane_handle, base_values.controlPlane_handle);
 
 	physicalPort_egress_handle();
+
+	if (globalbase.workerstat_enabled)
+	{
+		auto index = std::min(handler_stat_size, uint32_t(WORKER_HANDLER_STAT_SIZE - 1));
+		handlerStat[index]++;
+	}
 }
 
 static_assert(CONFIG_YADECAP_PORTS_SIZE == 8, "(vlanId << 3) | metadata->fromPortId");

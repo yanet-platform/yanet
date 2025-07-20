@@ -120,6 +120,8 @@ struct MetadataWorker
 	uint64_t start_bursts;
 	uint64_t start_stats;
 	uint64_t start_stats_ports;
+	uint64_t start_ring_log;
+	uint64_t start_workers_stats;
 	uint64_t size;
 
 	std::map<std::string, uint64_t> counter_positions;
@@ -131,6 +133,8 @@ struct MetadataWorker
 		       other.start_bursts == start_bursts &&
 		       other.start_stats == start_stats &&
 		       other.start_stats_ports == start_stats_ports &&
+			   other.start_ring_log == start_ring_log &&
+			   other.start_workers_stats == start_workers_stats &&
 		       other.size == size &&
 		       MapsEqual(other.counter_positions, counter_positions);
 	}

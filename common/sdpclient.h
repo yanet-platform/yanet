@@ -352,21 +352,23 @@ private:
 			}
 			uint64_t index = start_workers_metadata / sizeof(uint64_t);
 
-			// 0-5 - values from MetadataWorker
+			// 0-7 - values from MetadataWorker
 			sdp_data.metadata_worker.start_counters = ReadValue(buffer, index);
 			sdp_data.metadata_worker.start_acl_counters = ReadValue(buffer, index + 1);
 			sdp_data.metadata_worker.start_bursts = ReadValue(buffer, index + 2);
 			sdp_data.metadata_worker.start_stats = ReadValue(buffer, index + 3);
 			sdp_data.metadata_worker.start_stats_ports = ReadValue(buffer, index + 4);
-			sdp_data.metadata_worker.size = ReadValue(buffer, index + 5);
-			// 6 - n1 = size MetadataWorker.counter_positions
-			uint64_t n1 = ReadValue(buffer, index + 6);
-			// 7-9 - значения из MetadataWorker
-			sdp_data.metadata_worker_gc.start_counters = ReadValue(buffer, index + 7);
-			sdp_data.metadata_worker_gc.start_stats = ReadValue(buffer, index + 8);
-			sdp_data.metadata_worker_gc.size = ReadValue(buffer, index + 9);
-			// 10 - n2 = size MetadataWorker.counter_positions
-			uint64_t n2 = ReadValue(buffer, index + 10);
+			sdp_data.metadata_worker.start_ring_log = ReadValue(buffer, index + 5);
+			sdp_data.metadata_worker.start_workers_stats = ReadValue(buffer, index + 6);
+			sdp_data.metadata_worker.size = ReadValue(buffer, index + 7);
+			// 8 - n1 = size MetadataWorker.counter_positions
+			uint64_t n1 = ReadValue(buffer, index + 8);
+			// 9-11 - values from MetadataWorker
+			sdp_data.metadata_worker_gc.start_counters = ReadValue(buffer, index + 9);
+			sdp_data.metadata_worker_gc.start_stats = ReadValue(buffer, index + 10);
+			sdp_data.metadata_worker_gc.size = ReadValue(buffer, index + 11);
+			// 12 - n2 = size MetadataWorker.counter_positions
+			uint64_t n2 = ReadValue(buffer, index + 12);
 
 			if (128 * (1 + n1 + n2) > size_workers_metadata)
 			{

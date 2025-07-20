@@ -119,6 +119,8 @@ extern LogPriority logPriority;
 #define YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV ((uint32_t)(3))
 #define YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED ((uint32_t)(30))
 
+#define WORKER_HANDLER_STAT_SIZE CONFIG_YADECAP_MBUFS_BURST_SIZE + 1
+
 #define CALCULATE_LOGICALPORT_ID(portId, vlanId) ((portId << 13) | ((vlanId & 0xFFF) << 1) | 1)
 
 #if __cpp_exceptions

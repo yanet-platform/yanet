@@ -196,6 +196,8 @@ protected:
 	eResult update_host_config(const common::idp::updateGlobalBase::update_host_config::request& request);
 	eResult proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request);
 	eResult proxy_service_remove(const common::idp::updateGlobalBase::proxy_service_remove::request& request);
+	eResult ringlog_state_update(const common::idp::updateGlobalBase::ringlog_state_update::request& request);
+	eResult worker_handler_stat_update(const common::idp::updateGlobalBase::worker_handler_stat_update::request& request);
 
 	void evaluate_service_ring();
 	inline uint64_t count_real_connections(uint32_t counter_id);
@@ -340,6 +342,10 @@ public: ///< @todo
 	dataplane::perf::tsc_base_values tsc_base_values;
 
 	dataplane::proxy::TcpConnectionStore* tcp_connection_store;
+
+	bool ringlog_enabled{false};
+	uint32_t ringlog_value;
+	bool workerstat_enabled{false};
 };
 
 }

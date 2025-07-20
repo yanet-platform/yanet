@@ -488,6 +488,14 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		{
 			result = proxy_service_remove(std::get<common::idp::updateGlobalBase::proxy_service_remove::request>(data));
 		}
+		else if (type == common::idp::updateGlobalBase::requestType::ringlog_state_update)
+		{
+			result = ringlog_state_update(std::get<common::idp::updateGlobalBase::ringlog_state_update::request>(data));
+		}
+		else if (type == common::idp::updateGlobalBase::requestType::worker_handler_stat_update)
+		{
+			result = worker_handler_stat_update(std::get<common::idp::updateGlobalBase::worker_handler_stat_update::request>(data));
+		}
 		else
 		{
 			YADECAP_LOG_ERROR("invalid request type\n");
@@ -2689,5 +2697,20 @@ eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::pr
 	YANET_LOG_WARNING("proxy_service_remove: service_id=%d\n", service_id);
 	auto& service = proxy_services[service_id];
 	tcp_connection_store->ServiceRemove(service, &dataPlane->memory_manager, dataPlane->currentGlobalBaseId, dataPlane->first_state_update_global_base);
+	return eResult::success;
+}
+
+eResult generation::ringlog_state_update(const common::idp::updateGlobalBase::ringlog_state_update::request& request)
+{
+	auto [enabled, value] = request;
+	ringlog_enabled = enabled;
+	ringlog_value = value;
+	return eResult::success;
+}
+
+eResult generation::worker_handler_stat_update(const common::idp::updateGlobalBase::worker_handler_stat_update::request& request)
+{
+	bool enabled = request;
+	workerstat_enabled = enabled;
 	return eResult::success;
 }
