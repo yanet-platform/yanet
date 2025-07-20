@@ -4,11 +4,13 @@
 #include <rte_tcp.h>
 
 #include "common/idp.h"
+#include "common/ringlog.h"
 #include "common/static_vector.h"
 
 #include "base.h"
 #include "local_pool.h"
 #include "memory_manager.h"
+#include "proxy_debug.h"
 #include "proxy_connections.h"
 #include "syncookies.h"
 #include "type.h"
@@ -164,10 +166,10 @@ public:
     common::idp::proxy_tables::response GetTables(const std::vector<std::pair<proxy_service_id_t, std::string>>& services);
 
     // Actions from worker
-    bool ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id);
-    bool ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id);
-    bool ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters);
-    bool ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters);
+    bool ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id, common::ringlog::LogInfo& ringlog);
+    bool ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id, common::ringlog::LogInfo& ringlog);
+    bool ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, common::ringlog::LogInfo& ringlog);
+    bool ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, common::ringlog::LogInfo& ringlog);
 
     uint32_t current_time_sec;
     uint64_t current_time_ms;

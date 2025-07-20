@@ -42,10 +42,44 @@ void disable()
     ChangeState(false, 0);
 }
 
-void print()
+std::unordered_map<common::ringlog::DebugEvent, std::string> GetEvents()
+{
+    std::unordered_map<common::ringlog::DebugEvent, std::string> result;
+
+    result[common::ringlog::DebugEvent::SynOverflow] = "SynOverflow";
+    result[common::ringlog::DebugEvent::SynFound] = "SynFound";
+    result[common::ringlog::DebugEvent::SynErrLocal] = "ERROR SynErrLocal";
+    result[common::ringlog::DebugEvent::SynAdd] = "SynAdd";
+
+    result[common::ringlog::DebugEvent::AckOverflow] = "ERROR AckOverflow";
+    result[common::ringlog::DebugEvent::AckFound] = "AckFound";
+    result[common::ringlog::DebugEvent::AckNoServiceAnswer] = "ERROR AckNoServiceAnswer";
+    result[common::ringlog::DebugEvent::AckBadFirstAck] = "ERROR AckBadFirstAck";
+    result[common::ringlog::DebugEvent::AckNew] = "AckNew";
+    result[common::ringlog::DebugEvent::AckBadCookie] = "ERROR AckBadCookie";
+    result[common::ringlog::DebugEvent::AckErrLocal] = "ERROR AckErrLocal";
+    result[common::ringlog::DebugEvent::AckFromCookie] = "AckFromCookie";
+
+    result[common::ringlog::DebugEvent::SynAckNoLoc] = "ERROR SynAckNoLoc";
+    result[common::ringlog::DebugEvent::SynAckInSyn] = "SynAckInSyn";
+    result[common::ringlog::DebugEvent::SynAckNoCon] = "ERROR SynAckNoCon";
+    result[common::ringlog::DebugEvent::SynAckOkNoCookie] = "SynAckOkNoCookie";
+    result[common::ringlog::DebugEvent::SynAckOkFromCookie] = "SynAckOkFromCookie";
+
+    result[common::ringlog::DebugEvent::SrvAckNoLoc] = "ERROR SrvAckNoLoc";
+    result[common::ringlog::DebugEvent::SrvAckNoCon] = "ERROR SrvAckNoCon";
+    result[common::ringlog::DebugEvent::SrvAckOk] = "SrvAckOk";
+
+    return result;
+}
+
+void print(std::optional<uint16_t> value_param)
 {
     common::sdp::DataPlaneInSharedMemory sdp_data;
 	OpenSharedMemoryDataplaneBuffers(sdp_data, true);
+
+    std::vector<std::tuple<common::ringlog::LogRecord, uint32_t, tCoreId>> events_output;
+    std::vector<std::tuple<common::ringlog::LogRecord, uint32_t, tCoreId>> events_error;
 
 	for (const auto& [coreId, worker_info] : sdp_data.workers)
 	{
@@ -54,17 +88,98 @@ void print()
 		
         for (uint32_t index = 0; index < RINGLOG_SIZE_PER_WORKER; index++)
         {
-            uint64_t time = buffer[index].time;
-            if (time != 0)
+            if (buffer[index].time != 0)
             {
-                uint64_t value = buffer[index].data;
-                uint8_t event = value & 0xff;
-                uint16_t value1 = rte_be_to_cpu_16((value >> 8) & 0xffff);
-                uint16_t value2 = rte_be_to_cpu_16((value >> 24) & 0xffff);
-                printf("%.3f %3d %c%02u %5u %5u\n", time * 0.001, coreId, (event >= 200 ? 'E' : ' '), event % 200, value1, value2);
+                if (!value_param.has_value())
+                {
+                    events_output.push_back({buffer[index], index, coreId});
+                }
+                else
+                {
+                    uint64_t value = buffer[index].data;
+                    uint8_t event = value & 0xff;
+                    uint16_t value1 = rte_be_to_cpu_16((value >> 8) & 0xffff);
+                    if (value1 == *value_param)
+                    {
+                        events_output.push_back({buffer[index], index, coreId});
+                    }
+                    else if (event > 200 && value1 == 0)
+                    {
+                        events_error.push_back({buffer[index], index, coreId});
+                    }
+                }
             }
         }
-	}
+    }
+
+    std::vector<std::string> event_names(256);
+    for (uint32_t index = 0; index < 256; index++)
+    {
+        event_names[index] = std::to_string(index);
+    }
+    for (const auto& [event, name] : GetEvents())
+    {
+        event_names[static_cast<uint8_t>(event)] = name;
+    }
+
+    if (events_output.empty())
+    {
+        // no events, output all errors
+        events_output.swap(events_error);
+    }
+    else
+    {
+        // find nearest errors
+        uint64_t time_min = std::get<0>(events_output[0]).time;
+        uint64_t time_max = time_min;
+        for (const auto& [record, index, coreId] : events_output)
+        {
+            GCC_BUG_UNUSED(coreId);
+            GCC_BUG_UNUSED(index);
+            time_min = std::min(time_min, record.time);
+            time_max = std::max(time_max, record.time);
+        }
+
+        for (const auto& [record, index, coreId] : events_error)
+        {
+            if (record.time + 1000 > time_min && record.time < time_max + 1000)
+            {
+                events_output.push_back({record, index, coreId});
+            }
+        }
+    }
+
+    std::sort(events_output.begin(), events_output.end(), [](const auto& left, const auto& right) {
+        return (std::get<0>(left).time < std::get<0>(right).time) ||
+        ((std::get<0>(left).time == std::get<0>(right).time) && (std::get<1>(left) < std::get<1>(right)));
+    });
+
+    uint64_t prev_second = 0;
+    for (const auto& [record, index, coreId] : events_output)
+    {
+        GCC_BUG_UNUSED(index);
+        uint64_t time = record.time;
+        uint64_t second = time / 1000;
+        if ((prev_second == 0) || (second == prev_second + 1))
+        {
+            printf("%.3f ", time * 0.001);
+        }
+        else if (second == prev_second)
+        {
+            printf("          .%03ld ", time % 1000);
+        }
+        else
+        {
+            printf("%.3f+", time * 0.001);
+        }
+        prev_second = second;
+
+        uint64_t value = record.data;
+        uint8_t event = value & 0xff;
+        uint16_t value1 = rte_be_to_cpu_16((value >> 8) & 0xffff);
+        uint16_t value2 = rte_be_to_cpu_16((value >> 24) & 0xffff);
+        printf(" %3d %5u %5u %s\n", coreId, value1, value2, event_names[event].c_str());
+    }    
 }
 
 }

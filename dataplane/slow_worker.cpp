@@ -5,6 +5,7 @@
 #include "dataplane.h"
 #include "icmp_translations.h"
 #include "prepare.h"
+#include "proxy_debug.h"
 
 namespace dataplane
 {
@@ -1001,7 +1002,7 @@ void SlowWorker::SendRentransmits()
 		for (uint32_t index = 0; (index < MAX_COUNT_RETRANSMITS_ALL_SERVICES) && (rte_ring_dequeue(ring_retransmit_send_, (void**)&data) == 0); index++)
 		{
 			
-#ifdef TCP_PROXY_DEBUG
+#if TCP_PROXY_FULL_DEBUG == 1
 			YANET_LOG_WARNING("!!!!  SlowWorker::SendRentransmits src=%x:%u, dst=%x:%u, client_start_seq=%u\n",
 				rte_be_to_cpu_32(data->src), rte_be_to_cpu_16(data->sport), rte_be_to_cpu_32(data->dst), rte_be_to_cpu_16(data->sport),
 				rte_be_to_cpu_32(data->client_start_seq));

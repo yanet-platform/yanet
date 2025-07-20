@@ -37,4 +37,31 @@ struct LogInfo
 
 #endif
 
+enum class DebugEvent : uint8_t
+{
+	SynOverflow = 11,
+    SynFound = 12,
+    SynErrLocal = 211,
+    SynAdd = 13,
+
+    AckOverflow = 221,
+    AckFound = 21,
+    AckNoServiceAnswer = 222,
+    AckBadFirstAck = 223,
+    AckNew = 22,
+    AckBadCookie = 224,
+    AckErrLocal = 225,
+    AckFromCookie = 23,
+
+    SynAckNoLoc = 231,
+    SynAckInSyn = 31,
+    SynAckNoCon = 232,
+    SynAckOkNoCookie = 32,
+    SynAckOkFromCookie = 33,
+
+    SrvAckNoLoc = 241,
+    SrvAckNoCon = 242,
+    SrvAckOk = 41,
+};
+
 }

@@ -6151,8 +6151,8 @@ inline void cWorker::proxy_client_syn_handle()
 
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_client_syn_stack.mbufsCount; mbuf_i++)
 	{
-		rte_mbuf* mbuf = proxy_client_syn_stack.mbufs[mbuf_i];		
-		if (tcp_connection_store->ActionClientOnSyn(mbuf, base, counters, proxy_worker_id))
+		rte_mbuf* mbuf = proxy_client_syn_stack.mbufs[mbuf_i];
+		if (tcp_connection_store->ActionClientOnSyn(mbuf, base, counters, proxy_worker_id, ringLog))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6182,7 +6182,7 @@ inline void cWorker::proxy_client_ack_handle()
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_client_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_client_ack_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionClientOnAck(mbuf, base, counters, proxy_worker_id))
+		if (tcp_connection_store->ActionClientOnAck(mbuf, base, counters, proxy_worker_id, ringLog))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6212,7 +6212,7 @@ inline void cWorker::proxy_server_syn_ack_handle()
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_server_syn_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_server_syn_ack_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionServiceOnSynAck(mbuf, base, counters))
+		if (tcp_connection_store->ActionServiceOnSynAck(mbuf, base, counters, ringLog))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6242,7 +6242,7 @@ inline void cWorker::proxy_server_ack_handle()
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_server_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_server_ack_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionServiceOnAck(mbuf, base, counters))
+		if (tcp_connection_store->ActionServiceOnAck(mbuf, base, counters, ringLog))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}

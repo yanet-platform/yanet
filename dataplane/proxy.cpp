@@ -8,8 +8,6 @@
 #include "proxy.h"
 #include "syncookies.h"
 
-// #define TCP_PROXY_DEBUG
-
 namespace dataplane::proxy
 {
 
@@ -381,16 +379,6 @@ common::idp::proxy_tables::response TcpConnectionStore::GetTables(const std::vec
     return response;
 }
 
-void DebugPacket(const char* message, proxy_service_id_t service_id, const rte_ipv4_hdr* ipv4_header, const rte_tcp_hdr* tcp_header)
-{
-#ifdef TCP_PROXY_DEBUG
-    YANET_LOG_WARNING("%s service_id=%d, %s:%d -> %s:%d, seq=%u, ack=%u\n", message, service_id,
-        common::ipv4_address_t(rte_cpu_to_be_32(ipv4_header->src_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->src_port),
-        common::ipv4_address_t(rte_cpu_to_be_32(ipv4_header->dst_addr)).toString().c_str(), rte_cpu_to_be_16(tcp_header->dst_port),
-        rte_cpu_to_be_32(tcp_header->sent_seq), rte_cpu_to_be_32(tcp_header->recv_ack));
-#endif
-}
-
 void SwapAddresses(rte_ipv4_hdr* ipv4_header)
 {
     rte_be32_t tmp = ipv4_header->src_addr;
@@ -476,7 +464,7 @@ void PrepareSynToService(const proxy_service_t& service, rte_ipv4_hdr* ipv4_head
 }
 
 // Action from worker
-bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id)
+bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id, common::ringlog::LogInfo& ringlog)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 	
@@ -490,6 +478,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_client_syn", service_id, ipv4_header, tcp_header);
+    RINGLOG_CONDITION(base.globalBase->ringlog_enabled && base.globalBase->ringlog_value == ipv4_header->src_addr);
     bool action = true;
 
     SynConnectionData syn_connection_data;
@@ -498,6 +487,8 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
         case TableSearchResult::Overflow:
         {
             DebugPacket("\tsyn.FindAndLock=Overflow", service_id, ipv4_header, tcp_header);
+		    RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynOverflow, tcp_header->src_port, 0));
+
             PrepareSynToClient(service_id, service, mbuf, ipv4_header, tcp_header, counters);
             counters[service.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
             counters[service.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;
@@ -506,6 +497,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
         case TableSearchResult::Found:
         {
             DebugPacket("\tsyn.FindAndLock=Found", service_id, ipv4_header, tcp_header);
+            RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynFound, tcp_header->src_port, syn_connection_data.connection->local));
             PrepareSynToService(service, ipv4_header, tcp_header, syn_connection_data.connection->local);
             break;
         }
@@ -515,11 +507,13 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
             uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
             if (local == 0)
             {
+                RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynErrLocal, tcp_header->src_port, 0));
                 counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
                 action = false;
             }
             else
             {
+                RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynAdd, tcp_header->src_port, local));
                 syn_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
                 syn_connection_data.connection->local = local;
                 syn_connection_data.connection->client_start_seq = tcp_header->sent_seq;
@@ -588,7 +582,7 @@ uint32_t TcpConnectionStore::CheckSynCookie(proxy_service_id_t service_id, const
     return cookie_data;
 }
 
-bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id)
+bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id, common::ringlog::LogInfo& ringlog)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
     proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
@@ -600,6 +594,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_client_ack", service_id, ipv4_header, tcp_header);
+    RINGLOG_CONDITION(base.globalBase->ringlog_enabled && base.globalBase->ringlog_value == ipv4_header->src_addr);
     bool action = true;
 
     ServiceConnectionData service_connection_data;
@@ -608,6 +603,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
         case TableSearchResult::Overflow:
         {
             DebugPacket("\tservice.FindAndLock=Overflow", service_id, ipv4_header, tcp_header);
+            RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckOverflow, tcp_header->src_port, 0));
             counters[service.counter_id + (tCounterId)::proxy::service_counter::service_bucket_overflow]++;
             action = false;
             break;
@@ -615,6 +611,8 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
         case TableSearchResult::Found:
         {
             DebugPacket("\tservice.FindAndLock=Found", service_id, ipv4_header, tcp_header);
+            RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckFound, tcp_header->src_port, service_connection_data.connection->local));
+
             // check non-empty tcp-data packet
             if (NonEmptyTcpData(ipv4_header, tcp_header))
             {
@@ -714,6 +712,8 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                 {
                     // ack, but server didn't answer
                     DebugPacket("\tno answer from server", service_id, ipv4_header, tcp_header);
+                    RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckNoServiceAnswer, tcp_header->src_port, 0));
+
                     syn_connection_data.Unlock();
                     counters[service.counter_id + (tCounterId)::proxy::service_counter::ack_without_service_answer]++;
                     action = false;
@@ -722,6 +722,8 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                 {
                     // ack, but ack number is invalid
                     // YANET_LOG_WARNING("Invalid ACK: server_seq=%u, ack=%u\n", syn_connection_data.connection->server_seq, rte_be_to_cpu_32(tcp_header->recv_ack));
+                    RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckBadFirstAck, tcp_header->src_port, 0));
+
                     DebugPacket("\tbad ack", service_id, ipv4_header, tcp_header);
                     syn_connection_data.Unlock();
                     counters[service.counter_id + (tCounterId)::proxy::service_counter::ack_invalid_ack_number]++;
@@ -730,6 +732,8 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                 else
                 {
                     DebugPacket("\tadd to service", service_id, ipv4_header, tcp_header);
+                    RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckNew, tcp_header->src_port, syn_connection_data.connection->local));
+
                     uint32_t src_addr = ipv4_header->src_addr;
                     uint16_t src_port = tcp_header->src_port;
                     service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
@@ -767,6 +771,8 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                     if (cookie_data == 0)
                     {
                         DebugPacket("!CheckSynCookie", service_id, ipv4_header, tcp_header);
+                        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckBadCookie, tcp_header->src_port, 0));
+
                         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
                         action = false;
                     }
@@ -777,11 +783,14 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                         if (local == 0)
                         {
                             DebugPacket("!local_pool.Allocate", service_id, ipv4_header, tcp_header);
+                            RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckErrLocal, tcp_header->src_port, 0));
+
                             counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
                             action = false;
                         }
                         else
                         {
+                            RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckFromCookie, tcp_header->src_port, local));
                             TcpOptions tcp_options;
                             memset(&tcp_options, 0, sizeof(tcp_options));
                             if (!tcp_options.Read(tcp_header))
@@ -838,7 +847,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
     return action;
 }
 
-bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters)
+bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, common::ringlog::LogInfo& ringlog)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
     proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
@@ -847,10 +856,12 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_server_syn_ack", service_id, ipv4_header, tcp_header);
+    RINGLOG_CONDITION(base.globalBase->ringlog_enabled);
 
     uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
+        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynAckNoLoc, 0, tcp_header->dst_port));
         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
         return false;
     }
@@ -861,7 +872,9 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     SynConnectionData syn_connection_data;
     if (service.tables.syn_connections.FindAndLock(client_addr, client_port, current_time_ms, syn_connection_data, false) == TableSearchResult::Found)
     {
+        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynAckInSyn, client_port, tcp_header->dst_port));
         DebugPacket("\tsyn.FindAndLock=Found", service_id, ipv4_header, tcp_header);
+
         syn_connection_data.connection->server_answer = true;
         syn_connection_data.connection->server_seq = rte_be_to_cpu_32(tcp_header->sent_seq);
         syn_connection_data.Unlock();
@@ -893,6 +906,8 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     if (service.tables.service_connections.FindAndLock(client_addr, client_port, current_time_ms, service_connection_data, false) != TableSearchResult::Found)
     {
         DebugPacket("\tservice.FindAndLock!=Found", service_id, ipv4_header, tcp_header);
+        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynAckNoCon, 0, tcp_header->dst_port));
+
         service_connection_data.Unlock();
         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_answer_service_syn_ack]++;
         return false;
@@ -903,9 +918,12 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     if (!service_connection_data.connection->CreatedFromSynCookie())
     {
         // todo
+        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynAckOkNoCookie, client_port, tcp_header->dst_port));
     }
     else
     {
+        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynAckOkFromCookie, client_port, tcp_header->dst_port));
+
         TcpOptions tcp_options{};
         if (!tcp_options.Read(tcp_header))
             counters[service.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
@@ -970,7 +988,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     return action;
 }
 
-bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters)
+bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, common::ringlog::LogInfo& ringlog)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
     proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
@@ -979,10 +997,12 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_server_ack", service_id, ipv4_header, tcp_header);
+    RINGLOG_CONDITION(base.globalBase->ringlog_enabled);
 
     uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
+        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckNoLoc, tcp_header->dst_port, 0));
         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
         return false;
     }
@@ -995,9 +1015,11 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
     {
         service_connection_data.Unlock();
         counters[service.counter_id + (tCounterId)::proxy::service_counter::failed_search_client_service_ack]++;
+        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckNoCon, client_port, tcp_header->dst_port));
         return false;
     }
 
+    RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckOk, client_port, tcp_header->dst_port));
     if (service_connection_data.connection->CreatedFromSynCookie())
     {
         tcp_header->sent_seq = add_cpu_32(tcp_header->sent_seq, service_connection_data.connection->shift_server);
@@ -1073,7 +1095,7 @@ bool UpdaterProxyTables::GetDataForRetramsits(const proxy_service_t& service, co
 
             data->tcp_options_len = tcp_options.WriteBuffer(data->tcp_options_data);
 
-#ifdef TCP_PROXY_DEBUG
+#if TCP_PROXY_FULL_DEBUG == 1
             YANET_LOG_WARNING("Add to retransmit, cookie_data=%d, tcp_options=%s, flags=%u\n", connection.cookie_data, tcp_options.DebugInfo().c_str(), connection.flags);
 #endif
 
