@@ -17,7 +17,6 @@
 #define TCP_OPTIONS_MAX_COUNT 12
 
 #define TIMEOUT_RETRANSMIT 1000 // todo
-#define MAX_COUNT_RETRANSMITS_PER_SERVICE (uint32_t)16 // todo
 #define MAX_COUNT_RETRANSMITS_ALL_SERVICES (uint32_t)128 // todo - must be a power of 2
 
 namespace dataplane::proxy
@@ -54,7 +53,7 @@ struct UpdaterProxyTables
     void FillSynConnections(uint64_t current_time, common::idp::proxy_syn::response& response);
     void GetTables(proxy_service_id_t service_id, const std::string& service_name, common::idp::proxy_tables::response& response);
 
-    void CollectGarbage(uint64_t current_time);
+    void CollectGarbage(uint64_t current_time, uint64_t timeout_recv, uint64_t timeout_syn);
     bool GetDataForRetramsits(const proxy_service_t& service, common::globalBase::tFlow next_flow, uint64_t current_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
 };
 
@@ -178,6 +177,7 @@ public:
 
 private:
     SynCookies syn_cookies_[YANET_CONFIG_PROXY_SERVICES_SIZE];
+    proxy_service_t service_configs[YANET_CONFIG_PROXY_SERVICES_SIZE];
     UpdaterProxyTables updater_proxy_tables[YANET_CONFIG_PROXY_SERVICES_SIZE];
 
     proxy_service_id_t index_start_check_retransmits_ = YANET_CONFIG_PROXY_SERVICES_SIZE;

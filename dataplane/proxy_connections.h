@@ -8,9 +8,6 @@
 namespace dataplane::proxy
 {
 
-#define TIMEOUT_ACK 30000 // todo
-#define TIMEOUT_SYN 3000 // todo - to config
-
 #define TIMEOUT_BUCKET_OVERFLOW 1000
 
 template<typename ConnectionInfo>
@@ -47,7 +44,7 @@ struct ConnectionBucket
         last_times[idx] = 0;
     }
 
-    bool IsExpired(uint32_t idx, uint64_t current_time, uint64_t timeout = TIMEOUT_ACK)
+    bool IsExpired(uint32_t idx, uint64_t current_time, uint64_t timeout)
     {
         return last_times[idx] + timeout < current_time;
     }
@@ -246,7 +243,7 @@ public:
         }
     }
 
-    void CollectGarbage(uint64_t current_time, LocalPool& local_pool)
+    void CollectGarbage(uint64_t current_time, uint64_t timeout, LocalPool& local_pool)
     {
         if (unlikely(!initialized_)) return;
 
@@ -256,7 +253,7 @@ public:
             bucket.Lock();
             for (uint32_t i = 0; i < Bucket::bucket_size; i++)
             {
-                if (bucket.addresses[i] != 0 && bucket.IsExpired(i, current_time))
+                if (bucket.addresses[i] != 0 && bucket.IsExpired(i, current_time, timeout))
                 {
                     local_pool.Free(LocalPool::max_workers, bucket.connections[i].local);
                     bucket.Clear(i);
@@ -346,17 +343,14 @@ public:
 
         for (uint32_t index = 0; index < Bucket::bucket_size; index++)
         {
-            if (!bucket->IsExpired(index, current_time))
+            if (addr == bucket->addresses[index] && port == bucket->ports[index])
             {
-                if (addr == bucket->addresses[index] && port == bucket->ports[index])
-                {
-                    bucket->last_times[index] = current_time;
-                    data.connection = &bucket->connections[index];
-                    data.idx = index;
-                    return TableSearchResult::Found;
-                }
+                bucket->last_times[index] = current_time;
+                data.connection = &bucket->connections[index];
+                data.idx = index;
+                return TableSearchResult::Found;
             }
-            else if(data.idx == Bucket::bucket_size)
+            else if ((data.idx == Bucket::bucket_size) && (bucket->addresses[index] == 0))
             {
                 data.connection = &bucket->connections[index];
                 data.idx = index;

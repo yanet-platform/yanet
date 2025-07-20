@@ -315,6 +315,7 @@ eResult TcpConnectionStore::ServiceUpdate(proxy_service_t& service, dataplane::m
         return result;
     }
     service.tables.CopyFrom(updater_proxy_tables[service_id].tables[newGlobalBaseId]);
+    service_configs[service_id] = service;
 
     return eResult::success;
 }
@@ -340,7 +341,8 @@ void TcpConnectionStore::CollectGarbage()
     uint64_t current_time = current_time_ms;
     for (uint32_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
     {
-        updater_proxy_tables[index].CollectGarbage(current_time);
+        const proxy_service_t& service = service_configs[index];
+        updater_proxy_tables[index].CollectGarbage(current_time, service.timeout_established, service.timeout_syn_recv);
     }
 }
 
@@ -1174,11 +1176,11 @@ void UpdaterProxyTables::FillSynConnections(uint64_t current_time, common::idp::
 	});
 }
 
-void UpdaterProxyTables::CollectGarbage(uint64_t current_time)
+void UpdaterProxyTables::CollectGarbage(uint64_t current_time, uint64_t timeout_recv, uint64_t timeout_syn)
 {
     std::lock_guard<std::mutex> guard(mutex);
-    tables[active_index].service_connections.CollectGarbage(current_time, tables[active_index].local_pool);
-    tables[active_index].syn_connections.CollectGarbage(current_time, tables[active_index].local_pool);
+    tables[active_index].service_connections.CollectGarbage(current_time, timeout_recv, tables[active_index].local_pool);
+    tables[active_index].syn_connections.CollectGarbage(current_time, timeout_syn, tables[active_index].local_pool);
 }
 
 void UpdaterProxyTables::GetTables(proxy_service_id_t service_id, const std::string& service_name, common::idp::proxy_tables::response& response)

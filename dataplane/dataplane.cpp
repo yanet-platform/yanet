@@ -1562,7 +1562,7 @@ void cDataPlane::start()
 		for (;;)
 		{
 			tcp_connection_store.UpdateSynCookieKeys();
-			std::this_thread::sleep_for(std::chrono::seconds(3000));
+			std::this_thread::sleep_for(std::chrono::seconds(30));
 		}
 	});
 
