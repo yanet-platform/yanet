@@ -129,4 +129,6 @@ if target_option.contains('release')
                  install_dir: bindir_option)
 elif target_option.contains('autotest')
     subdir('autotest')
+elif target_option.contains('proxytest')
+    subdir('proxytest')
 endif

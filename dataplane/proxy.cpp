@@ -293,7 +293,9 @@ eResult TcpConnectionStore::ServiceUpdate(proxy_service_t& service, dataplane::m
     proxy_service_id_t service_id = service.service_id;
 
     common::ipv4_prefix_t upstream_net(service.pool_prefix.address.address, service.pool_prefix.mask);
+    #ifdef TCP_PROXY_DEBUG
     YANET_LOG_WARNING("proxy_service_update\n");
+    #endif
     service.Debug();
 
     uint8_t newGlobalBaseId = currentGlobalBaseId ^ 1;
@@ -1137,7 +1139,9 @@ eResult UpdaterProxyTables::FirstUpdate(uint8_t old_index, uint8_t new_index, da
 {
     std::lock_guard<std::mutex> guard(mutex);
 
+    #ifdef TCP_PROXY_DEBUG
     YANET_LOG_WARNING("First update, activate: %d\n", new_index);
+    #endif
     eResult result = eResult::success;
     if (tables[new_index].NeedUpdate(service))
     {
@@ -1155,7 +1159,9 @@ eResult UpdaterProxyTables::FirstUpdate(uint8_t old_index, uint8_t new_index, da
 
 eResult UpdaterProxyTables::SecondUpdate(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager)
 {
+    #ifdef TCP_PROXY_DEBUG
     YANET_LOG_WARNING("Second update, move: %d->%d\n", old_index, new_index);
+    #endif
     tables[new_index].ClearIfNotEqual(tables[old_index], memory_manager);
     tables[new_index].CopyFrom(tables[old_index]);
     return eResult::success;
@@ -1272,6 +1278,7 @@ void ProxyTables::ClearLinks()
 
 void proxy_service_t::Debug()
 {
+#ifdef TCP_PROXY_DEBUG
     YANET_LOG_WARNING("service_id=%d, counter_id=%d, size_con=%d, size_syn=%d, proxy_header=%d\n", service_id, counter_id, size_connections_table, size_syn_table, send_proxy_header);
     YANET_LOG_WARNING("\tproxy=%s:%d, service=%s:%d, pool=%s\n",
         common::ipv4_address_t(rte_cpu_to_be_32(proxy_addr)).toString().c_str(), rte_cpu_to_be_16(proxy_port),
@@ -1281,6 +1288,7 @@ void proxy_service_t::Debug()
     YANET_LOG_WARNING("\tTimeouts: rto=%d, syn_recv=%d, established=%d\n", timeout_syn_rto, timeout_syn_recv, timeout_established);
     YANET_LOG_WARNING("\tDebug: ignore_size_update_detections=%d, dont_use_bucket_optimization=%d, ignore_check_client_first_ack=%d\n", ignore_size_update_detections, dont_use_bucket_optimization, ignore_check_client_first_ack);
 	YANET_LOG_WARNING("\tservice=[%s], syn=[%s], local=[%s]\n", tables.service_connections.Debug().c_str(), tables.syn_connections.Debug().c_str(), tables.local_pool.Debug().c_str());
+#endif
 }
 
 }

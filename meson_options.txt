@@ -1,6 +1,6 @@
 option('target',
        type: 'combo',
-       choices : ['release', 'autotest', 'unittest', 'buildenv', 'librib'],
+       choices : ['release', 'autotest', 'unittest', 'buildenv', 'librib', 'proxytest'],
        value: 'release',
        description: 'Set the target build.')
 
