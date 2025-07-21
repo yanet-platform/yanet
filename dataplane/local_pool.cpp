@@ -205,7 +205,7 @@ uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) c
     uint32_t idx = tuple_to_index(PackTuple(local_addr, local_port));
     local_addr = rte_be_to_cpu_32(local_addr);
     local_port = rte_be_to_cpu_16(local_port);
-    if (unlikely(idx > local_info_->num_chunks * chunk_size))
+    if (unlikely(idx > local_info_->num_chunks * chunk_size - 1))
     {
         // YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: out of range, local_addr=%s local_port=%d idx=%d num_connections_=%lu\n",
         //     common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx, local_info_->num_chunks * chunk_size);
