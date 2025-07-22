@@ -30,6 +30,7 @@ TEST(ServiceConnectionsTest, Benchmark)
                 {
                     dataplane::proxy::ConnectionData<dataplane::proxy::Connection> data;
                     conn.FindAndLock(i, 2, 7, data, false);
+                    data.Unlock();
                 }
                 auto find_elapsed = std::chrono::steady_clock::now() - start;
     
@@ -85,6 +86,7 @@ TEST(ServiceConnectionsTest, BenchmarkConcurrent)
                         {
                             dataplane::proxy::ConnectionData<dataplane::proxy::Connection> data;
                             conn.FindAndLock(k, 2, 7, data, false);
+                            data.Unlock();
                         }
                     });
                 }
