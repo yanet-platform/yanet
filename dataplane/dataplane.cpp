@@ -1072,7 +1072,8 @@ eResult cDataPlane::initWorkers()
 		                                                         socket_id,
 		                                                         config_values_,
 		                                                         port_to_socket,
-		                                                         std::move(samplers));
+		                                                         std::move(samplers),
+																 &tcp_connection_store);
 		if (!worker)
 		{
 			return eResult::errorAllocatingMemory;
@@ -1530,28 +1531,20 @@ void cDataPlane::start()
 
 	bus.run();
 
-	threads.emplace_back([this]() {
-		for (;;)
-		{
-			tcp_connection_store.CollectGarbage();
-			std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		}
-	});
-
-	threads.emplace_back([this]() {
-		auto iter_bases = globalBases.begin();
-		for (;;)
-		{
-			bool work = true;
-			for (uint32_t index = 0; (index < YANET_CONFIG_PROXY_SERVICES_SIZE) && work; index++)
-			{
-				proxy_service_id_t service_id = tcp_connection_store.GetIndexServiceForNextRetransmit();
-				const dataplane::proxy::proxy_service_t& service = iter_bases->second[currentGlobalBaseId & 1]->proxy_services[service_id];;
-				work = tcp_connection_store.GetDataForRetramsits(service, ring_retransmit_free_, ring_retransmit_send_);
-			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(10));
-		}
-	});
+	// threads.emplace_back([this]() {
+	// 	auto iter_bases = globalBases.begin();
+	// 	for (;;)
+	// 	{
+	// 		bool work = true;
+	// 		for (uint32_t index = 0; (index < YANET_CONFIG_PROXY_SERVICES_SIZE) && work; index++)
+	// 		{
+	// 			proxy_service_id_t service_id = tcp_connection_store.GetIndexServiceForNextRetransmit();
+	// 			const dataplane::proxy::proxy_service_t& service = iter_bases->second[currentGlobalBaseId & 1]->proxy_services[service_id];;
+	// 			work = tcp_connection_store.GetDataForRetramsits(service, ring_retransmit_free_, ring_retransmit_send_);
+	// 		}
+	// 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	// 	}
+	// });
 
 	threads.emplace_back([this]() {
 		for (;;)

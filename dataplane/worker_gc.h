@@ -8,6 +8,7 @@
 #include "common/sdpcommon.h"
 #include "config_values.h"
 #include "hashtable.h"
+#include "proxy.h"
 #include "samples.h"
 #include "utils.h"
 
@@ -21,7 +22,7 @@ class worker_gc_t
 public:
 	using PortToSocketArray = std::array<tSocketId, CONFIG_YADECAP_PORTS_SIZE>;
 	using SamplersVector = utils::StaticVector<samples::Sampler*, YANET_CONFIG_MAX_SAMPLED_WORKERS_PER_GC>;
-	worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, SamplersVector&& samplers);
+	worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, SamplersVector&& samplers, dataplane::proxy::TcpConnectionStore* tcp_connection_store);
 	~worker_gc_t();
 
 	eResult init(const tCoreId& core_id, const tSocketId& socket_id, const dataplane::base::permanently& base_permanently, const dataplane::base::generation& base);
@@ -45,6 +46,7 @@ protected:
 	void handle_acl_sync();
 	void handle_callbacks();
 	void handle_free_mbuf();
+	void handle_proxy_gc();
 
 	bool is_timeout(const uint32_t timestamp, const uint32_t timeout);
 	void correct_timestamp(uint16_t& timestamp, const uint16_t last_seen_max = YANET_CONFIG_STATE_TIMEOUT_MAX);
@@ -114,4 +116,7 @@ public:
 	dataplane::hashtable_gc_t fw6_state_gc;
 	uint32_t gc_step;
 	uint32_t sample_gc_step;
+
+	dataplane::proxy::TcpConnectionStore* tcp_connection_store_;
+	uint32_t last_time_proxy_gc = 0;
 };

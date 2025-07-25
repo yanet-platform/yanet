@@ -7,7 +7,8 @@
 #include "dataplane/sdpserver.h"
 #include "dataplane/worker_gc.h"
 
-worker_gc_t::worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, SamplersVector&& samplers) :
+worker_gc_t::worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, SamplersVector&& samplers,
+						  dataplane::proxy::TcpConnectionStore* tcp_connection_store) :
         mempool(nullptr),
         core_id(-1),
         socket_id(-1),
@@ -19,7 +20,8 @@ worker_gc_t::worker_gc_t(const ConfigValues& cfg, const PortToSocketArray& pts, 
         samplers_{samplers},
         callback_id(0),
         gc_step{static_cast<uint32_t>(cfg.gc_step)},
-        sample_gc_step{static_cast<uint32_t>(cfg.sample_gc_step)}
+        sample_gc_step{static_cast<uint32_t>(cfg.sample_gc_step)},
+		tcp_connection_store_(tcp_connection_store)
 {
 }
 
@@ -208,6 +210,7 @@ void worker_gc_t::handle()
 	handle_callbacks();
 	handle_free_mbuf();
 	handle_samples();
+	handle_proxy_gc();
 }
 
 void worker_gc_t::handle_nat64stateful_gc()
@@ -1203,4 +1206,13 @@ void worker_gc_t::balancer_state_clear()
 
 		return true;
 	});
+}
+
+void worker_gc_t::handle_proxy_gc()
+{
+	if (current_time != last_time_proxy_gc)
+	{
+		tcp_connection_store_->CollectGarbage();
+		last_time_proxy_gc = current_time;
+	}
 }
