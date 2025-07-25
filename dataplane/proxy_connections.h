@@ -250,16 +250,28 @@ public:
         for (uint32_t index = 0; index < number_buckets_; index++)
         {
             Bucket& bucket = buckets_[index];
-            bucket.Lock();
+            bool expired = false;
             for (uint32_t i = 0; i < Bucket::bucket_size; i++)
             {
                 if (bucket.addresses[i] != 0 && bucket.IsExpired(i, current_time, timeout))
                 {
-                    local_pool.Free(LocalPool::max_workers, bucket.connections[i].local);
-                    bucket.Clear(i);
+                    expired = true;
+                    break;
                 }
             }
-            bucket.Unlock();
+            if (expired)
+            {
+                bucket.Lock();
+                for (uint32_t i = 0; i < Bucket::bucket_size; i++)
+                {
+                    if (bucket.addresses[i] != 0 && bucket.IsExpired(i, current_time, timeout))
+                    {
+                        local_pool.Free(LocalPool::max_workers, bucket.connections[i].local);
+                        bucket.Clear(i);
+                    }
+                }
+                bucket.Unlock();
+            }
         }
     }
 
