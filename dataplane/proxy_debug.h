@@ -1,12 +1,8 @@
 #pragma once
 
-#include <unordered_map>
-
 #include "common/ringlog.h"
 
 #define TCP_PROXY_FULL_DEBUG 0
-
-#define PackLog(event, value1, value2) ((uint64_t)(static_cast<uint8_t>(event)) | (((uint64_t)value1 & 0xffff) << 8) | (((uint64_t)value2 & 0xffff) << 24))
 
 namespace dataplane::proxy
 {

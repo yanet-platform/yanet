@@ -116,6 +116,7 @@ public: ///< @todo
 	YADECAP_CACHE_ALIGNED(align12);
 
 	uint32_t currentTime;
+	uint64_t current_time_ms;
 	uint8_t physicalPort_flags[CONFIG_YADECAP_PORTS_SIZE];
 
 	YADECAP_CACHE_ALIGNED(align2);

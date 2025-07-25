@@ -49,9 +49,9 @@ cWorker::cWorker(cDataPlane* dataPlane) :
         ring_toFreePackets(nullptr),
         ring_log(nullptr),
         roundRobinCounter(0),
-		ringLog{0, nullptr},
 		handlerStat(nullptr),
-        packetsToSWNPRemainder(dataPlane->config.SWNormalPriorityRateLimitPerWorker)
+        packetsToSWNPRemainder(dataPlane->config.SWNormalPriorityRateLimitPerWorker),
+		ringLog{0, nullptr}
 {
 }
 

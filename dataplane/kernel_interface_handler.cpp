@@ -175,12 +175,14 @@ void KernelInterfaceWorker::RecvFree()
 }
 
 /// @brief Receive packets from kernel interface and send to physical port
-void KernelInterfaceWorker::ForwardToPhy()
+unsigned KernelInterfaceWorker::ForwardToPhy()
 {
+	unsigned total = 0;
 	for (std::size_t i = 0; i < size_; ++i)
 	{
 		rte_mbuf* burst[CONFIG_YADECAP_MBUFS_BURST_SIZE];
 		auto packets = rte_eth_rx_burst(forward_[i].port(), forward_[i].queue(), burst, CONFIG_YADECAP_MBUFS_BURST_SIZE);
+		total += packets;
 		uint64_t bytes = std::accumulate(burst, burst + packets, 0, [](uint64_t total, rte_mbuf* mbuf) {
 			return total + rte_pktmbuf_pkt_len(mbuf);
 		});
@@ -200,6 +202,7 @@ void KernelInterfaceWorker::ForwardToPhy()
 		stats.ibytes += bytes;
 		stats.idropped += remain;
 	}
+	return total;
 }
 
 void KernelInterfaceWorker::HandlePacketDump(rte_mbuf* mbuf)

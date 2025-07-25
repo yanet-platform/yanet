@@ -70,7 +70,37 @@ std::unordered_map<common::ringlog::DebugEvent, std::string> GetEvents()
     result[common::ringlog::DebugEvent::SrvAckNoCon] = "ERROR SrvAckNoCon";
     result[common::ringlog::DebugEvent::SrvAckOk] = "SrvAckOk";
 
+    result[common::ringlog::DebugEvent::SlowWorkerCounts] = "SlowWorkerCounts";
+
     return result;
+}
+
+using OneLogRecord = std::tuple<common::ringlog::LogRecord, uint32_t, tCoreId>;
+
+void SortRecords(std::vector<OneLogRecord>& records)
+{
+    std::sort(records.begin(), records.end(), [](const auto& left, const auto& right) {
+        return (std::get<0>(left).time < std::get<0>(right).time) ||
+        ((std::get<0>(left).time == std::get<0>(right).time) && (std::get<1>(left) < std::get<1>(right)));
+    });
+}
+
+void PrintTime(uint64_t time, uint64_t& prev_second)
+{
+    uint64_t second = time / 1000;
+    if ((prev_second == 0) || (second == prev_second + 1))
+    {
+        printf("%.3f ", time * 0.001);
+    }
+    else if (second == prev_second)
+    {
+        printf("          .%03ld ", time % 1000);
+    }
+    else
+    {
+        printf("%.3f+", time * 0.001);
+    }
+    prev_second = second;
 }
 
 void print(std::optional<uint16_t> value_param)
@@ -78,8 +108,8 @@ void print(std::optional<uint16_t> value_param)
     common::sdp::DataPlaneInSharedMemory sdp_data;
 	OpenSharedMemoryDataplaneBuffers(sdp_data, true);
 
-    std::vector<std::tuple<common::ringlog::LogRecord, uint32_t, tCoreId>> events_output;
-    std::vector<std::tuple<common::ringlog::LogRecord, uint32_t, tCoreId>> events_error;
+    std::vector<OneLogRecord> events_output;
+    std::vector<OneLogRecord> events_error;
 
 	for (const auto& [coreId, worker_info] : sdp_data.workers)
 	{
@@ -149,30 +179,13 @@ void print(std::optional<uint16_t> value_param)
         }
     }
 
-    std::sort(events_output.begin(), events_output.end(), [](const auto& left, const auto& right) {
-        return (std::get<0>(left).time < std::get<0>(right).time) ||
-        ((std::get<0>(left).time == std::get<0>(right).time) && (std::get<1>(left) < std::get<1>(right)));
-    });
+    SortRecords(events_output);
 
     uint64_t prev_second = 0;
     for (const auto& [record, index, coreId] : events_output)
     {
         GCC_BUG_UNUSED(index);
-        uint64_t time = record.time;
-        uint64_t second = time / 1000;
-        if ((prev_second == 0) || (second == prev_second + 1))
-        {
-            printf("%.3f ", time * 0.001);
-        }
-        else if (second == prev_second)
-        {
-            printf("          .%03ld ", time % 1000);
-        }
-        else
-        {
-            printf("%.3f+", time * 0.001);
-        }
-        prev_second = second;
+        PrintTime(record.time, prev_second);
 
         uint64_t value = record.data;
         uint8_t event = value & 0xff;
@@ -180,6 +193,38 @@ void print(std::optional<uint16_t> value_param)
         uint16_t value2 = rte_be_to_cpu_16((value >> 24) & 0xffff);
         printf(" %3d %5u %5u %s\n", coreId, value1, value2, event_names[event].c_str());
     }    
+}
+
+void print_slow()
+{
+    common::sdp::DataPlaneInSharedMemory sdp_data;
+	OpenSharedMemoryDataplaneBuffers(sdp_data, true);
+
+    std::vector<OneLogRecord> events_output;
+    for (const auto& [coreId, worker_info] : sdp_data.workers)
+    {
+	    auto* buffer = common::sdp::ShiftBuffer<common::ringlog::LogRecord*>(worker_info.buffer,
+		                                                                 sdp_data.metadata_worker.start_ring_log);
+	    for (uint32_t index = 0; index < RINGLOG_SIZE_PER_WORKER; index++)
+	    {
+		    if ((buffer[index].time != 0) && ((buffer[index].data & 0xff) == (uint8_t)common::ringlog::DebugEvent::SlowWorkerCounts))
+		    {
+			    events_output.push_back({buffer[index], index, coreId});
+		    }
+	    }
+    }
+    SortRecords(events_output);
+
+    uint64_t prev_second = 0;
+    for (const auto& [record, index, coreId] : events_output)
+    {
+        PrintTime(record.time, prev_second);
+        uint64_t value = record.data;
+        uint16_t value1 = (value >> 8) & 0xffff;
+        uint16_t value2 = (value >> 24) & 0xffff;
+        uint16_t value3 = (value >> 40) & 0xffff;
+        printf(" %2d %5d %5d %5d\n", coreId, value1, value2, value3);
+    }
 }
 
 }

@@ -3,6 +3,8 @@
 #include <tuple>
 #include <vector>
 
+#include "common/ringlog.h"
+
 #include "dpdk.h"
 #include "dregress.h"
 #include "fragmentation.h"
@@ -94,7 +96,7 @@ public:
 	bool handlePacket_fw_state_sync_ingress(rte_mbuf* mbuf);
 	void handlePacket_balancer_icmp_forward(rte_mbuf* mbuf);
 	void handlePacketFromForwardingPlane(rte_mbuf* mbuf);
-	void HandleWorkerRings();
+	unsigned HandleWorkerRings();
 	void SendRentransmits();
 
 	// \brief dequeue packets from worker_gc's ring to slowworker
@@ -104,7 +106,8 @@ public:
 	{
 		slow_worker_->slowWorkerBeforeHandlePackets();
 
-		HandleWorkerRings();
+		uint32_t count1 = HandleWorkerRings();
+		uint32_t count2 = 0;
 
 		if (config_.use_kernel_interface)
 		{
@@ -114,13 +117,21 @@ public:
 		DequeueGC();
 		fragmentation_.handle();
 		dregress_.handle();
-		SendRentransmits();
+		// SendRentransmits();
 
 		if (config_.use_kernel_interface)
 		{
-			kni_worker_.ForwardToPhy();
+			count2 = kni_worker_.ForwardToPhy();
 			kni_worker_.RecvFree();
 		}
+
+		uint count3 = slow_worker_mbufs_.size();
+		GCC_BUG_UNUSED(count1);
+		GCC_BUG_UNUSED(count2);
+		GCC_BUG_UNUSED(count3);
+
+		RINGLOG_CONDITION(slow_worker_->CurrentBase().globalBase->ringlog_enabled && (count1 + count2 + count3 != 0));
+		RINGLOG_ADD(slow_worker_->ringLog, slow_worker_->CurrentTimeMs(), PackLog3(common::ringlog::DebugEvent::SlowWorkerCounts, count1, count2, count3));
 
 		/// push packets to slow worker
 		while (!slow_worker_mbufs_.empty())

@@ -10,6 +10,11 @@
 static_assert((RINGLOG_SIZE_PER_WORKER & (RINGLOG_SIZE_PER_WORKER - 1)) == 0, "size is not power 2");
 #define RINGLOG_SIZE_PER_WORKER_MASK (RINGLOG_SIZE_PER_WORKER - 1)
 
+#define PackLog(event, value1, value2) ((uint64_t)(static_cast<uint8_t>(event)) | (((uint64_t)value1 & 0xffff) << 8) | (((uint64_t)value2 & 0xffff) << 24))
+
+#define PackTo16(value) ((uint64_t)((uint16_t)(value > 0xffff ? 0xffff : value)))
+#define PackLog3(event, value1, value2, value3) ((uint64_t)(static_cast<uint8_t>(event)) | PackTo16(value1) << 8 | PackTo16(value2) << 24 | PackTo16(value3) << 40)
+
 namespace common::ringlog
 {
 
@@ -62,6 +67,8 @@ enum class DebugEvent : uint8_t
     SrvAckNoLoc = 241,
     SrvAckNoCon = 242,
     SrvAckOk = 41,
+
+    SlowWorkerCounts = 51,
 };
 
 }

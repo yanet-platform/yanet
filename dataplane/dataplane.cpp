@@ -1452,25 +1452,20 @@ void cDataPlane::init_worker_base()
 
 void cDataPlane::timestamp_thread()
 {
-	uint32_t prev_time = 0;
-
 	for (;;)
 	{
 		current_time = time(nullptr);
+		uint64_t current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-		if (current_time != prev_time)
+		for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
 		{
-			for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
-			{
-				GCC_BUG_UNUSED(socket_id);
-				globalbase_atomic->currentTime = current_time;
-			}
-			tcp_connection_store.current_time_sec = current_time;
-
-			prev_time = current_time;
+			GCC_BUG_UNUSED(socket_id);
+			globalbase_atomic->currentTime = current_time;
+			globalbase_atomic->current_time_ms = current_time_ms;
 		}
+		tcp_connection_store.current_time_sec = current_time;
 
-		tcp_connection_store.current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+		tcp_connection_store.current_time_ms = current_time_ms;
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}

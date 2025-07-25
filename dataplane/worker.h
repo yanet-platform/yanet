@@ -259,6 +259,7 @@ public:
 	const dataplane::base::generation& CurrentBase() { return bases[localBaseId & 1]; }
 	void IncrementCounter(common::globalBase::static_counter_type type) { counters[(uint32_t)type]++; }
 	[[nodiscard]] uint32_t CurrentTime() const { return basePermanently.globalBaseAtomic->currentTime; }
+	[[nodiscard]] uint64_t CurrentTimeMs() const { return basePermanently.globalBaseAtomic->current_time_ms; }
 
 	friend class cDataPlane;
 	friend class cReport;
@@ -266,6 +267,7 @@ public:
 	friend class dregress_t;
 	friend class worker_gc_t;
 	friend class dataplane::globalBase::generation;
+	friend class SlowWorker;
 	friend struct dataplane::ActionDispatcher<dataplane::FlowDirection::Ingress>;
 	friend struct dataplane::ActionDispatcher<dataplane::FlowDirection::Egress>;
 
@@ -390,7 +392,6 @@ protected:
 	uint64_t* aclCounters; // YANET_CONFIG_ACL_COUNTERS_SIZE
 	uint64_t roundRobinCounter;
 
-	common::ringlog::LogInfo ringLog;
 	uint32_t* handlerStat;
 
 	// will decrease with each new packet sent to slow worker, replenishes each N mseconds
@@ -410,6 +411,7 @@ public:
 	                                  32,
 	                                  8>
 	        neighbor_resolve;
+	common::ringlog::LogInfo ringLog;
 
 protected:
 	YADECAP_CACHE_ALIGNED(align3);

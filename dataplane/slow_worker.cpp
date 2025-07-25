@@ -935,8 +935,9 @@ void SlowWorker::handlePacketFromForwardingPlane(rte_mbuf* mbuf)
 	}
 }
 
-void SlowWorker::HandleWorkerRings()
+unsigned SlowWorker::HandleWorkerRings()
 {
+	unsigned total = 0;
 	for (unsigned nIter = 0; nIter < YANET_CONFIG_RING_PRIORITY_RATIO; nIter++)
 	{
 		for (unsigned hIter = 0; hIter < YANET_CONFIG_RING_PRIORITY_RATIO; hIter++)
@@ -946,6 +947,7 @@ void SlowWorker::HandleWorkerRings()
 			{
 				hProcessed += ring_handle(worker->ring_toFreePackets, worker->ring_highPriority);
 			}
+			total += hProcessed;
 			if (!hProcessed)
 			{
 				break;
@@ -957,6 +959,7 @@ void SlowWorker::HandleWorkerRings()
 		{
 			nProcessed += ring_handle(worker->ring_toFreePackets, worker->ring_normalPriority);
 		}
+		total += nProcessed;
 		if (!nProcessed)
 		{
 			break;
@@ -964,8 +967,9 @@ void SlowWorker::HandleWorkerRings()
 	}
 	for (cWorker* worker : workers_serviced_)
 	{
-		ring_handle(worker->ring_toFreePackets, worker->ring_lowPriority);
+		total += ring_handle(worker->ring_toFreePackets, worker->ring_lowPriority);
 	}
+	return total;
 }
 
 void SlowWorker::DequeueGC()

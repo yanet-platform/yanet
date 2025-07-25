@@ -92,7 +92,7 @@ public:
 	/// @brief Receive from in.X/out.X/drop.X interfaces and free packets
 	void RecvFree();
 	/// @brief Receive packets from kernel interface and send to physical port
-	void ForwardToPhy();
+	unsigned ForwardToPhy();
 	void HandlePacketDump(rte_mbuf* mbuf);
 	void HandlePacketFromForwardingPlane(rte_mbuf* mbuf);
 };
