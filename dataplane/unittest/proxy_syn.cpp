@@ -17,7 +17,7 @@ void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection
     uint16_t upstream_port = rte_cpu_to_be_16(8080);
     common::ipv4_prefix_t local_pool_prefix("33.0.0.0/24");
     uint32_t size_connections_table = 256;
-    uint32_t size_syn_table = 32;
+    uint32_t size_syn_table = 0;
 
     proxy_service_id_t service_id = 1;
 
@@ -68,8 +68,8 @@ void CreateMbuf(rte_mbuf** mbuf)
 
 TEST(ServiceSynConnectionsTest, SynFlood)
 {
-    uint32_t threads_count = 4;
-    uint32_t packets_count = 10000;
+    uint32_t threads_count = 1;
+    uint64_t packets_count = 100'000'000;
     uint32_t client_addr = rte_cpu_to_be_32(common::ipv4_address_t("11.0.0.1"));
 
     dataplane::proxy::TcpConnectionStore tcp_connection_store;
@@ -83,14 +83,16 @@ TEST(ServiceSynConnectionsTest, SynFlood)
         CreateMbuf(&mbufs[index]);
     }
 
-    std::vector<std::thread> threads;
-    for (uint32_t index = 0; index < threads_count; index++)
-    {
+    // std::vector<std::thread> threads;
+    // for (uint32_t index = 0; index < threads_count; index++)
+    // {
+    uint32_t index = 0;
         uint32_t worker_id = index;
-        threads.emplace_back([&mbufs, &base, &tcp_connection_store, &service, client_addr, worker_id, packets_count, index]() {
+    //     threads.emplace_back([&mbufs, &base, &tcp_connection_store, &service, client_addr, worker_id, packets_count, index]() {
+            common::ringlog::LogInfo ringlog;
             uint64_t counters[64];
             rte_mbuf* mbuf = mbufs[index];
-            for (uint32_t packet_index = 0; packet_index < packets_count; packet_index++)
+            for (uint64_t packet_index = 0; packet_index < packets_count; packet_index++)
             {
                 // if (packet_index % 1000 == 0)
                 // {
@@ -115,15 +117,15 @@ TEST(ServiceSynConnectionsTest, SynFlood)
                 mbuf->pkt_len = 100;
 
                 metadata->flow.data.proxy_service_id = 1;
-                ASSERT_TRUE(tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, worker_id));
+                ASSERT_TRUE(tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, worker_id, ringlog));
             }
-        });
-    }
+    //     });
+    // }
 
-    for (uint32_t index = 0; index < threads_count; index++)
-    {
-        threads[index].join();
-    }
+    // for (uint32_t index = 0; index < threads_count; index++)
+    // {
+    //     threads[index].join();
+    // }
 }
 
 TEST(ServiceSynConnectionsTest, Benchmark)
