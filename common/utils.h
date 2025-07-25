@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <bitset>
 #include <iomanip>
 #include <string>
@@ -112,6 +113,60 @@ std::string bitset_to_hex_string(const std::bitset<N>& bs)
 	}
 	return ss.str();
 }
+
+class Job
+{
+	std::atomic<bool> run_;
+	std::thread thread_;
+	template<typename Task, typename... Args>
+	void Loop(Task&& task, Args&&... args)
+	{
+		run_.store(true, std::memory_order_relaxed);
+		while (run_)
+		{
+			std::forward<Task>(task)(std::forward(args)...);
+		}
+	}
+
+public:
+	Job() : run_{false} {}
+
+	template<typename Task, typename... Args>
+	Job(Task&& task, Args&&... args) :
+	        run_(true), thread_(Loop(std::forward(task), std::forward(args)...)) {}
+	Job(Job&& other) = default;
+	Job& operator=(Job&& other) = default;
+	Job(const Job& other) = delete;
+	Job& operator=(const Job& other) = delete;
+	~Job()
+	{
+		Stop();
+	}
+
+	template<typename Task, typename... Args>
+	void Run(Task&& task, Args&&... args)
+	{
+		if (Running())
+		{
+			Stop();
+		}
+		Loop(std::forward<Task>(task), std::forward(args)...);
+	}
+
+	bool Running() const
+	{
+		return run_.load(std::memory_order_relaxed);
+	}
+
+	void Stop()
+	{
+		run_.store(false, std::memory_order_relaxed);
+		if (thread_.joinable())
+		{
+			thread_.join();
+		}
+	}
+};
 
 }
 // namespace utils

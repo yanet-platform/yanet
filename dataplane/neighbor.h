@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+#include <chrono>
 #include <map>
 #include <thread>
 #include <unordered_map>
@@ -9,12 +11,15 @@
 #include "common/generation.h"
 #include "common/idp.h"
 #include "common/neighbor.h"
+#include "common/utils.h"
 
 #include "hashtable.h"
 #include "type.h"
 
 namespace dataplane::neighbor
 {
+
+using namespace std::chrono_literals;
 
 constexpr static uint16_t flag_is_ipv6 = 1 << 0;
 constexpr static uint16_t flag_is_static = 1 << 1;
@@ -61,6 +66,8 @@ public:
 
 class module
 {
+	static constexpr auto PAUSE = 10ms;
+
 public:
 	module();
 
@@ -79,21 +86,31 @@ public:
 
 	void report(nlohmann::json& json);
 
+	void Upsert(tInterfaceId iface, const ipv6_address_t& dst, const rte_ether_addr& mac);
+	void UpdateTimestamp(tInterfaceId iface, const ipv6_address_t& dst);
+	void Remove(tInterfaceId iface, const ipv6_address_t& dst);
+
 protected:
-	void main_thread();
-	void netlink_thread();
+	void StartResolveJob();
+	void StartNetlinkMonitor();
+	eResult DumpOSNeighbors();
 
 	void resolve(const dataplane::neighbor::key& key);
 
+	void neighbor_upsert(const std::string& interface_name,
+	                     const common::ip_address_t& ip_address,
+	                     const common::mac_address_t& mac_address);
+
 protected:
 	cDataPlane* dataplane;
-
-	std::vector<std::thread> threads;
 
 	generation_manager<dataplane::neighbor::generation_interface> generation_interface;
 	generation_manager<dataplane::neighbor::generation_hashtable, eResult> generation_hashtable;
 
 	common::neighbor::stats stats;
+
+	utils::Job resolve_;
+	utils::Job monitor_;
 };
 
 }

@@ -26,6 +26,7 @@ dataplane_common_dep = declare_dependency(
 dependencies = []
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
+dependencies += dependency('libnl-route-3.0')
 dependencies += [dataplane_common_dep]
 
 sources = files('bus.cpp',
