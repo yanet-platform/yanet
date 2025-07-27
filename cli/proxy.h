@@ -24,6 +24,7 @@ void counters()
         table.insert_row(row);
     }
 
+	table.RemoveZeroColumns();
     table.Print();
 }
 
@@ -37,11 +38,12 @@ void connections(std::string service_name)
 					 "src_addr",
 	                 "src_port",
 	                 "local_addr",
-	                 "local_port");
+	                 "local_port",
+					 "socket_id");
 
-	for (const auto& [service_name, src_addr, src_port, local_addr, local_port] : response)
+	for (const auto& [service_name, src_addr, src_port, local_addr, local_port, socket_id] : response)
 	{
-		table.insert_row(service_name, common::ipv4_address_t(rte_cpu_to_be_32(src_addr)).toString(), rte_cpu_to_be_16(src_port), common::ipv4_address_t(rte_cpu_to_be_32(local_addr)).toString(), rte_cpu_to_be_16(local_port));
+		table.insert_row(service_name, common::ipv4_address_t(rte_cpu_to_be_32(src_addr)).toString(), rte_cpu_to_be_16(src_port), common::ipv4_address_t(rte_cpu_to_be_32(local_addr)).toString(), rte_cpu_to_be_16(local_port), socket_id);
 	}
 
 	table.Print();
@@ -58,11 +60,12 @@ void syn(std::string service_name)
 					 "src_addr",
 	                 "src_port",
 	                 "local_addr",
-	                 "local_port");
+	                 "local_port",
+					 "socket_id");
 
-	for (const auto& [service_name, src_addr, src_port, local_addr, local_port] : response)
+	for (const auto& [service_name, src_addr, src_port, local_addr, local_port, socket_id] : response)
 	{
-		table.insert_row(service_name, common::ipv4_address_t(rte_cpu_to_be_32(src_addr)).toString(), rte_cpu_to_be_16(src_port), common::ipv4_address_t(rte_cpu_to_be_32(local_addr)).toString(), rte_cpu_to_be_16(local_port));
+		table.insert_row(service_name, common::ipv4_address_t(rte_cpu_to_be_32(src_addr)).toString(), rte_cpu_to_be_16(src_port), common::ipv4_address_t(rte_cpu_to_be_32(local_addr)).toString(), rte_cpu_to_be_16(local_port), socket_id);
 	}
 
 	table.Print();
@@ -76,6 +79,7 @@ void tables(std::optional<std::string> service_name)
 	TablePrinter table;
 	table.insert_row("service_id",
 					 "service_name",
+					 "socket_id",
 					 "connections",
 					 "max_connections",
 					 "syn_connections",
@@ -84,9 +88,9 @@ void tables(std::optional<std::string> service_name)
 					 "total_addresses",
 					 "free_addresses",
 					 "used_addresses");
-	for (const auto& [service_id, service_name, connections, max_connections, syn_connections, max_syn_connections, prefix, total_addresses, free_addresses, used_addresses] : response)
+	for (const auto& record : response)
 	{
-		table.insert_row(service_id, service_name, connections, max_connections, syn_connections, max_syn_connections, prefix, total_addresses, free_addresses, used_addresses);
+		table.insert_row(record);
 	}
 
 	table.Print();

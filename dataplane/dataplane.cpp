@@ -854,6 +854,8 @@ eResult cDataPlane::initGlobalBases()
 			return result;
 		}
 
+		tcp_connection_store.ActivateSocket(socketId);
+
 		socket_ids.emplace(socketId);
 	}
 
@@ -872,6 +874,8 @@ eResult cDataPlane::initGlobalBases()
 		{
 			return result;
 		}
+
+		tcp_connection_store.ActivateSocket(socketId);
 
 		socket_ids.emplace(socketId);
 	}
@@ -1464,9 +1468,6 @@ void cDataPlane::timestamp_thread()
 			globalbase_atomic->currentTime = current_time;
 			globalbase_atomic->current_time_ms = current_time_ms;
 		}
-		tcp_connection_store.current_time_sec = current_time;
-
-		tcp_connection_store.current_time_ms = current_time_ms;
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}

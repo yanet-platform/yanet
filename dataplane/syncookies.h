@@ -52,6 +52,6 @@ private:
     static constexpr uint32_t DATA_MASK = WSCALE_MASK | SACK_MASK | MSS_MASK;
 
     uint32_t cookie_hash(uint32_t saddr, uint16_t sport, uint32_t keyidx);
-};
+} __rte_cache_aligned;
 
 }

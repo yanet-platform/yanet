@@ -3,8 +3,8 @@ import ipaddress
 
 
 def write_pcap(filename, *packetsList):
-	if len(packetsList) == 0:
-		PcapWriter(filename)._write_header(Ether())
+	if len(*packetsList) == 0:
+		PcapWriter(filename).close()
 		return
 
 	PcapWriter(filename)

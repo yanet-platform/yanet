@@ -258,23 +258,27 @@ void LocalPool::ClearIfNotEqual(const LocalPool& other, dataplane::memory_manage
 {
     if (chunk_queue_ != other.chunk_queue_ && chunk_queue_ != nullptr)
     {
-        memory_manager->destroy(chunk_queue_);
-        chunk_queue_ = nullptr;
-    }
-
-    if (local_to_client_ != other.local_to_client_ && local_to_client_ != nullptr)
-    {
-        memory_manager->destroy(local_to_client_);
-        local_to_client_ = nullptr;
-    }
-
-    if (local_info_ != other.local_info_ && local_info_ != nullptr)
-    {
-        memory_manager->destroy(local_info_);
-        local_info_ = nullptr;
+        Clear(memory_manager);
+        ClearLinks();
     }
 
     initialized_ = false;
+}
+
+void LocalPool::Clear(dataplane::memory_manager* memory_manager)
+{
+    if (memory_manager != nullptr)
+    {
+        memory_manager->destroy(chunk_queue_);
+        memory_manager->destroy(local_to_client_);
+        memory_manager->destroy(local_info_);
+    }
+    else
+    {
+        delete chunk_queue_;
+        delete local_to_client_;
+        delete local_info_;
+    }
 }
 
 void LocalPool::CopyFrom(const LocalPool& other)

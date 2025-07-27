@@ -818,7 +818,8 @@ using request = proxy_service_id_t; ///< proxy_service_id
 using connection = std::tuple<uint32_t, ///< src_addr
                               uint16_t, ///< src_port
                               uint32_t, ///< local_addr
-                              uint16_t>; ///< local_port
+                              uint16_t, ///< local_port
+                              tSocketId>; ///< socket id
 
 using response = std::vector<connection>;
 }
@@ -830,7 +831,8 @@ using request = proxy_service_id_t; ///< proxy_service_id
 using connection = std::tuple<uint32_t, ///< src_addr
                               uint16_t, ///< src_port
                               uint32_t, ///< local_addr
-                              uint16_t>; ///< local_port
+                              uint16_t, ///< local_port
+                              tSocketId>; ///< socket id
 
 using response = std::vector<connection>;        
 }
@@ -841,6 +843,7 @@ using request = std::vector<std::pair<proxy_service_id_t, std::string>>;
 
 using tables = std::tuple<proxy_service_id_t, ///< proxy_service_id
                           std::string, ///< service_name
+                          tSocketId, ///< socket
                           size_t, ///< connections
                           size_t, ///< max connections
                           size_t, ///< syn connections

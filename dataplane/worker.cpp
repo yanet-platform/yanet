@@ -2213,7 +2213,7 @@ inline void cWorker::route_handle4()
 
 		if (route_ipv4_values[mbuf_i] == dataplane::lpmValueIdInvalid)
 		{
-			YANET_LOG_WARNING("lpmValueIdInvalid\n");
+			// YANET_LOG_WARNING("lpmValueIdInvalid\n");
 			stats->interface_lookupMisses++;
 			rte_pktmbuf_free(mbuf);
 			continue;
@@ -2262,7 +2262,7 @@ inline void cWorker::route_handle4()
 			}
 			else
 			{
-				YANET_LOG_WARNING("neighbor invalid\n");
+				// YANET_LOG_WARNING("neighbor invalid\n");
 				stats->interface_neighbor_invalid++;
 				drop(mbuf);
 
@@ -6149,10 +6149,12 @@ inline void cWorker::proxy_client_syn_handle()
 		return;
 	}
 
+	uint32_t current_time_sec = CurrentTime();
+	uint64_t current_time_ms = CurrentTimeMs();
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_client_syn_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_client_syn_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionClientOnSyn(mbuf, base, counters, proxy_worker_id, ringLog))
+		if (tcp_connection_store->ActionClientOnSyn(mbuf, base, counters, proxy_worker_id, ringLog, current_time_sec, current_time_ms))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6179,10 +6181,12 @@ inline void cWorker::proxy_client_ack_handle()
 		return;
 	}
 
+	uint32_t current_time_sec = CurrentTime();
+	uint64_t current_time_ms = CurrentTimeMs();
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_client_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_client_ack_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionClientOnAck(mbuf, base, counters, proxy_worker_id, ringLog))
+		if (tcp_connection_store->ActionClientOnAck(mbuf, base, counters, proxy_worker_id, ringLog, current_time_sec, current_time_ms))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6209,10 +6213,12 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		return;
 	}
 
+	uint32_t current_time_sec = CurrentTime();
+	uint64_t current_time_ms = CurrentTimeMs();
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_server_syn_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_server_syn_ack_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionServiceOnSynAck(mbuf, base, counters, ringLog))
+		if (tcp_connection_store->ActionServiceOnSynAck(mbuf, base, counters, ringLog, current_time_sec, current_time_ms))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6239,10 +6245,12 @@ inline void cWorker::proxy_server_ack_handle()
 		return;
 	}
 
+	uint32_t current_time_sec = CurrentTime();
+	uint64_t current_time_ms = CurrentTimeMs();
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_server_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_server_ack_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionServiceOnAck(mbuf, base, counters, ringLog))
+		if (tcp_connection_store->ActionServiceOnAck(mbuf, base, counters, ringLog, current_time_sec, current_time_ms))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6288,11 +6296,11 @@ inline void cWorker::proxy_client_icmp_handle()
 		// 		common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(),
 		// 		common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str());
 
-		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
-		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_in] += mbuf->pkt_len;
-		counters[service.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
-		counters[service.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
-		counters[service.counter_id + (tCounterId)proxy::service_counter::ping_count]++;
+		counters[service.config.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
+		counters[service.config.counter_id + (tCounterId)proxy::service_counter::bytes_in] += mbuf->pkt_len;
+		counters[service.config.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
+		counters[service.config.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
+		counters[service.config.counter_id + (tCounterId)proxy::service_counter::ping_count]++;
 
 		uint32_t tmp_for_swap = ipv4Header->src_addr;
 		ipv4Header->src_addr = ipv4Header->dst_addr;

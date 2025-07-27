@@ -110,6 +110,7 @@ public:
 	uint64_t* counters; // YANET_CONFIG_COUNTERS_SIZE
 
 	uint32_t current_time;
+	uint64_t current_time_ms;
 	dataplane::hashtable_gc_t nat64stateful_lan_state_gc;
 	dataplane::hashtable_gc_t nat64stateful_wan_state_gc;
 	dataplane::hashtable_gc_t fw4_state_gc;

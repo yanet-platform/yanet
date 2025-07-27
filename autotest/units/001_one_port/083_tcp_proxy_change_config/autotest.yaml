@@ -1,0 +1,88 @@
+steps:
+- cli:
+  - rib static insert default 10.0.5.0/24 10.0.1.1
+  - rib static insert default 10.0.2.0/24 10.0.2.1
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 001_1-send.pcap
+    expect: 001_1-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 001_2-send.pcap
+    expect: 001_2-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 001_3-send.pcap
+    expect: 001_3-expect.pcap
+
+- cli:
+  - proxy counters
+  - proxy connections service2
+  - proxy connections service3
+
+- reload: controlplane2.conf
+
+- cli:
+  - proxy connections service2
+  - proxy connections service3
+
+- sendPackets:
+  - port: kni0
+    send: 002_1-send.pcap
+    expect: 002_1-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002_2_1-send.pcap
+    expect: 002_2_1-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002_2_2-send.pcap
+    expect: 002_2_2-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002_3_1-send.pcap
+    expect: 002_3_1-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002_3_2-send.pcap
+    expect: 002_3_2-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 002_4-send.pcap
+    expect: 002_4-expect.pcap
+
+- cli:
+  - proxy counters
+  - proxy connections service2
+  - proxy connections service3
+
+- reload: controlplane3.conf
+
+- cli:
+  - proxy counters
+
+- sendPackets:
+  - port: kni0
+    send: 003_2_1-send.pcap
+    expect: 003_2_1-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 003_2_2-send.pcap
+    expect: 003_2_2-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 003_3-send.pcap
+    expect: 003_3-expect.pcap
+- sendPackets:
+  - port: kni0
+    send: 003_4-send.pcap
+    expect: 003_4-expect.pcap
+
+
+- cli:
+  - proxy connections service2
+  - rib static remove default 10.0.5.0/24 10.0.1.1
+  - rib static remove default 10.0.2.0/24 10.0.2.1
+  - rib prefixes

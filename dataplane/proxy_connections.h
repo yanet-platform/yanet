@@ -171,11 +171,6 @@ class ConnectionsTable
 public:
     using Bucket = ConnectionBucket<ConnectionInfo>;
 
-    ~ConnectionsTable()
-    {
-        if (destroy) destroy();
-    }
-
     bool Init(proxy_service_id_t service_id, uint32_t number_connections, dataplane::memory_manager* memory_manager, uint32_t service_addr, uint16_t service_port)
     {
         if (initialized_)
@@ -208,9 +203,6 @@ public:
         else
         {
             buckets_ = new Bucket[number_buckets]{};
-            destroy = [this](){
-                delete[] buckets_;
-            };
         }
         if (buckets_ == nullptr)
         {
@@ -404,17 +396,34 @@ public:
 
     void ClearIfNotEqual(const ConnectionsTable& other, dataplane::memory_manager* memory_manager)
     {
-        // YANET_LOG_WARNING("\t\tClearIfNotEqual buckets_=%p, other.buckets_=%p\n", buckets_, other.buckets_);
+        // YANET_LOG_WARNING("\t\tClearIfNotEqual %p, other %p, buckets_=%p, other.buckets_=%p\n", this, &other, buckets_, other.buckets_);
         if (buckets_ != other.buckets_ && buckets_ != nullptr)
         {
             // todo info
-            memory_manager->destroy(buckets_);
-            ClearLinks();
+            Clear(memory_manager);
         }
+    }
+
+    void Clear(dataplane::memory_manager* memory_manager)
+    {
+        // YANET_LOG_WARNING("\t\tClear %p\n", this);
+        if (buckets_ != nullptr)
+        {
+            if (memory_manager == nullptr)
+            {
+                delete buckets_;
+            }
+            else
+            {
+                memory_manager->destroy(buckets_);
+            }
+        }
+        ClearLinks();
     }
 
     void CopyFrom(const ConnectionsTable& other)
     {
+        // YANET_LOG_WARNING("\t\tCopyFrom %p, other %p\n", this, &other);
         buckets_ = other.buckets_;
         number_buckets_ = other.number_buckets_;
         initialized_ = other.initialized_;
@@ -423,6 +432,7 @@ public:
 
     void ClearLinks()
     {
+        // YANET_LOG_WARNING("\t\tClearLinks %p\n", this);
         buckets_ = nullptr;
         number_buckets_ = 0;
         initialized_ = false;

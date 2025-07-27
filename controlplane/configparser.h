@@ -36,8 +36,11 @@ protected:
 	void loadConfig_balancer_unrdup(controlplane::balancer::config_t& balancer, const std::string& rootFilePath, const std::string& unrdup_cfg_path);
 	void loadConfig_tun64(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_tun64mappings(controlplane::base_t& baseNext, controlplane::tun64::config_t& tunnel, const nlohmann::json& mappingsJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
+	
 	void loadConfig_proxy(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_proxy_services(controlplane::base_t& baseNext, controlplane::proxy::config_t& proxy, const nlohmann::json& json, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
+	void loadConfig_proxy_tcp_options(const nlohmann::json& moduleJson, controlplane::proxy::tcp_options_t& options, const controlplane::proxy::tcp_options_t& default_tcp_options);
+	void loadConfig_proxy_timeouts(const nlohmann::json& moduleJson, controlplane::proxy::timeouts_t& timeouts, const controlplane::proxy::timeouts_t& default_timeouts);
 
 	void loadConfig_variables(controlplane::base_t& baseNext, const nlohmann::json& json);
 	void loadConfig_fqdns(controlplane::base_t& baseNext, const nlohmann::json& json, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);

@@ -754,9 +754,28 @@ void config_converter_t::processProxy()
 			throw error_result_t(eResult::invalidFlow, "invalid flow type for proxy: " + std::to_string(unsigned(proxy.flow.type)));
 		}
 
-		if (proxy.upstream_net.mask() == 0 && !proxy.services.empty())
+		if (!proxy.services.empty())
 		{
-			throw error_result_t(eResult::invalidFlow, "empty local pool for proxy");
+			// check upstrem nets
+			for (const auto& net : proxy.upstream_nets)
+			{
+				if (net.mask() == 0)
+				{
+					throw error_result_t(eResult::invalidFlow, "empty local pool for proxy in upstream_nets");
+				}
+			}
+			for (size_t first = 0; first < proxy.upstream_nets.size(); first++)
+			{
+				for (size_t second = first + 1; second < proxy.upstream_nets.size(); second++)
+				{
+					const auto& net_first = proxy.upstream_nets[first];
+					const auto& net_second = proxy.upstream_nets[second];
+					if (net_first.subnetOf(net_second) || net_second.subnetOf(net_first))
+					{
+						throw error_result_t(eResult::invalidFlow, "disjoint prefixes in upstream_nets: " + net_first.toString() + " and " + net_second.toString());
+					}
+				}
+			}
 		}
 
 		for (auto& iter_service : proxy.services)

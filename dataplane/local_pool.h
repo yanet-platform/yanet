@@ -51,6 +51,7 @@ public:
 
     bool NeedUpdate(const ipv4_prefix_t& prefix);
     void ClearIfNotEqual(const LocalPool& other, dataplane::memory_manager* memory_manager);
+    void Clear(dataplane::memory_manager* memory_manager);
     void CopyFrom(const LocalPool& other);
     void ClearLinks();
 

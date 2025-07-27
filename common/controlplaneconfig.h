@@ -313,14 +313,50 @@ public:
 namespace proxy
 {
 
+class tcp_options_t
+{
+public:
+	tcp_options_t() = default;
+
+	SERIALIZABLE(use_sack, mss, winscale, timestamps);
+
+	void Debug() const
+	{
+		YANET_LOG_WARNING("\tTCP options: use_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", use_sack, mss, winscale, timestamps);
+	}
+
+public:
+	bool use_sack{YANET_PROXY_DEFAULT_USE_SACK};
+	uint32_t mss{YANET_PROXY_DEFAULT_MSS};
+	uint32_t winscale{YANET_PROXY_DEFAULT_WINSCALE};
+	bool timestamps{YANET_PROXY_DEFAULT_USE_TIMESTAMPS};
+};
+
+class timeouts_t
+{
+public:
+	timeouts_t() = default;
+
+	SERIALIZABLE(syn_rto, syn_recv, established);
+
+	void Debug() const
+	{
+    	YANET_LOG_WARNING("\tTimeouts: rto=%d, syn_recv=%d, established=%d\n", syn_rto, syn_recv, established);
+	}
+
+public:
+	uint32_t syn_rto{YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO};
+	uint32_t syn_recv{YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV};
+	uint32_t established{YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED};
+};
+
 class service_t
 {
 public:
 	service_t() = default;
 
 	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, proto, upstream_addr, upstream_port, size_connections_table, 
-		size_syn_table, flow, upstream_net, blacklist, send_proxy_header, use_sack, mss, winscale, timestamps,
-		ignore_size_update_detections, dont_use_bucket_optimization, ignore_check_client_first_ack, timeout_syn_rto, timeout_syn_recv, timeout_established);
+		size_syn_table, flow, upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts);
 
 	using key_t = std::tuple<common::ip_address_t, tPortId, uint8_t>;
 
@@ -342,25 +378,13 @@ public:
 	uint32_t size_syn_table;
 
 	common::globalBase::tFlow flow;
-	common::ipv4_prefix_t upstream_net;
+	std::vector<common::ipv4_prefix_t> upstream_nets;
 	std::set<common::ip_prefix_t> blacklist;
 	bool send_proxy_header;
 
-	// tcp options
-	bool use_sack;
-	uint32_t mss;
-	uint32_t winscale;
-	bool timestamps;
-
-	// temp - develop
-	bool ignore_size_update_detections;
-	bool dont_use_bucket_optimization;
-	bool ignore_check_client_first_ack;
-
-	// timeouts
-	uint32_t timeout_syn_rto;
-	uint32_t timeout_syn_recv;
-	uint32_t timeout_established;
+	tcp_options_t tcp_options;
+	timeouts_t timeouts;
+	uint64_t debug_flags;
 
 	key_t Key() const
 	{
@@ -369,10 +393,16 @@ public:
 
 	void Debug() const
 	{
+		std::string prefixes;
+		for (const auto& net : upstream_nets)
+		{
+			prefixes += (prefixes.empty() ? "" : ", ") + net.toString();
+		}
+
 	    YANET_LOG_WARNING("service_id=%d, service=%s, size_con=%d, size_syn=%d, proxy_header=%d\n", service_id, service.c_str(), size_connections_table, size_syn_table, send_proxy_header);
-    	YANET_LOG_WARNING("\tproxy=%s:%d, service=%s:%d, pool=%s\n", proxy_addr.toString().c_str(), proxy_port, upstream_addr.toString().c_str(), upstream_port, upstream_net.toString().c_str());
-		YANET_LOG_WARNING("\tTCP options: use_sack=%d, mss=%d, winscale=%d, timestamps=%d\n", use_sack, mss, winscale, timestamps);
-    	YANET_LOG_WARNING("\tTimeouts: rto=%d, syn_recv=%d, established=%d\n", timeout_syn_rto, timeout_syn_recv, timeout_established);
+    	YANET_LOG_WARNING("\tproxy=%s:%d, service=%s:%d, pool=[%s]\n", proxy_addr.toString().c_str(), proxy_port, upstream_addr.toString().c_str(), upstream_port, prefixes.c_str());
+		tcp_options.Debug();
+		timeouts.Debug();
 	}
 };
 
@@ -381,9 +411,7 @@ class config_t
 public:
 	config_t() = default;
 
-	SERIALIZABLE(services, size_connections_table, size_syn_table, nextModule, flow, upstream_net, blacklist, send_proxy_header,
-		use_sack, mss, winscale, timestamps, ignore_size_update_detections, dont_use_bucket_optimization, ignore_check_client_first_ack,
-		timeout_syn_rto, timeout_syn_recv, timeout_established);
+	SERIALIZABLE(services, size_connections_table, size_syn_table, nextModule, flow, upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts);
 
 public:
 	std::map<service_t::key_t, service_t> services;
@@ -394,25 +422,13 @@ public:
 
 	std::string nextModule;
 	common::globalBase::tFlow flow;
-	common::ipv4_prefix_t upstream_net;
+	std::vector<common::ipv4_prefix_t> upstream_nets;
 	std::set<common::ip_prefix_t> blacklist;
 	bool send_proxy_header;
 
-	// tcp options
-	bool use_sack;
-	uint32_t mss;
-	uint32_t winscale;
-	bool timestamps;
-	
-	// temp - develop
-	bool ignore_size_update_detections;
-	bool dont_use_bucket_optimization;
-	bool ignore_check_client_first_ack;
-	
-	// timeouts
-	uint32_t timeout_syn_rto;
-	uint32_t timeout_syn_recv;
-	uint32_t timeout_established;
+	tcp_options_t tcp_options;
+	timeouts_t timeouts;
+	uint64_t debug_flags;
 };
 
 }

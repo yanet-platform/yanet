@@ -3,6 +3,7 @@
 #include <mutex>
 #include <rte_tcp.h>
 
+#include "common/controlplaneconfig.h"
 #include "common/idp.h"
 #include "common/ringlog.h"
 #include "common/static_vector.h"
@@ -10,8 +11,8 @@
 #include "base.h"
 #include "local_pool.h"
 #include "memory_manager.h"
-#include "proxy_debug.h"
 #include "proxy_connections.h"
+#include "proxy_debug.h"
 #include "syncookies.h"
 #include "type.h"
 
@@ -24,42 +25,7 @@
 namespace dataplane::proxy
 {
 
-struct proxy_service_t;
-
-struct ProxyTables
-{
-    dataplane::proxy::LocalPool local_pool;
-    dataplane::proxy::ServiceConnections service_connections;
-    dataplane::proxy::ServiceSynConnections syn_connections;
-
-    bool NeedUpdate(const proxy_service_t& service);
-    void ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager);
-    eResult Allocate(dataplane::memory_manager* memory_manager, const proxy_service_t& service);
-    void CopyFrom(const ProxyTables& other);    
-    void ClearLinks();
-};
-
-struct UpdaterProxyTables
-{
-    ProxyTables tables[2];
-    uint8_t active_index;
-    std::mutex mutex;
-
-    UpdaterProxyTables();
-    eResult FirstUpdate(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager, const proxy_service_t& service);
-    eResult SecondUpdate(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager);
-    void FirstRemove(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager);
-    void SecondRemove(uint8_t old_index, uint8_t new_index, dataplane::memory_manager* memory_manager);
-
-    void FillConnections(uint64_t current_time, common::idp::proxy_connections::response& response);
-    void FillSynConnections(uint64_t current_time, common::idp::proxy_syn::response& response);
-    void GetTables(proxy_service_id_t service_id, const std::string& service_name, common::idp::proxy_tables::response& response);
-
-    void CollectGarbage(uint64_t current_time, uint64_t timeout_recv, uint64_t timeout_syn);
-    bool GetDataForRetramsits(const proxy_service_t& service, common::globalBase::tFlow next_flow, uint64_t current_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
-};
-
-struct proxy_service_t
+struct proxy_service_config_t
 {
 	proxy_service_id_t service_id;
 	tCounterId counter_id;
@@ -76,27 +42,50 @@ struct proxy_service_t
 
 	ipv4_prefix_t pool_prefix;
 	bool send_proxy_header;
+    
+    controlplane::proxy::tcp_options_t tcp_options;
+	controlplane::proxy::timeouts_t timeouts;
+    uint64_t debug_flags;
+
+    bool EnabledFlag(uint8_t flag) const;
+
+    static constexpr uint64_t flag_dont_use_bucket_optimization = (1ul << 0);
+    static constexpr uint64_t flag_ignore_size_update_detections = (1ul << 1);
+    static constexpr uint64_t flag_ignore_check_client_first_ack = (1ul << 2);
+};
+
+struct ProxyTables
+{
+    dataplane::proxy::LocalPool local_pool;
+    dataplane::proxy::ServiceConnections service_connections;
+    dataplane::proxy::ServiceSynConnections syn_connections;
+
+    bool NeedUpdate(const proxy_service_config_t& service_config);
+    void ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager);
+    eResult Allocate(dataplane::memory_manager* memory_manager, const proxy_service_config_t& service_config);
+    void CopyFrom(const ProxyTables& other);    
+    void ClearLinks();
+    void Clear(dataplane::memory_manager* memory_manager);
+};
+
+
+struct proxy_service_t
+{
+    proxy_service_config_t config;
 	proxy::proxy_v2_ipv4_hdr proxy_header;
-
-	// tcp options
-	bool use_sack;
-	uint32_t mss;
-	uint32_t winscale;
-	bool timestamps;
-
-    // temp - develop
-	bool ignore_size_update_detections;
-    bool dont_use_bucket_optimization;
-    bool ignore_check_client_first_ack;
-
-	// timeouts
-	uint32_t timeout_syn_rto;
-	uint32_t timeout_syn_recv;
-	uint32_t timeout_established;
-
 	ProxyTables tables;
+    SynCookies syn_cookie;
 
-    void Debug();
+    void Debug() const;
+    void UpdateProxyHeader();
+};
+
+struct proxy_service_on_socket_t
+{
+    proxy_service_config_t config;
+	ProxyTables tables;
+    bool enabled;
+    std::shared_mutex mutex;
 };
 
 struct TcpOptions
@@ -150,13 +139,11 @@ struct DataForRetransmit
 class TcpConnectionStore
 {
 public:
-    TcpConnectionStore();
+    void ActivateSocket(tSocketId socket_id);
+    eResult ServiceUpdateOnSocket(tSocketId socket_id, dataplane::proxy::proxy_service_t& service, tCounterId counter_id, const controlplane::proxy::service_t& service_info, bool first_state_update_global_base, dataplane::memory_manager* memory_manager);
+    void ServiceRemoveOnSocket(tSocketId socket_id, proxy_service_id_t service_id, dataplane::memory_manager* memory_manager);
 
-    // Update
-    eResult ServiceUpdate(proxy_service_t& service, dataplane::memory_manager* memory_manager, uint8_t currentGlobalBaseId, bool first_state_update_global_base);
-    void ServiceRemove(proxy_service_t& service, dataplane::memory_manager* memory_manager, uint8_t currentGlobalBaseId, bool first_state_update_global_base);
-
-    void CollectGarbage();
+    void CollectGarbage(tSocketId socket_id, uint64_t current_time_ms);
 
     void UpdateSynCookieKeys();
 
@@ -166,27 +153,24 @@ public:
     common::idp::proxy_tables::response GetTables(const std::vector<std::pair<proxy_service_id_t, std::string>>& services);
 
     // Actions from worker
-    bool ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id, common::ringlog::LogInfo& ringlog);
-    bool ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id, common::ringlog::LogInfo& ringlog);
-    bool ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, common::ringlog::LogInfo& ringlog);
-    bool ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, common::ringlog::LogInfo& ringlog);
+    bool ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id, common::ringlog::LogInfo& ringlog, uint32_t current_time_sec, uint64_t current_time_ms);
+    bool ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, uint32_t worker_id, common::ringlog::LogInfo& ringlog, uint32_t current_time_sec, uint64_t current_time_ms);
+    bool ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, common::ringlog::LogInfo& ringlog, uint32_t current_time_sec, uint64_t current_time_ms);
+    bool ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::base::generation& base, uint64_t* counters, common::ringlog::LogInfo& ringlog, uint32_t current_time_sec, uint64_t current_time_ms);
 
-    uint32_t current_time_sec;
-    uint64_t current_time_ms;
-
-    bool GetDataForRetramsits(const proxy_service_t& service, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
+    bool GetDataForRetramsits(const proxy_service_config_t& service_config, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
     proxy_service_id_t GetIndexServiceForNextRetransmit();
 
 private:
+	std::map<tSocketId, std::array<dataplane::proxy::proxy_service_on_socket_t, YANET_CONFIG_PROXY_SERVICES_SIZE>> proxy_services;
+
     SynCookies syn_cookies_[YANET_CONFIG_PROXY_SERVICES_SIZE];
-    proxy_service_t service_configs[YANET_CONFIG_PROXY_SERVICES_SIZE];
-    UpdaterProxyTables updater_proxy_tables[YANET_CONFIG_PROXY_SERVICES_SIZE];
 
     proxy_service_id_t index_start_check_retransmits_ = YANET_CONFIG_PROXY_SERVICES_SIZE;
     common::globalBase::tFlow next_flow_;
 
     void PrepareSynToClient(proxy_service_id_t service_id, const proxy_service_t& service,
-                            rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t* counters);
+                            rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t* counters, uint32_t current_time_sec);
     uint32_t CheckSynCookie(proxy_service_id_t service_id, const proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header);
 };
 

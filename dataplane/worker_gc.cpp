@@ -202,6 +202,7 @@ YANET_INLINE_NEVER void worker_gc_t::thread()
 void worker_gc_t::handle()
 {
 	current_time = base_permanently.globalBaseAtomic->currentTime;
+	current_time_ms = base_permanently.globalBaseAtomic->current_time_ms;
 
 	handle_nat64stateful_gc();
 	handle_balancer_gc();
@@ -1212,7 +1213,7 @@ void worker_gc_t::handle_proxy_gc()
 {
 	if (current_time != last_time_proxy_gc)
 	{
-		tcp_connection_store_->CollectGarbage();
+		tcp_connection_store_->CollectGarbage(socket_id, current_time_ms);
 		last_time_proxy_gc = current_time;
 	}
 }

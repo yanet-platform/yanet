@@ -1160,6 +1160,25 @@ bool IsPower2(uint32_t value)
 	return (value != 0) && ((value & (value - 1)) == 0);
 }
 
+void config_parser_t::loadConfig_proxy_tcp_options(const nlohmann::json& moduleJson,
+                                                   controlplane::proxy::tcp_options_t& options,
+                                                   const controlplane::proxy::tcp_options_t& default_tcp_options)
+{
+	options.use_sack = moduleJson.value("useSack", default_tcp_options.use_sack);
+	options.mss = moduleJson.value("mss", default_tcp_options.mss);
+	options.winscale = moduleJson.value("winscale", default_tcp_options.winscale);
+	options.timestamps = moduleJson.value("timestamps", default_tcp_options.timestamps);
+}
+
+void config_parser_t::loadConfig_proxy_timeouts(const nlohmann::json& moduleJson,
+                                                controlplane::proxy::timeouts_t& timeouts,
+                                                const controlplane::proxy::timeouts_t& default_timeouts)
+{
+	timeouts.syn_rto = TimeoutValue(moduleJson, "SYNRTO", default_timeouts.syn_rto);
+	timeouts.syn_recv = TimeoutValue(moduleJson, "SYNRecv", default_timeouts.syn_recv);
+	timeouts.established = TimeoutValue(moduleJson, "established", default_timeouts.established);
+}
+
 void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
                                        const std::string& moduleId,
                                        const nlohmann::json& moduleJson,
@@ -1176,23 +1195,24 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 	proxy.size_syn_table = moduleJson.value("sizeSYNTable", 0);
 
 	proxy.nextModule = moduleJson["nextModule"];
-	proxy.upstream_net = moduleJson.value("upstreamNet", "");
+
+	if (moduleJson["upstreamNet"].is_string())
+	{
+		proxy.upstream_nets = { moduleJson["upstreamNet"].get<std::string>() };
+	}
+	else
+	{
+		for (const auto& upstream_net : moduleJson["upstreamNet"])
+		{
+			proxy.upstream_nets.push_back(common::ipv4_prefix_t(upstream_net));
+		}
+	}
 	LoadBlackList(moduleJson, rootFilePath, proxy.blacklist);
 	proxy.send_proxy_header = moduleJson.value("proxyHeader", YANET_PROXY_DEFAULT_USE_PROXY_HEADER);
 
-	// tcp options
-	proxy.use_sack = moduleJson.value("useSack", YANET_PROXY_DEFAULT_USE_SACK);
-	proxy.mss = moduleJson.value("mss", YANET_PROXY_DEFAULT_MSS);
-	proxy.winscale = moduleJson.value("winscale", YANET_PROXY_DEFAULT_WINSCALE);
-	proxy.timestamps = moduleJson.value("timestamps", YANET_PROXY_DEFAULT_USE_TIMESTAMPS);
-	proxy.ignore_size_update_detections = moduleJson.value("ignoreSizeUpdateDetections", false);
-	proxy.dont_use_bucket_optimization = moduleJson.value("dontUseBucketOptimization", false);
-	proxy.ignore_check_client_first_ack = moduleJson.value("ignoreCheckClientFirstAck", false);
-
-	// timeouts	
-	proxy.timeout_syn_rto = TimeoutValue(moduleJson, "SYNRTO", YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO);
-	proxy.timeout_syn_recv = TimeoutValue(moduleJson, "SYNRecv", YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV);
-	proxy.timeout_established = TimeoutValue(moduleJson, "established", YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED);
+	loadConfig_proxy_tcp_options(moduleJson, proxy.tcp_options, controlplane::proxy::tcp_options_t());
+	loadConfig_proxy_timeouts(moduleJson, proxy.timeouts, controlplane::proxy::timeouts_t());
+	proxy.debug_flags = moduleJson.value("debugFlags", 0);
 
 	loadConfig_proxy_services(baseNext,
 								proxy,
@@ -1292,34 +1312,24 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 			throw error_result_t(eResult::invalidConfigurationFile, "sizeSYNTable must be 0 or power of 2");
 		}
 
-		service.upstream_net = proxy.upstream_net;
+		service.upstream_nets = proxy.upstream_nets;
 		service.blacklist = proxy.blacklist;
 		LoadBlackList(service_json, rootFilePath, service.blacklist);
 		service.send_proxy_header = service_json.value("proxyHeader", proxy.send_proxy_header);
 
-		// tcp options
-		service.use_sack = service_json.value("useSack", proxy.use_sack);
-		service.mss = service_json.value("mss", proxy.mss);
-		service.winscale = service_json.value("winscale", proxy.winscale);
-		service.timestamps = service_json.value("timestamps", proxy.timestamps);
-		service.ignore_size_update_detections = service_json.value("ignoreSizeUpdateDetections", proxy.ignore_size_update_detections);
-		service.dont_use_bucket_optimization = service_json.value("dontUseBucketOptimization", proxy.dont_use_bucket_optimization);
-		service.ignore_check_client_first_ack = service_json.value("ignoreCheckClientFirstAck", proxy.ignore_check_client_first_ack);
-
-		// timeouts	
-		service.timeout_syn_rto = TimeoutValue(service_json, "SYNRTO", proxy.timeout_syn_rto);
-		service.timeout_syn_recv = TimeoutValue(service_json, "SYNRecv", proxy.timeout_syn_recv);
-		service.timeout_established = TimeoutValue(service_json, "established", proxy.timeout_established);
+		loadConfig_proxy_tcp_options(service_json, service.tcp_options, proxy.tcp_options);
+		loadConfig_proxy_timeouts(service_json, service.timeouts, proxy.timeouts);
+		service.debug_flags = service_json.value("debugFlags", proxy.debug_flags);
 
 		// check duplicates
 		if (proxy.services.find(service.Key()) != proxy.services.end())
 		{
-			throw error_result_t(eResult::invalidConfigurationFile, "Duplicate service: " + service.proxy_addr.toString());
+			throw error_result_t(eResult::invalidConfigurationFile, "Duplicate service: " + service.proxy_addr.toString() + ":" + std::to_string(service.proxy_port));
 		}
 		controlplane::proxy::service_t::key_t upstream = {service.upstream_addr, service.upstream_port, service.proto};
 		if (upstreams.find(upstream) != upstreams.end())
 		{
-			throw error_result_t(eResult::invalidConfigurationFile, "Duplicate upstream: " + service.upstream_addr.toString());
+			throw error_result_t(eResult::invalidConfigurationFile, "Duplicate upstream: " + service.upstream_addr.toString() + ":" + std::to_string(service.upstream_port));
 		}
 		upstreams.insert(upstream);
 
