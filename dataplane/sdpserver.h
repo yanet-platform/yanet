@@ -49,7 +49,7 @@ public:
 			void* buffer = common::ipc::SharedMemory::CreateBufferFile(filename, size, use_huge_tlb, socket_id);
 			if (buffer == nullptr)
 			{
-				YANET_LOG_ERROR("Error create buffer in shared memory for workers on numa=%d, filename=%s, size=%ld",
+				YANET_LOG_ERROR("Error create buffer in shared memory for workers on numa=%d, filename=%s, size=%ld\n",
 				                socket_id,
 				                filename.c_str(),
 				                size);
@@ -60,7 +60,7 @@ public:
 			void* buffer = common::ipc::SharedMemory::CreateBufferKey(key_shared_memory_segment, size, use_huge_tlb, socket_id);
 			if (buffer == nullptr)
 			{
-				YANET_LOG_ERROR("Error create buffer in shared memory for workers on numa=%d, key=%d, size=%ld",
+				YANET_LOG_ERROR("Error create buffer in shared memory for workers on numa=%d, key=%d, size=%ld\n",
 				                socket_id,
 				                key_shared_memory_segment,
 				                size);
@@ -92,7 +92,7 @@ public:
 		                                                                      std::nullopt);
 		if (sdp_data.dataplane_data == nullptr)
 		{
-			YANET_LOG_ERROR("Error create buffer in shared memory for dataplane data, filename=%s, size=%ld",
+			YANET_LOG_ERROR("Error create buffer in shared memory for dataplane data, filename=%s, size=%ld\n",
 			                YANET_SHARED_MEMORY_FILE_DATAPLANE,
 			                sdp_data.size_dataplane_buffer);
 			return eResult::errorInitSharedMemory;
@@ -104,7 +104,7 @@ public:
 		                                                                     std::nullopt);
 		if (sdp_data.dataplane_data == nullptr)
 		{
-			YANET_LOG_ERROR("Error create buffer in shared memory for dataplane data, key=%d, size=%ld",
+			YANET_LOG_ERROR("Error create buffer in shared memory for dataplane data, key=%d, size=%ld\n",
 			                key_shared_memory_segment,
 			                sdp_data.size_dataplane_buffer);
 			return eResult::errorInitSharedMemory;
@@ -175,7 +175,7 @@ private:
 			WriteValue(sdp_data, index + 5, sdp_data.metadata_worker.size);
 			// 6 - n1 = size MetadataWorker.counter_positions
 			WriteValue(sdp_data, index + 6, sdp_data.metadata_worker.counter_positions.size());
-			// 7-9 - значения из MetadataWorker
+			// 7-9 - values from MetadataWorker
 			WriteValue(sdp_data, index + 7, sdp_data.metadata_worker_gc.start_counters);
 			WriteValue(sdp_data, index + 8, sdp_data.metadata_worker_gc.start_stats);
 			WriteValue(sdp_data, index + 9, sdp_data.metadata_worker_gc.size);

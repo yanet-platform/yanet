@@ -361,7 +361,7 @@ private:
 			sdp_data.metadata_worker.size = ReadValue(buffer, index + 5);
 			// 6 - n1 = size MetadataWorker.counter_positions
 			uint64_t n1 = ReadValue(buffer, index + 6);
-			// 7-9 - значения из MetadataWorker
+			// 7-9 - values from MetadataWorker
 			sdp_data.metadata_worker_gc.start_counters = ReadValue(buffer, index + 7);
 			sdp_data.metadata_worker_gc.start_stats = ReadValue(buffer, index + 8);
 			sdp_data.metadata_worker_gc.size = ReadValue(buffer, index + 9);
