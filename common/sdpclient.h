@@ -131,7 +131,7 @@ public:
 				                shift);
 				return eResult::errorInitSharedMemory;
 			}
-			iter.second.buffer = ShiftBuffer<void*>(buffer, shift);
+			iter.second.buffer = ShiftBuffer(buffer, shift);
 		}
 		for (auto& iter : sdp_data.workers_gc)
 		{
@@ -147,7 +147,7 @@ public:
 				                shift);
 				return eResult::errorInitSharedMemory;
 			}
-			iter.second.buffer = ShiftBuffer<void*>(buffer, shift);
+			iter.second.buffer = ShiftBuffer(buffer, shift);
 		}
 
 		return eResult::success;
@@ -177,8 +177,8 @@ public:
 			{
 				if (!core_id.has_value() || worker_core_id == core_id)
 				{
-					auto* counters = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
-					                                                     sdp_data.metadata_worker.start_counters);
+					auto* counters = ShiftBuffer<uint64_t*>(worker_info.buffer,
+					                                        sdp_data.metadata_worker.start_counters);
 					result[worker_core_id] = counters[index];
 				}
 			}
@@ -193,8 +193,8 @@ public:
 			{
 				if (!core_id.has_value() || worker_core_id == core_id)
 				{
-					auto* counters = common::sdp::ShiftBuffer<uint64_t*>(worker_info.buffer,
-					                                                     sdp_data.metadata_worker.start_counters);
+					auto* counters = ShiftBuffer<uint64_t*>(worker_info.buffer,
+					                                        sdp_data.metadata_worker.start_counters);
 					result[worker_core_id] = counters[index];
 				}
 			}
@@ -232,8 +232,8 @@ public:
 		std::vector<uint64_t*> buffers;
 		for (const auto& iter : sdp_data.workers)
 		{
-			buffers.push_back(common::sdp::ShiftBuffer<uint64_t*>(iter.second.buffer,
-			                                                      sdp_data.metadata_worker.start_counters));
+			buffers.push_back(ShiftBuffer<uint64_t*>(iter.second.buffer,
+			                                         sdp_data.metadata_worker.start_counters));
 		}
 
 		for (size_t i = 0; i < counter_ids.size(); i++)
@@ -352,23 +352,24 @@ private:
 			}
 			uint64_t index = start_workers_metadata / sizeof(uint64_t);
 
-			// 0-7 - values from MetadataWorker
+			// 0-5 - values from MetadataWorker
 			sdp_data.metadata_worker.start_counters = ReadValue(buffer, index);
 			sdp_data.metadata_worker.start_acl_counters = ReadValue(buffer, index + 1);
 			sdp_data.metadata_worker.start_bursts = ReadValue(buffer, index + 2);
 			sdp_data.metadata_worker.start_stats = ReadValue(buffer, index + 3);
 			sdp_data.metadata_worker.start_stats_ports = ReadValue(buffer, index + 4);
-			sdp_data.metadata_worker.start_ring_log = ReadValue(buffer, index + 5);
-			sdp_data.metadata_worker.start_workers_stats = ReadValue(buffer, index + 6);
-			sdp_data.metadata_worker.size = ReadValue(buffer, index + 7);
-			// 8 - n1 = size MetadataWorker.counter_positions
-			uint64_t n1 = ReadValue(buffer, index + 8);
-			// 9-11 - values from MetadataWorker
-			sdp_data.metadata_worker_gc.start_counters = ReadValue(buffer, index + 9);
-			sdp_data.metadata_worker_gc.start_stats = ReadValue(buffer, index + 10);
-			sdp_data.metadata_worker_gc.size = ReadValue(buffer, index + 11);
-			// 12 - n2 = size MetadataWorker.counter_positions
-			uint64_t n2 = ReadValue(buffer, index + 12);
+			sdp_data.metadata_worker.size = ReadValue(buffer, index + 5);
+			// 6 - n1 = size MetadataWorker.counter_positions
+			uint64_t n1 = ReadValue(buffer, index + 6);
+			// 7-9 - values from MetadataWorker
+			sdp_data.metadata_worker_gc.start_counters = ReadValue(buffer, index + 7);
+			sdp_data.metadata_worker_gc.start_stats = ReadValue(buffer, index + 8);
+			sdp_data.metadata_worker_gc.size = ReadValue(buffer, index + 9);
+			// 10 - n2 = size MetadataWorker.counter_positions
+			uint64_t n2 = ReadValue(buffer, index + 10);
+
+			sdp_data.metadata_worker.start_ring_log = ReadValue(buffer, index + 11);
+			sdp_data.metadata_worker.start_workers_stats = ReadValue(buffer, index + 12);
 
 			if (128 * (1 + n1 + n2) > size_workers_metadata)
 			{
@@ -431,7 +432,7 @@ private:
 
 	static uint64_t ReadValue(void* buffer, uint64_t index)
 	{
-		auto* data = common::sdp::ShiftBuffer<uint8_t*>(buffer, index * sizeof(uint64_t));
+		auto* data = ShiftBuffer<uint8_t*>(buffer, index * sizeof(uint64_t));
 		uint64_t result = 0;
 		for (int i = 0; i < 8; i++)
 		{
@@ -445,9 +446,9 @@ private:
 		values.clear();
 		for (uint64_t index = 0; index < count; index++)
 		{
-			void* current = common::sdp::ShiftBuffer<void*>(buffer, shift + 128 * index);
+			void* current = ShiftBuffer(buffer, shift + 128 * index);
 			uint64_t value = ReadValue(current, 0);
-			char* str = common::sdp::ShiftBuffer<char*>(current, 8);
+			char* str = ShiftBuffer<char*>(current, 8);
 			if (str[119] != 0)
 			{
 				// 119 - index of last symbol
