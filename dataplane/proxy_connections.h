@@ -126,10 +126,15 @@ struct Connection
 
     void Clear() {
         local = 0;
+        client_start_seq = 0;
+        proxy_start_seq = 0;
         shift_server = 0;
+        cookie_data = 0;
+        timestamp_proxy_first = 0;
+        timestamp_client_last = 0;
         timestamp_shift = 0;
-        flags = 0;
         window_size_shift = 0;
+        flags = 0;
     }
 
     bool CreatedFromSynCookie()
@@ -157,8 +162,10 @@ struct SynConnection
 
     void Clear()
     {
-        server_answer = false;
         local = 0;
+        client_start_seq = 0;
+        server_seq = 0;
+        server_answer = false;
     }
 };
 

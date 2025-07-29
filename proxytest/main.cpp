@@ -5,13 +5,6 @@
 
 #include "benchmark.h"
 
-struct Config {
-    bool help = false;
-    unsigned int syn_threads;
-    unsigned int threads;
-    std::chrono::duration<double> duration;
-};
-
 std::chrono::duration<double> ParseDuration(const std::string& arg) {
     switch (arg[arg.size() - 1])
     {
@@ -38,7 +31,8 @@ const std::unordered_map<std::string, ArgHandle> OneArgs = {
     S2("--threads", threads, std::stoi(arg)),
     S2("-t", threads, std::stoi(arg)),
     S2("--duration", duration, ParseDuration(arg)),
-    S2("-d", duration, ParseDuration(arg))
+    S2("-d", duration, ParseDuration(arg)),
+    S2("--synflood-packets", synflood_packets, std::stoi(arg))
 };
 
 Config ParseArgs(int argc, char** argv) {
@@ -59,22 +53,24 @@ Config ParseArgs(int argc, char** argv) {
     return config;
 }
 
+void Help(char ** argv)
+{
+    std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
+    std::cout << "Options:" << std::endl;
+    std::cout << "-s, --syn-threads <n>" << std::endl;
+    std::cout << "-t, --threads <n>" << std::endl;
+    std::cout << "-d, --duration <n>" << std::endl;
+    std::cout << "--synflood-packets <n>" << std::endl;
+}
+
 int main(int argc, char** argv){
     Config config = ParseArgs(argc, argv);
-    if (config.help) {
-        std::cout << "Usage: " << argv[0] << " [options]" << std::endl;
-        std::cout << "Options:" << std::endl;
-        std::cout << "-s, --syn-threads <n>" << std::endl;
-        std::cout << "-t, --threads <n>" << std::endl;
+    if (config.help 
+        || (config.duration.count() == 0 && config.synflood_packets == 0)
+        || (config.syn_threads == 0 && config.threads == 0)) {
+        Help(argv);
         return 0;
     }
 
-    if (config.syn_threads == 0)
-        config.syn_threads = 1;
-    if (config.threads == 0)
-        config.threads = 1;
-    if (config.duration == std::chrono::duration<double>(0))
-        config.duration = std::chrono::duration<double>(std::chrono::seconds(10));
-
-    Benckmark(config.syn_threads, config.threads, config.duration);
+    Benchmark(config);
 }

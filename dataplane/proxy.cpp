@@ -286,6 +286,19 @@ std::string TcpOptions::DebugInfo() const
     return ss.str();
 }
 
+void TcpOptions::Clear()
+{
+    timestamp_value = 0;
+    timestamp_echo = 0;
+    mss = 0;
+    sack_permitted = false;
+    window_scaling = 0;
+
+    sack_count = 0;
+    memset(sack_start, 0, sizeof(sack_start));
+    memset(sack_finish, 0, sizeof(sack_finish));
+}
+
 void TcpConnectionStore::ActivateSocket(tSocketId socket_id)
 {
     proxy_services[socket_id];
@@ -523,7 +536,7 @@ void TcpConnectionStore::PrepareSynToClient(proxy_service_id_t service_id, const
 
     uint32_t cookie_data = SynCookies::PackData(tcp_options);
     uint32_t cookie = syn_cookies_[service_id].GetCookie(ipv4_header->src_addr, tcp_header->src_port, tcp_header->sent_seq, cookie_data);
-    // YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, tcp_header->sent_seq);
+    // YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, rte_be_to_cpu_32(tcp_header->sent_seq));
 
     tcp_options.window_scaling = service.config.tcp_options.winscale;
     if (tcp_options.timestamp_value != 0 && service.config.tcp_options.timestamps)
@@ -611,6 +624,7 @@ bool TcpConnectionStore::ActionClientOnSyn(rte_mbuf* mbuf, const dataplane::base
             uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
             if (local == 0)
             {
+                DebugPacket("failed to allocate local address", service_id, ipv4_header, tcp_header);
                 RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynErrLocal, tcp_header->src_port, 0));
                 counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
                 action = false;
@@ -679,7 +693,7 @@ uint32_t TcpConnectionStore::CheckSynCookie(proxy_service_id_t service_id, const
         tcp_header->sent_seq = add_cpu_32(tcp_header->sent_seq, 1);
     }
 
-    uint32_t cookie_data = syn_cookies_[service_id].CheckCookie(rte_cpu_to_be_32(tcp_header->recv_ack) - 1, 
+    uint32_t cookie_data = syn_cookies_[service_id].CheckCookie(rte_be_to_cpu_32(tcp_header->recv_ack) - 1, 
                                                                 ipv4_header->src_addr, tcp_header->src_port, sub_cpu_32(tcp_header->sent_seq, 1));
     // YANET_LOG_WARNING("\tcookie_data=%d, ack=%u, seq=%u\n", cookie_data, tcp_header->recv_ack, tcp_header->sent_seq);
 
@@ -966,6 +980,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
+        DebugPacket("\tclient not found", service_id, ipv4_header, tcp_header);
         RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynAckNoLoc, 0, tcp_header->dst_port));
         counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
         return false;
@@ -1107,6 +1122,7 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
     uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
+        DebugPacket("client not found", service_id, ipv4_header, tcp_header);
         RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckNoLoc, tcp_header->dst_port, 0));
         counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
         return false;
@@ -1118,6 +1134,7 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
     ServiceConnectionData service_connection_data;
     if (service.tables.service_connections.FindAndLock(client_addr, client_port, current_time_ms, service_connection_data, false) != TableSearchResult::Found)
     {
+        DebugPacket("connection not found", service_id, ipv4_header, tcp_header);
         service_connection_data.Unlock();
         counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_search_client_service_ack]++;
         RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckNoCon, client_port, tcp_header->dst_port));

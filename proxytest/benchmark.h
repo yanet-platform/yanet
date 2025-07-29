@@ -2,4 +2,12 @@
 
 #include <chrono>
 
-void Benckmark(unsigned int syn_threads_num, unsigned int threads_num, std::chrono::duration<double> duration);
+struct Config {
+    bool help = false;
+    unsigned int syn_threads;
+    unsigned int threads;
+    std::chrono::duration<double> duration;
+    uint64_t synflood_packets;
+};
+
+void Benchmark(const Config& config);

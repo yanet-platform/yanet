@@ -7,17 +7,19 @@
 #include "dataplane/globalbase.h"
 #include "dataplane/metadata.h"
 #include "dataplane/proxy.h"
+#include "common/ringlog.h"
 
 const common::ipv4_prefix_t local_pool_prefix("33.0.0.0/24");
-const uint32_t size_connections_table = 256;
-const uint32_t size_syn_table = 32;
+const uint32_t size_connections_table = 65536;
+const uint32_t size_syn_table = 1024;
+const uint32_t proxy_addr = rte_cpu_to_be_32(common::ipv4_address_t("22.0.0.1"));
+const uint16_t proxy_port = rte_cpu_to_be_16(80);
+const uint32_t upstream_addr = rte_cpu_to_be_32(common::ipv4_address_t("44.0.0.1"));
+const uint16_t upstream_port = rte_cpu_to_be_16(8080);
+common::ringlog::LogInfo ringlog;
 
 void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection_store, dataplane::base::generation& base, dataplane::proxy::proxy_service_t& service)
 {
-    uint32_t proxy_addr = rte_cpu_to_be_32(common::ipv4_address_t("22.0.0.1"));
-    uint16_t proxy_port = rte_cpu_to_be_16(80);
-    uint32_t upstream_addr = rte_cpu_to_be_32(common::ipv4_address_t("44.0.0.1"));
-    uint16_t upstream_port = rte_cpu_to_be_16(8080);
 
     proxy_service_id_t service_id = 1;
 
@@ -39,6 +41,8 @@ void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection
 	service_cfg.mss = YANET_PROXY_DEFAULT_MSS;
 	service_cfg.winscale = YANET_PROXY_DEFAULT_WINSCALE;
 	service_cfg.timestamps = YANET_PROXY_DEFAULT_USE_TIMESTAMPS;
+    service_cfg.timeout_syn_recv = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV;
+    service_cfg.timeout_established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED;
 
     uint8_t currentGlobalBaseId = 0;
     uint8_t newGlobalBaseId = currentGlobalBaseId ^ 1;
@@ -51,6 +55,21 @@ void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection
     base.globalBase->proxy_services[service_id] = service_cfg;
     tcp_connection_store.current_time_sec = time(nullptr);
     tcp_connection_store.current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
+    ringlog.records = new common::ringlog::LogRecord[64];
+}
+
+inline void ResetMbuf(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
+{
+    rte_pktmbuf_reset(mbuf);
+    mbuf->data_off = 256;
+    memset(mbuf->buf_addr, 0, 10240);
+    dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+    metadata->network_headerOffset = 18;
+    metadata->transport_headerOffset = 38;
+    metadata->flow.data.proxy_service_id = 1;
+    *ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+    *tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
 }
 
 void CreateMbuf(rte_mbuf** mbuf)
@@ -63,13 +82,37 @@ void CreateMbuf(rte_mbuf** mbuf)
     dataplane::metadata* metadata = YADECAP_METADATA(*mbuf);
     metadata->network_headerOffset = 18;
     metadata->transport_headerOffset = 38;
+    metadata->flow.data.proxy_service_id = 1;
 }
 
-void Benckmark(unsigned int syn_threads_num, unsigned int threads_num, std::chrono::duration<double> duration) {
-    uint64_t duration_sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+inline void SetIPAddresses(rte_ipv4_hdr* ipv4_header, uint32_t src_addr, uint32_t dst_addr)
+{
+    ipv4_header->src_addr = src_addr;
+    ipv4_header->dst_addr = dst_addr;
+}
+
+inline void SetTCPPorts(rte_tcp_hdr* tcp_header, uint16_t src_port, uint16_t dst_port)
+{
+    tcp_header->src_port = src_port;
+    tcp_header->dst_port = dst_port;
+}
+
+inline void SetSeqAck(rte_tcp_hdr* tcp_header, uint32_t seq, uint32_t ack)
+{
+    tcp_header->sent_seq = rte_cpu_to_be_32(seq);
+    tcp_header->recv_ack = rte_cpu_to_be_32(ack);
+}
+
+inline void AdvanceTS(dataplane::proxy::TcpOptions& tcp_options, uint32_t& timestamp){
+    tcp_options.timestamp_echo = timestamp++;
+    tcp_options.timestamp_value = timestamp;
+}
+
+void Benchmark(const Config& config) {
+    uint64_t duration_sec = std::chrono::duration_cast<std::chrono::seconds>(config.duration).count();
     std::cout << "Starting benchmark...\n";
-    std::cout << "Syn threads: " << syn_threads_num << "\n";
-    std::cout << "Threads: " << threads_num << "\n";
+    std::cout << "Syn threads: " << config.syn_threads << "\n";
+    std::cout << "Threads: " << config.threads << "\n";
     std::cout << "Duration: " << duration_sec << "s\n";
 
     dataplane::proxy::TcpConnectionStore tcp_connection_store;
@@ -100,60 +143,30 @@ void Benckmark(unsigned int syn_threads_num, unsigned int threads_num, std::chro
 		}
     });
 
-    std::vector<rte_mbuf*> syn_mbufs(syn_threads_num);
-    std::vector<rte_mbuf*> mbufs(threads_num);
-    for (unsigned int i = 0; i < syn_threads_num; i++) {
+    std::vector<rte_mbuf*> syn_mbufs(config.syn_threads);
+    std::vector<rte_mbuf*> mbufs(config.threads);
+    for (unsigned int i = 0; i < config.syn_threads; i++) {
         CreateMbuf(&syn_mbufs[i]);
     }
-    for (unsigned int i = 0; i < threads_num; i++) {
+    for (unsigned int i = 0; i < config.threads; i++) {
         CreateMbuf(&mbufs[i]);
     }
 
     std::vector<std::thread> syn_threads;
     std::vector<std::thread> threads;
-    std::vector<uint64_t> syn_iterations(syn_threads_num);
-    std::vector<uint64_t> iterations(threads_num);
-    for (unsigned int i = 0; i < syn_threads_num; i++) {
-        syn_threads.emplace_back([=, &syn_mbufs, &syn_iterations, &base, &tcp_connection_store, &service]() {
+    std::vector<uint64_t> syn_iterations(config.syn_threads);
+    std::vector<uint64_t> iterations(config.threads);
+
+    uint64_t synflood_syn_dropped = 0;
+    uint64_t synflood_synack_dropped = 0;
+
+    for (unsigned int i = 0; i < config.syn_threads; i++) {
+        syn_threads.emplace_back([=, &synflood_syn_dropped, &synflood_synack_dropped, &syn_mbufs, &syn_iterations, &base, &tcp_connection_store, &service]() {
             uint32_t client_addr = rte_cpu_to_be_32(common::ipv4_address_t("11.0.0.1") + i);
             std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
             uint64_t counters[64];
             rte_mbuf* mbuf = syn_mbufs[i];
-            uint8_t tcp_options[] = {0x02, 0x04, 0x05, 0xb4, 0x04, 0x02, 0x08, 0x0a, 0xb1, 0xcf, 0x1a, 0x9a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x05, 0x01};
-            for (uint32_t j = 0; ; j++)
-            {
-                if ((syn_iterations[i] & (1024 - 1)) == 0 && std::chrono::steady_clock::now() - start >= duration)
-                    break;
 
-                dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-                rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-                rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
-                ipv4_header->src_addr = client_addr;
-                ipv4_header->dst_addr = service.proxy_addr;
-                tcp_header->src_port = rte_cpu_to_be_16(32768 + (j + i * 1024) % 32768);
-                tcp_header->dst_port = service.proxy_port;
-                tcp_header->data_off = 0xa0;
-                memcpy((uint8_t*)tcp_header + sizeof(rte_tcp_hdr), tcp_options, 20);
-
-                mbuf->buf_len = 100;
-                mbuf->pkt_len = 100;
-
-                metadata->flow.data.proxy_service_id = 1;
-
-                tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, i);
-                syn_iterations[i]++;
-            }
-        });
-    }
-
-    dataplane::proxy::LocalPool local_pool;
-    local_pool.Init(1, ipv4_prefix_t{local_pool_prefix.address(), local_pool_prefix.mask()}, nullptr);
-    for (unsigned int i = 0; i < threads_num; i++) {
-        threads.emplace_back([=, &local_pool, &mbufs, &iterations, &base, &tcp_connection_store, &service]() {
-            uint32_t client_addr = rte_cpu_to_be_32(common::ipv4_address_t("11.0.1.0") + i);
-            std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-            uint64_t counters[64];
-            rte_mbuf* mbuf = mbufs[i];
             uint32_t local_addr;
             uint16_t local_port;
 
@@ -163,60 +176,189 @@ void Benckmark(unsigned int syn_threads_num, unsigned int threads_num, std::chro
             tcp_options.window_scaling = 5;
             tcp_options.sack_permitted = true;
             tcp_options.timestamp_value = timestamp;
-            for (uint32_t j = 0; ; j++)
+            for (uint64_t j = 0; j < config.synflood_packets; j++)
             {
-                if ((iterations[i] & (1024 - 1)) == 0 && std::chrono::steady_clock::now() - start >= duration)
+                if ((j & (1024 - 1)) == 0 && std::chrono::steady_clock::now() - start >= config.duration)
                     break;
 
-                uint16_t client_port = rte_cpu_to_be_16(32768 + (j + i * 1024) % 32768);
-                dataplane::proxy::LocalPool::UnpackTuple(
-                    local_pool.Allocate(i, client_addr, client_port), 
-                    local_addr, local_port
-                );
-
                 dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-                metadata->flow.data.proxy_service_id = 1;
-
                 rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
                 rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
-                ipv4_header->src_addr = client_addr;
-                ipv4_header->dst_addr = service.proxy_addr;
-                tcp_header->src_port = client_port;
-                tcp_header->dst_port = service.proxy_port;
-                tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, i);
 
-                ipv4_header->src_addr = service.upstream_addr;
-                ipv4_header->dst_addr = local_addr;
-                tcp_header->src_port = service.upstream_port;
-                tcp_header->dst_port = local_port;
-                tcp_options.timestamp_value = timestamp + 1;
-                tcp_options.timestamp_echo = timestamp;
+                SetIPAddresses(ipv4_header, client_addr, service.proxy_addr);
+                SetTCPPorts(tcp_header, rte_cpu_to_be_16(32768 + j % 32768), service.proxy_port);
+                SetSeqAck(tcp_header, 0, 0);
                 tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters);
+                if (!tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, i, ringlog))
+                { // packet dropped
+                    synflood_syn_dropped++;
+                    continue;
+                }
 
-                ipv4_header->src_addr = client_addr;
-                ipv4_header->dst_addr = service.proxy_addr;
-                tcp_header->src_port = client_port;
-                tcp_header->dst_port = service.proxy_port;
-                tcp_options.mss = 0;
-                tcp_options.window_scaling = 0;
-                tcp_options.sack_permitted = false;
-                tcp_options.timestamp_value = timestamp + 2;
-                tcp_options.timestamp_echo = timestamp + 1;
-                tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                tcp_connection_store.ActionClientOnAck(mbuf, base, counters, i);
+                if (ipv4_header->dst_addr != client_addr) // not cookie
+                {
+                    local_addr = ipv4_header->src_addr;
+                    local_port = tcp_header->src_port;
 
-                ipv4_header->src_addr = service.upstream_addr;
-                ipv4_header->dst_addr = local_addr;
-                tcp_header->src_port = service.upstream_port;
-                tcp_header->dst_port = local_port;
-                tcp_options.timestamp_value = timestamp + 3;
-                tcp_options.timestamp_echo = timestamp + 2;
+                    SetIPAddresses(ipv4_header, service.upstream_addr, local_addr);
+                    SetTCPPorts(tcp_header, service.upstream_port, local_port);
+                    SetSeqAck(tcp_header, 0, rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
+                    AdvanceTS(tcp_options, timestamp);
+                    tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
+                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog))
+                    { // packet dropped
+                        synflood_synack_dropped++;
+                        break;
+                    }
+                }
+
+                syn_iterations[i]++;
+            }
+        });
+    }
+
+    uint64_t client_syn_dropped = 0;
+    uint64_t client_ack_dropped = 0;
+    uint64_t server_synack_dropped = 0;
+    uint64_t server_ack_dropped = 0;
+
+    for (unsigned int i = 0; i < config.threads; i++) {
+        threads.emplace_back([=, &client_syn_dropped, &client_ack_dropped, &server_synack_dropped, &server_ack_dropped, &mbufs, &iterations, &base, &tcp_connection_store, &service]() {
+            uint32_t client_addr = rte_cpu_to_be_32(common::ipv4_address_t("11.0.1.1") + i);
+            std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+            uint64_t counters[64];
+            rte_mbuf* mbuf = mbufs[i];
+            uint32_t local_addr;
+            uint16_t local_port;
+
+            uint32_t timestamp = 0xb1cf1a9a;
+            uint32_t server_seq = 0;
+            uint32_t client_seq = 0xf0000000;
+            dataplane::proxy::TcpOptions tcp_options;
+            for (uint32_t j = 0; ; j++)
+            {
+                if ((j & (1024 - 1)) == 0 && std::chrono::steady_clock::now() - start >= config.duration)
+                break;
+                
+                uint16_t client_port = rte_cpu_to_be_16(32768 + j % 32768);
+                
+                dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+                rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+                rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+                SetIPAddresses(ipv4_header, client_addr, service.proxy_addr);
+                SetTCPPorts(tcp_header, client_port, service.proxy_port);
+                SetSeqAck(tcp_header, client_seq, 0);
+                tcp_options.mss = 1460;
+                tcp_options.window_scaling = 5;
+                tcp_options.sack_permitted = true;
+                tcp_options.timestamp_value = timestamp;
                 tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                tcp_connection_store.ActionServiceOnAck(mbuf, base, counters);
+                if (!tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, i, ringlog))
+                { // packet dropped
+                    client_syn_dropped++;
+                    continue;
+                }
+
+                if (ipv4_header->dst_addr == client_addr) // syn cookie
+                {
+                    SetIPAddresses(ipv4_header, client_addr, service.proxy_addr);
+                    SetTCPPorts(tcp_header, client_port, service.proxy_port);
+                    SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
+                    tcp_options.Clear();
+                    AdvanceTS(tcp_options, timestamp);
+                    tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
+                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, i, ringlog))
+                    { // packet dropped
+                        client_ack_dropped++;
+                        continue;
+                    }
+
+                    // ClientOnAck moves packet headers when writing options
+                    ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+                    tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+                    local_addr = ipv4_header->src_addr;
+                    local_port = tcp_header->src_port;
+                    
+                    ResetMbuf(mbuf, &ipv4_header, &tcp_header); // TODO: Should probably just move headers back
+                    SetIPAddresses(ipv4_header, service.upstream_addr, local_addr);
+                    SetTCPPorts(tcp_header, service.upstream_port, local_port);
+                    SetSeqAck(tcp_header, server_seq, rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
+                    tcp_options.Clear();
+                    AdvanceTS(tcp_options, timestamp);
+                    tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
+                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog))
+                    { // packet dropped
+                        server_synack_dropped++;
+                        continue;
+                    }
+
+                    SetIPAddresses(ipv4_header, client_addr, service.proxy_addr);
+                    SetTCPPorts(tcp_header, client_port, service.proxy_port);
+                    SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
+                    tcp_options.Clear();
+                    AdvanceTS(tcp_options, timestamp);
+                    tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
+                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, i, ringlog))
+                    { // packet dropped
+                        client_ack_dropped++;
+                        continue;
+                    }
+
+                    ResetMbuf(mbuf, &ipv4_header, &tcp_header); // TODO: Should probably just move headers back
+                    SetIPAddresses(ipv4_header, service.upstream_addr, local_addr);
+                    SetTCPPorts(tcp_header, service.upstream_port, local_port);
+                    SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
+                    AdvanceTS(tcp_options, timestamp);
+                    tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
+                    if (!tcp_connection_store.ActionServiceOnAck(mbuf, base, counters, ringlog))
+                    { // packet dropped
+                        server_ack_dropped++;
+                        continue;
+                    }
+                }
+                else if (ipv4_header->dst_addr == upstream_addr) // normal flow
+                {
+                    local_addr = ipv4_header->src_addr;
+                    local_port = tcp_header->src_port;
+
+                    SetIPAddresses(ipv4_header, service.upstream_addr, local_addr);
+                    SetTCPPorts(tcp_header, service.upstream_port, local_port);
+                    SetSeqAck(tcp_header, server_seq, rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
+                    AdvanceTS(tcp_options, timestamp);
+                    tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
+                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog))
+                    { // packet dropped
+                        server_synack_dropped++;
+                        continue;
+                    }
+    
+                    SetIPAddresses(ipv4_header, client_addr, service.proxy_addr);
+                    SetTCPPorts(tcp_header, client_port, service.proxy_port);
+                    SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
+                    tcp_options.Clear();
+                    AdvanceTS(tcp_options, timestamp);
+                    tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
+                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, i, ringlog))
+                    { // packet dropped
+                        client_ack_dropped++;
+                        continue;
+                    }
+    
+                    ResetMbuf(mbuf, &ipv4_header, &tcp_header); // TODO: Should probably just move headers back
+                    SetIPAddresses(ipv4_header, service.upstream_addr, local_addr);
+                    SetTCPPorts(tcp_header, service.upstream_port, local_port);
+                    SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
+                    AdvanceTS(tcp_options, timestamp);
+                    tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
+                    if (!tcp_connection_store.ActionServiceOnAck(mbuf, base, counters, ringlog))
+                    { // packet dropped
+                        server_ack_dropped++;
+                        continue;
+                    }
+                }
 
                 iterations[i]++;
+                ResetMbuf(mbuf, &ipv4_header, &tcp_header); // TODO: Should probably just move headers back
             }
         });
     }
@@ -241,13 +383,20 @@ void Benckmark(unsigned int syn_threads_num, unsigned int threads_num, std::chro
 
     std::cout << "Benchmark finished\n";
     std::cout << "Syn threads:\n";
-    for (unsigned int i = 0; i < syn_threads_num; i++) {
+    for (unsigned int i = 0; i < config.syn_threads; i++) {
         std::cout << i << ": " << syn_iterations[i] << " iterations\n";
     }
     std::cout << "Sum: " << std::accumulate(syn_iterations.begin(), syn_iterations.end(), 0) << " iterations\n";
-    std::cout << "Threads:\n";
-    for (unsigned int i = 0; i < threads_num; i++) {
+    std::cout << "synflood_syn_dropped: " << synflood_syn_dropped << std::endl;
+    std::cout << "synflood_synack_dropped: " << synflood_synack_dropped << std::endl;
+
+    std::cout << "\nThreads:\n";
+    for (unsigned int i = 0; i < config.threads; i++) {
         std::cout << i << ": " << iterations[i] << " iterations\n";
     }
     std::cout << "Sum: " << std::accumulate(iterations.begin(), iterations.end(), 0) << " iterations\n";
+    std::cout << "client_syn_dropped: " << client_syn_dropped << std::endl;
+    std::cout << "client_ack_dropped: " << client_ack_dropped << std::endl;
+    std::cout << "server_synack_dropped: " << server_synack_dropped << std::endl;
+    std::cout << "server_ack_dropped: " << server_ack_dropped << std::endl;
 }

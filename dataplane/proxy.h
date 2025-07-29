@@ -107,6 +107,8 @@ struct TcpOptions
     uint32_t WriteBuffer(uint8_t* data) const;
     uint32_t Size() const;
 
+    void Clear();
+
     std::string DebugInfo() const;
 
     constexpr bool operator==(const TcpOptions& other) const {
