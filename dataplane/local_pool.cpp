@@ -10,7 +10,8 @@ LocalPool::~LocalPool()
     if(destroy) destroy();
 }
 
-bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager)
+bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
+                     dataplane::memory_manager* memory_manager, bool include_edge_addresses)
 {
     if (initialized_)
     {
@@ -22,7 +23,9 @@ bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
     }
     prefix_ = prefix;
 
-    uint32_t num_connections = ((1u << (32u - prefix_.mask)) - 2) * num_ports;
+    uint32_t num_addresses = 1u << (32u - prefix_.mask);
+    if (!include_edge_addresses && num_addresses > 2) num_addresses -= 2;
+    uint32_t num_connections = num_addresses * num_ports;
     uint32_t num_free_chunks = max_workers * 2;
     uint32_t num_chunks = num_connections / chunk_size;
     

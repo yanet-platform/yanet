@@ -36,7 +36,8 @@ public:
 
     ~LocalPool();
 
-    bool Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, dataplane::memory_manager* memory_manager);
+    bool Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, 
+              dataplane::memory_manager* memory_manager, bool include_edge_addresses = false);
 
     uint64_t Allocate(uint32_t worker_id, uint32_t client_addr, tPortId client_port);
     uint64_t FindClientByLocal(uint32_t local_addr, tPortId local_port) const;
