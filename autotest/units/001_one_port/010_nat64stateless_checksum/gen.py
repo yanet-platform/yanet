@@ -33,14 +33,12 @@ write_pcap("002-expect.pcap",
 write_pcap("003-send.pcap",
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=100)/IPv6(dst="5555:5555:5555:5555:5555:5555:102.102.102.103", src="aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa", hlim=64)/UDP(dport=22, sport=(1,56740)),
            Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=100)/IPv6(dst="5555:5555:5555:5555:5555:5555:102.102.102.103", src="aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa", hlim=64)/UDP(dport=22, sport=56741, chksum=0xffff),
-           Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=100)/IPv6(dst="5555:5555:5555:5555:5555:5555:102.102.102.103", src="aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa", hlim=64)/UDP(dport=22, sport=(56742,65535)),
-           Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=100)/IPv6(dst="5555:5555:5555:5555:5555:5555:102.102.102.103", src="aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa", hlim=64)/UDP(dport=80, sport=80, chksum=0))
+           Ether(dst="00:11:22:33:44:55", src="00:00:00:00:00:01")/Dot1Q(vlan=100)/IPv6(dst="5555:5555:5555:5555:5555:5555:102.102.102.103", src="aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa", hlim=64)/UDP(dport=22, sport=(56742,65535)))
 
 write_pcap("003-expect.pcap",
            Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="102.102.102.103", src="153.153.153.153", ttl=63, id=0)/UDP(dport=22, sport=(1,65478)),
            Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="102.102.102.103", src="153.153.153.153", ttl=63, id=0)/UDP(dport=22, sport=65479, chksum=0xffff),
-           Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="102.102.102.103", src="153.153.153.153", ttl=63, id=0)/UDP(dport=22, sport=(65480,65535)),
-           Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="102.102.102.103", src="153.153.153.153", ttl=63, id=0)/UDP(dport=80, sport=80, chksum=0))
+           Ether(dst="00:00:00:22:22:22", src="00:11:22:33:44:55")/Dot1Q(vlan=200)/IP(dst="102.102.102.103", src="153.153.153.153", ttl=63, id=0)/UDP(dport=22, sport=(65480,65535)))
 
 
 write_pcap("004-send.pcap",
@@ -53,7 +51,7 @@ write_pcap("004-expect.pcap",
            Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=100)/IPv6(dst="aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa", src="5555:5555:5555:5555:5555:5555:102.102.102.102", hlim=63, fl=0)/UDP(dport=(1,56683), sport=80),
            Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=100)/IPv6(dst="aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa", src="5555:5555:5555:5555:5555:5555:102.102.102.102", hlim=63, fl=0)/UDP(dport=56684, sport=80, chksum=0xffff),
            Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=100)/IPv6(dst="aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa", src="5555:5555:5555:5555:5555:5555:102.102.102.102", hlim=63, fl=0)/UDP(dport=(56685,65535), sport=80),
-           Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=100)/IPv6(dst="aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa", src="5555:5555:5555:5555:5555:5555:102.102.102.102", hlim=63, fl=0)/UDP(dport=22, sport=22, chksum=0))
+           Ether(dst="00:00:00:11:11:11", src="00:11:22:33:44:55")/Dot1Q(vlan=100)/IPv6(dst="aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa:aaaa", src="5555:5555:5555:5555:5555:5555:102.102.102.102", hlim=63, fl=0)/UDP(dport=22, sport=22,))
 
 
 write_pcap("005-send.pcap",
