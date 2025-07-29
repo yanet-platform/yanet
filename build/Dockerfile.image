@@ -25,7 +25,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         protobuf-compiler \
         libprotobuf-dev \
         bison \
-        debhelper-compat
+        debhelper-compat \
+        cmake
 
 # PEP 668 strict recommends to use virtualenv
 RUN python3 -m pip install meson==0.61.2 --break-system-packages \
