@@ -32,7 +32,7 @@ public:
             uint32_t next_idx;
         };
         uint32_t connections[chunk_size];
-    };
+    } __rte_cache_aligned;
 
     ~LocalPool();
 
@@ -73,7 +73,7 @@ private:
 
         uint32_t free_addresses;
         uint32_t used_addresses;
-    };
+    } __rte_cache_aligned;
 
     bool initialized_{false};
     ipv4_prefix_t prefix_;
