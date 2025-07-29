@@ -189,7 +189,7 @@ struct DataPlaneInSharedMemory
 		{
 			if (munmap(dataplane_data, size) < 0)
 			{
-				YANET_LOG_ERROR("Error munmap %d: %s", errno, strerror(errno));
+				YANET_LOG_DEBUG("Error munmap %d: %s\n", errno, strerror(errno));
 			}
 			dataplane_data = nullptr;
 		}
