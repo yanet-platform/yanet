@@ -120,6 +120,11 @@ public:
 			YANET_LOG_ERROR("filename=%s, mmap(%p, %lu, %d, %d, %d, 0)\n", filename.c_str(), nullptr, size, prot, flags_mmap, fd);
 			return nullptr;
 		}
+		YANET_LOG_INFO("mmap allocated=%p, socket=%s, size=%ld, filename=%s\n",
+		               addr,
+		               (socket_id.has_value() ? std::to_string(*socket_id).c_str() : "any"),
+		               size,
+		               filename.c_str());
 
 		// Zero memory
 		memset(addr, 0, size);
@@ -176,6 +181,11 @@ public:
 			YANET_LOG_ERROR("shmat(%d, %p, %d): %s\n", shmid, nullptr, 0, strerror(errno));
 			return nullptr;
 		}
+		YANET_LOG_INFO("shmat allocated=%p, socket=%s, size=%ld, key=%d\n",
+		               addr,
+		               (socket_id.has_value() ? std::to_string(*socket_id).c_str() : "any"),
+		               size,
+		               key);
 
 		// Zero memory
 		memset(addr, 0, size);
@@ -297,7 +307,7 @@ private:
 				numa_set_preferred(*socket_id);
 				if (errno != 0)
 				{
-					YANET_LOG_ERROR("numa_set_preferred(%d): %s\n", *socket_id, strerror(errno));
+					YANET_LOG_DEBUG("numa_set_preferred(%d): %s\n", *socket_id, strerror(errno));
 				}
 			}
 		}
