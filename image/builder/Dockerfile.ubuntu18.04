@@ -48,7 +48,7 @@ RUN mkdir bison && \
     tar -xf bison.tar.gz -C bison --strip-components=1
 
 WORKDIR /project/bison
-RUN ./configure --prefix=/usr
+RUN env CXXFLAGS=-D_GLIBCXX_USE_CXX11_ABI=1 ./configure --prefix=/usr
 RUN make -j
 RUN make prefix=/target install
 

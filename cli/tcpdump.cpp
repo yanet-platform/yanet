@@ -119,6 +119,8 @@ bool initialize_shm_rings(
 {
 	for (const auto& [ring_name, dump_tag, dump_config, core_id, socket_id, ipc_key, offset, capacity] : shm_info)
 	{
+		GCC_BUG_UNUSED(capacity);
+
 		if (target_dump_tag != dump_tag)
 		{
 			continue;
