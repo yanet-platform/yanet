@@ -19,7 +19,11 @@ bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
     prefix_ = prefix;
 
     uint32_t num_addresses = 1u << (32u - prefix_.mask);
-    if (!include_edge_addresses && num_addresses > 2) num_addresses -= 2;
+    if (!include_edge_addresses && num_addresses > 2) 
+    {
+        num_addresses -= 2;
+        addr_offset_ = 1;
+    }
     uint32_t num_connections = num_addresses * num_ports;
     uint32_t num_free_chunks = max_workers * 2;
     uint32_t num_chunks = num_connections / chunk_size;
@@ -231,14 +235,14 @@ LocalPoolStat LocalPool::GetStat() const {
 
 inline uint64_t LocalPool::index_to_tuple(uint32_t index) const
 {
-    return PackTuple(rte_cpu_to_be_32(prefix_.address.address + 1 + index / num_ports),
+    return PackTuple(rte_cpu_to_be_32(prefix_.address.address + addr_offset_ + index / num_ports),
                       rte_cpu_to_be_16(index % num_ports + min_port));
 }
 
 inline uint32_t LocalPool::tuple_to_index(uint64_t tuple) const
 {
     return (rte_be_to_cpu_16((uint16_t)(tuple & 0xffff)) - min_port) + 
-           (rte_be_to_cpu_32((uint32_t)(tuple >> 16)) - prefix_.address.address - 1) * num_ports;
+           (rte_be_to_cpu_32((uint32_t)(tuple >> 16)) - prefix_.address.address - addr_offset_) * num_ports;
 }
 
 bool LocalPool::NeedUpdate(const ipv4_prefix_t& prefix)
@@ -276,6 +280,7 @@ void LocalPool::Clear(dataplane::memory_manager* memory_manager)
 void LocalPool::CopyFrom(const LocalPool& other)
 {
     prefix_ = other.prefix_;
+    addr_offset_ = other.addr_offset_;
     chunk_queue_ = other.chunk_queue_;
     local_to_client_ = other.local_to_client_;
     local_info_ = other.local_info_;

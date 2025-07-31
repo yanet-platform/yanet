@@ -75,6 +75,7 @@ private:
 
     bool initialized_{false};
     ipv4_prefix_t prefix_;
+    uint32_t addr_offset_{0};
     ConnectionsChunk* chunk_queue_{nullptr};
     uint64_t* local_to_client_{nullptr};
     LocalInfo* local_info_{nullptr};
