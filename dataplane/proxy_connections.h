@@ -178,7 +178,7 @@ class ConnectionsTable
 public:
     using Bucket = ConnectionBucket<ConnectionInfo>;
 
-    bool Init(proxy_service_id_t service_id, uint32_t number_connections, dataplane::memory_manager* memory_manager, uint32_t service_addr, uint16_t service_port)
+    bool Init(proxy_service_id_t service_id, uint32_t number_connections, dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
     {
         if (initialized_)
         {
@@ -188,23 +188,13 @@ public:
             if (number_connections == 0) {
                 number_buckets_ = 0;
                 initialized_ = true;
-                service_key_ = Pack(service_addr, rte_cpu_to_be_16(service_port));
                 return true;
             }
         }
 
-        uint32_t number_buckets = number_connections / Bucket::bucket_size;
-        
-        tSocketId socket_id = 0; // todo !!!
-        std::string name;
-        if constexpr (std::is_same_v<ConnectionInfo, Connection>)
-        name = "tcp_proxy.connections." + std::to_string(service_id);
-        else if constexpr (std::is_same_v<ConnectionInfo, SynConnection>)
-        name = "tcp_proxy.syn_connections." + std::to_string(service_id);
+        uint32_t number_buckets = number_connections / Bucket::bucket_size;        
         if (memory_manager != nullptr)
         {
-            // size_t mem_size = number_buckets * sizeof(Bucket);
-            // YANET_LOG_WARNING("ConnectionsTable::Initialize number_connections=%d, number_buckets=%d, mem_size=%ld\n", number_connections, number_buckets, mem_size);
             buckets_ = memory_manager->create_static_array<Bucket>(name.data(), number_buckets, socket_id);
         }
         else
@@ -218,7 +208,6 @@ public:
 
         number_buckets_ = number_buckets;
         initialized_ = true;
-        service_key_ = Pack(service_addr, rte_cpu_to_be_16(service_port));
 
         return true;
     }
@@ -315,19 +304,13 @@ public:
             bucket.Lock();
             for (uint32_t i = 0; i < Bucket::bucket_size; i++)
             {
-                if (bucket.addresses[i] != 0 && func(bucket, i, service_key_)) 
+                if (bucket.addresses[i] != 0 && func(bucket, i)) 
                     break;
             }
             bucket.Unlock();
         }
 
         return count;
-    }
-
-    bool WasRecentlyOverflowed(uint32_t addr, uint16_t port, uint64_t current_time)
-    {
-        uint64_t key = Hash(addr, port);
-        return number_buckets_ == 0 || current_time - buckets_[key & (number_buckets_ - 1)].time_overflow < TIMEOUT_BUCKET_OVERFLOW;
     }
 
     TableSearchResult FindAndLock(uint32_t addr, uint16_t port, uint64_t current_time, ConnectionData<ConnectionInfo>& data, bool first_overflow_check)
@@ -403,17 +386,14 @@ public:
 
     void ClearIfNotEqual(const ConnectionsTable& other, dataplane::memory_manager* memory_manager)
     {
-        // YANET_LOG_WARNING("\t\tClearIfNotEqual %p, other %p, buckets_=%p, other.buckets_=%p\n", this, &other, buckets_, other.buckets_);
         if (buckets_ != other.buckets_ && buckets_ != nullptr)
         {
-            // todo info
             Clear(memory_manager);
         }
     }
 
     void Clear(dataplane::memory_manager* memory_manager)
     {
-        // YANET_LOG_WARNING("\t\tClear %p\n", this);
         if (buckets_ != nullptr)
         {
             if (memory_manager == nullptr)
@@ -430,24 +410,16 @@ public:
 
     void CopyFrom(const ConnectionsTable& other)
     {
-        // YANET_LOG_WARNING("\t\tCopyFrom %p, other %p\n", this, &other);
         buckets_ = other.buckets_;
         number_buckets_ = other.number_buckets_;
         initialized_ = other.initialized_;
-        service_key_ = other.service_key_;
     }
 
     void ClearLinks()
     {
-        // YANET_LOG_WARNING("\t\tClearLinks %p\n", this);
         buckets_ = nullptr;
         number_buckets_ = 0;
         initialized_ = false;
-    }
-
-    void Debug(const std::string& message) const
-    {
-        YANET_LOG_WARNING("%s: initialized_=%d, number_buckets_=%d, buckets_=%p\n", message.c_str(), initialized_, number_buckets_, buckets_);
     }
 
     std::string Debug() const
@@ -458,7 +430,7 @@ public:
         }
 
         char loc_buf[256];
-        snprintf(loc_buf, sizeof(loc_buf), "buckets=%d, pointer=%p", number_buckets_, buckets_);
+        snprintf(loc_buf, sizeof(loc_buf), "initialized_=%d, number_buckets_=%d, buckets_=%p", initialized_, number_buckets_, buckets_);
         return std::string(loc_buf);
     }
 
@@ -466,9 +438,6 @@ private:
     Bucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;
     bool initialized_ = false;
-    uint64_t service_key_;
-
-    std::function<void()> destroy;
 };
 
 using ServiceConnections = ConnectionsTable<Connection>;

@@ -34,10 +34,8 @@ public:
         uint32_t connections[chunk_size];
     } __rte_cache_aligned;
 
-    ~LocalPool();
-
     bool Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, 
-              dataplane::memory_manager* memory_manager, bool include_edge_addresses = false);
+              dataplane::memory_manager* memory_manager, tSocketId socket_id, bool include_edge_addresses = false);
 
     uint64_t Allocate(uint32_t worker_id, uint32_t client_addr, tPortId client_port);
     uint64_t FindClientByLocal(uint32_t local_addr, tPortId local_port) const;
@@ -80,8 +78,6 @@ private:
     ConnectionsChunk* chunk_queue_{nullptr};
     uint64_t* local_to_client_{nullptr};
     LocalInfo* local_info_{nullptr};
-
-    std::function<void()> destroy;
 
     inline uint64_t index_to_tuple(uint32_t index) const;
     inline uint32_t tuple_to_index(uint64_t tuple) const;

@@ -5,13 +5,8 @@ namespace dataplane::proxy
 
 constexpr uint32_t NULL_CHUNK = 0xffffffff;
 
-LocalPool::~LocalPool()
-{
-    if(destroy) destroy();
-}
-
 bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
-                     dataplane::memory_manager* memory_manager, bool include_edge_addresses)
+                     dataplane::memory_manager* memory_manager, tSocketId socket_id, bool include_edge_addresses)
 {
     if (initialized_)
     {
@@ -31,7 +26,6 @@ bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
     
     if (memory_manager != nullptr)
     {
-        tSocketId socket_id = 0; // todo !!!
         std::string name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".local_info";
         local_info_ = (LocalInfo*)memory_manager->alloc(name.data(), socket_id, sizeof(LocalInfo));
         name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".chunk_queue";
@@ -44,11 +38,6 @@ bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
         local_info_ = new LocalInfo();
         chunk_queue_ = new ConnectionsChunk[num_free_chunks + num_chunks];
         local_to_client_ = new uint64_t[num_chunks * chunk_size];
-        destroy = [this]() {
-            delete[] local_info_;
-            delete[] chunk_queue_;
-            delete[] local_to_client_;
-        };
     }
     if (local_info_ == nullptr || chunk_queue_ == nullptr || local_to_client_ == nullptr)
     {

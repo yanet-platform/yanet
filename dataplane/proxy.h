@@ -62,7 +62,7 @@ struct ProxyTables
 
     bool NeedUpdate(const proxy_service_config_t& service_config);
     void ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager);
-    eResult Allocate(dataplane::memory_manager* memory_manager, const proxy_service_config_t& service_config);
+    eResult Allocate(dataplane::memory_manager* memory_manager, tSocketId socket_id, const proxy_service_config_t& service_config);
     void CopyFrom(const ProxyTables& other);    
     void ClearLinks();
     void Clear(dataplane::memory_manager* memory_manager);

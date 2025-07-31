@@ -360,7 +360,7 @@ eResult TcpConnectionStore::ServiceUpdateOnSocket(tSocketId socket_id, dataplane
 		if (service_main.tables.NeedUpdate(service.config))
 		{
             service_main.tables.ClearLinks();
-			eResult result = service_main.tables.Allocate(memory_manager, service.config);
+			eResult result = service_main.tables.Allocate(memory_manager, socket_id, service.config);
 			if (result != eResult::success)
 			{
 				return result;
@@ -877,77 +877,69 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
             {
                 syn_connection_data.Unlock();
 
-                // if (unlikely(!service.tables.syn_connections.WasRecentlyOverflowed(ipv4_header->src_addr, tcp_header->src_port, current_time_ms)))
-                // {
-                //     DebugPacket("!WasRecentlyOverflowed", service_id, ipv4_header, tcp_header);
-                //     action = false;
-                // }
-                // else
-                // {
-                    // try check cookie
-                    // todo - check time overflow
-                    uint32_t cookie_data = CheckSynCookie(service_id, service, ipv4_header, tcp_header);
-                    if (cookie_data == 0)
-                    {
-                        DebugPacket("!CheckSynCookie", service_id, ipv4_header, tcp_header);
-                        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckBadCookie, tcp_header->src_port, 0));
+                // try check cookie
+                // todo - check time overflow
+                uint32_t cookie_data = CheckSynCookie(service_id, service, ipv4_header, tcp_header);
+                if (cookie_data == 0)
+                {
+                    DebugPacket("!CheckSynCookie", service_id, ipv4_header, tcp_header);
+                    RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckBadCookie, tcp_header->src_port, 0));
 
-                        counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
+                    counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
+                    action = false;
+                }
+                else
+                {
+                    // get from local
+                    uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
+                    if (local == 0)
+                    {
+                        DebugPacket("!local_pool.Allocate", service_id, ipv4_header, tcp_header);
+                        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckErrLocal, tcp_header->src_port, 0));
+
+                        counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
                         action = false;
                     }
                     else
                     {
-                        // get from local
-                        uint64_t local = service.tables.local_pool.Allocate(worker_id, ipv4_header->src_addr, tcp_header->src_port);
-                        if (local == 0)
-                        {
-                            DebugPacket("!local_pool.Allocate", service_id, ipv4_header, tcp_header);
-                            RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckErrLocal, tcp_header->src_port, 0));
+                        RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckFromCookie, tcp_header->src_port, local));
+                        TcpOptions tcp_options;
+                        memset(&tcp_options, 0, sizeof(tcp_options));
+                        if (!tcp_options.Read(tcp_header))
+                            counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
 
-                            counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
-                            action = false;
+                        // Add to connections
+                        service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
+                        LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
+                        service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
+                        service_connection_data.connection->proxy_start_seq = rte_be_to_cpu_32(tcp_header->recv_ack) - 1;
+                        service_connection_data.connection->client_start_seq = sub_cpu_32(tcp_header->sent_seq, 1);
+                        service_connection_data.connection->timestamp_proxy_first = tcp_options.timestamp_echo;
+                        service_connection_data.connection->timestamp_client_last = tcp_options.timestamp_value;
+                        service_connection_data.connection->cookie_data = cookie_data;
+
+                        tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, 1 + (service.config.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
+
+                        TcpOptions cookie_options = SynCookies::UnpackData(cookie_data);
+                        if (tcp_options.timestamp_value != 0 && service.config.tcp_options.timestamps)
+                        {
+                            cookie_options.timestamp_value = tcp_options.timestamp_value;
                         }
                         else
                         {
-                            RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::AckFromCookie, tcp_header->src_port, local));
-                            TcpOptions tcp_options;
-                            memset(&tcp_options, 0, sizeof(tcp_options));
-                            if (!tcp_options.Read(tcp_header))
-                                counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
-    
-                            // Add to connections
-                            service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, current_time_ms);
-                            LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
-                            service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
-                            service_connection_data.connection->proxy_start_seq = rte_be_to_cpu_32(tcp_header->recv_ack) - 1;
-                            service_connection_data.connection->client_start_seq = sub_cpu_32(tcp_header->sent_seq, 1);
-                            service_connection_data.connection->timestamp_proxy_first = tcp_options.timestamp_echo;
-                            service_connection_data.connection->timestamp_client_last = tcp_options.timestamp_value;
-                            service_connection_data.connection->cookie_data = cookie_data;
-    
-                            tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, 1 + (service.config.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
-    
-                            TcpOptions cookie_options = SynCookies::UnpackData(cookie_data);
-                            if (tcp_options.timestamp_value != 0 && service.config.tcp_options.timestamps)
-                            {
-                                cookie_options.timestamp_value = tcp_options.timestamp_value;
-                            }
-                            else
-                            {
-                                cookie_options.timestamp_value = 0;
-                                flags |= Connection::flag_no_timestamps;
-                            }
-                            service_connection_data.connection->flags = Connection::flag_from_synkookie | flags;
-    
-                            cookie_options.Write(mbuf, &ipv4_header, &tcp_header);
-                            ipv4_header->time_to_live = 64;
-                            tcp_header->recv_ack = 0;
-                            tcp_header->tcp_flags = TCP_SYN_FLAG;
-    
-                            counters[service.config.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
+                            cookie_options.timestamp_value = 0;
+                            flags |= Connection::flag_no_timestamps;
                         }
+                        service_connection_data.connection->flags = Connection::flag_from_synkookie | flags;
+
+                        cookie_options.Write(mbuf, &ipv4_header, &tcp_header);
+                        ipv4_header->time_to_live = 64;
+                        tcp_header->recv_ack = 0;
+                        tcp_header->tcp_flags = TCP_SYN_FLAG;
+
+                        counters[service.config.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
                     }
-                // }
+                }
             }
                         
             break;
@@ -1202,7 +1194,7 @@ proxy_service_id_t TcpConnectionStore::GetIndexServiceForNextRetransmit()
 // {
 //     bool result = true;
 //     std::lock_guard<std::mutex> guard(mutex);
-//     tables[active_index].service_connections.GetDataForRetramsits([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx, uint64_t service_key) -> bool {
+//     tables[active_index].service_connections.GetDataForRetramsits([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx) -> bool {
 //         Connection& connection = bucket.connections[conn_idx];
 //         if ((bucket.last_times[conn_idx] + service_config.timeouts.syn_rto <= current_time) && connection.UseForRetransmit()) {
 //             DataForRetransmit* data;
@@ -1224,7 +1216,9 @@ proxy_service_id_t TcpConnectionStore::GetIndexServiceForNextRetransmit()
 
 //             data->service_id = service_config.service_id;
 //             ServiceConnections::Unpack(connection.local, data->src, data->sport);
-//             ServiceConnections::Unpack(service_key, data->dst, data->dport);
+//             ServiceConnections::Unpack(service_key, 
+//             data->dst = service_config.upstream_addr;
+//             data->dport = service_config.upstream_port;
 //             data->client_start_seq = connection.client_start_seq;
 //             data->flow = next_flow;
 
@@ -1257,22 +1251,22 @@ void ProxyTables::ClearIfNotEqual(const ProxyTables& other, dataplane::memory_ma
     local_pool.ClearIfNotEqual(other.local_pool, memory_manager);
 }
 
-eResult ProxyTables::Allocate(dataplane::memory_manager* memory_manager, const proxy_service_config_t& service_config)
+eResult ProxyTables::Allocate(dataplane::memory_manager* memory_manager, tSocketId socket_id, const proxy_service_config_t& service_config)
 {
-    if (!service_connections.Init(service_config.service_id, service_config.size_connections_table, memory_manager, service_config.upstream_addr, service_config.upstream_port))
+    if (!service_connections.Init(service_config.service_id, service_config.size_connections_table, memory_manager, socket_id, "tcp_proxy.connections." + std::to_string(service_config.service_id) + ".socket." + std::to_string(socket_id)))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.ServiceConnections, service: %d\n", service_config.service_id);
         return eResult::errorAllocatingMemory;
     }
 
-    if (!syn_connections.Init(service_config.service_id, service_config.size_syn_table, memory_manager, service_config.upstream_addr, service_config.upstream_port))
+    if (!syn_connections.Init(service_config.service_id, service_config.size_syn_table, memory_manager, socket_id, "tcp_proxy.syn_connections." + std::to_string(service_config.service_id) + ".socket." + std::to_string(socket_id)))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.SynConnections, service: %d\n", service_config.service_id);
         return eResult::errorAllocatingMemory;
     }
 
     
-    if (!local_pool.Init(service_config.service_id, service_config.pool_prefix, memory_manager))
+    if (!local_pool.Init(service_config.service_id, service_config.pool_prefix, memory_manager, socket_id))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.LocalPool, service: %d\n", service_config.service_id);
         return eResult::errorAllocatingMemory;
