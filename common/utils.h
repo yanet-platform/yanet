@@ -1,6 +1,7 @@
 #pragma once
 
 #include <bitset>
+#include <cstddef>
 #include <iomanip>
 #include <string>
 #include <type_traits>

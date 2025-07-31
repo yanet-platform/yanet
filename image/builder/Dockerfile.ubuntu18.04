@@ -31,13 +31,12 @@ WORKDIR /project
 RUN git clone -b v${PROTOBUF_VERSION} https://github.com/protocolbuffers/protobuf
 
 WORKDIR /project/protobuf
+RUN git log -3
 RUN git submodule update --init --recursive
 RUN ./autogen.sh && \
-    ./configure --prefix=/target
+    ./configure --prefix=/target "CFLAGS=-fPIC" "CXXFLAGS=-fPIC"
 RUN make -j
-RUN make install && \
-    ldconfig
-
+RUN make install
 
 # bison
 ENV BISON_VERSION 3.3.2
@@ -51,7 +50,6 @@ WORKDIR /project/bison
 RUN ./configure --prefix=/usr
 RUN make -j
 RUN make prefix=/target install
-
 
 FROM ubuntu:18.04
 
@@ -76,10 +74,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     debhelper \
     dupload \
     python3-pyelftools \
-    python3-pip
+    python3-pip \
+    curl
 
 RUN python3 -m pip install meson
 
+RUN apt remove -y libprotobuf-dev
+
 COPY --from=base /target/ /usr/
+
+# cmake
+RUN curl https://cmake.org/files/v3.16/cmake-3.16.7-Linux-x86_64.tar.gz -o cmake-3.16.7-Linux-x86_64.tar.gz
+RUN tar zxvf cmake-3.16.7-Linux-x86_64.tar.gz
+RUN mv cmake-3.16.7-Linux-x86_64     /opt/cmake-3.16.7
+RUN ln -sf  /opt/cmake-3.16.7/bin/*    /usr/bin
 
 WORKDIR /project

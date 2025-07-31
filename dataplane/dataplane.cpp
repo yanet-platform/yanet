@@ -1413,6 +1413,7 @@ void cDataPlane::timestamp_thread()
 		{
 			for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
 			{
+				GCC_BUG_UNUSED(socket_id);
 				globalbase_atomic->currentTime = current_time;
 			}
 
@@ -1428,6 +1429,7 @@ void cDataPlane::timestamp_thread()
 
 		for (const auto& [socket_id, globalbase_atomic] : globalBaseAtomics)
 		{
+			GCC_BUG_UNUSED(socket_id);
 			auto& wd = globalbase_atomic->wallclock;
 
 			wd.seq.fetch_add(1, std::memory_order_release);
@@ -2319,6 +2321,7 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 	cores_mask[config.controlPlaneCoreId] = true;
 	for (const auto& [coreId, workerConfig] : config.controlplane_workers)
 	{
+		GCC_BUG_UNUSED(workerConfig);
 		cores_mask[coreId] = true;
 	}
 	for (const auto& coreId : config.workerGCs)
@@ -2327,6 +2330,7 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 	}
 	for (const auto& [coreId, workerConfig] : config.workers)
 	{
+		GCC_BUG_UNUSED(workerConfig);
 		cores_mask[coreId] = true;
 	}
 
@@ -2352,7 +2356,10 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 	// Device whitelist
 	for (const auto& [portId, portConfig] : config.ports)
 	{
+		GCC_BUG_UNUSED(portId);
 		const auto& [pci, name, symmetric_mode, rss_flags] = portConfig;
+		GCC_BUG_UNUSED(symmetric_mode);
+		GCC_BUG_UNUSED(rss_flags);
 
 		// Do not whitelist sock dev virtual devices
 		if (StartsWith(name, SOCK_DEV_PREFIX))
