@@ -12,49 +12,38 @@
 const common::ipv4_prefix_t local_pool_prefix("33.0.0.0/24");
 const uint32_t size_connections_table = 65536;
 const uint32_t size_syn_table = 1024;
-const uint32_t proxy_addr = rte_cpu_to_be_32(common::ipv4_address_t("22.0.0.1"));
+const common::ipv4_address_t proxy_addr("22.0.0.1");
 const uint16_t proxy_port = rte_cpu_to_be_16(80);
-const uint32_t upstream_addr = rte_cpu_to_be_32(common::ipv4_address_t("44.0.0.1"));
+const common::ipv4_address_t upstream_addr("44.0.0.1");
 const uint16_t upstream_port = rte_cpu_to_be_16(8080);
 common::ringlog::LogInfo ringlog;
 
-void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection_store, dataplane::base::generation& base, dataplane::proxy::proxy_service_t& service)
+void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection_store, dataplane::base::generation& base, proxy_service_id_t service_id)
 {
-
-    proxy_service_id_t service_id = 1;
-
     base.globalBase = new dataplane::globalBase::generation(nullptr, 0);
-    dataplane::proxy::proxy_service_t service_cfg;
+    controlplane::proxy::service_t service_cfg;
 
     service_cfg.service_id = service_id;
     service_cfg.proxy_addr = proxy_addr;
 	service_cfg.proxy_port = proxy_port;
 	service_cfg.upstream_addr = upstream_addr;
 	service_cfg.upstream_port = upstream_port;
-    service_cfg.pool_prefix.address.address = uint32_t(local_pool_prefix.address());
-    service_cfg.pool_prefix.mask = local_pool_prefix.mask();
-	service_cfg.counter_id = 0;
+    service_cfg.upstream_nets.push_back(local_pool_prefix);
 	service_cfg.send_proxy_header = false;
 	service_cfg.size_connections_table = size_connections_table;
 	service_cfg.size_syn_table = size_syn_table;
-	service_cfg.use_sack = YANET_PROXY_DEFAULT_USE_SACK;
-	service_cfg.mss = YANET_PROXY_DEFAULT_MSS;
-	service_cfg.winscale = YANET_PROXY_DEFAULT_WINSCALE;
-	service_cfg.timestamps = YANET_PROXY_DEFAULT_USE_TIMESTAMPS;
-    service_cfg.timeout_syn_recv = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV;
-    service_cfg.timeout_established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED;
+	service_cfg.tcp_options.use_sack = YANET_PROXY_DEFAULT_USE_SACK;
+	service_cfg.tcp_options.mss = YANET_PROXY_DEFAULT_MSS;
+	service_cfg.tcp_options.winscale = YANET_PROXY_DEFAULT_WINSCALE;
+	service_cfg.tcp_options.timestamps = YANET_PROXY_DEFAULT_USE_TIMESTAMPS;
+    service_cfg.timeouts.syn_recv = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV;
+    service_cfg.timeouts.established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED;
 
-    uint8_t currentGlobalBaseId = 0;
-    uint8_t newGlobalBaseId = currentGlobalBaseId ^ 1;
+    dataplane::proxy::proxy_service_t& service = base.globalBase->proxy_services[service_id];
 
-    base.globalBase->proxy_services[service_id] = service_cfg;
-
-    tcp_connection_store.ServiceUpdate(service_cfg, nullptr, currentGlobalBaseId, true);
-    tcp_connection_store.ServiceUpdate(service_cfg, nullptr, newGlobalBaseId, false);
-    service = service_cfg;
-    base.globalBase->proxy_services[service_id] = service_cfg;
-    tcp_connection_store.current_time_sec = time(nullptr);
-    tcp_connection_store.current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    tcp_connection_store.ActivateSocket(0);
+    tcp_connection_store.ServiceUpdateOnSocket(0, service, 0, service_cfg, true, nullptr);
+    tcp_connection_store.ServiceUpdateOnSocket(0, service, 0, service_cfg, false, nullptr);
 
     ringlog.records = new common::ringlog::LogRecord[64];
 }
@@ -117,8 +106,12 @@ void Benchmark(const Config& config) {
 
     dataplane::proxy::TcpConnectionStore tcp_connection_store;
     dataplane::base::generation base;
-    dataplane::proxy::proxy_service_t service;
-    InitializeProxyService(tcp_connection_store, base, service);
+    proxy_service_id_t service_id = 1;
+    InitializeProxyService(tcp_connection_store, base, service_id);
+    dataplane::proxy::proxy_service_t& service = base.globalBase->proxy_services[service_id];
+
+    uint32_t current_time = time(nullptr);
+    uint64_t current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
     bool finished = false;
     std::thread ts_thread = std::thread([&]() {
@@ -128,17 +121,17 @@ void Benchmark(const Config& config) {
             uint32_t current_time = time(nullptr);
             if (current_time != prev_time)
             {
-                tcp_connection_store.current_time_sec = current_time;
+                current_time = current_time;
                 prev_time = current_time;
             }
-            tcp_connection_store.current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+            current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
     });
     std::thread gc_thread = std::thread([&]() {
         while (!finished)
 		{
-			tcp_connection_store.CollectGarbage();
+			tcp_connection_store.CollectGarbage(0, current_time_ms);
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
     });
@@ -160,8 +153,9 @@ void Benchmark(const Config& config) {
     uint64_t synflood_syn_dropped = 0;
     uint64_t synflood_synack_dropped = 0;
 
-    for (unsigned int i = 0; i < config.syn_threads; i++) {
-        syn_threads.emplace_back([=, &synflood_syn_dropped, &synflood_synack_dropped, &syn_mbufs, &syn_iterations, &base, &tcp_connection_store, &service]() {
+    uint32_t worker_id = 0;
+    for (unsigned int i = 0; i < config.syn_threads; i++, worker_id++) {
+        syn_threads.emplace_back([=, &current_time, &current_time_ms, &synflood_syn_dropped, &synflood_synack_dropped, &syn_mbufs, &syn_iterations, &base, &tcp_connection_store, &service]() {
             uint32_t client_addr = rte_cpu_to_be_32(common::ipv4_address_t("11.0.0.1") + i);
             std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
             uint64_t counters[64];
@@ -176,20 +170,21 @@ void Benchmark(const Config& config) {
             tcp_options.window_scaling = 5;
             tcp_options.sack_permitted = true;
             tcp_options.timestamp_value = timestamp;
-            for (uint64_t j = 0; j < config.synflood_packets; j++)
+            for (uint64_t j = 0; ; j++)
             {
                 if ((j & (1024 - 1)) == 0 && std::chrono::steady_clock::now() - start >= config.duration)
                     break;
+                if (config.synflood_packets && j == config.synflood_packets) break;
 
                 dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
                 rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
                 rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
 
-                SetIPAddresses(ipv4_header, client_addr, service.proxy_addr);
-                SetTCPPorts(tcp_header, rte_cpu_to_be_16(32768 + j % 32768), service.proxy_port);
+                SetIPAddresses(ipv4_header, client_addr, service.config.proxy_addr);
+                SetTCPPorts(tcp_header, rte_cpu_to_be_16(32768 + j % 32768), service.config.proxy_port);
                 SetSeqAck(tcp_header, 0, 0);
                 tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                if (!tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, i, ringlog))
+                if (!tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, worker_id, ringlog, current_time, current_time_ms))
                 { // packet dropped
                     synflood_syn_dropped++;
                     continue;
@@ -200,12 +195,12 @@ void Benchmark(const Config& config) {
                     local_addr = ipv4_header->src_addr;
                     local_port = tcp_header->src_port;
 
-                    SetIPAddresses(ipv4_header, service.upstream_addr, local_addr);
-                    SetTCPPorts(tcp_header, service.upstream_port, local_port);
+                    SetIPAddresses(ipv4_header, service.config.upstream_addr, local_addr);
+                    SetTCPPorts(tcp_header, service.config.upstream_port, local_port);
                     SetSeqAck(tcp_header, 0, rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog))
+                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog, current_time, current_time_ms))
                     { // packet dropped
                         synflood_synack_dropped++;
                         break;
@@ -222,8 +217,8 @@ void Benchmark(const Config& config) {
     uint64_t server_synack_dropped = 0;
     uint64_t server_ack_dropped = 0;
 
-    for (unsigned int i = 0; i < config.threads; i++) {
-        threads.emplace_back([=, &client_syn_dropped, &client_ack_dropped, &server_synack_dropped, &server_ack_dropped, &mbufs, &iterations, &base, &tcp_connection_store, &service]() {
+    for (unsigned int i = 0; i < config.threads; i++, worker_id++) {
+        threads.emplace_back([=, &current_time, &current_time_ms, &client_syn_dropped, &client_ack_dropped, &server_synack_dropped, &server_ack_dropped, &mbufs, &iterations, &base, &tcp_connection_store, &service]() {
             uint32_t client_addr = rte_cpu_to_be_32(common::ipv4_address_t("11.0.1.1") + i);
             std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
             uint64_t counters[64];
@@ -245,15 +240,15 @@ void Benchmark(const Config& config) {
                 dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
                 rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
                 rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
-                SetIPAddresses(ipv4_header, client_addr, service.proxy_addr);
-                SetTCPPorts(tcp_header, client_port, service.proxy_port);
+                SetIPAddresses(ipv4_header, client_addr, service.config.proxy_addr);
+                SetTCPPorts(tcp_header, client_port, service.config.proxy_port);
                 SetSeqAck(tcp_header, client_seq, 0);
                 tcp_options.mss = 1460;
                 tcp_options.window_scaling = 5;
                 tcp_options.sack_permitted = true;
                 tcp_options.timestamp_value = timestamp;
                 tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                if (!tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, i, ringlog))
+                if (!tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, worker_id, ringlog, current_time, current_time_ms))
                 { // packet dropped
                     client_syn_dropped++;
                     continue;
@@ -261,13 +256,13 @@ void Benchmark(const Config& config) {
 
                 if (ipv4_header->dst_addr == client_addr) // syn cookie
                 {
-                    SetIPAddresses(ipv4_header, client_addr, service.proxy_addr);
-                    SetTCPPorts(tcp_header, client_port, service.proxy_port);
+                    SetIPAddresses(ipv4_header, client_addr, service.config.proxy_addr);
+                    SetTCPPorts(tcp_header, client_port, service.config.proxy_port);
                     SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     tcp_options.Clear();
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, i, ringlog))
+                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, worker_id, ringlog, current_time, current_time_ms))
                     { // packet dropped
                         client_ack_dropped++;
                         continue;
@@ -280,37 +275,37 @@ void Benchmark(const Config& config) {
                     local_port = tcp_header->src_port;
                     
                     ResetMbuf(mbuf, &ipv4_header, &tcp_header); // TODO: Should probably just move headers back
-                    SetIPAddresses(ipv4_header, service.upstream_addr, local_addr);
-                    SetTCPPorts(tcp_header, service.upstream_port, local_port);
+                    SetIPAddresses(ipv4_header, service.config.upstream_addr, local_addr);
+                    SetTCPPorts(tcp_header, service.config.upstream_port, local_port);
                     SetSeqAck(tcp_header, server_seq, rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     tcp_options.Clear();
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog))
+                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog, current_time, current_time_ms))
                     { // packet dropped
                         server_synack_dropped++;
                         continue;
                     }
 
-                    SetIPAddresses(ipv4_header, client_addr, service.proxy_addr);
-                    SetTCPPorts(tcp_header, client_port, service.proxy_port);
+                    SetIPAddresses(ipv4_header, client_addr, service.config.proxy_addr);
+                    SetTCPPorts(tcp_header, client_port, service.config.proxy_port);
                     SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     tcp_options.Clear();
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, i, ringlog))
+                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, worker_id, ringlog, current_time, current_time_ms))
                     { // packet dropped
                         client_ack_dropped++;
                         continue;
                     }
 
                     ResetMbuf(mbuf, &ipv4_header, &tcp_header); // TODO: Should probably just move headers back
-                    SetIPAddresses(ipv4_header, service.upstream_addr, local_addr);
-                    SetTCPPorts(tcp_header, service.upstream_port, local_port);
+                    SetIPAddresses(ipv4_header, service.config.upstream_addr, local_addr);
+                    SetTCPPorts(tcp_header, service.config.upstream_port, local_port);
                     SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionServiceOnAck(mbuf, base, counters, ringlog))
+                    if (!tcp_connection_store.ActionServiceOnAck(mbuf, base, counters, ringlog, current_time, current_time_ms))
                     { // packet dropped
                         server_ack_dropped++;
                         continue;
@@ -321,36 +316,36 @@ void Benchmark(const Config& config) {
                     local_addr = ipv4_header->src_addr;
                     local_port = tcp_header->src_port;
 
-                    SetIPAddresses(ipv4_header, service.upstream_addr, local_addr);
-                    SetTCPPorts(tcp_header, service.upstream_port, local_port);
+                    SetIPAddresses(ipv4_header, service.config.upstream_addr, local_addr);
+                    SetTCPPorts(tcp_header, service.config.upstream_port, local_port);
                     SetSeqAck(tcp_header, server_seq, rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog))
+                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog, current_time, current_time_ms))
                     { // packet dropped
                         server_synack_dropped++;
                         continue;
                     }
     
-                    SetIPAddresses(ipv4_header, client_addr, service.proxy_addr);
-                    SetTCPPorts(tcp_header, client_port, service.proxy_port);
+                    SetIPAddresses(ipv4_header, client_addr, service.config.proxy_addr);
+                    SetTCPPorts(tcp_header, client_port, service.config.proxy_port);
                     SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     tcp_options.Clear();
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, i, ringlog))
+                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, worker_id, ringlog, current_time, current_time_ms))
                     { // packet dropped
                         client_ack_dropped++;
                         continue;
                     }
     
                     ResetMbuf(mbuf, &ipv4_header, &tcp_header); // TODO: Should probably just move headers back
-                    SetIPAddresses(ipv4_header, service.upstream_addr, local_addr);
-                    SetTCPPorts(tcp_header, service.upstream_port, local_port);
+                    SetIPAddresses(ipv4_header, service.config.upstream_addr, local_addr);
+                    SetTCPPorts(tcp_header, service.config.upstream_port, local_port);
                     SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionServiceOnAck(mbuf, base, counters, ringlog))
+                    if (!tcp_connection_store.ActionServiceOnAck(mbuf, base, counters, ringlog, current_time, current_time_ms))
                     { // packet dropped
                         server_ack_dropped++;
                         continue;
@@ -396,7 +391,7 @@ void Benchmark(const Config& config) {
     }
     std::cout << "Sum: " << std::accumulate(iterations.begin(), iterations.end(), 0) << " iterations\n";
     std::cout << "client_syn_dropped: " << client_syn_dropped << std::endl;
-    std::cout << "client_ack_dropped: " << client_ack_dropped << std::endl;
     std::cout << "server_synack_dropped: " << server_synack_dropped << std::endl;
+    std::cout << "client_ack_dropped: " << client_ack_dropped << std::endl;
     std::cout << "server_ack_dropped: " << server_ack_dropped << std::endl;
 }

@@ -941,7 +941,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                     }
                 }
             }
-                        
+            
             break;
         }
     }
@@ -972,7 +972,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
-        DebugPacket("\tclient not found", service_id, ipv4_header, tcp_header);
+        DebugPacket("\tservice synack client not found", service_id, ipv4_header, tcp_header);
         RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SynAckNoLoc, 0, tcp_header->dst_port));
         counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
         return false;
@@ -1095,8 +1095,8 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
     UpdateCheckSums(ipv4_header, tcp_header);
 
     counters[service.config.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
-    counters[service.config.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;			
-
+    counters[service.config.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;
+    			
     return action;
 }
 
@@ -1114,7 +1114,7 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
     uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
-        DebugPacket("client not found", service_id, ipv4_header, tcp_header);
+        DebugPacket("service ack client not found", service_id, ipv4_header, tcp_header);
         RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckNoLoc, tcp_header->dst_port, 0));
         counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
         return false;
@@ -1126,7 +1126,7 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
     ServiceConnectionData service_connection_data;
     if (service.tables.service_connections.FindAndLock(client_addr, client_port, current_time_ms, service_connection_data, false) != TableSearchResult::Found)
     {
-        DebugPacket("connection not found", service_id, ipv4_header, tcp_header);
+        DebugPacket("service ack connection not found", service_id, ipv4_header, tcp_header);
         service_connection_data.Unlock();
         counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_search_client_service_ack]++;
         RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckNoCon, client_port, tcp_header->dst_port));
