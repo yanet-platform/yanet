@@ -28,21 +28,18 @@ bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
     uint32_t num_free_chunks = max_workers * 2;
     uint32_t num_chunks = num_connections / chunk_size;
     
-    if (memory_manager != nullptr)
-    {
-        std::string name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".local_info";
-        local_info_ = (LocalInfo*)memory_manager->alloc(name.data(), socket_id, sizeof(LocalInfo));
-        name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".chunk_queue";
-        chunk_queue_ = memory_manager->create_static_array<ConnectionsChunk>(name.data(), num_free_chunks + num_chunks, socket_id);
-        name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".local_to_client";
-        local_to_client_ = memory_manager->create_static_array<uint64_t>(name.data(), num_chunks * chunk_size, socket_id);
-    }
-    else
-    {
-        local_info_ = new LocalInfo();
-        chunk_queue_ = new ConnectionsChunk[num_free_chunks + num_chunks];
-        local_to_client_ = new uint64_t[num_chunks * chunk_size];
-    }
+#ifdef CONFIG_YADECAP_UNITTEST
+    local_info_ = new LocalInfo();
+    chunk_queue_ = new ConnectionsChunk[num_free_chunks + num_chunks];
+    local_to_client_ = new uint64_t[num_chunks * chunk_size];
+#else
+    std::string name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".local_info";
+    local_info_ = (LocalInfo*)memory_manager->alloc(name.data(), socket_id, sizeof(LocalInfo));
+    name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".chunk_queue";
+    chunk_queue_ = memory_manager->create_static_array<ConnectionsChunk>(name.data(), num_free_chunks + num_chunks, socket_id);
+    name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".local_to_client";
+    local_to_client_ = memory_manager->create_static_array<uint64_t>(name.data(), num_chunks * chunk_size, socket_id);
+#endif
     if (local_info_ == nullptr || chunk_queue_ == nullptr || local_to_client_ == nullptr)
     {
         return false;
@@ -263,18 +260,15 @@ void LocalPool::ClearIfNotEqual(const LocalPool& other, dataplane::memory_manage
 
 void LocalPool::Clear(dataplane::memory_manager* memory_manager)
 {
-    if (memory_manager != nullptr)
-    {
-        memory_manager->destroy(chunk_queue_);
-        memory_manager->destroy(local_to_client_);
-        memory_manager->destroy(local_info_);
-    }
-    else
-    {
+#ifdef CONFIG_YADECAP_UNITTEST
         delete chunk_queue_;
         delete local_to_client_;
         delete local_info_;
-    }
+#else
+    memory_manager->destroy(chunk_queue_);
+    memory_manager->destroy(local_to_client_);
+    memory_manager->destroy(local_info_);
+#endif
 }
 
 void LocalPool::CopyFrom(const LocalPool& other)

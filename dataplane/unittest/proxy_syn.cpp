@@ -19,38 +19,40 @@ void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection
     uint32_t size_connections_table = 256;
     uint32_t size_syn_table = 0;
 
+    tcp_connection_store.ActivateSocket(0);
+
     proxy_service_id_t service_id = 1;
 
     base.globalBase = new dataplane::globalBase::generation(nullptr, 0);
     dataplane::proxy::proxy_service_t service_cfg;
 
-    service_cfg.service_id = service_id;
-    service_cfg.proxy_addr = proxy_addr;
-	service_cfg.proxy_port = proxy_port;
-	service_cfg.upstream_addr = upstream_addr;
-	service_cfg.upstream_port = upstream_port;
-    service_cfg.pool_prefix.address.address = uint32_t(local_pool_prefix.address());
-    service_cfg.pool_prefix.mask = local_pool_prefix.mask();
-	service_cfg.counter_id = 0;
-	service_cfg.send_proxy_header = false;
-	service_cfg.size_connections_table = size_connections_table;
-	service_cfg.size_syn_table = size_syn_table;
-	service_cfg.use_sack = YANET_PROXY_DEFAULT_USE_SACK;
-	service_cfg.mss = YANET_PROXY_DEFAULT_MSS;
-	service_cfg.winscale = YANET_PROXY_DEFAULT_WINSCALE;
-	service_cfg.timestamps = YANET_PROXY_DEFAULT_USE_TIMESTAMPS;
+    service_cfg.config.service_id = service_id;
+    service_cfg.config.proxy_addr = proxy_addr;
+	service_cfg.config.proxy_port = proxy_port;
+	service_cfg.config.upstream_addr = upstream_addr;
+	service_cfg.config.upstream_port = upstream_port;
+    service_cfg.config.pool_prefix.address.address = uint32_t(local_pool_prefix.address());
+    service_cfg.config.pool_prefix.mask = local_pool_prefix.mask();
+	service_cfg.config.counter_id = 0;
+	service_cfg.config.send_proxy_header = false;
+	service_cfg.config.size_connections_table = size_connections_table;
+	service_cfg.config.size_syn_table = size_syn_table;
+	service_cfg.config.tcp_options.use_sack = YANET_PROXY_DEFAULT_USE_SACK;
+	service_cfg.config.tcp_options.mss = YANET_PROXY_DEFAULT_MSS;
+	service_cfg.config.tcp_options.winscale = YANET_PROXY_DEFAULT_WINSCALE;
+	service_cfg.config.tcp_options.timestamps = YANET_PROXY_DEFAULT_USE_TIMESTAMPS;
 
-    uint8_t currentGlobalBaseId = 0;
-    uint8_t newGlobalBaseId = currentGlobalBaseId ^ 1;
+    // uint8_t currentGlobalBaseId = 0;
+    // uint8_t newGlobalBaseId = currentGlobalBaseId ^ 1;
 
     base.globalBase->proxy_services[service_id] = service_cfg;
 
-    ASSERT_EQ(tcp_connection_store.ServiceUpdate(service_cfg, nullptr, currentGlobalBaseId, true), eResult::success);
-    ASSERT_EQ(tcp_connection_store.ServiceUpdate(service_cfg, nullptr, newGlobalBaseId, false), eResult::success);
+    controlplane::proxy::service_t service_info;
+
+    ASSERT_EQ(tcp_connection_store.ServiceUpdateOnSocket(0, service_cfg, 0, service_info, true, nullptr), eResult::success);
+    ASSERT_EQ(tcp_connection_store.ServiceUpdateOnSocket(0, service_cfg, 0, service_info, false, nullptr), eResult::success);
     service = service_cfg;
     base.globalBase->proxy_services[service_id] = service_cfg;
-    tcp_connection_store.current_time_sec = time(nullptr);
-    tcp_connection_store.current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 void CreateMbuf(rte_mbuf** mbuf)
@@ -83,6 +85,9 @@ TEST(ServiceSynConnectionsTest, SynFlood)
         CreateMbuf(&mbufs[index]);
     }
 
+    uint32_t current_time_sec = time(nullptr);
+    uint64_t current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
     // std::vector<std::thread> threads;
     // for (uint32_t index = 0; index < threads_count; index++)
     // {
@@ -103,9 +108,9 @@ TEST(ServiceSynConnectionsTest, SynFlood)
                 rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
                 rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
                 ipv4_header->src_addr = client_addr;
-                ipv4_header->dst_addr = service.proxy_addr;
+                ipv4_header->dst_addr = service.config.proxy_addr;
                 tcp_header->src_port = rte_cpu_to_be_16(32768 + (packet_index + index * 1024) % 32768);
-                tcp_header->dst_port = service.proxy_port;
+                tcp_header->dst_port = service.config.proxy_port;
                 tcp_header->data_off = 0xa0;
                 uint8_t tcp_options[] = {0x02, 0x04, 0x05, 0xb4, 0x04, 0x02, 0x08, 0x0a, 0xb1, 0xcf, 0x1a, 0x9a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x05, 0x01};
                 for (int i = 0; i < 20; i++)
@@ -117,7 +122,7 @@ TEST(ServiceSynConnectionsTest, SynFlood)
                 mbuf->pkt_len = 100;
 
                 metadata->flow.data.proxy_service_id = 1;
-                ASSERT_TRUE(tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, worker_id, ringlog));
+                ASSERT_TRUE(tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, worker_id, ringlog, current_time_sec, current_time_ms));
             }
     //     });
     // }

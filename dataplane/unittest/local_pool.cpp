@@ -271,7 +271,7 @@ TEST(LocalPoolTest, Allocate)
 {
     common::ipv4_prefix_t prefix("192.168.0.0/30");
     dataplane::proxy::LocalPool pool;
-    pool.Init(0, ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()}, nullptr);
+    pool.Init(0, ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()}, nullptr, 0, false);
 
     uint32_t client_addr = ipv4_address_t::convert(common::ipv4_address_t("192.168.0.1")).address;
     tPortId client_port = 12345;
@@ -538,7 +538,7 @@ TEST(LocalPoolTest, Benchmark)
                                                                             std::chrono::duration<double>,
                                                                             std::chrono::duration<double>> {
                 dataplane::proxy::LocalPool pool;
-                pool.Init(0, ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()}, nullptr);
+                pool.Init(0, ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()}, nullptr, 0, false);
             
                 std::vector<uint64_t> addresses(iterations);
                 
@@ -630,7 +630,7 @@ TEST(LocalPoolTest, BenchmarkConcurrent)
                                                                             std::chrono::duration<double>,
                                                                             std::chrono::duration<double>> {
                 dataplane::proxy::LocalPool pool;
-                pool.Init(0, ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()}, nullptr);
+                pool.Init(0, ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()}, nullptr, 0, false);
             
                 std::vector<uint64_t> addresses(iterations);
                 

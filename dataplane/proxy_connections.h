@@ -200,14 +200,12 @@ public:
         }
 
         uint32_t number_buckets = number_connections / Bucket::bucket_size;        
-        if (memory_manager != nullptr)
-        {
-            buckets_ = memory_manager->create_static_array<Bucket>(name.data(), number_buckets, socket_id);
-        }
-        else
-        {
-            buckets_ = new Bucket[number_buckets]{};
-        }
+#ifdef CONFIG_YADECAP_UNITTEST
+        buckets_ = new Bucket[number_buckets]{};
+#else
+        buckets_ = memory_manager->create_static_array<Bucket>(name.data(), number_buckets, socket_id);
+#endif
+
         if (buckets_ == nullptr)
         {
             return false;
@@ -403,14 +401,11 @@ public:
     {
         if (buckets_ != nullptr)
         {
-            if (memory_manager == nullptr)
-            {
-                delete buckets_;
-            }
-            else
-            {
-                memory_manager->destroy(buckets_);
-            }
+#ifdef CONFIG_YADECAP_UNITTEST
+            delete buckets_;
+#else
+            memory_manager->destroy(buckets_);
+#endif
         }
         ClearLinks();
     }
