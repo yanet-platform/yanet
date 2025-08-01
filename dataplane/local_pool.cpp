@@ -110,7 +110,9 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId c
             local_info_->last = NULL_CHUNK;
 
         local_info_->worker_chunks[worker_id] = idx;
-        chunk_queue_[idx].offset = 0;    
+        chunk_queue_[idx].offset = 0;
+        local_info_->free_addresses -= chunk_size;
+        local_info_->used_addresses += chunk_size;
         rte_spinlock_unlock(&local_info_->spinlock);
     }
     
@@ -128,9 +130,6 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId c
         rte_spinlock_unlock(&local_info_->spinlock);
     }
     local_to_client_[local] = PackTuple(client_addr, client_port); 
-
-    local_info_->free_addresses--;
-    local_info_->used_addresses++;
 
     return res;
 }
@@ -180,13 +179,12 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
             local_info_->first = gc_chunk;
         local_info_->gc_chunks[worker_id] = NULL_CHUNK;
         chunk_queue_[local_info_->last].next_idx = NULL_CHUNK;
+        local_info_->free_addresses += chunk_size;
+        local_info_->used_addresses -= chunk_size;
         rte_spinlock_unlock(&local_info_->spinlock);
     }
 
     local_to_client_[idx] = 0;
-
-    local_info_->free_addresses++;
-    local_info_->used_addresses--;
 }
 
 uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) const
