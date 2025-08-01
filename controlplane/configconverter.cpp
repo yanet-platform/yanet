@@ -646,6 +646,8 @@ void config_converter_t::processBalancer()
 
 		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::update_balancer,
 		                        common::idp::updateGlobalBase::update_balancer::request{balancer.balancer_id,
+		                                                                                balancer.dscp_mark_type,
+		                                                                                balancer.dscp,
 		                                                                                balancer.source_ipv6,
 		                                                                                balancer.source_ipv4,
 		                                                                                balancer.flow});

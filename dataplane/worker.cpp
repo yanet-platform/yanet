@@ -807,6 +807,29 @@ inline void cWorker::mark_ipv4_dscp(rte_mbuf* mbuf,
 	}
 }
 
+inline void cWorker::mark_ipv6_dscp(rte_mbuf* mbuf,
+                                    const uint8_t dscp_flags)
+{
+	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+	rte_ipv6_hdr* ipv6_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+
+	uint32_t traffic_class = (rte_be_to_cpu_32(ipv6_header->vtc_flow) >> 20) & 0xFF;
+	if (dscp_flags & YADECAP_GB_DSCP_FLAG_ALWAYS_MARK)
+	{
+		traffic_class &= 0x3; ///< ECN
+		traffic_class |= dscp_flags & 0xFC;
+		ipv6_header->vtc_flow = rte_cpu_to_be_32(traffic_class << 20) | (~rte_cpu_to_be_32(0xff << 20) & ipv6_header->vtc_flow);
+	}
+	else if (dscp_flags & YADECAP_GB_DSCP_FLAG_MARK)
+	{
+		if (!(traffic_class & 0xFC)) ///< DSCP == 0
+		{
+			traffic_class |= dscp_flags & 0xFC;
+			ipv6_header->vtc_flow = rte_cpu_to_be_32(traffic_class << 20) | (~rte_cpu_to_be_32(0xff << 20) & ipv6_header->vtc_flow);
+		}
+	}
+}
+
 inline void cWorker::handlePackets()
 {
 	const auto& base = bases[localBaseId & 1];
@@ -4308,6 +4331,7 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 			ipv6Header->proto = IPPROTO_IPV6;
 			ipv6Header->hop_limits = ipv6HeaderInner->hop_limits;
 		}
+		mark_ipv6_dscp(mbuf, balancer.dscp_flags);
 	}
 	else // IPV4
 	{
@@ -4345,6 +4369,7 @@ inline void cWorker::balancer_tunnel(rte_mbuf* mbuf,
 			ipv4Header->time_to_live = ipv6HeaderInner->hop_limits;
 			ipv4Header->next_proto_id = IPPROTO_IPV6;
 		}
+		mark_ipv4_dscp(mbuf, balancer.dscp_flags);
 
 		balancer_ipv4_source(ipv4Header, balancer.source_ipv4, service);
 		ipv4Header->dst_addr = real.destination.mapped_ipv4_address.address;
