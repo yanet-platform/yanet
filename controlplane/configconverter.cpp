@@ -2042,7 +2042,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 			// server_ack
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "server_ack");	
 			flow.data.proxy_service_id = service.service_id;
-			server_rule_transport.flags = {TCP_ACK_FLAG, TCP_SYN_FLAG};
+			server_rule_transport.flags = {0, TCP_SYN_FLAG};
 			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
 		}
 	}

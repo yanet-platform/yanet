@@ -180,19 +180,26 @@ WriteTest("004", data_type4)
 
 # 005 - pings
 
-write_pcap("005-send.pcap",
-           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER1)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("abcdef"),
-           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER2)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("abcd"),
-           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER3)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("ab"),
-           Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER4)/ICMP(type=8, code=0, id=1, seq=0x0001),
-)
+data_type_icmp = [
+    (
+        Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER1)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("abcdef"),
+        Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER1, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("abcdef"),
+	),
+    (
+		Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER2)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("abcd"),
+		Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER2, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("abcd"),
+	),
+    (
+		Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER3)/ICMP(type=8, code=0, id=1, seq=0x0001)/Raw("ab"),
+		Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER3, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("ab"),
+	),
+    (
+		Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY)/Dot1Q(vlan=100)/IP(src=IP_CLIENT, dst=IP_SERVER4)/ICMP(type=8, code=0, id=1, seq=0x0001),
+		Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER4, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001),
+	)
+]
 
-write_pcap("005-expect.pcap",
-           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER1, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("abcdef"),
-           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER2, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("abcd"),
-           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER3, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001)/Raw("ab"),
-           Ether(src=ProxyTest.MAC_PROXY, dst=ProxyTest.MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=IP_SERVER4, dst=IP_CLIENT, ttl=64)/ICMP(type=0, code=0, id=1, seq=0x0001),
-)
+WriteTest("005", data_type_icmp)
 
 # 006 - blacklist
 
@@ -307,3 +314,45 @@ data_type9 = [
 ]
 
 WriteTest("009", data_type9)
+
+# 010 - Server RST
+
+test_010 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT + 3, cport=PORT_CLIENT + 3)
+
+data_type10_1 = [
+    (
+		test_010.FromClient((0, None), 'S', options=options_client_syn),
+		test_010.ToServer((0, None), 'S', options=options_client_syn)
+	), 
+    (
+		test_010.FromServer((0, 1), 'AS', options=options_server_syn),
+		test_010.ToClient((0, 1), 'AS', options=options_server_syn)
+	), 
+    (
+		test_010.FromClient((1, 1), 'A', raw=data_client1, options=options_client_ack),
+		test_010.ToServer((1, 1), 'A', raw=data_client1, options=options_client_ack)
+	), 
+    (
+		test_010.FromServer((1, 1 + len(data_client1)), 'A', raw=data_server1),
+		test_010.ToClient((1, 1 + len(data_client1)), 'A', raw=data_server1)
+	), 
+    (
+		test_010.FromClient((1 + len(data_client1), 1 + len(data_server1)), 'A', raw=data_client2),
+		test_010.ToServer((1 + len(data_client1), 1 + len(data_server1)), 'A', raw=data_client2)
+	),
+    (
+		test_001.FromServer((1 + len(data_server1), 1 + len(data_client1) + len(data_client2)), 'R'),
+		test_001.ToClient((1 + len(data_server1), 1 + len(data_client1) + len(data_client2)), 'R')
+	), 
+]
+
+WriteTest("010_1", data_type10_1)
+
+data_type10_2 = [
+    (
+		test_001.FromClient((1 + len(data_client1), 1 + len(data_server1)), 'A', raw=data_client2),
+        # dropped
+	),
+]
+
+WriteTest("010_2", data_type10_2)

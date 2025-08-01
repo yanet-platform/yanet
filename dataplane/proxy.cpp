@@ -736,6 +736,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
             {
                 service_connection_data.connection->flags |= Connection::flag_nonempty_ack_from_client;
             }
+            service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
 
             if (tcp_header->sent_seq == service_connection_data.connection->client_start_seq)
             {
@@ -862,6 +863,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                     syn_connection_data.Unlock();
 
                     service_connection_data.connection->flags = flags;
+                    service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
                     service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
 
                     if (service.config.send_proxy_header)
@@ -931,6 +933,7 @@ bool TcpConnectionStore::ActionClientOnAck(rte_mbuf* mbuf, const dataplane::base
                             flags |= Connection::flag_no_timestamps;
                         }
                         service_connection_data.connection->flags = Connection::flag_from_synkookie | flags;
+                        service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
 
                         cookie_options.Write(mbuf, &ipv4_header, &tcp_header);
                         ipv4_header->time_to_live = 64;
@@ -1027,6 +1030,7 @@ bool TcpConnectionStore::ActionServiceOnSynAck(rte_mbuf* mbuf, const dataplane::
 
     bool action = true;
     service_connection_data.connection->flags |= Connection::flag_answer_from_server;
+    service_connection_data.connection->service_flags |= tcp_header->tcp_flags;
     if (!service_connection_data.connection->CreatedFromSynCookie())
     {
         // todo
@@ -1132,6 +1136,8 @@ bool TcpConnectionStore::ActionServiceOnAck(rte_mbuf* mbuf, const dataplane::bas
         RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckNoCon, client_port, tcp_header->dst_port));
         return false;
     }
+
+    service_connection_data.connection->service_flags |= tcp_header->tcp_flags;
 
     RINGLOG_ADD(ringlog, current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckOk, client_port, tcp_header->dst_port));
     if (service_connection_data.connection->CreatedFromSynCookie())

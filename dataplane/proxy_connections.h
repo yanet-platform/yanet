@@ -10,6 +10,88 @@ namespace dataplane::proxy
 
 #define TIMEOUT_BUCKET_OVERFLOW 1000
 
+enum class TableSearchResult : uint32_t
+{
+    Overflow = 0,
+    Found,
+    NotFound
+};
+
+struct Connection
+{
+    uint64_t local;     // ip + port from local pool
+
+    // SEQ values
+    uint32_t client_start_seq; // SEQ received from client in first SYN packet
+    uint32_t proxy_start_seq; // SEQ sent from proxy to client in SYN+ACK packet (= our syn-cookie)
+    uint32_t shift_server;
+    uint32_t cookie_data;    // used for sent retransmits syn packets to service
+
+    // Timestamps
+    uint32_t timestamp_proxy_first;
+    uint32_t timestamp_client_last;    // used for sent retransmits syn packets to service
+    uint32_t timestamp_shift;
+
+    int32_t window_size_shift;
+    uint32_t flags;
+    uint16_t client_flags;
+    uint16_t service_flags;
+
+    static constexpr uint32_t flag_from_synkookie = 1u << 0;
+    static constexpr uint32_t flag_answer_from_server = 1u << 1;
+    static constexpr uint32_t flag_nonempty_ack_from_client = 1u << 2;
+    static constexpr uint32_t flag_sent_rentransmit_syn_to_server = 1u << 3;
+    static constexpr uint32_t flag_clear_sack = 1u << 4;
+    static constexpr uint32_t flag_no_timestamps = 1u << 5;
+    static constexpr uint32_t flag_timestamp_fail = 1u << 6;
+
+    void Clear() {
+        local = 0;
+        client_start_seq = 0;
+        proxy_start_seq = 0;
+        shift_server = 0;
+        cookie_data = 0;
+        timestamp_proxy_first = 0;
+        timestamp_client_last = 0;
+        timestamp_shift = 0;
+        window_size_shift = 0;
+        flags = 0;
+        client_flags = 0;
+        service_flags = 0;
+    }
+
+    bool CreatedFromSynCookie()
+    {
+        return (flags & flag_from_synkookie) != 0;
+    }
+
+    bool UseForRetransmit()
+    {
+        if (((flags & flag_from_synkookie) != 0) && ((flags & flag_sent_rentransmit_syn_to_server) == 0) &&
+                ((flags & flag_nonempty_ack_from_client) == 0)) {
+            flags |= flag_nonempty_ack_from_client;
+            return true;
+        }
+        return false;
+    }
+};
+
+struct SynConnection
+{
+    uint64_t local;     // ip + port from local pool
+    uint32_t client_start_seq;  // SEQ received from client in first SYN packet
+    uint32_t server_seq; // SEQ received from server in SYNACK packet
+    bool server_answer; // was received answer from server
+
+    void Clear()
+    {
+        local = 0;
+        client_start_seq = 0;
+        server_seq = 0;
+        server_answer = false;
+    }
+};
+
 template<typename ConnectionInfo>
 struct ConnectionBucket
 {
@@ -46,6 +128,9 @@ struct ConnectionBucket
 
     bool IsExpired(uint32_t idx, uint64_t current_time, uint64_t timeout)
     {
+        if constexpr (std::is_same_v<ConnectionInfo, Connection>) {
+            if (connections[idx].service_flags & TCP_RST_FLAG != 0) return true;
+        }
         return last_times[idx] + timeout < current_time;
     }
 
@@ -88,84 +173,6 @@ struct ConnectionData {
     
     bool operator==(const ConnectionData& other) const {
         return bucket == other.bucket && idx == other.idx;
-    }
-};
-
-enum class TableSearchResult : uint32_t
-{
-    Overflow = 0,
-    Found,
-    NotFound
-};
-
-struct Connection
-{
-    uint64_t local;     // ip + port from local pool
-
-    // SEQ values
-    uint32_t client_start_seq; // SEQ received from client in first SYN packet
-    uint32_t proxy_start_seq; // SEQ sent from proxy to client in SYN+ACK packet (= our syn-cookie)
-    uint32_t shift_server;
-    uint32_t cookie_data;    // used for sent retransmits syn packets to service
-
-    // Timestamps
-    uint32_t timestamp_proxy_first;
-    uint32_t timestamp_client_last;    // used for sent retransmits syn packets to service
-    uint32_t timestamp_shift;
-
-    int32_t window_size_shift;
-    uint32_t flags;
-
-    static constexpr uint32_t flag_from_synkookie = 1u << 0;
-    static constexpr uint32_t flag_answer_from_server = 1u << 1;
-    static constexpr uint32_t flag_nonempty_ack_from_client = 1u << 2;
-    static constexpr uint32_t flag_sent_rentransmit_syn_to_server = 1u << 3;
-    static constexpr uint32_t flag_clear_sack = 1u << 4;
-    static constexpr uint32_t flag_no_timestamps = 1u << 5;
-    static constexpr uint32_t flag_timestamp_fail = 1u << 6;
-
-    void Clear() {
-        local = 0;
-        client_start_seq = 0;
-        proxy_start_seq = 0;
-        shift_server = 0;
-        cookie_data = 0;
-        timestamp_proxy_first = 0;
-        timestamp_client_last = 0;
-        timestamp_shift = 0;
-        window_size_shift = 0;
-        flags = 0;
-    }
-
-    bool CreatedFromSynCookie()
-    {
-        return (flags & flag_from_synkookie) != 0;
-    }
-
-    bool UseForRetransmit()
-    {
-        if (((flags & flag_from_synkookie) != 0) && ((flags & flag_sent_rentransmit_syn_to_server) == 0) &&
-                ((flags & flag_nonempty_ack_from_client) == 0)) {
-            flags |= flag_nonempty_ack_from_client;
-            return true;
-        }
-        return false;
-    }
-};
-
-struct SynConnection
-{
-    uint64_t local;     // ip + port from local pool
-    uint32_t client_start_seq;  // SEQ received from client in first SYN packet
-    uint32_t server_seq; // SEQ received from server in SYNACK packet
-    bool server_answer; // was received answer from server
-
-    void Clear()
-    {
-        local = 0;
-        client_start_seq = 0;
-        server_seq = 0;
-        server_answer = false;
     }
 };
 
