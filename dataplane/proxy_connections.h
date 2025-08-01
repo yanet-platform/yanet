@@ -129,7 +129,7 @@ struct ConnectionBucket
     bool IsExpired(uint32_t idx, uint64_t current_time, uint64_t timeout)
     {
         if constexpr (std::is_same_v<ConnectionInfo, Connection>) {
-            if (connections[idx].service_flags & TCP_RST_FLAG != 0) return true;
+            if ((connections[idx].service_flags & TCP_RST_FLAG) != 0) return true;
         }
         return last_times[idx] + timeout < current_time;
     }
