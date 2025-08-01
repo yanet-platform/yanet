@@ -120,6 +120,11 @@ public:
 		return get<common::idp::requestType::getReport, common::idp::getReport::response>();
 	}
 
+	common::idp::getPhysicalPortsFull::response getPhysicalPortsFull(common::idp::getPhysicalPortsFull::request& request) const
+	{
+		return get<common::idp::requestType::getPhysicalPortsFull, common::idp::getPhysicalPortsFull::response>(request);
+	}
+
 	common::idp::getGlobalBase::response getGlobalBase(const common::idp::getGlobalBase::request& request) const
 	{
 		return get<common::idp::requestType::getGlobalBase, common::idp::getGlobalBase::response>(request);

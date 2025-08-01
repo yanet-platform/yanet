@@ -52,6 +52,25 @@ inline void physicalPort()
 	table.Print();
 }
 
+inline void physicalPortsFullReport(int indent)
+{
+	interface::dataPlane dataPlane;
+	for (const auto& [portId, str_report] : dataPlane.getPhysicalPortsFull(indent))
+	{
+		std::cout << portId << ";" << str_report << "\n";
+	}
+}
+
+inline void physicalPortsFull()
+{
+	physicalPortsFullReport(-1);
+}
+
+inline void physicalPortsFullRead()
+{
+	physicalPortsFullReport(2);
+}
+
 inline void physical_port_dump(const std::string& direction,
                                const std::string& interface_name,
                                const std::string& state)

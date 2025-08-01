@@ -105,6 +105,20 @@ nlohmann::json cReport::getReport()
 	return jsonReport;
 }
 
+common::idp::getPhysicalPortsFull::response cReport::getPhysicalPortsFull(int request)
+{
+	int indent = request;
+	std::vector<std::pair<tPortId, std::string>> result;
+
+	for (const auto& iter : dataPlane->ports)
+	{
+		const tPortId& portId = iter.first;
+		result.emplace_back(portId, convertPort(portId).dump(indent));
+	}
+
+	return result;
+}
+
 std::string pointerToHex(const void* pointer)
 {
 	char buffer[128];

@@ -84,6 +84,7 @@ enum class requestType : uint32_t
         proxy_connections,
         proxy_syn,
         proxy_tables,
+        getPhysicalPortsFull,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -771,6 +772,14 @@ namespace getReport
 using response = std::string;
 }
 
+namespace getPhysicalPortsFull
+{
+using request = int;    // indent
+
+using response = std::vector<std::pair<tPortId, ///< PortId
+                                       std::string>>; ///< str_report
+}
+
 namespace lpm4LookupAddress
 {
 using request = uint32_t; ///< ipAddress
@@ -1091,7 +1100,8 @@ using request = std::tuple<requestType,
                                         neighbor_remove::request,
                                         neighbor_update_interfaces::request,
                                         memory_manager_update::request,
-                                        proxy_tables::request>>;
+                                        proxy_tables::request,
+                                        getPhysicalPortsFull::request>>;
 
 using response = std::variant<std::tuple<>,
                               updateGlobalBase::response, ///< + others which have eResult as response
@@ -1125,5 +1135,6 @@ using response = std::variant<std::tuple<>,
                               neighbor_stats::response,
                               memory_manager_stats::response,
                               proxy_connections::response,
-                              proxy_tables::response>;
+                              proxy_tables::response,
+                              getPhysicalPortsFull::response>;
 }

@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include "common/idp.h"
 #include "type.h"
 
 /// Provides various reports about the current state of the dataplane in JSON format.
@@ -19,6 +20,7 @@ public:
 	/// As a result, this method itself is not thread-safe. Be careful calling
 	/// DPDK functions in multiple threads parallel with this method.
 	nlohmann::json getReport();
+	common::idp::getPhysicalPortsFull::response getPhysicalPortsFull(int request);
 
 protected:
 	nlohmann::json convertWorker(const cWorker* worker);

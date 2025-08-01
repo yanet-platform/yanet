@@ -61,7 +61,11 @@ inline std::vector<bus_request_info> get_bus_requests(common::sdp::DataPlaneInSh
 	        {common::idp::requestType::neighbor_update_interfaces, "neighbor_update_interfaces"},
 	        {common::idp::requestType::neighbor_stats, "neighbor_stats"},
 	        {common::idp::requestType::memory_manager_update, "memory_manager_update"},
-	        {common::idp::requestType::memory_manager_stats, "memory_manager_stats"}};
+	        {common::idp::requestType::memory_manager_stats, "memory_manager_stats"},
+	        {common::idp::requestType::proxy_connections, "proxy_connections"},
+	        {common::idp::requestType::proxy_syn, "proxy_syn"},
+	        {common::idp::requestType::proxy_tables, "proxy_tables"},
+	        {common::idp::requestType::getPhysicalPortsFull, "getPhysicalPortsFull"}};
 
 	std::vector<bus_request_info> result;
 	for (uint32_t index = 0; index < (uint32_t)common::idp::requestType::size; ++index)

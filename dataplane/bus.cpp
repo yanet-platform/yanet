@@ -397,6 +397,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = dataPlane->memory_manager.memory_manager_stats();
 		}
+		else if (type == common::idp::requestType::getPhysicalPortsFull)
+		{
+			response = dataPlane->report.getPhysicalPortsFull(std::get<common::idp::getPhysicalPortsFull::request>(std::get<1>(request)));
+		}
 		else
 		{
 			stats.errors[(uint32_t)common::idp::errorType::busParse]++;
