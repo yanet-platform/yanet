@@ -224,11 +224,14 @@ public:
 	nlohmann::json save() const;
 	*/
 
-	SERIALIZABLE(balancer_id, services, source_ipv6, source_ipv4, vip_to_balancers, default_wlc_power, next_module);
+	SERIALIZABLE(balancer_id, services, dscp_mark_type, dscp, source_ipv6, source_ipv4, vip_to_balancers, default_wlc_power, next_module);
 
 public:
 	balancer_id_t balancer_id;
 	std::vector<service_t> services; ///< @todo: std::map<>
+
+	common::eDscpMarkType dscp_mark_type{common::eDscpMarkType::never};
+	uint8_t dscp{};
 
 	// when communicating with reals
 	common::ipv6_address_t source_ipv6;

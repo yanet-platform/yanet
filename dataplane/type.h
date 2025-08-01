@@ -372,6 +372,7 @@ struct balancer_t
 	// when communicating with reals
 	ipv6_address_t source_ipv6;
 	ipv4_address_t source_ipv4;
+	uint8_t dscp_flags;
 
 	common::globalBase::tFlow flow;
 };
