@@ -1580,6 +1580,48 @@ void config_parser_t::loadConfig_balancer(controlplane::base_t& baseNext,
 		                             jsons);
 	}
 
+	if (exist(moduleJson, "dscpMarkType"))
+	{
+		using common::eDscpMarkType;
+
+		std::string dscpMarkTypeString = moduleJson["dscpMarkType"];
+
+		if (dscpMarkTypeString == "never")
+		{
+			balancer.dscp_mark_type = eDscpMarkType::never;
+		}
+		else if (dscpMarkTypeString == "onlyDefault")
+		{
+			balancer.dscp_mark_type = eDscpMarkType::onlyDefault;
+
+			if (exist(moduleJson, "dscp"))
+			{
+				balancer.dscp = moduleJson["dscp"];
+			}
+			else
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "dscp not set");
+			}
+		}
+		else if (dscpMarkTypeString == "always")
+		{
+			balancer.dscp_mark_type = eDscpMarkType::always;
+
+			if (exist(moduleJson, "dscp"))
+			{
+				balancer.dscp = moduleJson["dscp"];
+			}
+			else
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "dscp not set");
+			}
+		}
+		else
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "invalid dscpMarkType: " + dscpMarkTypeString);
+		}
+	}
+
 	balancer.source_ipv6 = moduleJson.value("source", "::");
 	balancer.source_ipv4 = moduleJson.value("source_ipv4", "0.0.0.0");
 

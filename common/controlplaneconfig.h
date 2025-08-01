@@ -332,6 +332,8 @@ public:
 	{
 		stream.pop(balancer_id);
 		stream.pop(services);
+		stream.pop(dscp_mark_type);
+		stream.pop(dscp);
 		stream.pop(source_ipv6);
 		stream.pop(source_ipv4);
 		stream.pop(vip_to_balancers);
@@ -343,6 +345,8 @@ public:
 	{
 		stream.push(balancer_id);
 		stream.push(services);
+		stream.push(dscp_mark_type);
+		stream.push(dscp);
 		stream.push(source_ipv6);
 		stream.push(source_ipv4);
 		stream.push(vip_to_balancers);
@@ -353,6 +357,9 @@ public:
 public:
 	balancer_id_t balancer_id;
 	std::vector<service_t> services; ///< @todo: std::map<>
+
+	common::eDscpMarkType dscp_mark_type{common::eDscpMarkType::never};
+	uint8_t dscp{};
 
 	// when communicating with reals
 	common::ipv6_address_t source_ipv6;

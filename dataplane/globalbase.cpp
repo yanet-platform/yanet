@@ -1406,7 +1406,7 @@ eResult generation::nat46clat_update(const common::idp::updateGlobalBase::nat46c
 
 eResult generation::update_balancer(const common::idp::updateGlobalBase::update_balancer::request& request)
 {
-	const auto& [balancer_id, source_ipv6, source_ipv4, flow] = request;
+	const auto& [balancer_id, dscp_mark_type, dscp, source_ipv6, source_ipv4, flow] = request;
 
 	if (balancer_id >= YANET_CONFIG_BALANCERS_SIZE)
 	{
@@ -1427,6 +1427,31 @@ eResult generation::update_balancer(const common::idp::updateGlobalBase::update_
 	}
 
 	auto& balancer = balancers[balancer_id];
+
+	if (dscp_mark_type == common::eDscpMarkType::onlyDefault)
+	{
+		if (dscp > 0x3F)
+		{
+			YADECAP_LOG_ERROR("invalid dscp\n");
+			return eResult::invalidArguments;
+		}
+
+		balancer.dscp_flags = (dscp << 2) | YADECAP_GB_DSCP_FLAG_MARK;
+	}
+	else if (dscp_mark_type == common::eDscpMarkType::always)
+	{
+		if (dscp > 0x3F)
+		{
+			YADECAP_LOG_ERROR("invalid dscp\n");
+			return eResult::invalidArguments;
+		}
+
+		balancer.dscp_flags = (dscp << 2) | YADECAP_GB_DSCP_FLAG_ALWAYS_MARK;
+	}
+	else
+	{
+		balancer.dscp_flags = 0;
+	}
 
 	balancer.source_ipv6 = ipv6_address_t::convert(source_ipv6);
 	balancer.source_ipv4 = ipv4_address_t::convert(source_ipv4);

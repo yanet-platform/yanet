@@ -277,6 +277,8 @@ using request = std::tuple<nat46clat_id_t,
 namespace update_balancer
 {
 using request = std::tuple<balancer_id_t,
+                           eDscpMarkType, ///< dscp_type
+                           uint8_t, ///< dscp
                            common::ipv6_address_t, ///< source ipv6
                            common::ipv4_address_t, ///< source ipv4
                            common::globalBase::tFlow>;

@@ -82,6 +82,7 @@ protected:
 	inline void translation_ipv6_to_ipv4(rte_mbuf* mbuf, const ipv4_address_t& ipv4_source, const ipv4_address_t& ipv4_destination, const uint32_t port_source, const uint32_t port_destination, const uint32_t identifier);
 
 	inline void mark_ipv4_dscp(rte_mbuf* mbuf, const uint8_t dscp_flags);
+	inline void mark_ipv6_dscp(rte_mbuf* mbuf, const uint8_t dscp_flags);
 
 	inline void handlePackets();
 
