@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <memory.h>
 
-#include <rte_byteorder.h>
 #include <cstdint>
+#include <rte_byteorder.h>
 
 #include "rte_crc_x86.h"
 

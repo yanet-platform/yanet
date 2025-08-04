@@ -394,6 +394,7 @@ class updater_hashtable_mod_id32
 {
 public:
 	using object_type = hashtable_mod_id32_dynamic<key_t, chunk_size, valid_bit_offset, calculate_hash>;
+	using pair = typename object_type::pair;
 
 	updater_hashtable_mod_id32(const char* name,
 	                           dataplane::memory_manager* memory_manager,
@@ -412,37 +413,90 @@ public:
 
 	eResult update(const std::vector<std::tuple<key_t, uint32_t>>& values, bool retry = true)
 	{
+		// 4x is the sizing policy to reduce load factor
 		stats.pairs_size = upper_power_of_two(std::max(object_type::pairs_size_min,
 		                                               (uint32_t)(4ull * values.size())));
 
-		/// destroy pointer if exist
 		clear();
 
 		eResult result = eResult::success;
 		for (;;)
 		{
+			constexpr uint64_t chunk_bytes = 256ull << 20; // 256 megabytes
+			constexpr uint64_t pairs_in_chunk_raw = std::max<uint64_t>(1, chunk_bytes / sizeof(pair));
+			constexpr uint32_t ppc_shift = (pairs_in_chunk_raw > 0) ? (63u - __builtin_clzll(pairs_in_chunk_raw)) : 0;
+
 			pointer = memory_manager->create<object_type>(name.data(),
 			                                              socket_id,
 			                                              object_type::calculate_sizeof(stats.pairs_size),
-			                                              stats.pairs_size);
+			                                              stats.pairs_size,
+			                                              ppc_shift);
 			if (pointer == nullptr)
 			{
 				return eResult::errorAllocatingMemory;
 			}
 
-			result = pointer->fill(stats, values);
-			if (result != eResult::success)
+			// Allocate the array of chunk pointers.
+			const uint32_t num_chunks = pointer->num_chunks();
+			const uint64_t chunks_array_bytes = (uint64_t)num_chunks * sizeof(pair*);
+			auto* chunks_ptr_array = reinterpret_cast<pair**>(
+			        memory_manager->alloc((name + ".chunks").c_str(), socket_id, chunks_array_bytes));
+
+			if (!chunks_ptr_array)
 			{
-				if (retry)
+				memory_manager->destroy(pointer);
+				pointer = nullptr;
+				return eResult::errorAllocatingMemory;
+			}
+			std::memset(chunks_ptr_array, 0, chunks_array_bytes);
+
+			// Allocate each individual chunk.
+			const uint32_t pairs_per_chunk = pointer->pairs_per_chunk();
+			bool allocation_ok = true;
+			for (uint32_t i = 0; i < num_chunks; ++i)
+			{
+				const uint64_t chunk_mem_size = (uint64_t)pairs_per_chunk * sizeof(pair);
+				chunks_ptr_array[i] = reinterpret_cast<pair*>(
+				        memory_manager->alloc((name + ".chunk." + std::to_string(i)).c_str(),
+				                              socket_id,
+				                              chunk_mem_size));
+
+				if (chunks_ptr_array[i] == nullptr)
 				{
-					/// try again
-					memory_manager->destroy(pointer);
-					stats.pairs_size *= 2;
-					continue;
+					allocation_ok = false;
+					break;
 				}
+				// Zero-out chunk memory to mark all slots as invalid.
+				std::memset(chunks_ptr_array[i], 0, chunk_mem_size);
 			}
 
-			break;
+			if (!allocation_ok)
+			{
+				for (uint32_t i = 0; i < num_chunks; ++i)
+				{
+					if (chunks_ptr_array[i])
+					{
+						memory_manager->destroy(chunks_ptr_array[i]);
+					}
+				}
+				memory_manager->destroy(chunks_ptr_array);
+				memory_manager->destroy(pointer);
+				pointer = nullptr;
+				return eResult::errorAllocatingMemory;
+			}
+
+			// Attach the fully allocated chunks to the hashtable object.
+			pointer->attach_chunks(chunks_ptr_array);
+
+			result = pointer->fill(stats, values);
+			if (result == eResult::success || !retry)
+			{
+				break;
+			}
+
+			clear();
+			// Double the size for the next attempt.
+			stats.pairs_size *= 2;
 		}
 
 		return result;
@@ -450,11 +504,27 @@ public:
 
 	void clear()
 	{
-		if (pointer)
+		if (!pointer)
 		{
-			memory_manager->destroy(pointer);
-			pointer = nullptr;
+			return;
 		}
+
+		pair** chunks_ptr_array = pointer->chunks();
+		if (chunks_ptr_array)
+		{
+			const uint32_t num_chunks = pointer->num_chunks();
+			for (uint32_t i = 0; i < num_chunks; ++i)
+			{
+				if (chunks_ptr_array[i])
+				{
+					memory_manager->destroy(chunks_ptr_array[i]);
+				}
+			}
+			memory_manager->destroy(chunks_ptr_array);
+		}
+
+		memory_manager->destroy(pointer);
+		pointer = nullptr;
 	}
 
 	void limits(common::idp::limits::response& limits) const
@@ -474,15 +544,18 @@ public:
 		report["pointer"] = to_hex(pointer);
 		report["pairs_count"] = stats.pairs_count;
 		report["pairs_size"] = stats.pairs_size;
-		for (unsigned int i = 0;
-		     i < stats.pairs_in_chunks.size();
-		     i++)
+		for (unsigned int i = 0; i < stats.pairs_in_chunks.size(); i++)
 		{
 			report["pairs_in_chunks"][i] = stats.pairs_in_chunks[i];
 		}
 		report["longest_chain"] = stats.longest_chain;
 		report["insert_failed"] = stats.insert_failed;
 		report["rewrites"] = stats.rewrites;
+		if (pointer)
+		{
+			report["num_chunks"] = pointer->num_chunks();
+			report["pairs_per_chunk"] = pointer->pairs_per_chunk();
+		}
 	}
 
 protected:
