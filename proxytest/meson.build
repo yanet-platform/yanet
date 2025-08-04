@@ -12,6 +12,9 @@ dataplane_sources = files('../dataplane/proxy.cpp',
 
 sources = files('main.cpp', 'proxytest.cpp', 'benchmark.cpp')
 
+cpp_args_append = ['-DCONFIG_YADECAP_UNITTEST']
+
 executable('bench', [sources, dataplane_sources],
             include_directories: yanet_rootdir,
-            dependencies: dependencies)
+            dependencies: dependencies,
+            cpp_args: cpp_args_append)
