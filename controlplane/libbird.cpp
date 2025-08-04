@@ -325,37 +325,47 @@ parse_route_update(uintptr_t* ppos, uintptr_t end, const char* vrf, common::icp:
 	common::ip_address_t vpnDST;
 	uint32_t vpnRD = 0;
 
+YANET_LOG_ERROR("pth00\n");
 	/* Decode route prefix. */
 	net_addr_union addr;
 	if (!decode_net_addr(ppos, end, &addr))
 		return false;
+YANET_LOG_ERROR("pth01\n");
 
 	if (!recover_prefix_info(&addr, &prefix, &vpnDST, &vpnRD))
 		return false;
+YANET_LOG_ERROR("pth02\n");
 
 	uint32_t type;
 	if (!decode_u32(ppos, end, &type))
 		return false;
+YANET_LOG_ERROR("pth03\n");
 
 	ip_addr remote_addr;
 	if (!decode_ip_addr(ppos, end, &remote_addr))
 		return false;
 	peer_address = ipa_to_address(remote_addr);
 
+YANET_LOG_ERROR("pth1\n");
+
 	size_t attrs_end;
 	if (!decode_chunk(ppos, end, &attrs_end))
 		return false;
 
+YANET_LOG_ERROR("pth2\n");
 	if (attrs_end != end)
 		return false;
 
+YANET_LOG_ERROR("pth3\n");
 	/* Now decode all attributes one by one. */
 	while (*ppos < attrs_end)
 	{
+YANET_LOG_ERROR("attr %li\n", attrs_end - *ppos);
 		uint32_t attr_id;
 		if (!decode_u32(ppos, attrs_end, &attr_id))
 			return false;
 
+YANET_LOG_ERROR("attr1 %d %d\n", attr_id, EA_ID(attr_id));
 		switch (EA_ID(attr_id))
 		{
 			case BA_ORIGIN:
@@ -528,8 +538,11 @@ parse_route_update(uintptr_t* ppos, uintptr_t end, const char* vrf, common::icp:
 			}
 
 			default:
+
+		       YANET_LOG_ERROR("attr no %d\n", attr_id);
 				return false;
 		}
+	       YANET_LOG_ERROR("attr ok\n");
 	}
 
 	std::string afi;
@@ -691,20 +704,24 @@ bool read_bird_feed(const char* sock_name, const char* vrf, rib_update_handler h
 			uintptr_t pos = (uintptr_t)read_buf + parse_pos;
 			uintptr_t end = (uintptr_t)read_buf + read_pos;
 
+		       YANET_LOG_ERROR("strt %lu\n", end - pos);
 			/* Determine boundaries of the next route update. */
 			uintptr_t route_end;
 			if (!decode_chunk(&pos, end, &route_end))
 				break;
 
+		       YANET_LOG_ERROR("prs %lu\n", end - pos);
 			common::icp::rib_update::action action;
 			if (!parse_route_update(&pos, route_end, vrf, &action))
 				break;
 
+		       YANET_LOG_ERROR("add act\n");
 			requests.emplace_back(action);
 
 			parse_pos = pos - (uintptr_t)read_buf;
 		}
 
+	       YANET_LOG_ERROR("handler %lu\n", requests.size());
 		handler(requests);
 		requests.clear();
 

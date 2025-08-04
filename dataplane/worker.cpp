@@ -2761,7 +2761,7 @@ inline void cWorker::route_tunnel_nexthop(rte_mbuf* mbuf,
 	{
 		uint32_t vtc_flow = 0;
 		uint16_t payload_len = 0;
-		uint32_t ipv4_src_addr;
+		uint32_t ipv4_src_addr = 0;
 		if (is_ipv4)
 		{
 			rte_ipv4_hdr* ipv4HeaderInner = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
