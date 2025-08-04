@@ -1,8 +1,14 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <bitset>
+#include <cstring>
 #include <limits>
+#include <tuple>
+#include <vector>
+
+#include <rte_prefetch.h>
 
 #include "common/result.h"
 #include "hashtable_common.h"
@@ -14,6 +20,10 @@ namespace dataplane
  * A hash table with a dynamically allocated size, using open addressing
  * and limited linear probing for collision resolution. Key is provided as
  * a template arument, value is an unsigned 32-bit integer.
+ *
+ * Instead of a single contiguous memory block, it uses an array of pointers to
+ * smaller "chunks", making it suitable for very large allocations that would
+ * otherwise fail due to memory fragmentation.
  *
  * Uses a single bit from the value to indicate whether a slot is occupied.
  * Collisions are resolved by probing a `chunk_size` amount of subsequent slots
@@ -31,7 +41,6 @@ class hashtable_mod_id32_dynamic
 {
 	using value_t = uint32_t;
 	static constexpr std::size_t value_bits = std::numeric_limits<value_t>::digits;
-	static constexpr value_t validity_mask = 1u << (value_bits - valid_bit_offset - 1);
 
 	static constexpr bool is_power_of_two(uint32_t n)
 	{
@@ -41,31 +50,16 @@ class hashtable_mod_id32_dynamic
 	static_assert(is_power_of_two(chunk_size), "chunk_size must be a power of 2");
 	static_assert(valid_bit_offset < value_bits, "valid_bit_offset must be less than 32");
 
-	[[nodiscard]] constexpr bool is_valid(value_t value) const
-	{
-		return (value & validity_mask) != 0;
-	}
-
-	void set_valid_flag(value_t& value) const
-	{
-		value |= validity_mask;
-	}
-
-	void clear_valid_flag(value_t& value) const
-	{
-		value &= ~validity_mask;
-	}
-
-	// Checks if the key at the given index is equal to the provided key.
-	[[nodiscard]] constexpr bool is_equal(const uint32_t index, const key_t& key) const
-	{
-		return pairs[index].key == key;
-	}
-
 public:
 	using hashtable_t = hashtable_mod_id32_dynamic<key_t, chunk_size, valid_bit_offset, calculate_hash>;
 
 	constexpr static uint32_t pairs_size_min = 128;
+
+	struct pair
+	{
+		key_t key;
+		value_t value;
+	};
 
 	struct stats_t
 	{
@@ -78,10 +72,8 @@ public:
 	};
 
 	/**
-	 * Calculates the total memory required for a hash table of a given size.
-	 *
-	 * @param pairs_size The number of key-value pairs the table should hold. Must be a power of two.
-	 * @return The total size in bytes, or 0 on error.
+	 * Calculates the memory required for the header of the hash table.
+	 * The main data is stored in separate chunks.
 	 */
 	static uint64_t calculate_sizeof(uint32_t pairs_size)
 	{
@@ -97,19 +89,39 @@ public:
 			return 0;
 		}
 
-		return sizeof(hashtable_t) + pairs_size * sizeof(pair);
+		return sizeof(hashtable_t);
 	}
 
 public:
-	hashtable_mod_id32_dynamic(const uint32_t pairs_size) :
-	        total_mask(pairs_size - 1)
+	/**
+	 * Constructs the hash table header. The updater is responsible for allocating
+	 * and attaching the memory chunks.
+	 *
+	 * @param pairs_size Total number of pairs the table can hold. Must be a power of two.
+	 * @param pairs_per_chunk_shift Log2 of the number of pairs in each chunk.
+	 */
+	hashtable_mod_id32_dynamic(const uint32_t pairs_size,
+	                           const uint32_t pairs_per_chunk_shift) :
+	        total_mask(pairs_size - 1),
+	        pairs_size_(pairs_size),
+	        ppc_shift_(pairs_per_chunk_shift),
+	        ppc_mask_((1u << pairs_per_chunk_shift) - 1),
+	        num_chunks_((pairs_size_ + ppc_mask_) >> ppc_shift_),
+	        chunks_(nullptr)
 	{
-		// Ititializing values to 0 also marks them as invalid.
-		for (unsigned int i = 0; i < pairs_size; i++)
-		{
-			pairs[i].value = 0;
-		}
 	}
+
+	// Called by the updater to link the allocated chunks to this object.
+	void attach_chunks(pair** chunks)
+	{
+		chunks_ = chunks;
+	}
+
+	// Accessors for the updater to use during deallocation.
+	[[nodiscard]] uint32_t pairs_size() const { return pairs_size_; }
+	[[nodiscard]] uint32_t num_chunks() const { return num_chunks_; }
+	[[nodiscard]] uint32_t pairs_per_chunk() const { return (1u << ppc_shift_); }
+	pair** chunks() const { return chunks_; }
 
 	/**
 	 * Performs a batched lookup for multiple keys.
@@ -139,13 +151,13 @@ public:
 		for (unsigned int i = 0; i < count; i++)
 		{
 			hashes[i] = calculate_hash(keys[i]) & total_mask;
-			rte_prefetch0(&pairs[hashes[i]]);
+			rte_prefetch0(get_pair_ptr(hashes[i]));
 		}
 
 		// Perform the first check at the primary hash location.
 		for (unsigned int i = 0; i < count; i++)
 		{
-			values[i] = pairs[hashes[i]].value;
+			values[i] = get_pair(hashes[i]).value;
 			if (is_valid(values[i]) && is_equal(hashes[i], keys[i]))
 			{
 				success_mask.set(i);
@@ -178,7 +190,7 @@ public:
 				for (unsigned int try_i = 1; try_i < chunk_size; try_i++)
 				{
 					const uint32_t index = (hashes[i] + try_i) & total_mask;
-					const value_t probed_value = pairs[index].value;
+					const value_t probed_value = get_pair(index).value;
 
 					if (!is_valid(probed_value))
 					{
@@ -205,17 +217,13 @@ public:
 	 *
 	 * @param[out] stats A struct to be filled with statistics about the fill operation.
 	 * @param[in]  data  A vector of key-value tuples to insert.
+	 *
 	 * @return eResult::success on success, or an error code if any insertion fails.
 	 */
 	eResult fill(stats_t& stats, const std::vector<std::tuple<key_t, value_t>>& data)
 	{
 		eResult result = eResult::success;
-
-		stats.pairs_count = 0;
-		stats.pairs_in_chunks.fill(0);
-		stats.longest_chain = 0;
-		stats.insert_failed = 0;
-		stats.rewrites = 0;
+		stats = {}; // Zero-initialize stats
 
 		for (const auto& [key, value] : data)
 		{
@@ -226,13 +234,14 @@ public:
 			}
 		}
 
+		stats.pairs_size = pairs_size_;
 		// Calculate statistics on how many pairs are in each chunk.
 		for (uint32_t chunk_i = 0; chunk_i < stats.pairs_size / chunk_size; chunk_i++)
 		{
 			unsigned int count = 0;
 			for (uint32_t pair_i = 0; pair_i < chunk_size; pair_i++)
 			{
-				if (is_valid(pairs[chunk_i * chunk_size + pair_i].value))
+				if (is_valid(get_pair(chunk_i * chunk_size + pair_i).value))
 				{
 					count++;
 				}
@@ -265,11 +274,13 @@ public:
 		for (unsigned int try_i = 0; try_i < chunk_size; try_i++)
 		{
 			const uint32_t index = (hash + try_i) & total_mask;
+			auto& p = get_pair(index);
 
-			if (!is_valid(pairs[index].value))
+			if (!is_valid(p.value))
 			{
-				pairs[index] = {key, value};
-				set_valid_flag(pairs[index].value);
+				p.key = key;
+				p.value = value;
+				set_valid_flag(p.value);
 
 				stats.pairs_count++;
 				stats.longest_chain = std::max(stats.longest_chain, try_i + 1);
@@ -278,32 +289,67 @@ public:
 			}
 			else if (is_equal(index, key))
 			{
-				// Found the same key, update its value.
-				pairs[index].value = value;
-				set_valid_flag(pairs[index].value);
-
+				p.value = value;
+				set_valid_flag(p.value);
 				stats.rewrites++;
-
 				return eResult::success;
 			}
 		}
 
 		// After probing `chunk_size` slots, no space was found.
 		stats.insert_failed++;
-
 		return eResult::isFull;
 	}
 
 private:
-	/// Bitmask to wrap around the hash table array using bitwise AND.
-	/// This is efficient as long as pairs_size is a power of 2.
+	// Bitmask to wrap around the hash table array using bitwise AND.
 	uint32_t total_mask;
 
-	struct pair
+	uint32_t pairs_size_;
+	uint32_t ppc_shift_; // pairs-per-chunk shift (log2)
+	uint32_t ppc_mask_; // pairs-per-chunk mask
+
+	uint32_t num_chunks_;
+
+	// Pointer to an array of pointers, where each element points to a memory chunk.
+	pair** chunks_;
+
+	// Get a pointer to a pair at a given logical index.
+	[[nodiscard]] struct pair* get_pair_ptr(uint32_t index) const
 	{
-		key_t key;
-		value_t value;
-	} pairs[];
+		const uint32_t chunk_id = index >> ppc_shift_;
+		const uint32_t id_in_chunk = index & ppc_mask_;
+		return &chunks_[chunk_id][id_in_chunk];
+	}
+
+	// Get a reference to a pair at a given logical index.
+	[[nodiscard]] struct pair& get_pair(uint32_t index) const
+	{
+		return *get_pair_ptr(index);
+	}
+
+	// Checks if the key at the given index is equal to the provided key.
+	[[nodiscard]] constexpr bool is_equal(const uint32_t index, const key_t& key) const
+	{
+		return get_pair(index).key == key;
+	}
+
+	static constexpr value_t validity_mask = 1u << (value_bits - valid_bit_offset - 1);
+
+	[[nodiscard]] constexpr bool is_valid(value_t value) const
+	{
+		return (value & validity_mask) != 0;
+	}
+
+	void set_valid_flag(value_t& value) const
+	{
+		value |= validity_mask;
+	}
+
+	void clear_valid_flag(value_t& value) const
+	{
+		value &= ~validity_mask;
+	}
 };
 
-}
+} // namespace dataplane
