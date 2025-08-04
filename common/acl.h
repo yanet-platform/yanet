@@ -96,6 +96,27 @@ struct transport_key_t
 		                second.network_flags);
 	}
 
+	bool operator==(const transport_key_t& second) const
+	{
+		return std::tie(network_id,
+		                protocol,
+		                group1,
+		                group2,
+		                group3,
+		                network_flags) ==
+		       std::tie(second.network_id,
+		                second.protocol,
+		                second.group1,
+		                second.group2,
+		                second.group3,
+		                second.network_flags);
+	}
+
+	bool operator!=(const transport_key_t& second) const
+	{
+		return !(*this == second);
+	}
+
 	tAclGroupId network_id : 32;
 	tAclGroupId protocol : 16;
 	tAclGroupId group1 : 16;
