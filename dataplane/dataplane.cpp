@@ -697,6 +697,22 @@ eResult cDataPlane::initGlobalBases()
 eResult cDataPlane::initWorkers()
 {
 	tQueueId outQueueId = 0;
+	std::map<tSocketId, uint32_t> socket_to_numa_idx;
+	uint32_t current_numa_idx = 0;
+
+	if (globalBaseAtomics.size() > YANET_CONFIG_NUMA_SIZE)
+	{
+		YADECAP_LOG_ERROR("globalBaseAtomics size %zu exceeds configured YANET_CONFIG_NUMA_SIZE %u\n",
+		                  globalBaseAtomics.size(),
+		                  YANET_CONFIG_NUMA_SIZE);
+		return eResult::invalidSocketId;
+	}
+
+	for (const auto& [socket_id, ptr] : globalBaseAtomics)
+	{
+		(void)ptr;
+		socket_to_numa_idx[socket_id] = current_numa_idx++;
+	}
 
 	/// slow worker
 	{
@@ -715,6 +731,7 @@ eResult cDataPlane::initWorkers()
 
 		dataplane::base::permanently basePermanently;
 		basePermanently.globalBaseAtomic = globalBaseAtomics[socket_id];
+		basePermanently.activeNumaNodesCount = globalBaseAtomics.size();
 		basePermanently.outQueueId = outQueueId; ///< 0
 		for (const auto& portIter : ports)
 		{
@@ -760,6 +777,7 @@ eResult cDataPlane::initWorkers()
 		}
 
 		dataplane::base::permanently basePermanently;
+		basePermanently.activeNumaNodesCount = globalBaseAtomics.size();
 		{
 			auto iter = globalBaseAtomics.find(socket_id);
 			if (iter == globalBaseAtomics.end())
@@ -777,12 +795,6 @@ eResult cDataPlane::initWorkers()
 			idx++;
 		}
 
-		if (socket_id >= globalBaseAtomics.size())
-		{
-			YADECAP_LOG_ERROR("invalid socket_id: %u\n", socket_id);
-			return eResult::invalidSocketId;
-		}
-
 		if (globalBaseAtomics.size() > 1)
 		{
 			size_t pow2_size = 1;
@@ -795,7 +807,7 @@ eResult cDataPlane::initWorkers()
 
 			basePermanently.nat64stateful_numa_mask = rte_cpu_to_be_16(0xFFFFu << shift);
 			basePermanently.nat64stateful_numa_reverse_mask = rte_cpu_to_be_16(0xFFFFu >> (16 - shift));
-			basePermanently.nat64stateful_numa_id = rte_cpu_to_be_16(socket_id);
+			basePermanently.nat64stateful_numa_id = rte_cpu_to_be_16(socket_to_numa_idx.at(socket_id));
 		}
 
 		for (const auto& [port_id, port] : ports)
@@ -914,6 +926,7 @@ eResult cDataPlane::initWorkers()
 		}
 
 		dataplane::base::permanently basePermanently;
+		basePermanently.activeNumaNodesCount = globalBaseAtomics.size();
 		{
 			auto iter = globalBaseAtomics.find(socket_id);
 			if (iter == globalBaseAtomics.end())
@@ -931,12 +944,6 @@ eResult cDataPlane::initWorkers()
 			idx++;
 		}
 
-		if (socket_id >= globalBaseAtomics.size())
-		{
-			YADECAP_LOG_ERROR("invalid socket_id: %u\n", socket_id);
-			return eResult::invalidSocketId;
-		}
-
 		if (globalBaseAtomics.size() > 1)
 		{
 			size_t pow2_size = 1;
@@ -949,7 +956,7 @@ eResult cDataPlane::initWorkers()
 
 			basePermanently.nat64stateful_numa_mask = rte_cpu_to_be_16(0xFFFFu << shift);
 			basePermanently.nat64stateful_numa_reverse_mask = rte_cpu_to_be_16(0xFFFFu >> (16 - shift));
-			basePermanently.nat64stateful_numa_id = rte_cpu_to_be_16(socket_id);
+			basePermanently.nat64stateful_numa_id = rte_cpu_to_be_16(socket_to_numa_idx.at(socket_id));
 		}
 
 		dataplane::base::generation base;
