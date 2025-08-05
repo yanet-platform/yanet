@@ -3179,7 +3179,7 @@ inline void cWorker::nat64stateful_lan_handle()
 
 				/// @todo: create cross-numa state over slowworker?
 				for (unsigned int numa_i = 0;
-				     numa_i < YANET_CONFIG_NUMA_SIZE;
+				     numa_i < basePermanently.activeNumaNodesCount;
 				     numa_i++)
 				{
 					auto* globalbase_atomic = basePermanently.globalBaseAtomics[numa_i];
@@ -3219,7 +3219,7 @@ inline void cWorker::nat64stateful_lan_handle()
 				/// @todo: create cross-numa state over slowworker?
 				value.timestamp_last_packet = basePermanently.globalBaseAtomic->currentTime - YANET_CONFIG_STATE_TIMEOUT_MAX;
 				for (unsigned int numa_i = 0;
-				     numa_i < YANET_CONFIG_NUMA_SIZE;
+				     numa_i < basePermanently.activeNumaNodesCount;
 				     numa_i++)
 				{
 					auto* globalbase_atomic = basePermanently.globalBaseAtomics[numa_i];
@@ -4999,7 +4999,7 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 		value.tcp.dst_flags = 0;
 
 		bool emit = false;
-		for (unsigned int idx = 0; idx < YANET_CONFIG_NUMA_SIZE; ++idx)
+		for (unsigned int idx = 0; idx < basePermanently.activeNumaNodesCount; ++idx)
 		{
 			dataplane::globalBase::atomic* atomic = basePermanently.globalBaseAtomics[idx];
 			if (atomic == nullptr)
@@ -5096,7 +5096,7 @@ inline void cWorker::acl_create_keepstate(rte_mbuf* mbuf, tAclId aclId, const co
 		value.tcp.dst_flags = 0;
 
 		bool emit = false;
-		for (unsigned int idx = 0; idx < YANET_CONFIG_NUMA_SIZE; ++idx)
+		for (unsigned int idx = 0; idx < basePermanently.activeNumaNodesCount; ++idx)
 		{
 			dataplane::globalBase::atomic* atomic = basePermanently.globalBaseAtomics[idx];
 			if (atomic == nullptr)

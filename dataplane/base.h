@@ -97,6 +97,9 @@ public:
 	/// Used to distribute firewall states.
 	dataplane::globalBase::atomic* globalBaseAtomics[YANET_CONFIG_NUMA_SIZE];
 
+	/// Actual number of active NUMA nodes
+	uint32_t activeNumaNodesCount{};
+
 	unsigned int workerPortsCount;
 	struct
 	{

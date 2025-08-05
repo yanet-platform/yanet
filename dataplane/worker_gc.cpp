@@ -235,7 +235,7 @@ void worker_gc_t::handle_nat64stateful_gc()
 
 		/// check other wan tables
 		for (unsigned int numa_i = 0;
-		     numa_i < YANET_CONFIG_NUMA_SIZE;
+		     numa_i < base_permanently.activeNumaNodesCount;
 		     numa_i++)
 		{
 			auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
@@ -271,7 +271,7 @@ void worker_gc_t::handle_nat64stateful_gc()
 
 		/// check lan tables
 		for (unsigned int numa_i = 0;
-		     numa_i < YANET_CONFIG_NUMA_SIZE;
+		     numa_i < base_permanently.activeNumaNodesCount;
 		     numa_i++)
 		{
 			auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
@@ -420,7 +420,7 @@ void worker_gc_t::handle_balancer_gc()
 				iter.unlock();
 
 				for (unsigned int numa_i = 0;
-				     numa_i < YANET_CONFIG_NUMA_SIZE;
+				     numa_i < base_permanently.activeNumaNodesCount;
 				     numa_i++)
 				{
 					dataplane::globalBase::atomic* globalbase_atomic_other = base_permanently.globalBaseAtomics[numa_i];
@@ -949,7 +949,7 @@ void worker_gc_t::nat64stateful_remove_state(const dataplane::globalBase::nat64s
 {
 	/// remove on other numas
 	for (unsigned int numa_i = 0;
-	     numa_i < YANET_CONFIG_NUMA_SIZE;
+	     numa_i < base_permanently.activeNumaNodesCount;
 	     numa_i++)
 	{
 		auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
@@ -1097,7 +1097,7 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 
 			/// check other wan tables
 			for (unsigned int numa_i = 0;
-			     numa_i < YANET_CONFIG_NUMA_SIZE;
+			     numa_i < base_permanently.activeNumaNodesCount;
 			     numa_i++)
 			{
 				auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
@@ -1132,7 +1132,7 @@ void worker_gc_t::nat64stateful_state(const common::idp::nat64stateful_state::re
 
 			/// check lan tables
 			for (unsigned int numa_i = 0;
-			     numa_i < YANET_CONFIG_NUMA_SIZE;
+			     numa_i < base_permanently.activeNumaNodesCount;
 			     numa_i++)
 			{
 				auto* globalbase_atomic = base_permanently.globalBaseAtomics[numa_i];
