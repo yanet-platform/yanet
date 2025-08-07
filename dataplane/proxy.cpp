@@ -452,8 +452,58 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
         proxy_service_on_socket_t& service = iter_service->second[index];
         if (service.mutex.try_lock())
         {
-            service.tables_work.service_connections.CollectGarbage(current_time_ms, service.config.timeouts.established, service.tables_work.local_pool);
-            service.tables_work.syn_connections.CollectGarbage(current_time_ms, service.config.timeouts.syn_recv, service.tables_work.local_pool);
+            for (auto& bucket : service.tables_work.service_connections)
+            {
+                bool condition = false;
+                for (uint32_t conn_idx : bucket)
+                {
+                    if (bucket.IsExpired(conn_idx, current_time_ms, service.config.timeouts.established))
+                    {
+                        condition = true;
+                        break;
+                    }
+                }
+                if (condition)
+                {
+                    bucket.Lock();
+                    for (uint32_t conn_idx : bucket)
+                    {
+                        if (bucket.IsExpired(conn_idx, current_time_ms, service.config.timeouts.established))
+                        {
+                            service.tables_work.local_pool.Free(LocalPool::max_workers, bucket.connections[conn_idx].local);
+                            bucket.Clear(conn_idx);
+                            bucket.num_allocated--;
+                        }
+                    }
+                    bucket.Unlock();
+                }
+            }
+            for (auto& bucket : service.tables_work.syn_connections)
+            {
+                bool condition = false;
+                for (uint32_t conn_idx : bucket)
+                {
+                    if (bucket.IsExpired(conn_idx, current_time_ms, service.config.timeouts.syn_recv))
+                    {
+                        condition = true;
+                        break;
+                    }
+                }
+                if (condition)
+                {
+                    bucket.Lock();
+                    for (uint32_t conn_idx : bucket)
+                    {
+                        if (bucket.IsExpired(conn_idx, current_time_ms, service.config.timeouts.syn_recv))
+                        {
+                            service.tables_work.local_pool.Free(LocalPool::max_workers, bucket.connections[conn_idx].local);
+                            bucket.Clear(conn_idx);
+                            bucket.num_allocated--;
+                        }
+                    }
+                    bucket.Unlock();
+                }
+            }
             service.mutex.unlock();
         }
     }
@@ -470,13 +520,19 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(prox
         {
             GCC_BUG_UNUSED(socket_id);
             std::shared_lock lock(all_services[service_id].mutex);
-            all_services[service_id].tables_work.service_connections.GetConnections([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx) {
-                Connection& connection = bucket.connections[conn_idx];
-                uint32_t local_addr;
-                uint16_t local_port;
-                ServiceConnections::Unpack(connection.local, local_addr, local_port);
-                response.emplace_back(bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port, socket_id);
-            });
+            for (auto& bucket : all_services[service_id].tables_work.service_connections)
+            {
+                bucket.Lock();
+                for (uint32_t conn_idx : bucket)
+                {
+                    const Connection& connection = bucket.connections[conn_idx];
+                    uint32_t local_addr;
+                    uint16_t local_port;
+                    ServiceConnections::Unpack(connection.local, local_addr, local_port);
+                    response.emplace_back(bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port, socket_id);
+                }
+                bucket.Unlock();
+            }
         }
     }
     return response;
@@ -491,13 +547,19 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t s
         {
             GCC_BUG_UNUSED(socket_id);
             std::shared_lock lock(all_services[service_id].mutex);
-            all_services[service_id].tables_work.syn_connections.GetConnections([&](ServiceSynConnections::Bucket& bucket, uint32_t conn_idx) {
-                SynConnection& connection = bucket.connections[conn_idx];
-                uint32_t local_addr;
-                uint16_t local_port;
-                ServiceConnections::Unpack(connection.local, local_addr, local_port);
-                response.emplace_back(bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port, socket_id);
-            });
+            for (auto& bucket : all_services[service_id].tables_work.syn_connections)
+            {
+                bucket.Lock();
+                for (uint32_t conn_idx : bucket)
+                {
+                    SynConnection& connection = bucket.connections[conn_idx];
+                    uint32_t local_addr;
+                    uint16_t local_port;
+                    ServiceConnections::Unpack(connection.local, local_addr, local_port);
+                    response.emplace_back(bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port, socket_id);
+                }
+                bucket.Unlock();
+            }
         }
     }
     return response;

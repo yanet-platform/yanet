@@ -74,7 +74,7 @@ struct Connection
         }
         return false;
     }
-};
+} __rte_aligned(64);
 
 struct SynConnection
 {
@@ -90,7 +90,7 @@ struct SynConnection
         server_seq = 0;
         server_answer = false;
     }
-};
+} __rte_aligned(32);
 
 template<typename ConnectionInfo>
 struct ConnectionBucket
@@ -110,10 +110,11 @@ struct ConnectionBucket
     // 128 bytes = 2 cache lines
     uint64_t last_times[bucket_size];
 
-    // 104 bytes = 2 cache lines
+    // 108 bytes = 2 cache lines
     uint32_t addresses[bucket_size];
     uint16_t ports[bucket_size];
     uint32_t time_overflow;
+    uint32_t num_allocated;
     rte_spinlock_t spinlock;
 
     ConnectionInfo connections[bucket_size];
@@ -124,6 +125,7 @@ struct ConnectionBucket
         addresses[idx] = 0;
         ports[idx] = 0;
         last_times[idx] = 0;
+        num_allocated--;
     }
 
     bool IsExpired(uint32_t idx, uint64_t current_time, uint64_t timeout)
@@ -143,6 +145,54 @@ struct ConnectionBucket
     {
         rte_spinlock_unlock(&spinlock);
     }
+
+    class Iterator
+    {
+    public:
+        Iterator(const ConnectionBucket<ConnectionInfo>* bucket, uint32_t conn_idx) 
+            : bucket_(bucket), conn_idx_(conn_idx) 
+        {
+            while (conn_idx_ < bucket_size && bucket_->addresses[conn_idx_] == 0) conn_idx_++;
+        }
+
+        uint32_t& operator*()
+        {
+            return conn_idx_;
+        }
+
+        Iterator& operator++()
+        {
+            conn_idx_++;
+            while (conn_idx_ < bucket_size && bucket_->addresses[conn_idx_] == 0) conn_idx_++;
+            return *this;
+        }
+        Iterator operator++(int)
+        {
+            Iterator tmp = *this;
+            operator++();
+            return tmp;
+        }
+
+        friend bool operator==(const Iterator& lhs, const Iterator& rhs)
+        {
+            return lhs.bucket_ == rhs.bucket_ && lhs.conn_idx_ == rhs.conn_idx_;
+        }
+        friend bool operator!=(const Iterator& lhs, const Iterator& rhs)
+        {
+            return lhs.bucket_ != rhs.bucket_ || lhs.conn_idx_ != rhs.conn_idx_;
+        }
+
+    private:
+        const ConnectionBucket<ConnectionInfo>* bucket_;
+        uint32_t conn_idx_;
+    };
+
+    using iterator_type = Iterator;
+
+    iterator_type begin() { return Iterator(this, 0); }
+    iterator_type end() { return Iterator(this, bucket_size); }
+    iterator_type begin() const { return Iterator(this, 0); }
+    iterator_type end() const { return Iterator(this, bucket_size); }
 } __rte_cache_aligned;
 
 template<typename ConnectionInfo>
@@ -157,6 +207,7 @@ struct ConnectionData {
         bucket->ports[idx] = port;
         bucket->last_times[idx] = time;
         memset(connection, 0, sizeof(ConnectionInfo));
+        bucket->num_allocated++;
     }
     
     void Unlock()
@@ -217,79 +268,80 @@ public:
         return true;
     }
 
-    void GetConnections(std::function<void(Bucket&, uint32_t)> func)
+    template<typename T>
+    class Iterator
     {
-        if (unlikely(!initialized_)) return;
-
-        for (uint32_t index = 0; index < number_buckets_; index++)
+    public:
+        Iterator(const ConnectionsTable<ConnectionInfo>* table, uint32_t bucket_idx) 
+            : table_(table), bucket_idx_(bucket_idx)
         {
-            Bucket& bucket = buckets_[index];
-            bucket.Lock();
-            for (uint32_t i = 0; i < Bucket::bucket_size; i++)
-            {
-                if (bucket.addresses[i] != 0)
-                {
-                    func(bucket, i);
-                }
+            if (unlikely(!table_->initialized_)) {
+                bucket_idx_ = table_->number_buckets_;
+                return;
             }
-            bucket.Unlock();
+            while (bucket_idx_ < table_->number_buckets_ &&
+                   table_->buckets_[bucket_idx_].num_allocated == 0) 
+                bucket_idx_++;
+            if (bucket_idx_ < table_->number_buckets_) 
+                bucket_ = &table_->buckets_[bucket_idx_];
         }
-    }
 
-    void CollectGarbage(uint64_t current_time, uint64_t timeout, LocalPool& local_pool)
-    {
-        if (unlikely(!initialized_)) return;
-
-        for (uint32_t index = 0; index < number_buckets_; index++)
+        T& operator*()
         {
-            Bucket& bucket = buckets_[index];
-            bool expired = false;
-            for (uint32_t i = 0; i < Bucket::bucket_size; i++)
-            {
-                if (bucket.addresses[i] != 0 && bucket.IsExpired(i, current_time, timeout))
-                {
-                    expired = true;
-                    break;
-                }
-            }
-            if (expired)
-            {
-                bucket.Lock();
-                for (uint32_t i = 0; i < Bucket::bucket_size; i++)
-                {
-                    if (bucket.addresses[i] != 0 && bucket.IsExpired(i, current_time, timeout))
-                    {
-                        local_pool.Free(LocalPool::max_workers, bucket.connections[i].local);
-                        bucket.Clear(i);
-                    }
-                }
-                bucket.Unlock();
-            }
+            return *bucket_;
         }
-    }
+        T* operator->() 
+        {
+            return bucket_;
+        }
 
-    bool IsInitialized() const
-    {
-        return initialized_;
-    }
+        Iterator& operator++()
+        {
+            bucket_idx_++;
+            while (bucket_idx_ < table_->number_buckets_ &&
+                   table_->buckets_[bucket_idx_].num_allocated == 0) 
+                bucket_idx_++;
+            if (bucket_idx_ < table_->number_buckets_) 
+                bucket_ = &table_->buckets_[bucket_idx_];
+            return *this;
+        }
+        Iterator operator++(int)
+        {
+            Iterator tmp = *this;
+            operator++();
+            return tmp;
+        }
+
+        friend bool operator==(const Iterator& lhs, const Iterator& rhs)
+        {
+            return lhs.table_ == rhs.table_ && lhs.bucket_idx_ == rhs.bucket_idx_;
+        }
+        friend bool operator!=(const Iterator& lhs, const Iterator& rhs)
+        {
+            return lhs.table_ != rhs.table_ || lhs.bucket_idx_ != rhs.bucket_idx_;
+        }
+
+    private:
+        const ConnectionsTable<ConnectionInfo>* table_;
+        uint32_t bucket_idx_;
+        T* bucket_;
+    };
+
+    using iterator_type = Iterator<Bucket>;
+    using const_iterator_type = Iterator<const Bucket>;
+
+    iterator_type begin() { return Iterator<Bucket>(this, 0); }
+    iterator_type end() { return Iterator<Bucket>(this, number_buckets_); }
+    const_iterator_type begin() const { return Iterator<const Bucket>(this, 0); }
+    const_iterator_type end() const { return Iterator<const Bucket>(this, number_buckets_); }
 
     size_t Size() const
     {
-        if (unlikely(!initialized_)) return 0;
-
         size_t size = 0;
-        for (uint32_t index = 0; index < number_buckets_; index++)
+        for (const Bucket& bucket : *this)
         {
-            const Bucket& bucket = buckets_[index];
-            for (uint32_t i = 0; i < Bucket::bucket_size; i++)
-            {
-                if (bucket.addresses[i] != 0)
-                {
-                    size++;
-                }
-            }
+            for (auto iter = bucket.begin(); iter != bucket.end(); iter++) size++;
         }
-
         return size;
     }
 
