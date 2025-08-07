@@ -9,7 +9,7 @@
 #include "../metadata.h"
 #include "../proxy.h"
 
-void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection_store, dataplane::base::generation& base, dataplane::proxy::proxy_service_t& service)
+dataplane::proxy::proxy_service_config_t GetProxyConfig()
 {
     uint32_t proxy_addr = rte_cpu_to_be_32(common::ipv4_address_t("22.0.0.1"));
     uint16_t proxy_port = rte_cpu_to_be_16(80);
@@ -19,40 +19,54 @@ void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection
     uint32_t size_connections_table = 256;
     uint32_t size_syn_table = 0;
 
-    tcp_connection_store.ActivateSocket(0);
-
     proxy_service_id_t service_id = 1;
 
-    base.globalBase = new dataplane::globalBase::generation(nullptr, 0);
-    dataplane::proxy::proxy_service_t service_cfg;
+    dataplane::proxy::proxy_service_config_t service_config {
+        .service_id = service_id,
+	    .counter_id = 0,
+        .proxy_addr = proxy_addr,
+	    .proxy_port = proxy_port,
+	    .upstream_addr = upstream_addr,
+	    .upstream_port = upstream_port,
+	    .size_connections_table = size_connections_table,
+	    .size_syn_table = size_syn_table,
+        .pool_prefix {
+            .address = uint32_t(local_pool_prefix.address()),
+            .mask = local_pool_prefix.mask(),
+        },
+	    .send_proxy_header = false,
+	    .tcp_options = {
+            .use_sack = YANET_PROXY_DEFAULT_USE_SACK,
+	        .mss = YANET_PROXY_DEFAULT_MSS,
+	        .winscale = YANET_PROXY_DEFAULT_WINSCALE,
+	        .timestamps = YANET_PROXY_DEFAULT_USE_TIMESTAMPS,
+        },
+        .timeouts = {
+            .syn_rto = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO,
+            .syn_recv = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV,
+            .established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED,
+        },
+        .debug_flags = 0,
+    };
 
-    service_cfg.config.service_id = service_id;
-    service_cfg.config.proxy_addr = proxy_addr;
-	service_cfg.config.proxy_port = proxy_port;
-	service_cfg.config.upstream_addr = upstream_addr;
-	service_cfg.config.upstream_port = upstream_port;
-    service_cfg.config.pool_prefix.address.address = uint32_t(local_pool_prefix.address());
-    service_cfg.config.pool_prefix.mask = local_pool_prefix.mask();
-	service_cfg.config.counter_id = 0;
-	service_cfg.config.send_proxy_header = false;
-	service_cfg.config.size_connections_table = size_connections_table;
-	service_cfg.config.size_syn_table = size_syn_table;
-	service_cfg.config.tcp_options.use_sack = YANET_PROXY_DEFAULT_USE_SACK;
-	service_cfg.config.tcp_options.mss = YANET_PROXY_DEFAULT_MSS;
-	service_cfg.config.tcp_options.winscale = YANET_PROXY_DEFAULT_WINSCALE;
-	service_cfg.config.tcp_options.timestamps = YANET_PROXY_DEFAULT_USE_TIMESTAMPS;
+    return service_config;
+}
 
-    // uint8_t currentGlobalBaseId = 0;
-    // uint8_t newGlobalBaseId = currentGlobalBaseId ^ 1;
+void InitializeProxyService(dataplane::proxy::proxy_service_config_t& service_config, dataplane::globalBase::generation** globalBaseResult)
+{
+    tSocketId socket_id = 0;
+    proxy_service_id_t service_id = service_config.service_id;
 
-    base.globalBase->proxy_services[service_id] = service_cfg;
+    dataplane::globalBase::generation* globalBase = new dataplane::globalBase::generation(nullptr, 0);
+    globalBase->proxy_services[service_id].config = service_config;
+    globalBase->proxy_services[service_id].UpdateProxyHeader();
 
-    controlplane::proxy::service_t service_info;
+    dataplane::proxy::TcpConnectionStore tcp_connection_store;
+    tcp_connection_store.ActivateSocket(0);
+    ASSERT_EQ(tcp_connection_store.ServiceUpdateOnSocket(socket_id, globalBase->proxy_services[service_id], true, nullptr), eResult::success);
+    ASSERT_EQ(tcp_connection_store.ServiceUpdateOnSocket(socket_id, globalBase->proxy_services[service_id], false, nullptr), eResult::success);
 
-    ASSERT_EQ(tcp_connection_store.ServiceUpdateOnSocket(0, service_cfg, 0, service_info, true, nullptr), eResult::success);
-    ASSERT_EQ(tcp_connection_store.ServiceUpdateOnSocket(0, service_cfg, 0, service_info, false, nullptr), eResult::success);
-    service = service_cfg;
-    base.globalBase->proxy_services[service_id] = service_cfg;
+    *globalBaseResult = globalBase;
 }
 
 void CreateMbuf(rte_mbuf** mbuf)
@@ -74,10 +88,9 @@ TEST(ServiceSynConnectionsTest, SynFlood)
     uint64_t packets_count = 100'000'000;
     uint32_t client_addr = rte_cpu_to_be_32(common::ipv4_address_t("11.0.0.1"));
 
-    dataplane::proxy::TcpConnectionStore tcp_connection_store;
-    dataplane::base::generation base;
-    dataplane::proxy::proxy_service_t service;
-	InitializeProxyService(tcp_connection_store, base, service);
+    dataplane::proxy::proxy_service_config_t service_config = GetProxyConfig();
+	dataplane::globalBase::generation* globalBase;
+    InitializeProxyService(service_config, &globalBase);
 
     std::vector<rte_mbuf*> mbufs(threads_count);
     for (uint32_t index = 0; index < threads_count; index++)
@@ -88,29 +101,33 @@ TEST(ServiceSynConnectionsTest, SynFlood)
     uint32_t current_time_sec = time(nullptr);
     uint64_t current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-    // std::vector<std::thread> threads;
-    // for (uint32_t index = 0; index < threads_count; index++)
-    // {
-    uint32_t index = 0;
+    std::vector<std::thread> threads;
+    for (uint32_t index = 0; index < threads_count; index++)
+    {
         uint32_t worker_id = index;
-    //     threads.emplace_back([&mbufs, &base, &tcp_connection_store, &service, client_addr, worker_id, packets_count, index]() {
+        threads.emplace_back([&mbufs, globalBase, &service_config, client_addr, worker_id, packets_count, index, current_time_sec, current_time_ms]() {
             common::ringlog::LogInfo ringlog;
             uint64_t counters[64];
             rte_mbuf* mbuf = mbufs[index];
+
+            dataplane::proxy::WorkerInfo worker_info{
+                .globalBase = globalBase,
+                .counters = counters,
+                .worker_id = worker_id,
+                .ringlog = &ringlog,
+                .current_time_sec = current_time_sec,
+                .current_time_ms = current_time_ms,
+	        };
+
             for (uint64_t packet_index = 0; packet_index < packets_count; packet_index++)
             {
-                // if (packet_index % 1000 == 0)
-                // {
-                //     std::cout << "Work thread " << index << ", packet: " << packet_index << std::endl;
-                // }
                 dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-                // metadata->flow.data.proxy_service_id = 1;
                 rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
                 rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
                 ipv4_header->src_addr = client_addr;
-                ipv4_header->dst_addr = service.config.proxy_addr;
+                ipv4_header->dst_addr = service_config.proxy_addr;
                 tcp_header->src_port = rte_cpu_to_be_16(32768 + (packet_index + index * 1024) % 32768);
-                tcp_header->dst_port = service.config.proxy_port;
+                tcp_header->dst_port = service_config.proxy_port;
                 tcp_header->data_off = 0xa0;
                 uint8_t tcp_options[] = {0x02, 0x04, 0x05, 0xb4, 0x04, 0x02, 0x08, 0x0a, 0xb1, 0xcf, 0x1a, 0x9a, 0x00, 0x00, 0x00, 0x00, 0x03, 0x03, 0x05, 0x01};
                 for (int i = 0; i < 20; i++)
@@ -122,15 +139,16 @@ TEST(ServiceSynConnectionsTest, SynFlood)
                 mbuf->pkt_len = 100;
 
                 metadata->flow.data.proxy_service_id = 1;
-                ASSERT_TRUE(tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, worker_id, ringlog, current_time_sec, current_time_ms));
-            }
-    //     });
-    // }
 
-    // for (uint32_t index = 0; index < threads_count; index++)
-    // {
-    //     threads[index].join();
-    // }
+                ASSERT_TRUE(dataplane::proxy::ActionClientOnSyn(mbuf, worker_info));
+            }
+        });
+    }
+
+    for (uint32_t index = 0; index < threads_count; index++)
+    {
+        threads[index].join();
+    }
 }
 
 TEST(ServiceSynConnectionsTest, Benchmark)
