@@ -265,7 +265,12 @@ public:
 		return get<common::idp::requestType::memory_manager_stats, common::idp::memory_manager_stats::response>();
 	}
 
-protected:
+	auto proxy_services_clear() const
+	{
+		return get<common::idp::requestType::proxy_services_clear, eResult>();
+	}
+
+	protected:
 	void connectToDataPlane() const
 	{
 		if (clientSocket != -1)

@@ -1550,7 +1550,30 @@ void cDataPlane::start()
 	threads.emplace_back([this]() {
 		for (;;)
 		{
-			tcp_connection_store.UpdateSynCookieKeys();
+			YANET_LOG_INFO("TcpProxy::UpdateSynCookieKeys\n");
+			for (proxy_service_id_t service_id = 0; service_id < YANET_CONFIG_PROXY_SERVICES_SIZE; service_id++)
+			{
+				dataplane::proxy::SynCookies syn_cookie_copy;
+				bool first = true;
+				for (auto& [socket_id, generations] : globalBases)
+				{
+					GCC_BUG_UNUSED(socket_id);
+					for (dataplane::globalBase::generation* base : generations)
+					{
+						dataplane::proxy::SynCookies& syn_cookie = base->proxy_services[service_id].syn_cookie;
+						if (first)
+						{
+							syn_cookie.UpdateKeys();
+							syn_cookie_copy.CopyKeysFrom(syn_cookie);
+							first = false;
+						}
+						else
+						{
+							syn_cookie.CopyKeysFrom(syn_cookie_copy);
+						}
+					}
+				}
+			}
 			std::this_thread::sleep_for(std::chrono::seconds(30));
 		}
 	});

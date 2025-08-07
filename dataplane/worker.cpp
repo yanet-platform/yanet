@@ -6149,12 +6149,19 @@ inline void cWorker::proxy_client_syn_handle()
 		return;
 	}
 
-	uint32_t current_time_sec = CurrentTime();
-	uint64_t current_time_ms = CurrentTimeMs();
+	dataplane::proxy::WorkerInfo worker_info{
+	        .globalBase = base.globalBase,
+	        .counters = counters,
+	        .worker_id = proxy_worker_id,
+	        .ringlog = &ringLog,
+	        .current_time_sec = CurrentTime(),
+	        .current_time_ms = CurrentTimeMs(),
+	};
+
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_client_syn_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_client_syn_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionClientOnSyn(mbuf, base, counters, proxy_worker_id, ringLog, current_time_sec, current_time_ms))
+		if (dataplane::proxy::ActionClientOnSyn(mbuf, worker_info))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6181,12 +6188,19 @@ inline void cWorker::proxy_client_ack_handle()
 		return;
 	}
 
-	uint32_t current_time_sec = CurrentTime();
-	uint64_t current_time_ms = CurrentTimeMs();
+	dataplane::proxy::WorkerInfo worker_info{
+	        .globalBase = base.globalBase,
+	        .counters = counters,
+	        .worker_id = proxy_worker_id,
+	        .ringlog = &ringLog,
+	        .current_time_sec = CurrentTime(),
+	        .current_time_ms = CurrentTimeMs(),
+	};
+
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_client_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_client_ack_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionClientOnAck(mbuf, base, counters, proxy_worker_id, ringLog, current_time_sec, current_time_ms))
+		if (dataplane::proxy::ActionClientOnAck(mbuf, worker_info))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6213,12 +6227,19 @@ inline void cWorker::proxy_server_syn_ack_handle()
 		return;
 	}
 
-	uint32_t current_time_sec = CurrentTime();
-	uint64_t current_time_ms = CurrentTimeMs();
+	dataplane::proxy::WorkerInfo worker_info{
+	        .globalBase = base.globalBase,
+	        .counters = counters,
+	        .worker_id = proxy_worker_id,
+	        .ringlog = &ringLog,
+	        .current_time_sec = CurrentTime(),
+	        .current_time_ms = CurrentTimeMs(),
+	};
+
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_server_syn_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_server_syn_ack_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionServiceOnSynAck(mbuf, base, counters, ringLog, current_time_sec, current_time_ms))
+		if (dataplane::proxy::ActionServiceOnSynAck(mbuf, worker_info))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6245,12 +6266,19 @@ inline void cWorker::proxy_server_ack_handle()
 		return;
 	}
 
-	uint32_t current_time_sec = CurrentTime();
-	uint64_t current_time_ms = CurrentTimeMs();
+	dataplane::proxy::WorkerInfo worker_info{
+	        .globalBase = base.globalBase,
+	        .counters = counters,
+	        .worker_id = proxy_worker_id,
+	        .ringlog = &ringLog,
+	        .current_time_sec = CurrentTime(),
+	        .current_time_ms = CurrentTimeMs(),
+	};
+
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_server_ack_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_server_ack_stack.mbufs[mbuf_i];
-		if (tcp_connection_store->ActionServiceOnAck(mbuf, base, counters, ringLog, current_time_sec, current_time_ms))
+		if (dataplane::proxy::ActionServiceOnAck(mbuf, worker_info))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}

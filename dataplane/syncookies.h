@@ -14,19 +14,15 @@ class SynCookies
 public:
     SynCookies();
 
-    uint32_t GetCookie(uint32_t saddr, uint16_t sport, 
-                       uint32_t sseq, uint32_t data);
-    uint32_t CheckCookie(uint32_t cookie, uint32_t saddr,
-                         uint16_t sport, uint32_t sseq);
+    uint32_t GetCookie(uint32_t saddr, uint16_t sport,  uint32_t sseq, uint32_t data) const;
+    uint32_t CheckCookie(uint32_t cookie, uint32_t saddr, uint16_t sport, uint32_t sseq) const;
 
     void UpdateKeys();
+    void CopyKeysFrom(const SynCookies& other);
 
     static uint32_t PackData(TcpOptions options);
-
     static TcpOptions UnpackData(uint32_t data);
-
     static uint32_t MssToTable(uint32_t mss);
-
     static uint32_t MssFromTable(uint32_t table_value);
 
 private:
@@ -51,7 +47,7 @@ private:
     
     static constexpr uint32_t DATA_MASK = WSCALE_MASK | SACK_MASK | MSS_MASK;
 
-    uint32_t cookie_hash(uint32_t saddr, uint16_t sport, uint32_t keyidx);
+    uint32_t cookie_hash(uint32_t saddr, uint16_t sport, uint32_t keyidx) const;
 } __rte_cache_aligned;
 
 }

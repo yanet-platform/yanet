@@ -65,7 +65,7 @@ SynCookies::SynCookies()
 }
 
 uint32_t SynCookies::GetCookie(uint32_t saddr, uint16_t sport,
-                               uint32_t sseq, uint32_t data)
+                               uint32_t sseq, uint32_t data) const
 {
     uint32_t cookie = ((cookie_hash(saddr, sport, 0) + sseq) << 1)
                     + ((current_key_ - 1) << COOKIE_BITS)
@@ -76,7 +76,7 @@ uint32_t SynCookies::GetCookie(uint32_t saddr, uint16_t sport,
 }
  
 uint32_t SynCookies::CheckCookie(uint32_t cookie, uint32_t saddr,
-                                 uint16_t sport, uint32_t sseq)
+                                 uint16_t sport, uint32_t sseq) const
 {
     cookie -= (cookie_hash(saddr, sport, 0) + sseq) << 1;
     uint32_t keyidx = (cookie >> COOKIE_BITS) + 1;
@@ -109,7 +109,19 @@ void SynCookies::UpdateKeys()
 #endif
 }
 
-uint32_t SynCookies::cookie_hash(uint32_t saddr, uint16_t sport, uint32_t keyidx)
+void SynCookies::CopyKeysFrom(const SynCookies& other)
+{
+    for (int i1 = 0; i1 < 3; i1++)
+    {
+        for (int i2 = 0; i2 < 2; i2++)
+        {
+            keys_[i1][i2] = other.keys_[i1][i2];
+        }
+    }
+    current_key_ = other.current_key_;
+}
+
+uint32_t SynCookies::cookie_hash(uint32_t saddr, uint16_t sport, uint32_t keyidx) const
 {
     const uint64_t data[3] = {(uint64_t)saddr << 32 | (uint64_t)sport,
                                 keys_[keyidx][0], keys_[keyidx][1]};

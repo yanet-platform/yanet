@@ -1137,6 +1137,12 @@ eResult cControlPlane::balancer_state_clear()
 	return eResult::success;
 }
 
+eResult cControlPlane::proxy_services_clear()
+{
+	dataPlane->tcp_connection_store.ClearAllServices(&dataPlane->memory_manager);
+	return eResult::success;
+}
+
 common::idp::nat64stateful_state::response cControlPlane::nat64stateful_state(const common::idp::nat64stateful_state::request& request)
 {
 	common::idp::nat64stateful_state::response response;

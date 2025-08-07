@@ -265,10 +265,20 @@ void LocalPool::Clear(dataplane::memory_manager* memory_manager)
         delete local_to_client_;
         delete local_info_;
 #else
-    memory_manager->destroy(chunk_queue_);
-    memory_manager->destroy(local_to_client_);
-    memory_manager->destroy(local_info_);
+    if (chunk_queue_ != nullptr)
+    {
+        memory_manager->destroy(chunk_queue_);
+    }
+    if (local_to_client_ != nullptr)
+    {
+        memory_manager->destroy(local_to_client_);
+    }
+    if (local_info_ != nullptr)
+    {
+        memory_manager->destroy(local_info_);
+    }
 #endif
+    ClearLinks();
 }
 
 void LocalPool::CopyFrom(const LocalPool& other)

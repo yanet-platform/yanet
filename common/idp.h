@@ -85,6 +85,7 @@ enum class requestType : uint32_t
         proxy_syn,
         proxy_tables,
         getPhysicalPortsFull,
+        proxy_services_clear,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 

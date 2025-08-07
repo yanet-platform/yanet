@@ -1314,6 +1314,7 @@ void tAutotest::mainThread()
 		{
 			dataPlane.balancer_state_clear();
 			dataPlane.neighbor_clear();
+			dataPlane.proxy_services_clear();
 		}
 
 		try

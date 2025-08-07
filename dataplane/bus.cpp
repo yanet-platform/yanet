@@ -401,6 +401,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = dataPlane->report.getPhysicalPortsFull(std::get<common::idp::getPhysicalPortsFull::request>(std::get<1>(request)));
 		}
+		else if (type == common::idp::requestType::proxy_services_clear)
+		{
+			response = callWithResponse(&cControlPlane::proxy_services_clear, request);
+		}
 		else
 		{
 			stats.errors[(uint32_t)common::idp::errorType::busParse]++;

@@ -2641,12 +2641,16 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	}
 
 	dataplane::proxy::proxy_service_t& service = proxy_services[service_info.service_id];
-	// YANET_LOG_WARNING("\tproxy_service_update generation: %p, service: %p, service_connections: %p, [%s]\n", this, &service, &service.tables.service_connections, service.tables.service_connections.Debug().c_str());
 
 	proxy_enabled = 1;
 	proxy_flow = service_info.flow;
 
-	return dataPlane->tcp_connection_store.ServiceUpdateOnSocket(socketId, service, counter_id, service_info, dataPlane->first_state_update_global_base, &dataPlane->memory_manager);
+	if (!service.config.ReadConfig(service_info, socketId, counter_id))
+	{
+		return eResult::invalidId;
+	}
+
+	return dataPlane->tcp_connection_store.ServiceUpdateOnSocket(socketId, service, dataPlane->first_state_update_global_base, &dataPlane->memory_manager);
 }
 
 eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::proxy_service_remove::request& request)
@@ -2664,9 +2668,8 @@ eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::pr
 
 	if (!dataPlane->first_state_update_global_base)
 	{
-		dataPlane->tcp_connection_store.ServiceRemoveOnSocket(socketId, service_id, &dataPlane->memory_manager);
+		dataPlane->tcp_connection_store.ServiceRemoveOnSocket(socketId, service, dataPlane->first_state_update_global_base, &dataPlane->memory_manager);
 	}
-	service.tables.ClearLinks();
 
 	return eResult::success;
 }

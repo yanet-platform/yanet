@@ -32,7 +32,7 @@ struct LogInfo
 
 #if RINGLOG_ENABLED == 1
 
-#define RINGLOG_ADD(ringlog, time, data) {if (ringlog_condition__) { ringlog.records[(ringlog.index++) % RINGLOG_SIZE_PER_WORKER_MASK] = {time, data}; } }
+#define RINGLOG_ADD(ringlog, time, data) {if (ringlog_condition__) { (ringlog).records[((ringlog).index++) % RINGLOG_SIZE_PER_WORKER_MASK] = {time, data}; } }
 #define RINGLOG_CONDITION(condition) bool ringlog_condition__ = condition;
 
 #else

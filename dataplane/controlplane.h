@@ -86,6 +86,7 @@ public:
 	common::idp::get_shm_tsc_info::response get_shm_tsc_info();
 	eResult dump_physical_port(const common::idp::dump_physical_port::request& request);
 	eResult balancer_state_clear();
+	eResult proxy_services_clear();
 
 	void switchBase();
 	void switchGlobalBase();
