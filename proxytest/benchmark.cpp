@@ -18,34 +18,52 @@ const common::ipv4_address_t upstream_addr("44.0.0.1");
 const uint16_t upstream_port = rte_cpu_to_be_16(8080);
 common::ringlog::LogInfo ringlog;
 
+dataplane::proxy::proxy_service_config_t GetProxyConfig()
+{
+    proxy_service_id_t service_id = 1;
+
+    dataplane::proxy::proxy_service_config_t service_config {
+        .service_id = service_id,
+	    .counter_id = 0,
+        .proxy_addr = proxy_addr,
+	    .proxy_port = proxy_port,
+	    .upstream_addr = upstream_addr,
+	    .upstream_port = upstream_port,
+	    .size_connections_table = size_connections_table,
+	    .size_syn_table = size_syn_table,
+        .pool_prefix {
+            .address = uint32_t(local_pool_prefix.address()),
+            .mask = local_pool_prefix.mask(),
+        },
+	    .send_proxy_header = false,
+	    .tcp_options = {
+            .use_sack = YANET_PROXY_DEFAULT_USE_SACK,
+	        .mss = YANET_PROXY_DEFAULT_MSS,
+	        .winscale = YANET_PROXY_DEFAULT_WINSCALE,
+	        .timestamps = YANET_PROXY_DEFAULT_USE_TIMESTAMPS,
+        },
+        .timeouts = {
+            .syn_rto = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RTO,
+            .syn_recv = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV,
+            .established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED,
+        },
+        .debug_flags = 0,
+    };
+
+    return service_config;
+}
+
 void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection_store, dataplane::base::generation& base, proxy_service_id_t service_id)
 {
+    tSocketId socket_id = 0;
+
     base.globalBase = new dataplane::globalBase::generation(nullptr, 0);
-    controlplane::proxy::service_t service_cfg;
+    base.globalBase->proxy_services[service_id].config = GetProxyConfig();
+    base.globalBase->proxy_services[service_id].UpdateProxyHeader();
 
-    service_cfg.service_id = service_id;
-    service_cfg.proxy_addr = proxy_addr;
-	service_cfg.proxy_port = proxy_port;
-	service_cfg.upstream_addr = upstream_addr;
-	service_cfg.upstream_port = upstream_port;
-    service_cfg.upstream_nets.push_back(local_pool_prefix);
-	service_cfg.send_proxy_header = false;
-	service_cfg.size_connections_table = size_connections_table;
-	service_cfg.size_syn_table = size_syn_table;
-	service_cfg.tcp_options.use_sack = YANET_PROXY_DEFAULT_USE_SACK;
-	service_cfg.tcp_options.mss = YANET_PROXY_DEFAULT_MSS;
-	service_cfg.tcp_options.winscale = YANET_PROXY_DEFAULT_WINSCALE;
-	service_cfg.tcp_options.timestamps = YANET_PROXY_DEFAULT_USE_TIMESTAMPS;
-    service_cfg.timeouts.syn_recv = YANET_PROXY_DEFAULT_TIMEOUT_SYN_RECV;
-    service_cfg.timeouts.established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED;
-
-    dataplane::proxy::proxy_service_t& service = base.globalBase->proxy_services[service_id];
-
-    tcp_connection_store.ActivateSocket(0);
-    tcp_connection_store.ServiceUpdateOnSocket(0, service, 0, service_cfg, true, nullptr);
-    tcp_connection_store.ServiceUpdateOnSocket(0, service, 0, service_cfg, false, nullptr);
-
-    ringlog.records = new common::ringlog::LogRecord[64];
+    tcp_connection_store.ActivateSocket(socket_id);
+    tcp_connection_store.ServiceUpdateOnSocket(socket_id, base.globalBase->proxy_services[service_id], true, nullptr);
+    tcp_connection_store.ServiceUpdateOnSocket(socket_id, base.globalBase->proxy_services[service_id], false, nullptr);
 }
 
 inline void ResetMbuf(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
@@ -184,7 +202,15 @@ void Benchmark(const Config& config) {
                 SetTCPPorts(tcp_header, rte_cpu_to_be_16(32768 + j % 32768), service.config.proxy_port);
                 SetSeqAck(tcp_header, 0, 0);
                 tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                if (!tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, worker_id, ringlog, current_time, current_time_ms))
+                dataplane::proxy::WorkerInfo worker_info{
+                    .globalBase = base.globalBase,
+                    .counters = counters,
+                    .worker_id = worker_id,
+                    .ringlog = &ringlog,
+                    .current_time_sec = current_time,
+                    .current_time_ms = current_time_ms,
+                };
+                if (!dataplane::proxy::ActionClientOnSyn(mbuf, worker_info))
                 { // packet dropped
                     synflood_syn_dropped++;
                     continue;
@@ -200,7 +226,9 @@ void Benchmark(const Config& config) {
                     SetSeqAck(tcp_header, 0, rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog, current_time, current_time_ms))
+                    worker_info.current_time_sec = current_time;
+                    worker_info.current_time_ms = current_time_ms;
+                    if (!dataplane::proxy::ActionServiceOnSynAck(mbuf, worker_info))
                     { // packet dropped
                         synflood_synack_dropped++;
                         break;
@@ -233,7 +261,7 @@ void Benchmark(const Config& config) {
             for (uint32_t j = 0; ; j++)
             {
                 if ((j & (1024 - 1)) == 0 && std::chrono::steady_clock::now() - start >= config.duration)
-                break;
+                    break;
                 
                 uint16_t client_port = rte_cpu_to_be_16(32768 + j % 32768);
                 
@@ -248,7 +276,15 @@ void Benchmark(const Config& config) {
                 tcp_options.sack_permitted = true;
                 tcp_options.timestamp_value = timestamp;
                 tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                if (!tcp_connection_store.ActionClientOnSyn(mbuf, base, counters, worker_id, ringlog, current_time, current_time_ms))
+                dataplane::proxy::WorkerInfo worker_info{
+                    .globalBase = base.globalBase,
+                    .counters = counters,
+                    .worker_id = worker_id,
+                    .ringlog = &ringlog,
+                    .current_time_sec = current_time,
+                    .current_time_ms = current_time_ms,
+                };
+                if (!dataplane::proxy::ActionClientOnSyn(mbuf, worker_info))
                 { // packet dropped
                     client_syn_dropped++;
                     continue;
@@ -262,7 +298,9 @@ void Benchmark(const Config& config) {
                     tcp_options.Clear();
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, worker_id, ringlog, current_time, current_time_ms))
+                    worker_info.current_time_sec = current_time;
+                    worker_info.current_time_ms = current_time_ms;
+                    if (!dataplane::proxy::ActionClientOnAck(mbuf, worker_info))
                     { // packet dropped
                         client_ack_dropped++;
                         continue;
@@ -281,7 +319,9 @@ void Benchmark(const Config& config) {
                     tcp_options.Clear();
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog, current_time, current_time_ms))
+                    worker_info.current_time_sec = current_time;
+                    worker_info.current_time_ms = current_time_ms;
+                    if (!dataplane::proxy::ActionServiceOnSynAck(mbuf, worker_info))
                     { // packet dropped
                         server_synack_dropped++;
                         continue;
@@ -293,7 +333,9 @@ void Benchmark(const Config& config) {
                     tcp_options.Clear();
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, worker_id, ringlog, current_time, current_time_ms))
+                    worker_info.current_time_sec = current_time;
+                    worker_info.current_time_ms = current_time_ms;
+                    if (!dataplane::proxy::ActionClientOnAck(mbuf, worker_info))
                     { // packet dropped
                         client_ack_dropped++;
                         continue;
@@ -305,7 +347,9 @@ void Benchmark(const Config& config) {
                     SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionServiceOnAck(mbuf, base, counters, ringlog, current_time, current_time_ms))
+                    worker_info.current_time_sec = current_time;
+                    worker_info.current_time_ms = current_time_ms;
+                    if (!dataplane::proxy::ActionServiceOnAck(mbuf, worker_info))
                     { // packet dropped
                         server_ack_dropped++;
                         continue;
@@ -321,7 +365,9 @@ void Benchmark(const Config& config) {
                     SetSeqAck(tcp_header, server_seq, rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionServiceOnSynAck(mbuf, base, counters, ringlog, current_time, current_time_ms))
+                    worker_info.current_time_sec = current_time;
+                    worker_info.current_time_ms = current_time_ms;
+                    if (!dataplane::proxy::ActionServiceOnSynAck(mbuf, worker_info))
                     { // packet dropped
                         server_synack_dropped++;
                         continue;
@@ -333,7 +379,9 @@ void Benchmark(const Config& config) {
                     tcp_options.Clear();
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionClientOnAck(mbuf, base, counters, worker_id, ringlog, current_time, current_time_ms))
+                    worker_info.current_time_sec = current_time;
+                    worker_info.current_time_ms = current_time_ms;
+                    if (!dataplane::proxy::ActionClientOnAck(mbuf, worker_info))
                     { // packet dropped
                         client_ack_dropped++;
                         continue;
@@ -345,7 +393,9 @@ void Benchmark(const Config& config) {
                     SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
                     AdvanceTS(tcp_options, timestamp);
                     tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-                    if (!tcp_connection_store.ActionServiceOnAck(mbuf, base, counters, ringlog, current_time, current_time_ms))
+                    worker_info.current_time_sec = current_time;
+                    worker_info.current_time_ms = current_time_ms;
+                    if (!dataplane::proxy::ActionServiceOnAck(mbuf, worker_info))
                     { // packet dropped
                         server_ack_dropped++;
                         continue;
