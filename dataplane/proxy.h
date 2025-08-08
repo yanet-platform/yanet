@@ -48,7 +48,7 @@ struct proxy_service_config_t
     uint64_t debug_flags;
 
     bool EnabledFlag(uint8_t flag) const;
-    bool ReadConfig(const controlplane::proxy::service_t& service_info, tSocketId socket_id, tCounterId counter_id);
+    bool ReadConfig(const controlplane::proxy::service_t& service_info, tSocketId socket_id, tCounterId service_counter_id);
 
     static constexpr uint64_t flag_dont_use_bucket_optimization = (1ul << 0);
     static constexpr uint64_t flag_ignore_size_update_detections = (1ul << 1);

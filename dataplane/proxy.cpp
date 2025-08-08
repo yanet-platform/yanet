@@ -304,10 +304,10 @@ void TcpConnectionStore::ActivateSocket(tSocketId socket_id)
     proxy_services[socket_id];
 }
 
-bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& service_info, tSocketId socket_id, tCounterId counter_id)
+bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& service_info, tSocketId socket_id, tCounterId service_counter_id)
 {
 	service_id = service_info.service_id;
-	counter_id = counter_id;
+	counter_id = service_counter_id;
 
 	// proxy and service address, port
 	proxy_addr = ipv4_address_t::convert(service_info.proxy_addr.get_ipv4()).address;
@@ -452,58 +452,34 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
         proxy_service_on_socket_t& service = iter_service->second[index];
         if (service.mutex.try_lock())
         {
-            for (auto& bucket : service.tables_work.service_connections)
             {
-                bool condition = false;
-                for (uint32_t conn_idx : bucket)
-                {
-                    if (bucket.IsExpired(conn_idx, current_time_ms, service.config.timeouts.established))
-                    {
-                        condition = true;
-                        break;
-                    }
-                }
-                if (condition)
-                {
-                    bucket.Lock();
-                    for (uint32_t conn_idx : bucket)
-                    {
-                        if (bucket.IsExpired(conn_idx, current_time_ms, service.config.timeouts.established))
-                        {
-                            service.tables_work.local_pool.Free(LocalPool::max_workers, bucket.connections[conn_idx].local);
-                            bucket.Clear(conn_idx);
-                            bucket.num_allocated--;
-                        }
-                    }
-                    bucket.Unlock();
-                }
+                uint64_t time_to_clear = current_time_ms - service.config.timeouts.established;
+                auto condition = [time_to_clear] (uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
+                    return (last_time < time_to_clear) || ((connection.service_flags & TCP_RST_FLAG) != 0);
+                };
+
+                auto action = [&service](uint32_t conn_idx, auto& bucket) {
+                    service.tables_work.local_pool.Free(LocalPool::max_workers, bucket.connections[conn_idx].local);
+                    bucket.Clear(conn_idx);
+                };
+
+                service.tables_work.service_connections.ProcessAllConnectionsWithLocking(condition, action);
             }
-            for (auto& bucket : service.tables_work.syn_connections)
+
             {
-                bool condition = false;
-                for (uint32_t conn_idx : bucket)
-                {
-                    if (bucket.IsExpired(conn_idx, current_time_ms, service.config.timeouts.syn_recv))
-                    {
-                        condition = true;
-                        break;
-                    }
-                }
-                if (condition)
-                {
-                    bucket.Lock();
-                    for (uint32_t conn_idx : bucket)
-                    {
-                        if (bucket.IsExpired(conn_idx, current_time_ms, service.config.timeouts.syn_recv))
-                        {
-                            service.tables_work.local_pool.Free(LocalPool::max_workers, bucket.connections[conn_idx].local);
-                            bucket.Clear(conn_idx);
-                            bucket.num_allocated--;
-                        }
-                    }
-                    bucket.Unlock();
-                }
+                uint64_t time_to_clear = current_time_ms - service.config.timeouts.syn_recv;
+                auto condition = [time_to_clear] (uint32_t address, tPortId port, uint64_t last_time, const SynConnection& connection) {
+                    return last_time < time_to_clear;
+                };
+
+                auto action = [&service](uint32_t conn_idx, auto& bucket) {
+                    service.tables_work.local_pool.Free(LocalPool::max_workers, bucket.connections[conn_idx].local);
+                    bucket.Clear(conn_idx);
+                };
+
+                service.tables_work.syn_connections.ProcessAllConnectionsWithLocking(condition, action);
             }
+
             service.mutex.unlock();
         }
     }
@@ -518,21 +494,16 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(prox
     {
         for (auto& [socket_id, all_services] : proxy_services)
         {
-            GCC_BUG_UNUSED(socket_id);
             std::shared_lock lock(all_services[service_id].mutex);
-            for (auto& bucket : all_services[service_id].tables_work.service_connections)
-            {
-                bucket.Lock();
-                for (uint32_t conn_idx : bucket)
-                {
-                    const Connection& connection = bucket.connections[conn_idx];
-                    uint32_t local_addr;
-                    uint16_t local_port;
-                    ServiceConnections::Unpack(connection.local, local_addr, local_port);
-                    response.emplace_back(bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port, socket_id);
-                }
-                bucket.Unlock();
-            }
+            
+            auto get_connections = [&response, socket_id] (uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
+                uint32_t local_addr;
+                uint16_t local_port;
+                ServiceConnections::Unpack(connection.local, local_addr, local_port);
+                response.emplace_back(address, port, local_addr, local_port, socket_id);
+            };
+
+            all_services[service_id].tables_work.service_connections.ProcessAllConnectionsWithoutLocking(get_connections);
         }
     }
     return response;
@@ -545,21 +516,16 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t s
     {
         for (auto& [socket_id, all_services] : proxy_services)
         {
-            GCC_BUG_UNUSED(socket_id);
             std::shared_lock lock(all_services[service_id].mutex);
-            for (auto& bucket : all_services[service_id].tables_work.syn_connections)
-            {
-                bucket.Lock();
-                for (uint32_t conn_idx : bucket)
-                {
-                    SynConnection& connection = bucket.connections[conn_idx];
-                    uint32_t local_addr;
-                    uint16_t local_port;
-                    ServiceConnections::Unpack(connection.local, local_addr, local_port);
-                    response.emplace_back(bucket.addresses[conn_idx], bucket.ports[conn_idx], local_addr, local_port, socket_id);
-                }
-                bucket.Unlock();
-            }
+
+            auto get_connections = [&response, socket_id] (uint32_t address, tPortId port, uint64_t last_time, const SynConnection& connection) {
+                uint32_t local_addr;
+                uint16_t local_port;
+                ServiceConnections::Unpack(connection.local, local_addr, local_port);
+                response.emplace_back(address, port, local_addr, local_port, socket_id);
+            };
+
+            all_services[service_id].tables_work.syn_connections.ProcessAllConnectionsWithoutLocking(get_connections);
         }
     }
     return response;
@@ -1286,6 +1252,29 @@ bool TcpConnectionStore::GetDataForRetramsits(const proxy_service_config_t& serv
 {
     // uint64_t current_time = current_time_ms;
     // return updater_proxy_tables[service_config.service_id].GetDataForRetramsits(service_config, next_flow_, current_time, ring_retransmit_free, ring_retransmit_send);
+
+    //     uint32_t GetDataForRetramsits(std::function<bool(Bucket&, uint32_t, uint64_t)> func)
+    // {
+    //     if (unlikely(!initialized_)) return 0;
+        
+    //     uint32_t count = 0;
+    //     bool stop = false;
+    //     for (uint32_t index = 0; (index < number_buckets_) && !stop; index++)
+    //     {
+    //         Bucket& bucket = buckets_[index];
+    //         bucket.Lock();
+    //         for (uint32_t i = 0; i < Bucket::bucket_size; i++)
+    //         {
+    //             if (bucket.addresses[i] != 0 && func(bucket, i)) 
+    //                 break;
+    //         }
+    //         bucket.Unlock();
+    //     }
+
+    //     return count;
+    // }
+
+
     return false;
 }
 

@@ -60,19 +60,29 @@ struct Connection
         service_flags = 0;
     }
 
-    bool CreatedFromSynCookie()
+    bool FlagEnabled(uint32_t flag)
     {
-        return (flags & flag_from_synkookie) != 0;
+        return (flags & flag) != 0;
     }
 
-    bool UseForRetransmit()
+    void SetFlag(uint32_t flag)
     {
-        if (((flags & flag_from_synkookie) != 0) && ((flags & flag_sent_rentransmit_syn_to_server) == 0) &&
-                ((flags & flag_nonempty_ack_from_client) == 0)) {
-            flags |= flag_nonempty_ack_from_client;
-            return true;
-        }
-        return false;
+        flags |= flag;
+    }
+
+    bool CreatedFromSynCookie()
+    {
+        return FlagEnabled(flag_from_synkookie);
+    }
+
+    bool NeedRetransmit()
+    {
+        return CreatedFromSynCookie() && !FlagEnabled(flag_sent_rentransmit_syn_to_server | flag_nonempty_ack_from_client);
+    }
+
+    void SetSentRetransmit()
+    {
+        SetFlag(flag_sent_rentransmit_syn_to_server);
     }
 } __rte_aligned(64);
 
@@ -105,6 +115,7 @@ struct ConnectionBucket
         {
             Clear(index);
         }
+        num_allocated = 0;
     }
 
     // 128 bytes = 2 cache lines
@@ -112,7 +123,7 @@ struct ConnectionBucket
 
     // 108 bytes = 2 cache lines
     uint32_t addresses[bucket_size];
-    uint16_t ports[bucket_size];
+    tPortId ports[bucket_size];
     uint32_t time_overflow;
     uint32_t num_allocated;
     rte_spinlock_t spinlock;
@@ -126,14 +137,6 @@ struct ConnectionBucket
         ports[idx] = 0;
         last_times[idx] = 0;
         num_allocated--;
-    }
-
-    bool IsExpired(uint32_t idx, uint64_t current_time, uint64_t timeout)
-    {
-        if constexpr (std::is_same_v<ConnectionInfo, Connection>) {
-            if ((connections[idx].service_flags & TCP_RST_FLAG) != 0) return true;
-        }
-        return last_times[idx] + timeout < current_time;
     }
 
     void Lock()
@@ -199,9 +202,9 @@ template<typename ConnectionInfo>
 struct ConnectionData {
     ConnectionBucket<ConnectionInfo>* bucket;
     ConnectionInfo* connection;
-    uint32_t idx;    
+    uint32_t idx;
     
-    void Init(uint32_t ip, uint16_t port, uint64_t time)
+    void Init(uint32_t ip, tPortId port, uint64_t time)
     {
         bucket->addresses[idx] = ip;
         bucket->ports[idx] = port;
@@ -327,6 +330,48 @@ public:
         T* bucket_;
     };
 
+    template <typename Function>
+    void ProcessAllConnectionsWithoutLocking(Function func)
+    {
+        for (auto& bucket : *this)
+        {
+            for (uint32_t idx : bucket)
+            {
+                func(bucket.addresses[idx], bucket.ports[idx], bucket.last_times[idx], bucket.connections[idx]);
+            }
+        }
+    }
+
+    template <typename FunctionCondition, typename FunctionAction>
+    void ProcessAllConnectionsWithLocking(FunctionCondition condition, FunctionAction action)
+    {
+        for (auto& bucket : *this)
+        {
+            bool fulfilled = false;
+            for (uint32_t idx : bucket)
+            {
+                if (condition(bucket.addresses[idx], bucket.ports[idx], bucket.last_times[idx], bucket.connections[idx]))
+                {
+                    fulfilled = true;
+                    break;
+                }
+            }
+
+            if (fulfilled)
+            {
+                bucket.Lock();
+                for (uint32_t idx : bucket)
+                {
+                    if (condition(bucket.addresses[idx], bucket.ports[idx], bucket.last_times[idx], bucket.connections[idx]))
+                    {
+                        action(idx, bucket);
+                    }
+                }
+                bucket.Unlock();
+            }
+        }
+    }
+
     using iterator_type = Iterator<Bucket>;
     using const_iterator_type = Iterator<const Bucket>;
 
@@ -340,7 +385,7 @@ public:
         size_t size = 0;
         for (const Bucket& bucket : *this)
         {
-            for (auto iter = bucket.begin(); iter != bucket.end(); iter++) size++;
+            size += bucket.num_allocated;
         }
         return size;
     }
@@ -349,28 +394,7 @@ public:
         return number_buckets_ * Bucket::bucket_size;
     }
 
-    uint32_t GetDataForRetramsits(std::function<bool(Bucket&, uint32_t, uint64_t)> func)
-    {
-        if (unlikely(!initialized_)) return 0;
-        
-        uint32_t count = 0;
-        bool stop = false;
-        for (uint32_t index = 0; (index < number_buckets_) && !stop; index++)
-        {
-            Bucket& bucket = buckets_[index];
-            bucket.Lock();
-            for (uint32_t i = 0; i < Bucket::bucket_size; i++)
-            {
-                if (bucket.addresses[i] != 0 && func(bucket, i)) 
-                    break;
-            }
-            bucket.Unlock();
-        }
-
-        return count;
-    }
-
-    TableSearchResult FindAndLock(uint32_t addr, uint16_t port, uint64_t current_time, ConnectionData<ConnectionInfo>& data, bool first_overflow_check)
+    TableSearchResult FindAndLock(uint32_t addr, tPortId port, uint64_t current_time, ConnectionData<ConnectionInfo>& data, bool first_overflow_check)
     {
         data.bucket = nullptr;
         data.connection = nullptr;
@@ -430,7 +454,7 @@ public:
         return (((uint64_t)addr) << 16) | (uint64_t)port;
     }
 
-    inline static void Unpack(uint64_t key, uint32_t& addr, uint16_t& port)
+    inline static void Unpack(uint64_t key, uint32_t& addr, tPortId& port)
     {
         port = key & 0xffff;
         addr = key >> 16;
