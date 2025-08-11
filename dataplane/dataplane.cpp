@@ -297,6 +297,11 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	return result;
 }
 
+eResult cDataPlane::DryRun(const std::string& configFilePath)
+{
+	return parseConfig(configFilePath);
+}
+
 std::string rss_flags_to_string(uint64_t rss_flags)
 {
 	std::string flag_names;
