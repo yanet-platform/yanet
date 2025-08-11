@@ -587,7 +587,7 @@ bool NonEmptyTcpData(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
     return (rte_be_to_cpu_16(ipv4_header->total_length) != sizeof(rte_ipv4_hdr) + tcp_header_len);
 }
 
-void PrepareSynToClient(const proxy_service_t& service,
+void PrepareSynAckToClient(const proxy_service_t& service,
                                             rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t* counters, uint32_t current_time_sec)
 {
     TcpOptions tcp_options;
@@ -669,7 +669,7 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
             DebugPacket("\tsyn.FindAndLock=Overflow", service_id, ipv4_header, tcp_header);
 		    RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SynOverflow, tcp_header->src_port, 0));
 
-            PrepareSynToClient(service, mbuf, ipv4_header, tcp_header, worker_info.counters, worker_info.current_time_sec);
+            PrepareSynAckToClient(service, mbuf, ipv4_header, tcp_header, worker_info.counters, worker_info.current_time_sec);
             worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
             worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;
             break;
@@ -678,7 +678,14 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
         {
             DebugPacket("\tsyn.FindAndLock=Found", service_id, ipv4_header, tcp_header);
             RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SynFound, tcp_header->src_port, syn_connection_data.connection->local));
-            PrepareSynToService(service, ipv4_header, tcp_header, syn_connection_data.connection->local);
+            if (++syn_connection_data.connection->retransmits_from_client > 3)
+            {
+                PrepareSynAckToClient(service, mbuf, ipv4_header, tcp_header, worker_info.counters, worker_info.current_time_sec);
+            }
+            else
+            {
+                PrepareSynToService(service, ipv4_header, tcp_header, syn_connection_data.connection->local);
+            }
             break;
         }
         case TableSearchResult::NotFound:

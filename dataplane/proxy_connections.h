@@ -91,6 +91,7 @@ struct SynConnection
     uint64_t local;     // ip + port from local pool
     uint32_t client_start_seq;  // SEQ received from client in first SYN packet
     uint32_t server_seq; // SEQ received from server in SYNACK packet
+    uint32_t retransmits_from_client;
     bool server_answer; // was received answer from server
 
     void Clear()
@@ -98,6 +99,7 @@ struct SynConnection
         local = 0;
         client_start_seq = 0;
         server_seq = 0;
+        retransmits_from_client = 0;
         server_answer = false;
     }
 } __rte_aligned(32);

@@ -343,7 +343,7 @@ data_type10_1 = [
     (
 		test_001.FromServer((1 + len(data_server1), 1 + len(data_client1) + len(data_client2)), 'R'),
 		test_001.ToClient((1 + len(data_server1), 1 + len(data_client1) + len(data_client2)), 'R')
-	), 
+	),
 ]
 
 WriteTest("010_1", data_type10_1)
@@ -356,3 +356,41 @@ data_type10_2 = [
 ]
 
 WriteTest("010_2", data_type10_2)
+
+# 011 - Only 3 SYN packets allowed from one client addr + port
+
+SYN_COOKIE11 = 0xda8fecb2
+
+test_011 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=SYN_COOKIE11, port_proxy=PORT_PROXY_INT + 4, cport=PORT_CLIENT + 4)
+
+data_type11 = [
+    # First SYN - add record to table SynConnections
+    (
+		test_011.FromClient((0, None), 'S', options=options_client_syn),
+		test_011.ToServer((0, None), 'S', options=options_client_syn)
+	),
+    # Allow 3 retransmits to service
+    (
+		test_011.FromClient((0, None), 'S', options=options_client_syn),
+		test_011.ToServer((0, None), 'S', options=options_client_syn)
+	),
+    (
+		test_011.FromClient((0, None), 'S', options=options_client_syn),
+		test_011.ToServer((0, None), 'S', options=options_client_syn)
+	),
+    (
+		test_011.FromClient((0, None), 'S', options=options_client_syn),
+		test_011.ToServer((0, None), 'S', options=options_client_syn)
+	),
+    # Other SYN from clients - send syn-cookie
+    (
+		test_011.FromClient((0, None), 'S', options=options_client_syn),
+		test_011.ToClient((0, 1), 'AS', window=0, options=[("MSS", 1460), ("SAckOK", ''), ("Timestamp", (1, ts_client)), ('WScale', 14)])
+	),
+    (
+		test_011.FromClient((0, None), 'S', options=options_client_syn),
+		test_011.ToClient((0, 1), 'AS', window=0, options=[("MSS", 1460), ("SAckOK", ''), ("Timestamp", (1, ts_client)), ('WScale', 14)])
+	),
+]
+
+WriteTest("011", data_type11)
