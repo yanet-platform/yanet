@@ -113,6 +113,7 @@ protected:
 
 public:
 	void StartInterfaces();
+	bool WorkersStarted() {return workers_started_.load(std::memory_order_acquire);}
 
 protected:
 	eResult init_kernel_interfaces();
@@ -204,6 +205,7 @@ protected:
 	std::map<tSocketId, worker_gc_t*> socket_worker_gcs;
 	std::map<tSocketId, rte_mempool*> socket_cplane_mempools;
 
+	std::atomic<bool> workers_started_ = false;
 	std::vector<cWorker*> workers_vector;
 
 	std::mutex switch_worker_base_mutex;

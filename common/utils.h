@@ -4,6 +4,7 @@
 #include <bitset>
 #include <iomanip>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <vector>
 
@@ -118,15 +119,6 @@ class Job
 {
 	std::atomic<bool> run_;
 	std::thread thread_;
-	template<typename Task, typename... Args>
-	void Loop(Task&& task, Args&&... args)
-	{
-		run_.store(true, std::memory_order_relaxed);
-		while (run_)
-		{
-			std::forward<Task>(task)(std::forward(args)...);
-		}
-	}
 
 public:
 	Job() : run_{false} {}
@@ -150,12 +142,20 @@ public:
 		{
 			Stop();
 		}
-		Loop(std::forward<Task>(task), std::forward(args)...);
+		run_.store(true, std::memory_order_relaxed);
+		thread_ = std::thread(
+		        [this](Task&& task, Args&&... args) {
+			        while (run_ && std::forward<Task>(task)(std::forward(args)...))
+			        {
+			        }
+		        },
+		        std::forward<Task>(task),
+		        std::forward(args)...);
 	}
 
 	bool Running() const
 	{
-		return run_.load(std::memory_order_relaxed);
+		return thread_.joinable();
 	}
 
 	void Stop()
