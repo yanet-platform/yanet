@@ -86,9 +86,9 @@ public:
 
 	void report(nlohmann::json& json);
 
-	void Upsert(tInterfaceId iface, const ipv6_address_t& dst, const rte_ether_addr& mac);
-	void UpdateTimestamp(tInterfaceId iface, const ipv6_address_t& dst);
-	void Remove(tInterfaceId iface, const ipv6_address_t& dst);
+	void Upsert(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac);
+	void UpdateTimestamp(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6);
+	void Remove(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6);
 
 protected:
 	void StartResolveJob();
@@ -96,10 +96,6 @@ protected:
 	eResult DumpOSNeighbors();
 
 	void resolve(const dataplane::neighbor::key& key);
-
-	void neighbor_upsert(const std::string& interface_name,
-	                     const common::ip_address_t& ip_address,
-	                     const common::mac_address_t& mac_address);
 
 protected:
 	cDataPlane* dataplane;

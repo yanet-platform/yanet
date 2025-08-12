@@ -1535,6 +1535,7 @@ void cDataPlane::start()
 
 	StartInterfaces();
 
+	workers_started_.store(true, std::memory_order_release);
 	if (rte_eal_mp_remote_launch(LcoreFunc, this, CALL_MAIN))
 	{
 		YANET_LOG_ERROR("Failed to launch workers: some of assigned lcores busy\n");
