@@ -7,10 +7,11 @@
 #include "dataplane/globalbase.h"
 #include "dataplane/metadata.h"
 #include "dataplane/proxy.h"
+#include "common/counters.h"
 #include "common/ringlog.h"
 
 const common::ipv4_prefix_t local_pool_prefix("33.0.0.0/24");
-const uint32_t size_connections_table = 65536;
+const uint32_t size_connections_table = 2 << 24;
 const uint32_t size_syn_table = 1024;
 const common::ipv4_address_t proxy_addr("22.0.0.1");
 const uint16_t proxy_port = rte_cpu_to_be_16(80);
@@ -172,11 +173,11 @@ void Benchmark(const Config& config) {
     uint64_t synflood_synack_dropped = 0;
 
     uint32_t worker_id = 0;
+    uint64_t syn_counters[64]{};
     for (unsigned int i = 0; i < config.syn_threads; i++, worker_id++) {
-        syn_threads.emplace_back([=, &current_time, &current_time_ms, &synflood_syn_dropped, &synflood_synack_dropped, &syn_mbufs, &syn_iterations, &base, &tcp_connection_store, &service]() {
+        syn_threads.emplace_back([=, &syn_counters, &current_time, &current_time_ms, &synflood_syn_dropped, &synflood_synack_dropped, &syn_mbufs, &syn_iterations, &base, &tcp_connection_store, &service]() {
             uint32_t client_addr = rte_cpu_to_be_32(common::ipv4_address_t("11.0.0.1") + i);
             std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-            uint64_t counters[64];
             rte_mbuf* mbuf = syn_mbufs[i];
 
             uint32_t local_addr;
@@ -204,7 +205,7 @@ void Benchmark(const Config& config) {
                 tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
                 dataplane::proxy::WorkerInfo worker_info{
                     .globalBase = base.globalBase,
-                    .counters = counters,
+                    .counters = syn_counters,
                     .worker_id = worker_id,
                     .ringlog = &ringlog,
                     .current_time_sec = current_time,
@@ -245,11 +246,11 @@ void Benchmark(const Config& config) {
     uint64_t server_synack_dropped = 0;
     uint64_t server_ack_dropped = 0;
 
+    uint64_t counters[64]{};
     for (unsigned int i = 0; i < config.threads; i++, worker_id++) {
-        threads.emplace_back([=, &current_time, &current_time_ms, &client_syn_dropped, &client_ack_dropped, &server_synack_dropped, &server_ack_dropped, &mbufs, &iterations, &base, &tcp_connection_store, &service]() {
+        threads.emplace_back([=, &counters, &current_time, &current_time_ms, &client_syn_dropped, &client_ack_dropped, &server_synack_dropped, &server_ack_dropped, &mbufs, &iterations, &base, &tcp_connection_store, &service]() {
             uint32_t client_addr = rte_cpu_to_be_32(common::ipv4_address_t("11.0.1.1") + i);
             std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-            uint64_t counters[64];
             rte_mbuf* mbuf = mbufs[i];
             uint32_t local_addr;
             uint16_t local_port;
@@ -432,16 +433,26 @@ void Benchmark(const Config& config) {
         std::cout << i << ": " << syn_iterations[i] << " iterations\n";
     }
     std::cout << "Sum: " << std::accumulate(syn_iterations.begin(), syn_iterations.end(), 0) << " iterations\n";
-    std::cout << "synflood_syn_dropped: " << synflood_syn_dropped << std::endl;
-    std::cout << "synflood_synack_dropped: " << synflood_synack_dropped << std::endl;
+    std::cout << "SYNs dropped: " << synflood_syn_dropped << std::endl;
+    std::cout << "SYNACKs dropped: " << synflood_synack_dropped << std::endl;
+    std::cout << "counters:\n";
+    for (uint32_t i = 0; i < ::proxy::names.size(); i++)
+    {
+        std::cout << "\t" << ::proxy::names[i] << ": " << syn_counters[i] << "\n";
+    }
 
     std::cout << "\nThreads:\n";
     for (unsigned int i = 0; i < config.threads; i++) {
         std::cout << i << ": " << iterations[i] << " iterations\n";
     }
     std::cout << "Sum: " << std::accumulate(iterations.begin(), iterations.end(), 0) << " iterations\n";
-    std::cout << "client_syn_dropped: " << client_syn_dropped << std::endl;
-    std::cout << "server_synack_dropped: " << server_synack_dropped << std::endl;
-    std::cout << "client_ack_dropped: " << client_ack_dropped << std::endl;
-    std::cout << "server_ack_dropped: " << server_ack_dropped << std::endl;
+    std::cout << "Client SYNs dropped: " << client_syn_dropped << std::endl;
+    std::cout << "Server SYNACKs dropped: " << server_synack_dropped << std::endl;
+    std::cout << "Client ACKs dropped: " << client_ack_dropped << std::endl;
+    std::cout << "Server ACKs dropped: " << server_ack_dropped << std::endl;
+    std::cout << "counters:\n";
+    for (uint32_t i = 0; i < ::proxy::names.size(); i++)
+    {
+        std::cout << "\t" << ::proxy::names[i] << ": " << counters[i] << "\n";
+    }
 }
