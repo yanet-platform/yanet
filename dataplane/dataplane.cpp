@@ -286,7 +286,48 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	}
 	bus.SetBufferForCounters(sdp_data);
 
-	result = neighbor.init(this);
+	result = neighbor.init(
+	        get_socket_ids(),
+	        getConfigValues().neighbor_ht_size,
+	        [this](tSocketId socket_id) {
+		        return memory_manager.create<dataplane::neighbor::hashtable>(
+		                "neighbor.ht",
+		                socket_id,
+		                dataplane::neighbor::hashtable::calculate_sizeof(
+		                        getConfigValues().neighbor_ht_size));
+	        },
+	        [this]() { return get_current_time(); },
+	        [this]() {
+		        switch_worker_base();
+	        },
+	        [this]() {
+		        std::vector<dataplane::neighbor::key> keys;
+
+		        for (auto* worker : get_workers())
+		        {
+			        run_on_worker_gc(worker->socketId, [&]() {
+				        for (auto iter : worker->neighbor_resolve.range())
+				        {
+					        iter.lock();
+					        if (!iter.is_valid())
+					        {
+						        iter.unlock();
+						        continue;
+					        }
+
+					        auto key = *iter.key();
+
+					        iter.unset_valid();
+					        iter.unlock();
+
+					        keys.emplace_back(key);
+				        }
+
+				        return true;
+			        });
+		        }
+		        return keys;
+	        });
 	if (result != eResult::success)
 	{
 		return result;
