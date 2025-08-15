@@ -72,7 +72,13 @@ public:
 	module();
 
 public:
-	eResult init(cDataPlane* dataplane);
+	eResult init(
+	        const std::set<tSocketId>& socket_ids,
+	        uint64_t ht_size,
+	        std::function<dataplane::neighbor::hashtable*(tSocketId)> ht_allocator,
+	        std::function<std::uint32_t()> current_time,
+	        std::function<void()> on_update,
+	        std::function<std::vector<dataplane::neighbor::key>()> keys_to_resolve);
 
 	void update_worker_base(const std::vector<std::tuple<tSocketId, dataplane::base::generation*>>& base_nexts);
 
@@ -98,12 +104,14 @@ protected:
 	void resolve(const dataplane::neighbor::key& key);
 
 protected:
-	cDataPlane* dataplane;
-
 	generation_manager<dataplane::neighbor::generation_interface> generation_interface;
 	generation_manager<dataplane::neighbor::generation_hashtable, eResult> generation_hashtable;
 
 	common::neighbor::stats stats;
+
+	std::function<std::uint32_t()> current_time_provider_;
+	std::function<void()> on_neighbor_flush_handle_;
+	std::function<std::vector<dataplane::neighbor::key>()> keys_to_resolve_provider_;
 
 	utils::Job resolve_;
 	utils::Job monitor_;

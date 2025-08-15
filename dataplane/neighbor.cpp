@@ -5,28 +5,32 @@
 #include <netlink/route/neighbour.h>
 #include <unistd.h>
 
-#include "dataplane.h"
 #include "neighbor.h"
-#include "worker.h"
+#include "base.h"
 
 using namespace dataplane::neighbor;
 
-module::module() :dataplane(nullptr)
+module::module()
 {
 	memset(&stats, 0, sizeof(stats));
 }
 
-eResult module::init(cDataPlane* dataplane)
+eResult module::init(
+        const std::set<tSocketId>& socket_ids,
+        uint64_t ht_size,
+        std::function<dataplane::neighbor::hashtable*(tSocketId)> ht_allocator,
+        std::function<std::uint32_t()> current_time,
+        std::function<void()> on_neighbor_flush,
+        std::function<std::vector<dataplane::neighbor::key>()> keys_to_resolve)
 {
-	this->dataplane = dataplane;
+	current_time_provider_ = std::move(current_time);
+	on_neighbor_flush_handle_ = std::move(on_neighbor_flush);
+	keys_to_resolve_provider_ = std::move(keys_to_resolve);
 
-	auto ht_size = dataplane->getConfigValues().neighbor_ht_size;
 	generation_hashtable.fill([&](neighbor::generation_hashtable& hashtable) {
-		for (const auto socket_id : dataplane->get_socket_ids())
+		for (const auto socket_id : socket_ids)
 		{
-			auto* pointer = dataplane->memory_manager.create<dataplane::neighbor::hashtable>("neighbor.ht",
-			                                                                                 socket_id,
-			                                                                                 dataplane::neighbor::hashtable::calculate_sizeof(ht_size));
+			auto* pointer = ht_allocator(socket_id);
 			hashtable.hashtable_updater[socket_id].update_pointer(pointer,
 			                                                      socket_id,
 			                                                      ht_size);
@@ -81,7 +85,7 @@ common::idp::neighbor_show::response module::neighbor_show() const
 				std::optional<uint32_t> last_update_timestamp;
 				if (!(value.flags & flag_is_static))
 				{
-					last_update_timestamp = dataplane->get_current_time() - value.last_update_timestamp;
+					last_update_timestamp = current_time_provider_() - value.last_update_timestamp;
 				}
 
 				response.emplace_back(route_name,
@@ -134,7 +138,7 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 	memcpy(value.ether_address.addr_bytes, mac_address.data(), 6);
 	value.flags = 0;
 	value.flags |= flag_is_static;
-	value.last_update_timestamp = dataplane->get_current_time();
+	value.last_update_timestamp = current_time_provider_();
 
 	YANET_LOG_ERROR("Neighbor insert (controlplane): %s, %s, %s\n",
 	                interface_name.data(),
@@ -234,7 +238,7 @@ eResult module::neighbor_clear()
 eResult module::neighbor_flush()
 {
 	generation_hashtable.switch_generation_with_update([this]() {
-		dataplane->switch_worker_base();
+		on_neighbor_flush_handle_();
 	});
 	return eResult::success;
 }
@@ -439,8 +443,8 @@ std::vector<Entry> GetHostDump(
 		return {};
 	}
 #if AUTOTEST
-	set fd
-	set proto
+	// set fd
+	// set proto
 #else
 	if (auto err = nl_connect(sk, NETLINK_ROUTE); err < 0)
 	{
@@ -545,7 +549,7 @@ eResult module::DumpOSNeighbors()
 
 	eResult res = generation_hashtable.update(
 	        [dump,
-	         now = dataplane->get_current_time(),
+	         now = current_time_provider_(),
 	         this](
 	                neighbor::generation_hashtable& hashtable) {
 		        for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
@@ -613,31 +617,7 @@ void module::StartResolveJob()
 	std::vector<dataplane::neighbor::key> keys;
 
 	resolve_.Run([this, keys]() mutable {
-		keys.clear();
-
-		for (auto* worker : dataplane->get_workers())
-		{
-			dataplane->run_on_worker_gc(worker->socketId, [&]() {
-				for (auto iter : worker->neighbor_resolve.range())
-				{
-					iter.lock();
-					if (!iter.is_valid())
-					{
-						iter.unlock();
-						continue;
-					}
-
-					auto key = *iter.key();
-
-					iter.unset_valid();
-					iter.unlock();
-
-					keys.emplace_back(key);
-				}
-
-				return true;
-			});
-		}
+		keys = keys_to_resolve_provider_();
 
 		for (const auto& key : keys)
 		{
@@ -657,7 +637,7 @@ void module::Upsert(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6, c
 		{
 			if (!hashtable_updater.get_pointer()->insert_or_update(
 			            key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
-			            value{mac, 0, dataplane->get_current_time()}))
+			            value{mac, 0, current_time_provider_()}))
 			{
 				stats.hashtable_insert_error++;
 			}
@@ -681,7 +661,7 @@ void module::UpdateTimestamp(tInterfaceId iface, const ipv6_address_t& dst, bool
 			        ->lookup(key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst}, value);
 			if (value)
 			{
-				value->last_update_timestamp = dataplane->get_current_time();
+				value->last_update_timestamp = current_time_provider_();
 				stats.hashtable_insert_success++;
 			}
 			else
@@ -746,7 +726,7 @@ void module::resolve(const dataplane::neighbor::key& key)
 	}
 	*((uint32_t*)&value.ether_address.addr_bytes[2]) = rte_hash_crc(key.address.bytes, 16, 0);
 	value.flags = 0;
-	value.last_update_timestamp = dataplane->get_current_time();
+	value.last_update_timestamp = current_time_provider_();
 
 	generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 		for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
