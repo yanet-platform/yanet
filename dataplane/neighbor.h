@@ -14,6 +14,7 @@
 #include "common/utils.h"
 
 #include "hashtable.h"
+#include "netlink.hpp"
 #include "type.h"
 
 namespace dataplane::neighbor
@@ -63,15 +64,13 @@ public:
 };
 
 //
-
 class module
 {
 	static constexpr auto PAUSE = 10ms;
+	std::unique_ptr<netlink::Interface> neighbor_provider;
 
 public:
 	module();
-
-public:
 	eResult init(
 	        const std::set<tSocketId>& socket_ids,
 	        uint64_t ht_size,
@@ -99,6 +98,7 @@ public:
 protected:
 	void StartResolveJob();
 	void StartNetlinkMonitor();
+	void StopNetlinkMonitor();
 	eResult DumpOSNeighbors();
 
 	void resolve(const dataplane::neighbor::key& key);
@@ -114,7 +114,6 @@ protected:
 	std::function<std::vector<dataplane::neighbor::key>()> keys_to_resolve_provider_;
 
 	utils::Job resolve_;
-	utils::Job monitor_;
 };
 
 }

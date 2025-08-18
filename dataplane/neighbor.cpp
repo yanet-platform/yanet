@@ -2,15 +2,15 @@
 #include <net/if.h>
 #include <netinet/ip_icmp.h>
 #include <netlink/netlink.h>
-#include <netlink/route/neighbour.h>
 #include <unistd.h>
 
-#include "neighbor.h"
 #include "base.h"
+#include "neighbor.h"
 
-using namespace dataplane::neighbor;
+namespace dataplane::neighbor
+{
 
-module::module()
+module::module() :neighbor_provider{new netlink::Provider{}}
 {
 	memset(&stats, 0, sizeof(stats));
 }
@@ -23,6 +23,7 @@ eResult module::init(
         std::function<void()> on_neighbor_flush,
         std::function<std::vector<dataplane::neighbor::key>()> keys_to_resolve)
 {
+	memset(&stats, 0, sizeof(stats));
 	current_time_provider_ = std::move(current_time);
 	on_neighbor_flush_handle_ = std::move(on_neighbor_flush);
 	keys_to_resolve_provider_ = std::move(keys_to_resolve);
@@ -243,308 +244,43 @@ eResult module::neighbor_flush()
 	return eResult::success;
 }
 
-namespace
-{
-
-struct Entry
-{
-	tInterfaceId iface;
-	ipv6_address_t dst;
-	std::optional<rte_ether_addr> mac;
-	bool is_v6;
-};
-
-struct ValidDumpMsgArg
-{
-	std::vector<Entry> dump;
-	const std::unordered_map<std::string, tInterfaceId>& ids;
-};
-
-std::variant<Entry, int> ParseNeighbor(rtnl_neigh* neigh, const std::unordered_map<std::string, tInterfaceId>& ids)
-{
-	int sysifid = rtnl_neigh_get_ifindex(neigh);
-	Entry entry;
-	char ifname[IFNAMSIZ];
-	if (if_indextoname(sysifid, ifname) == nullptr)
-	{
-		YANET_LOG_INFO("Skipping message for unknown OS interface '%i'\n", sysifid);
-		return NL_OK;
-	}
-	if (auto it = ids.find(ifname); it == ids.end())
-	{
-		YANET_LOG_INFO("Skipping message for unconfigured interface '%s'\n", ifname);
-		return NL_OK;
-	}
-	else
-	{
-		entry.iface = it->second;
-	}
-
-	nl_addr* oaddr = rtnl_neigh_get_dst(neigh);
-	if (!oaddr)
-	{
-		YANET_LOG_INFO("Skipping message with no destination address\n");
-		return NL_OK;
-	}
-	char buf[256];
-	char* dst = nl_addr2str(oaddr, buf, sizeof(buf));
-	if (!dst)
-	{
-		YANET_LOG_INFO("Failed to parse destination address\n");
-		return NL_OK;
-	}
-	switch (nl_addr_get_family(oaddr))
-	{
-		case AF_INET:
-		{
-			auto& ip = entry.dst;
-			std::fill(std::begin(ip.nap), std::end(ip.nap), 0);
-			ip.mapped_ipv4_address =
-			        ipv4_address_t{*static_cast<uint32_t*>(nl_addr_get_binary_addr(oaddr))};
-			entry.is_v6 = false;
-			break;
-		}
-		case AF_INET6:
-			entry.dst.SetBinary(static_cast<uint8_t*>(nl_addr_get_binary_addr(oaddr)));
-			entry.is_v6 = true;
-			break;
-		default:
-			YANET_LOG_INFO("Skipping message with unsupported address family\n");
-			return NL_OK;
-	}
-
-	nl_addr* omac = rtnl_neigh_get_lladdr(neigh);
-	if (omac)
-	{
-		char* cmac = nl_addr2str(omac, buf, sizeof(buf));
-		if (cmac)
-		{
-			auto mac = static_cast<uint8_t*>(nl_addr_get_binary_addr(omac));
-			entry.mac.emplace();
-			std::copy(mac, mac + RTE_ETHER_ADDR_LEN, entry.mac.value().addr_bytes);
-		}
-		else
-		{
-			YANET_LOG_INFO("Failed to parse MAC address from\n");
-		}
-	}
-
-	return entry;
-}
-
-int OnValidDumpMsg(nl_msg* msg, void* arg)
-{
-	auto& [dump, ids] = *static_cast<ValidDumpMsgArg*>(arg);
-
-	nlmsghdr* msghdr = nlmsg_hdr(msg);
-	if (msghdr->nlmsg_type != RTM_NEWNEIGH && msghdr->nlmsg_type != RTM_DELNEIGH)
-	{
-		YANET_LOG_INFO("Skipping message of type '%d'\n", msghdr->nlmsg_type);
-		return NL_OK;
-	}
-
-	rtnl_neigh* neigh;
-	if (rtnl_neigh_parse(nlmsg_hdr(msg), &neigh))
-	{
-		YANET_LOG_INFO("Failed to parse neighbor message\n");
-		return NL_OK;
-	}
-
-	const int state = rtnl_neigh_get_state(neigh);
-	if (state == NUD_NOARP)
-	{
-		return NL_OK;
-	}
-
-	auto var = ParseNeighbor(neigh, ids);
-	if (!std::holds_alternative<Entry>(var))
-	{
-		return std::get<int>(var);
-	}
-	auto& entry = std::get<Entry>(var);
-	if (!entry.mac)
-	{
-		YANET_LOG_INFO("Skipping message with no MAC address\n");
-		return NL_OK;
-	}
-	dump.emplace_back(std::move(entry));
-
-	return NL_OK;
-}
-
-struct ValidUpdateMsgArg
-{
-	module& mod;
-	generation_manager<dataplane::neighbor::generation_interface>& generation_interface;
-};
-
-int OnValidUpdateMsg(nl_msg* msg, void* arg)
-{
-	auto& [mod, generation_interface] = *static_cast<ValidUpdateMsgArg*>(arg);
-	nlmsghdr* msghdr = nlmsg_hdr(msg);
-	if (msghdr->nlmsg_type != RTM_NEWNEIGH && msghdr->nlmsg_type != RTM_DELNEIGH)
-	{
-		YANET_LOG_INFO("Skipping message of type '%d'\n", msghdr->nlmsg_type);
-		return NL_OK;
-	}
-	rtnl_neigh* neigh;
-	if (rtnl_neigh_parse(msghdr, &neigh))
-	{
-		YANET_LOG_INFO("Failed to parse neighbor message\n");
-		return NL_OK;
-	}
-	const int state = rtnl_neigh_get_state(neigh);
-	if (state == NUD_NOARP)
-	{
-		YANET_LOG_INFO("Skipping message with state NUD_NOARP\n");
-		return NL_OK;
-	}
-
-	std::variant<Entry, int> var;
-	{
-		auto guard = generation_interface.current_lock_guard();
-		auto ids = generation_interface.current().interface_name_to_id;
-		var = ParseNeighbor(neigh, ids);
-	}
-	if (!std::holds_alternative<Entry>(var))
-	{
-		return std::get<int>(var);
-	}
-	auto& entry = std::get<Entry>(var);
-
-	switch (msghdr->nlmsg_type)
-	{
-		case RTM_NEWNEIGH:
-			if (entry.mac)
-			{
-				mod.Upsert(entry.iface, entry.dst, entry.is_v6, entry.mac.value());
-			}
-			else
-			{
-				mod.UpdateTimestamp(entry.iface, entry.dst, entry.is_v6);
-			}
-			break;
-		case RTM_DELNEIGH:
-			mod.Remove(entry.iface, entry.dst, entry.is_v6);
-			break;
-	}
-	return NL_OK;
-}
-
-std::vector<Entry> GetHostDump(
-        const std::unordered_map<std::string, tInterfaceId>& ids)
-{
-	ValidDumpMsgArg arg{{}, ids};
-	rtgenmsg rt_hdr = {.rtgen_family = AF_UNSPEC};
-	nl_sock* sk = nl_socket_alloc();
-	if (!sk)
-	{
-		YANET_LOG_ERROR("Failed to allocate netlink socket\n");
-		return {};
-	}
-#if AUTOTEST
-	// set fd
-	// set proto
-#else
-	if (auto err = nl_connect(sk, NETLINK_ROUTE); err < 0)
-	{
-		YANET_LOG_ERROR("Failed to connect to netlink socket '%s'\n", nl_geterror(err));
-		goto cleanup;
-	}
-#endif
-	if (nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM, &OnValidDumpMsg, &arg))
-	{
-		YANET_LOG_ERROR("Failed to set netlink callback\n");
-		goto cleanup;
-	}
-	// if (nl_socket_modify_cb(sk, NL_CB_FINISH, NL_CB_CUSTOM, &OnDone, nullptr))
-	// {
-	// 	YANET_LOG_ERROR("Failed to set netlink callback\n");
-	// 	goto cleanup;
-	// }
-	if (nl_send_simple(sk, RTM_GETNEIGH, NLM_F_DUMP, &rt_hdr, sizeof(rt_hdr)) < 0)
-	{
-		YANET_LOG_ERROR("Failed to send netlink request\n");
-		goto cleanup;
-	}
-	if (int err = nl_recvmsgs_default(sk); err < 0)
-	{
-		YANET_LOG_ERROR("Failed to receive netlink messages %s\n", nl_geterror(err));
-	}
-cleanup:
-	nl_socket_free(sk);
-	return arg.dump;
-}
-
-} // namespace
-
 void module::StartNetlinkMonitor()
 {
-	ValidUpdateMsgArg* arg;
-	{
-		auto interfaces_guard = generation_interface.current_lock_guard();
-		arg = new ValidUpdateMsgArg{*this, generation_interface};
-	}
-	nl_sock* sk = nl_socket_alloc();
-	if (!sk)
-	{
-		YANET_LOG_ERROR("Failed to allocate netlink socket\n");
-		return;
-	}
-	if (auto err = nl_connect(sk, NETLINK_ROUTE); err < 0)
-	{
-		YANET_LOG_ERROR("Failed to connect to netlink socket '%s'\n", nl_geterror(err));
-		nl_socket_free(sk);
-		return;
-	}
-	if (nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM, &OnValidUpdateMsg, arg))
-	{
-		YANET_LOG_ERROR("Failed to set netlink callback\n");
-		nl_socket_free(sk);
-		return;
-	}
-	nl_socket_disable_seq_check(sk);
-	if (nl_socket_add_membership(sk, RTNLGRP_NEIGH))
-	{
-		YANET_LOG_ERROR("Failed to subscribe to neighbor updates\n");
-		nl_socket_free(sk);
-		return;
-	}
-	int fd = nl_socket_get_fd(sk);
-	timeval tv = {.tv_sec = 0, .tv_usec = 100000};
-	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)))
-	{
-		YANET_LOG_ERROR("Failed to set socket timeout (%s)\n", strerror(errno));
-	}
-	monitor_.Run([this, sk]() {
-		int err;
-		if ((err = nl_recvmsgs_default(sk)) < 0)
-		{
-			switch (errno)
-			{
-				case ENOBUFS:
-					YANET_LOG_ERROR("Lost events because of ENOBUFS\n");
-					break;
-				case EAGAIN:
-				case EINTR:
-					break;
-				default:
-					YANET_LOG_ERROR("Failed to receive: %s", nl_geterror(err));
-					return false;
-			}
-		}
-		return true;
-	});
+	neighbor_provider->StartMonitor(
+	        [this](const char* ifname) -> std::optional<tInterfaceId> {
+		        auto interfaces_guard = generation_interface.current_lock_guard();
+		        auto ids = generation_interface.current().interface_name_to_id;
+		        if (auto it = ids.find(ifname); it != ids.end())
+		        {
+			        return it->second;
+		        }
+		        else
+		        {
+			        return std::nullopt;
+		        }
+	        },
+	        [this](auto... args) { return Upsert(args...); },
+	        [this](auto... args) { return Remove(args...); },
+	        [this](auto... args) { return UpdateTimestamp(args...); });
 	YANET_LOG_ERROR("Netlink monitor started\n");
+	return;
+}
+
+void module::StopNetlinkMonitor()
+{
+	neighbor_provider->StopMonitor();
+	YANET_LOG_ERROR("Netlink monitor stopped\n");
 	return;
 }
 
 eResult module::DumpOSNeighbors()
 {
+	using Entry = std::tuple<tInterfaceId, ipv6_address_t, std::optional<rte_ether_addr>, bool>;
+
 	std::vector<Entry> dump;
 	{
 		auto interfaces_guard = generation_interface.current_lock_guard();
-		dump = GetHostDump(generation_interface.current().interface_name_to_id);
+		dump = neighbor_provider->GetHostDump(generation_interface.current().interface_name_to_id);
 	}
 
 	eResult res = generation_hashtable.update(
@@ -590,8 +326,7 @@ eResult module::neighbor_update_interfaces(const common::idp::neighbor_update_in
 
 	generation_interface.switch_generation();
 	generation_interface.next_unlock();
-	monitor_.Stop();
-	YANET_LOG_INFO("Netlink monitor stopped\n");
+	StopNetlinkMonitor();
 	DumpOSNeighbors();
 	StartNetlinkMonitor();
 	return eResult::success;
@@ -817,3 +552,5 @@ void module::resolve(const dataplane::neighbor::key& key)
 	close(icmp_socket);
 #endif // CONFIG_YADECAP_AUTOTEST
 }
+
+} // namespace dataplane::neighbor
