@@ -113,7 +113,7 @@ protected:
 
 public:
 	void StartInterfaces();
-	bool WorkersStarted() {return workers_started_.load(std::memory_order_acquire);}
+	bool WorkersStarted() { return workers_started_.load(std::memory_order_acquire); }
 
 protected:
 	eResult init_kernel_interfaces();
