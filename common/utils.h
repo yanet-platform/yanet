@@ -121,7 +121,8 @@ class Job
 	std::thread thread_;
 
 public:
-	Job() : run_{false} {}
+	Job() :
+	        run_{false} {}
 
 	template<typename Task, typename... Args>
 	Job(Task&& task, Args&&... args) :
