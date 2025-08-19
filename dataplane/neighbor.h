@@ -67,10 +67,11 @@ public:
 class module
 {
 	static constexpr auto PAUSE = 10ms;
-	std::unique_ptr<netlink::Interface> neighbor_provider;
+	netlink::Interface* neighbor_provider;
 
 public:
 	module();
+	module(netlink::Interface* neigh_prov);
 	eResult init(
 	        const std::set<tSocketId>& socket_ids,
 	        uint64_t ht_size,

@@ -15,6 +15,11 @@ module::module() :neighbor_provider{new netlink::Provider{}}
 	memset(&stats, 0, sizeof(stats));
 }
 
+module::module(netlink::Interface* neigh_prov) :neighbor_provider{neigh_prov}
+{
+	memset(&stats, 0, sizeof(stats));
+}
+
 eResult module::init(
         const std::set<tSocketId>& socket_ids,
         uint64_t ht_size,
@@ -262,14 +267,14 @@ void module::StartNetlinkMonitor()
 	        [this](auto... args) { return Upsert(args...); },
 	        [this](auto... args) { return Remove(args...); },
 	        [this](auto... args) { return UpdateTimestamp(args...); });
-	YANET_LOG_ERROR("Netlink monitor started\n");
+	YANET_LOG_INFO("Netlink monitor started\n");
 	return;
 }
 
 void module::StopNetlinkMonitor()
 {
 	neighbor_provider->StopMonitor();
-	YANET_LOG_ERROR("Netlink monitor stopped\n");
+	YANET_LOG_INFO("Netlink monitor stopped\n");
 	return;
 }
 
