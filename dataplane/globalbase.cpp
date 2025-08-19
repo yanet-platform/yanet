@@ -856,7 +856,7 @@ static bool checkFlow(const common::globalBase::tFlow& flow)
 			 flow.type == common::globalBase::eFlowType::proxy_server_ack ||
 			 flow.type == common::globalBase::eFlowType::proxy_client_icmp)
 	{
-		if (flow.data.proxy_service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+		if (flow.data.proxy_service_id > YANET_CONFIG_PROXY_SERVICES_SIZE)
 		{
 			return false;
 		}
@@ -2627,9 +2627,15 @@ eResult generation::update_host_config(const common::idp::updateGlobalBase::upda
 eResult generation::proxy_service_update(const common::idp::updateGlobalBase::proxy_service_update::request& request)
 {
 	const auto [counter_id, service_info] = request;
-	// YANET_LOG_WARNING("proxy_service_update: service_id=%d, first=%d\n", service_info.service_id, dataPlane->first_state_update_global_base);
+	// YANET_LOG_WARNING("proxy_service_update: service_id=%d[%d] on socket %d, first=%d\n", service_info.service_id, service_info.socket_id, socketId, dataPlane->first_state_update_global_base);
 
-    if (service_info.service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+	if (socketId != service_info.socket_id)
+	{
+		// another numa node
+		return eResult::success;
+	}
+
+    if (service_info.service_id > YANET_CONFIG_PROXY_SERVICES_SIZE)
 	{
 		YADECAP_LOG_ERROR("invalid proxy_service_id: '%u'\n", service_info.service_id);
 		return eResult::invalidId;
@@ -2645,20 +2651,25 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	proxy_enabled = 1;
 	proxy_flow = service_info.flow;
 
-	if (!service.config.ReadConfig(service_info, socketId, counter_id))
+	if (!service.config.ReadConfig(service_info, counter_id))
 	{
 		return eResult::invalidId;
 	}
 
-	return dataPlane->tcp_connection_store.ServiceUpdateOnSocket(socketId, service, dataPlane->first_state_update_global_base, &dataPlane->memory_manager);
+	return dataPlane->tcp_connection_store.ServiceUpdateOnSocket(service, dataPlane->first_state_update_global_base, &dataPlane->memory_manager);
 }
 
 eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::proxy_service_remove::request& request)
 {
-	auto [service_id] = request;
-	// YANET_LOG_WARNING("proxy_service_remove: service_id=%d\n", service_id);
+	auto [socket_id, service_id] = request;
+	// YANET_LOG_WARNING("proxy_service_remove: service_id=%d[%d] on socket %d\n", service_id, socket_id, socketId);
+	if (socketId != socket_id)
+	{
+		// another numa node
+		return eResult::success;
+	}
 
-	if (service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+	if (service_id > YANET_CONFIG_PROXY_SERVICES_SIZE)
 	{
 		YADECAP_LOG_ERROR("invalid proxy_service_id: '%u'\n", service_id);
 		return eResult::invalidId;
@@ -2668,7 +2679,7 @@ eResult generation::proxy_service_remove(const common::idp::updateGlobalBase::pr
 
 	if (!dataPlane->first_state_update_global_base)
 	{
-		dataPlane->tcp_connection_store.ServiceRemoveOnSocket(socketId, service, dataPlane->first_state_update_global_base, &dataPlane->memory_manager);
+		dataPlane->tcp_connection_store.ServiceRemoveOnSocket(service, dataPlane->first_state_update_global_base, &dataPlane->memory_manager);
 	}
 
 	return eResult::success;

@@ -39,6 +39,66 @@ private:
 	std::unordered_map<std::string, std::optional<tVrfId>> vrf_ids;
 };
 
+template <typename IdType, typename Key>
+class IdAllocator
+{
+public:
+	IdAllocator(IdType first, IdType last)
+	{
+		for (IdType index = first; index <= last; index++)
+		{
+			free_ids_.push(index);
+		}
+	}
+
+	std::optional<IdType> GetId(const Key& key)
+	{
+		used_keys_.insert(key);
+		auto iter = values_.find(key);
+		if (iter != values_.end())
+		{
+			return iter->second;
+		}
+		else if (free_ids_.empty())
+		{
+			return std::nullopt;
+		}
+
+		IdType result = free_ids_.front();
+		free_ids_.pop();
+		values_[key] = result;
+		return result;
+	}
+
+	void ClearUsedKeys()
+	{
+		used_keys_.clear();
+	}
+
+	void RemoveUnusedKeys()
+	{
+		std::vector<std::pair<Key, IdType>> keys_to_del;
+		for (const auto& [key, id] : values_)
+		{
+			if (used_keys_.find(key) == used_keys_.end())
+			{
+				keys_to_del.push_back({key, id});
+			}
+		}
+
+		for (const auto& [key, id] : keys_to_del)
+		{
+			free_ids_.push(id);
+			values_.erase(key);
+		}
+	}
+
+private:
+	std::queue<IdType> free_ids_;
+	std::map<Key, IdType> values_;
+	std::set<Key> used_keys_;
+};
+
 class cControlPlane
 {
 public:
@@ -204,6 +264,7 @@ protected:
 	uint64_t loadConfig_done = 0;
 	uint64_t loadConfig_failed = 0;
 	bool loadConfigStatus = false; // true - last load was ok
+	IdAllocator<proxy_service_id_t, controlplane::proxy::service_t::key_t> proxy_services_ids{1, YANET_CONFIG_PROXY_SERVICES_SIZE};
 
 private:
 	/// used only in loadConfig()

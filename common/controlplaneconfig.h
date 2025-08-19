@@ -355,13 +355,14 @@ class service_t
 public:
 	service_t() = default;
 
-	SERIALIZABLE(service_id, service, proxy_addr, proxy_port, proto, upstream_addr, upstream_port, size_connections_table, 
+	SERIALIZABLE(service_id, socket_id, service, proxy_addr, proxy_port, proto, upstream_addr, upstream_port, size_connections_table, 
 		size_syn_table, flow, upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts);
 
 	using key_t = std::tuple<common::ip_address_t, tPortId, uint8_t>;
 
 public:
 	proxy_service_id_t service_id;
+	tSocketId socket_id;
 	std::string service;
 	
 	// key: proxy address, port and protocol
@@ -406,15 +407,18 @@ public:
 	}
 };
 
+using proxy_services = std::map<service_t::key_t, service_t>;
+
 class config_t
 {
 public:
 	config_t() = default;
 
-	SERIALIZABLE(services, size_connections_table, size_syn_table, nextModule, flow, upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts);
+	SERIALIZABLE(services, socket_id, size_connections_table, size_syn_table, nextModule, flow, upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts);
 
 public:
-	std::map<service_t::key_t, service_t> services;
+	proxy_services services;
+	tSocketId socket_id;
 
 	// sizes of tables
 	uint32_t size_connections_table;

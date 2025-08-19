@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "controlplane.h"
 #include "errors.h"
 #include "proxy.h"
@@ -33,42 +35,95 @@ void proxy_t::reload_before()
 	generations_config.next_lock();
 }
 
+std::set<proxy_service_id_t> GetAllProxyServicesId(const controlplane::base_t& base)
+{
+    std::set<proxy_service_id_t> ids;
+    for (const auto& iter_proxy : base.proxies)
+    {
+        for (const auto& iter_service : iter_proxy.second.services)
+        {
+            ids.insert(iter_service.second.service_id);
+        }
+    }
+    return ids;
+}
+
+std::set<tSocketId> GetSockets(const controlplane::base_t& base)
+{
+    std::set<proxy_service_id_t> sockets;
+    for (const auto& iter_proxy : base.proxies)
+    {
+        sockets.insert(iter_proxy.second.socket_id);
+    }
+    return sockets;
+}
+
+const controlplane::proxy::proxy_services& FindServicesOnSocket(const controlplane::base_t& base, tSocketId socket_id, const controlplane::proxy::proxy_services& default_result)
+{
+    for (const auto& [module, proxy] : base.proxies)
+    {
+        GCC_BUG_UNUSED(module);
+        if (proxy.socket_id == socket_id)
+        {
+            return proxy.services;
+        }
+    }
+    return default_result;
+}
+
 void proxy_t::reload(const controlplane::base_t& base_prev,
                      const controlplane::base_t& base_next,
                      common::idp::updateGlobalBase::request& globalbase)
 {
 	generations_config.next().update(base_prev, base_next);
 
-    std::map<controlplane::proxy::service_t::key_t, controlplane::proxy::service_t> empty;
-    auto& services_prev = (base_prev.proxies.empty() ? empty : base_prev.proxies.begin()->second.services);
-    auto& services_next = (base_next.proxies.empty() ? empty : base_next.proxies.begin()->second.services);
+	// get id's new services and removed
+	std::set<proxy_service_id_t> ids_prev = GetAllProxyServicesId(base_prev);
+	std::set<proxy_service_id_t> ids_next = GetAllProxyServicesId(base_next);
+	std::vector<proxy_service_id_t> ids_remove, ids_insert;
+	std::set_difference(ids_prev.begin(), ids_prev.end(), ids_next.begin(), ids_next.end(), std::back_inserter(ids_remove));
+	std::set_difference(ids_next.begin(), ids_next.end(), ids_prev.begin(), ids_prev.end(), std::back_inserter(ids_insert));
 
-    for (const auto& iter_prev : services_prev)
-    {
-        if (services_next.find(iter_prev.first) == services_next.end())
-        {
-            // service removed
-            proxy_service_id_t service_id = iter_prev.second.service_id;
-            service_counters.remove(service_id);
-            globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_service_remove,
-	                    common::idp::updateGlobalBase::proxy_service_remove::request{service_id});
-        }
-    }
+	// update counters
+	for (proxy_service_id_t service_id : ids_remove)
+	{
+		service_counters.remove(service_id);
+	}
+	for (proxy_service_id_t service_id : ids_insert)
+	{
+		service_counters.insert(service_id);
+	}
+	service_counters.allocate();
 
-    for (auto& iter_next : services_next)
-    {
-        const controlplane::proxy::service_t& service = iter_next.second;
-        const auto iter_prev = services_prev.find(iter_next.first);
-        if (iter_prev == services_prev.end())
-        {
-            // new service
-            service_counters.insert(service.service_id);
-        }
-        AddRequestUpdateService(globalbase, service);
-    }
+	// for each socket prepare requests
+	std::set<tSocketId> sockets_all = GetSockets(base_prev);
+	std::set<tSocketId> sockets_next = GetSockets(base_next);
+	sockets_all.insert(sockets_next.begin(), sockets_next.end());
+	controlplane::proxy::proxy_services empty;
+	for (tSocketId socket_id : sockets_all)
+	{
+		const auto& services_prev = FindServicesOnSocket(base_prev, socket_id, empty);
+		const auto& services_next = FindServicesOnSocket(base_next, socket_id, empty);
 
-    service_counters.allocate();
-	compile(globalbase, generations_config.next());
+		for (const auto& iter_prev : services_prev)
+		{
+			if (services_next.find(iter_prev.first) == services_next.end())
+			{
+				// service removed
+				proxy_service_id_t service_id = iter_prev.second.service_id;
+				globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_service_remove,
+				                        common::idp::updateGlobalBase::proxy_service_remove::request{socket_id, service_id});
+			}
+		}
+
+		for (auto& iter_next : services_next)
+		{
+			const controlplane::proxy::service_t& service = iter_next.second;
+			tCounterId counter_id = service_counters.get_id(service.service_id);
+			globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_service_update,
+			                        common::idp::updateGlobalBase::proxy_service_update::request{counter_id, service});
+		}
+	}
 }
 
 void proxy_t::reload_after()
@@ -76,26 +131,7 @@ void proxy_t::reload_after()
     service_counters.release();
 	generations_config.switch_generation();
 	generations_config.next_unlock();
-}
-
-void proxy_t::compile(common::idp::updateGlobalBase::request& globalbase,
-                      proxy::generation_config_t& generation_config)
-{
-    for (auto& [requestType, request] : globalbase)
-    {
-        if (requestType == common::idp::updateGlobalBase::requestType::proxy_service_update)
-        {
-            auto& request_update = std::get<common::idp::updateGlobalBase::proxy_service_update::request>(request);
-            auto& [counter_id, service] = request_update;
-            counter_id = service_counters.get_id(service.service_id);
-        }
-    }
-}
-
-void proxy_t::AddRequestUpdateService(common::idp::updateGlobalBase::request& globalbase, const controlplane::proxy::service_t& service)
-{
-	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::proxy_service_update,
-	                        common::idp::updateGlobalBase::proxy_service_update::request{0, service});
+    controlPlane->proxy_services_ids.RemoveUnusedKeys();
 }
 
 void proxy_t::counters_gc_thread()
@@ -118,6 +154,7 @@ common::icp::proxy_counters::response proxy_t::proxy_counters() const
 
 	const auto counters = service_counters.get_counters();
     constexpr size_t num_counters = static_cast<size_t>(proxy::service_counter::size);
+    std::set<proxy_service_id_t> used_id;
 
 	for (auto& [module, config] : config_proxies)
 	{
@@ -125,6 +162,12 @@ common::icp::proxy_counters::response proxy_t::proxy_counters() const
 		{
             const controlplane::proxy::service_t& service = iter_service.second;
             proxy_service_id_t service_id = service.service_id;
+            if (used_id.find(service_id) != used_id.end())
+            {
+                continue;
+            }
+            used_id.insert(service_id);
+
             std::string service_name = service.service;
             std::array<uint64_t, num_counters> counts;
 
@@ -203,7 +246,7 @@ common::icp::proxy_tables::response proxy_t::proxy_tables(const common::icp::pro
     std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
     generations_config.current_unlock();
 
-    std::vector<std::pair<proxy_service_id_t, std::string>> services;
+    common::idp::proxy_tables::request services;
     for (auto& [module, config] : config_proxies)
     {
         for (const auto& iter_service : config.services)
@@ -213,12 +256,12 @@ common::icp::proxy_tables::response proxy_t::proxy_tables(const common::icp::pro
             {
                 if (service.service.find(*service_name) != std::string::npos)
                 {
-                    services.emplace_back(service.service_id, service.service);
+                    services.emplace_back(service.service_id, service.socket_id, service.service);
                 }
             }
             else
             {
-                services.emplace_back(service.service_id, service.service);
+                services.emplace_back(service.service_id, service.socket_id, service.service);
             }
         }
     }

@@ -51,7 +51,6 @@ protected:
 	interface::dataPlane dataplane;
 	generation_manager<proxy::generation_config_t> generations_config;
 
-    void AddRequestUpdateService(common::idp::updateGlobalBase::request& globalbase, const controlplane::proxy::service_t& service);
     void counters_gc_thread();
     common::icp::proxy_counters::response proxy_counters() const;
 	common::icp::proxy_connections::response proxy_connections(const common::icp::proxy_connections::request& request) const;

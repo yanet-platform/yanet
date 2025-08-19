@@ -734,10 +734,13 @@ void config_converter_t::processBalancer()
 	
 void config_converter_t::processProxy()
 {
-	if (baseNext.proxies.size() > 1)
+	if (baseNext.proxies.size() > YANET_CONFIG_PROXIES_SIZE)
 	{
-		throw error_result_t(eResult::invalidProxyId, "No more than one proxy module is allowed");
+		throw error_result_t(eResult::invalidProxyId, "Too many proxy modules > " + std::to_string(YANET_CONFIG_PROXIES_SIZE));
 	}
+
+	controlplane_ptr->proxy_services_ids.ClearUsedKeys();
+	std::vector<common::ipv4_prefix_t> all_upstream_nets;
 
 	for (auto& [moduleName, proxy] : baseNext.proxies)
 	{
@@ -756,6 +759,7 @@ void config_converter_t::processProxy()
 
 		if (!proxy.services.empty())
 		{
+			all_upstream_nets.insert(all_upstream_nets.end(), proxy.upstream_nets.begin(), proxy.upstream_nets.end());
 			// check upstrem nets
 			for (const auto& net : proxy.upstream_nets)
 			{
@@ -763,81 +767,37 @@ void config_converter_t::processProxy()
 				{
 					throw error_result_t(eResult::invalidFlow, "empty local pool for proxy in upstream_nets");
 				}
-			}
-			for (size_t first = 0; first < proxy.upstream_nets.size(); first++)
-			{
-				for (size_t second = first + 1; second < proxy.upstream_nets.size(); second++)
-				{
-					const auto& net_first = proxy.upstream_nets[first];
-					const auto& net_second = proxy.upstream_nets[second];
-					if (net_first.subnetOf(net_second) || net_second.subnetOf(net_first))
-					{
-						throw error_result_t(eResult::invalidFlow, "disjoint prefixes in upstream_nets: " + net_first.toString() + " and " + net_second.toString());
-					}
-				}
-			}
+			}			
 		}
 
-		for (auto& iter_service : proxy.services)
+		for (auto& [service_key, service] : proxy.services)
 		{
-			controlplane::proxy::service_t& service = iter_service.second;
-			if (service.service_id >= YANET_CONFIG_PROXY_SERVICES_SIZE)
-			{
-				throw error_result_t(eResult::invalidConfigurationFile, "too many services");
-			}
 			service.flow = proxy.flow;
-		}
-	}
 
-	// get service_id from old proxy services
-	std::set<proxy_service_id_t> used_service_ids;
-	std::map<controlplane::proxy::service_t::key_t, proxy_service_id_t> old_services_ids;
-	for (const auto& iter_proxy : controlplane_ptr->base.proxies)
-	{
-		for (const auto& [service_key, service] : iter_proxy.second.services)
-		{
-			GCC_BUG_UNUSED(service_key);
-			used_service_ids.insert(service.service_id);
-			old_services_ids[service.Key()] = service.service_id;
-		}
-	}
-
-	// set service_id for proxy services
-	proxy_service_id_t id_for_new = 1;
-	for (auto& iter_proxy : baseNext.proxies)
-	{
-		for (auto& [service_key, service] : iter_proxy.second.services)
-		{
-			auto iter_base = old_services_ids.find(service_key);
-			if (iter_base != old_services_ids.end())
+			// set service_id for proxy services
+			std::optional<proxy_service_id_t> service_id = controlplane_ptr->proxy_services_ids.GetId(service_key);
+			if (!service_id.has_value())
 			{
-				service.service_id = iter_base->second;
+				throw error_result_t(eResult::invalidConfigurationFile, "can't get free id for proxy service");
 			}
-			else
-			{
-				bool found = false;
-				while (id_for_new < YANET_CONFIG_PROXY_SERVICES_SIZE)
-				{
-					if (used_service_ids.find(id_for_new) != used_service_ids.end())
-					{
-						id_for_new++;
-						continue;
-					}
-					service.service_id = id_for_new;
-					used_service_ids.insert(id_for_new);
-					found = true;
-					break;
-				}
-				if (!found)
-				{
-					throw error_result_t(eResult::invalidConfigurationFile, "can't get free id for proxy service");
-				}
+			service.service_id = *service_id;
+			service.socket_id = proxy.socket_id;
+		}
+	}
 
+	// check that all prefixes disjoints
+	for (size_t first = 0; first < all_upstream_nets.size(); first++)
+	{
+		for (size_t second = first + 1; second < all_upstream_nets.size(); second++)
+		{
+			const auto& net_first = all_upstream_nets[first];
+			const auto& net_second = all_upstream_nets[second];
+			if (net_first.subnetOf(net_second) || net_second.subnetOf(net_first))
+			{
+				throw error_result_t(eResult::invalidFlow, "disjoint prefixes in upstream_nets: " + net_first.toString() + " and " + net_second.toString());
 			}
 		}
 	}
-
-	/// continue in proxy::compile()
 }
 
 void config_converter_t::processDregress()

@@ -318,7 +318,8 @@ using request = std::tuple<
 
 namespace proxy_service_remove
 {
-using request = std::tuple<proxy_id_t>;
+using request = std::tuple<tSocketId,
+                           proxy_id_t>;
 }
 
 namespace proxy_service_update
@@ -562,7 +563,6 @@ using requestVariant = std::variant<std::tuple<>,
                                     tun64mappings_update::request,
                                     update_balancer::request,
                                     update_balancer_services::request,
-                                    proxy_service_remove::request,
                                     proxy_service_update::request,
                                     route_tunnel_weight_update::request,
                                     acl_network_ipv4_source::request, /// + acl_network_ipv4_destination, acl_network_ipv6_source, acl_network_ipv6_destination
@@ -849,7 +849,9 @@ using response = std::vector<connection>;
 
 namespace proxy_tables
 {
-using request = std::vector<std::pair<proxy_service_id_t, std::string>>;
+using request = std::vector<std::tuple<proxy_service_id_t, ///< service id
+                                       tSocketId, ///< socket id
+                                       std::string>>; ///< service name
 
 using tables = std::tuple<proxy_service_id_t, ///< proxy_service_id
                           std::string, ///< service_name

@@ -170,8 +170,8 @@ data_type4 = [
 	# 	test_004.ToClient((1 + len(data_server1)*3, 1 + len(data_client1)), 'A', raw=data_server1)
 	# ),
 	( # Duplicate Ack Packet#1, SAck Packet#5 and Packet#3
-		test_004.FromClient((1 + len(data_client1), 1 + len(data_server1)), 'A', options=[("SAck", (SYN_COOKIE3 + 1 + len(data_server1)*4, SYN_COOKIE3 + 1 + len(data_server1)*5)), ("SAck",(SYN_COOKIE3 + 1 + len(data_server1)*2, SYN_COOKIE3 + 1 + len(data_server1)*3))], raw=data_client2),
-		test_004.ToServer((1 + len(data_client1), 1 + len(data_server1)), 'A', options=[("SAck", (ProxyTest.START_SERVER_SEQ + 1 + len(data_server1)*4, ProxyTest.START_SERVER_SEQ + 1 + len(data_server1)*5)), ("SAck", (ProxyTest.START_SERVER_SEQ + 1 + len(data_server1)*2 , ProxyTest.START_SERVER_SEQ + 1 + len(data_server1)*3))], raw=data_client2)
+		test_004.FromClient((1 + len(data_client1), 1 + len(data_server1)), 'A', options=[("SAck", tuple([SYN_COOKIE3 + 1 + len(data_server1)*i for i in range(4, 12)]))], raw=data_client2),
+		test_004.ToServer((1 + len(data_client1), 1 + len(data_server1)), 'A', options=[("SAck", tuple([ProxyTest.START_SERVER_SEQ + 1 + len(data_server1)*i for i in range(4, 12)]))], raw=data_client2)
 	),
 ]
 

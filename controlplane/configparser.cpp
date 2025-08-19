@@ -203,6 +203,8 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 		throw error_result_t(eResult::invalidConfigurationFile, "invalid configuration file: socket_interfaces");
 	}
 
+	loadConfig_proxy_fill_sockets(baseNext);
+
 	return baseNext;
 }
 
@@ -1189,6 +1191,10 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 	CheckRequiredParameters(moduleJson, required_parameters);
 
 	auto& proxy = baseNext.proxies[moduleId];
+	if (baseNext.proxies.size() > YANET_CONFIG_PROXIES_SIZE)
+	{
+		throw error_result_t(eResult::invalidConfigurationFile, "too many different proxy modules");
+	}
 
 	// sizes of tables
 	proxy.size_connections_table = moduleJson.value("sizeConnectionsTable", 0);
@@ -1206,6 +1212,10 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 		{
 			proxy.upstream_nets.push_back(common::ipv4_prefix_t(upstream_net));
 		}
+		if (proxy.upstream_nets.empty())
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "empty list of upstream nets for proxy module");
+		}
 	}
 	LoadBlackList(moduleJson, rootFilePath, proxy.blacklist);
 	proxy.send_proxy_header = moduleJson.value("proxyHeader", YANET_PROXY_DEFAULT_USE_PROXY_HEADER);
@@ -1214,22 +1224,10 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 	loadConfig_proxy_timeouts(moduleJson, proxy.timeouts, controlplane::proxy::timeouts_t());
 	proxy.debug_flags = moduleJson.value("debugFlags", 0);
 
-	loadConfig_proxy_services(baseNext,
-								proxy,
-								moduleJson["services"],
-								rootFilePath,
-								jsons);
-}
 
-void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
-                                                controlplane::proxy::config_t& proxy,
-                                                const nlohmann::json& json,
-                                                const std::string& rootFilePath,
-                                                const std::map<std::string, nlohmann::json>& jsons)
-{
-	if (json.is_string())
+	if (moduleJson["services"].is_string())
 	{
-		std::string includePath = json;
+		std::string includePath = moduleJson["services"];
 
 		if (includePath.find("/") != 0) ///< relative path
 		{
@@ -1266,24 +1264,31 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 				                          jsons);
 			}
 		}
-
-		return;
 	}
+	else
+	{
+		loadConfig_proxy_services(baseNext,
+									proxy,
+									moduleJson["services"],
+									rootFilePath,
+									jsons);
+	}
+}
 
+void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
+                                                controlplane::proxy::config_t& proxy,
+                                                const nlohmann::json& json,
+                                                const std::string& rootFilePath,
+                                                const std::map<std::string, nlohmann::json>& jsons)
+{
 	std::set<controlplane::proxy::service_t::key_t> upstreams;
 	for (const auto& service_json : json)
 	{
-		if (baseNext.services_count >= YANET_CONFIG_BALANCER_SERVICES_SIZE)
-		{
-			throw error_result_t(eResult::invalidConfigurationFile, "too many services");
-		}
-
 		std::vector<std::string> required_parameters = {"proxyAddress", "proxyPort", "proto", "service", "upstreamAddress", "upstreamPort"};
 		CheckRequiredParameters(service_json, required_parameters);
 
 		controlplane::proxy::service_t service;
 
-		service.service_id = baseNext.proxy_services_count + 1;
 		service.service = service_json["service"];
 
 		// key: proxy address, port and protocol
@@ -2217,5 +2222,72 @@ void config_parser_t::loadConfig_host(controlplane::base::host_t& host_config, c
 	if (exist(json, "showRealAddress"))
 	{
 		host_config.show_real_address = json["showRealAddress"].get<bool>();
+	}
+}
+
+void config_parser_t::loadConfig_proxy_fill_sockets(controlplane::base_t& baseNext)
+{
+	if (baseNext.proxy_services_count == 0)
+	{
+		return;
+	}
+
+	// get socket id's for all acl modules
+	const auto& [dataplane_physicalports, dataplane_workers, dataplane_values] = dataPlaneConfig;
+	GCC_BUG_UNUSED(dataplane_workers);
+	GCC_BUG_UNUSED(dataplane_values);
+
+	std::map<std::string, std::set<tSocketId>> socketByAcl;
+	for (const auto& [moduleId, logicalPort] : baseNext.logicalPorts)
+	{
+		GCC_BUG_UNUSED(moduleId);
+		auto iter = dataplane_physicalports.find(logicalPort.physicalPortId);
+		if (iter == dataplane_physicalports.end())
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "invalid configuration file: not found physical port for logical port");
+		}
+		const auto& [physicalport_name, socket_id, mac_address, pci] = iter->second;
+		GCC_BUG_UNUSED(physicalport_name);
+		GCC_BUG_UNUSED(mac_address);
+		GCC_BUG_UNUSED(pci);
+		socketByAcl[logicalPort.nextModule].insert(socket_id);
+	}
+
+	// get socket id's for all next modules for acl modules
+	std::map<std::string, std::set<tSocketId>> socketNextAcl;
+	for (const auto& [moduleId, acl_config] : baseNext.acls)
+	{
+		GCC_BUG_UNUSED(moduleId);
+		for (const std::string& nextModule : acl_config.nextModules)
+		{
+			auto iter = socketByAcl.find(moduleId);
+			if (iter != socketByAcl.end())
+			{
+				socketNextAcl[nextModule.c_str()].insert(iter->second.begin(), iter->second.end());
+			}
+		}
+	}
+
+	// fill socket id for all proxy modules
+	std::map<tSocketId, std::string> proxy_modules_by_sockets;
+	for (auto& [moduleId, proxy] : baseNext.proxies)
+	{
+		auto iter = socketNextAcl.find(moduleId);
+		if (iter == socketNextAcl.end())
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "Not found in acl next modules proxy moule: " + moduleId);
+		}
+		else if (iter->second.size() != 1)
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "For proxy module: " + moduleId + " number of sockets: " + std::to_string(iter->second.size()));
+		}
+		proxy.socket_id = *iter->second.begin();
+		YANET_LOG_INFO("proxy module %s load on socket: %d\n", moduleId.c_str(), proxy.socket_id);
+		auto iter_proxy = proxy_modules_by_sockets.find(proxy.socket_id);
+		if (iter_proxy != proxy_modules_by_sockets.end())
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "Two proxy modules: " + iter_proxy->second + ", " + moduleId + " on socket: " + std::to_string(proxy.socket_id));
+		}
+		proxy_modules_by_sockets[proxy.socket_id] = moduleId;
 	}
 }

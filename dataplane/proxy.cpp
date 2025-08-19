@@ -112,16 +112,24 @@ bool TcpOptions::ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header)
         }
         case TCP_OPTION_KIND_SACK:
         {
-            if (sack_count < TCP_OPTIONS_MAX_SACK_COUNT)
+            uint32_t cur_sack_count = (options[index_read + 1] >> 3);
+            if (options[index_read + 1] != 8 * cur_sack_count + 2)
             {
-                if (!CheckSize(index_read, len, options, TCP_OPTION_SACK_LEN)) {
-                    return false;
-                }
-                sack_start[sack_count] = rte_be_to_cpu_32(*((uint32_t*)(options + index_read + 2)));
-                sack_finish[sack_count] = rte_be_to_cpu_32(*((uint32_t*)(options + index_read + 6)));
-                sack_count++;
+                return false;
             }
-            index_read += TCP_OPTION_SACK_LEN;
+            uint32_t index = 0;
+            while (index < cur_sack_count && sack_count < TCP_OPTIONS_MAX_SACK_COUNT)
+            {
+                sack_start[sack_count] = rte_be_to_cpu_32(*((uint32_t*)(options + index_read + 2 + 8 * index)));
+                sack_finish[sack_count] = rte_be_to_cpu_32(*((uint32_t*)(options + index_read + 6 + 8 * index)));
+                sack_count++;
+                index++;
+            }
+            if (index < cur_sack_count)
+            {
+                return false;
+            }
+            index_read += options[index_read + 1];
             break;
         }
         case TCP_OPTION_KIND_NOP:
@@ -157,14 +165,17 @@ uint32_t TcpOptions::WriteBuffer(uint8_t* data) const
         len += TCP_OPTION_SP_LEN;
     }
 
-    for (uint32_t index = 0; index < sack_count; index++)
+    if (sack_count != 0)
     {
         tcp_option_t* opt = (tcp_option_t*)&data[len];
         opt->kind = TCP_OPTION_KIND_SACK;
-        opt->len = TCP_OPTION_SACK_LEN;
-        *(uint32_t*)opt->data = rte_cpu_to_be_32(sack_start[index]);
-        *(uint32_t*)(opt->data + 4) = rte_cpu_to_be_32(sack_finish[index]);
-        len += TCP_OPTION_SACK_LEN;
+        opt->len = 2 + 8 * sack_count;
+        for (uint32_t index = 0; index < sack_count; index++)
+        {
+            *(uint32_t*)(opt->data + 8 * index) = rte_cpu_to_be_32(sack_start[index]);
+            *(uint32_t*)(opt->data + 4 + 8 * index) = rte_cpu_to_be_32(sack_finish[index]);
+        }
+        len += 2 + 8 * sack_count;
     }
 
     if (timestamp_value != 0 || timestamp_echo != 0)
@@ -195,7 +206,7 @@ uint32_t TcpOptions::WriteBuffer(uint8_t* data) const
 }
 
 uint32_t TcpOptions::Size() const {
-    uint32_t size = sack_count * TCP_OPTION_SACK_LEN;
+    uint32_t size = (sack_count == 0 ? 0 : 2 + 8 * sack_count);
     if (mss != 0) size += TCP_OPTION_MSS_LEN;
     if (sack_permitted != 0) size += TCP_OPTION_SP_LEN;
     if (timestamp_value != 0 || timestamp_echo != 0) size += TCP_OPTION_TS_LEN;
@@ -304,9 +315,10 @@ void TcpConnectionStore::ActivateSocket(tSocketId socket_id)
     proxy_services[socket_id];
 }
 
-bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& service_info, tSocketId socket_id, tCounterId service_counter_id)
+bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& service_info, tCounterId service_counter_id)
 {
 	service_id = service_info.service_id;
+    socket_id = service_info.socket_id;
 	counter_id = service_counter_id;
 
 	// proxy and service address, port
@@ -316,14 +328,14 @@ bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& se
 	upstream_port = rte_cpu_to_be_16(service_info.upstream_port);
 
 	// pool_prefix
-	if (socket_id >= service_info.upstream_nets.size())
+	if (service_info.upstream_nets.empty())
 	{
-		YADECAP_LOG_ERROR("invalid socket: '%d', size upstream_nets: '%ld'\n", socket_id, service_info.upstream_nets.size());
+		YADECAP_LOG_ERROR("upstream_nets empty'\n");
 		return false;
 	}
-	pool_prefix.address = ipv4_address_t::convert(service_info.upstream_nets[socket_id].address());
+	pool_prefix.address = ipv4_address_t::convert(service_info.upstream_nets[0].address());
     pool_prefix.address.address = rte_be_to_cpu_32(pool_prefix.address.address);
-    pool_prefix.mask = service_info.upstream_nets[socket_id].mask();
+    pool_prefix.mask = service_info.upstream_nets[0].mask();
 
 	// sizes of tables
 	size_connections_table = service_info.size_connections_table;
@@ -344,13 +356,12 @@ bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& se
     return true;
 }
 
-eResult proxy_service_on_socket_t::UpdateFirstStage(dataplane::proxy::proxy_service_t& service, dataplane::memory_manager* memory_manager, tSocketId socket_id)
-{
+eResult proxy_service_on_socket_t::UpdateFirstStage(dataplane::proxy::proxy_service_t& service, dataplane::memory_manager* memory_manager) {
     if (tables_tmp.NeedUpdate(service.config))
     {
         tables_tmp.ClearIfNotEqual(tables_work, memory_manager);
         tables_tmp.ClearLinks();
-        eResult result = tables_tmp.Allocate(memory_manager, socket_id, service.config);
+        eResult result = tables_tmp.Allocate(memory_manager, service.config);
         if (result != eResult::success)
         {
             return result;
@@ -370,12 +381,12 @@ void proxy_service_on_socket_t::UpdateSecondStage(dataplane::proxy::proxy_servic
 	service.tables.CopyFrom(tables_work);
 }
 
-eResult TcpConnectionStore::ServiceUpdateOnSocket(tSocketId socket_id, dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager)
+eResult TcpConnectionStore::ServiceUpdateOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager)
 {
-	auto iter_service = proxy_services.find(socket_id);
+	auto iter_service = proxy_services.find(service.config.socket_id);
 	if (iter_service == proxy_services.end())
 	{
-		YADECAP_LOG_ERROR("not found proxy service config for socketId: '%u' in ServiceUpdateOnSocket\n", socket_id);
+		YADECAP_LOG_ERROR("not found proxy service config for socketId: '%u' in ServiceUpdateOnSocket\n", service.config.socket_id);
 		return eResult::invalidId;
 	}
 
@@ -389,7 +400,7 @@ eResult TcpConnectionStore::ServiceUpdateOnSocket(tSocketId socket_id, dataplane
     // Update tables
 	if (first_state_update_global_base)
 	{
-        return service_on_socket.UpdateFirstStage(service, memory_manager, socket_id);
+        return service_on_socket.UpdateFirstStage(service, memory_manager);
 	}
 	else
 	{
@@ -398,12 +409,12 @@ eResult TcpConnectionStore::ServiceUpdateOnSocket(tSocketId socket_id, dataplane
 	}
 }
 
-void TcpConnectionStore::ServiceRemoveOnSocket(tSocketId socket_id, dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager)
+void TcpConnectionStore::ServiceRemoveOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager)
 {
-    auto iter_service = proxy_services.find(socket_id);
+    auto iter_service = proxy_services.find(service.config.socket_id);
 	if (iter_service == proxy_services.end())
 	{
-		YADECAP_LOG_ERROR("not found proxy service config for socketId: '%u' in ServiceRemoveOnSocket\n", socket_id);
+		YADECAP_LOG_ERROR("not found proxy service config for socketId: '%u' in ServiceRemoveOnSocket\n", service.config.socket_id);
 		return;
 	}
 
@@ -425,7 +436,7 @@ void TcpConnectionStore::ServiceRemoveOnSocket(tSocketId socket_id, dataplane::p
 
 void TcpConnectionStore::ClearAllServices(dataplane::memory_manager* memory_manager)
 {
-    for (proxy_service_id_t service_id = 0; service_id < YANET_CONFIG_PROXY_SERVICES_SIZE; service_id++)
+    for (proxy_service_id_t service_id = 0; service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE; service_id++)
     {
         for (auto& iter : proxy_services)
         {
@@ -447,7 +458,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
 		return;
 	}
 
-    for (proxy_service_id_t index = 0; index < YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
+    for (proxy_service_id_t index = 0; index <= YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
     {
         proxy_service_on_socket_t& service = iter_service->second[index];
         if (service.mutex.try_lock())
@@ -490,7 +501,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
 common::idp::proxy_connections::response TcpConnectionStore::GetConnections(proxy_service_id_t service_id)
 {
     common::idp::proxy_connections::response response;
-    if (service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
     {
         for (auto& [socket_id, all_services] : proxy_services)
         {
@@ -512,7 +523,7 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(prox
 common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t service_id)
 {
     common::idp::proxy_syn::response response;
-    if (service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+    if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
     {
         for (auto& [socket_id, all_services] : proxy_services)
         {
@@ -531,20 +542,20 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t s
     return response;
 }
 
-common::idp::proxy_tables::response TcpConnectionStore::GetTables(const std::vector<std::pair<proxy_service_id_t, std::string>>& services)
+common::idp::proxy_tables::response TcpConnectionStore::GetTables(const common::idp::proxy_tables::request& services)
 {
     common::idp::proxy_tables::response response;
 
-    for (const auto& [service_id, service_name] : services)
+    for (const auto& [service_id, socket_id, service_name] : services)
     {
-        if (service_id < YANET_CONFIG_PROXY_SERVICES_SIZE)
+        if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
         {
-            for (auto& [socket_id, all_services] : proxy_services)
+            for (auto& [service_socket_id, all_services] : proxy_services)
             {
-                std::shared_lock lock(all_services[service_id].mutex);
-                const ProxyTables& current = all_services[service_id].tables_work;
-                if (current.service_connections.Size() != 0)
+                if (service_socket_id == socket_id)
                 {
+                    std::shared_lock lock(all_services[service_id].mutex);
+                    const ProxyTables& current = all_services[service_id].tables_work;
                     LocalPoolStat stat = current.local_pool.GetStat();
 
                     response.emplace_back(service_id, service_name, socket_id,
@@ -592,8 +603,10 @@ void PrepareSynAckToClient(const proxy_service_t& service,
 {
     TcpOptions tcp_options;
     memset(&tcp_options, 0, sizeof(tcp_options));
-    if (!tcp_options.Read(tcp_header))
-        counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
+    if (!tcp_options.Read(tcp_header)) {
+        counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
+        // DebugFullHeader(mbuf, "PrepareSynAckToClient");
+    }
     tcp_options.sack_permitted &= service.config.tcp_options.use_sack;
     tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.config.tcp_options.mss);
 
@@ -820,8 +833,10 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                 {
                     TcpOptions tcp_options;
                     memset(&tcp_options, 0, sizeof(tcp_options));
-                    if (!tcp_options.Read(tcp_header))
-                        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
+                    if (!tcp_options.Read(tcp_header)) {
+                        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
+                        // DebugFullHeader(mbuf, "ActionClientOnAck 1");
+                    }
 
                     LocalPool::UnpackTupleSrc(service_connection_data.connection->local, ipv4_header, tcp_header);
                     tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, (service.config.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
@@ -848,8 +863,10 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                 
                 TcpOptions tcp_options;
                 memset(&tcp_options, 0, sizeof(tcp_options));
-                if (!tcp_options.ReadOnlyTimestampsAndSack(tcp_header))
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
+                if (!tcp_options.ReadOnlyTimestampsAndSack(tcp_header)) {
+                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
+                    // DebugFullHeader(mbuf, "ActionClientOnAck 2");
+                }
                 // YANET_LOG_WARNING("\t\t!!!! ReadOnlyTimestampsAndSack, timestamp=(%u, %u), sack_count=%d\n", tcp_options.timestamp_value, tcp_options.timestamp_echo, tcp_options.sack_count);
                 
                 // work with SACK
@@ -979,7 +996,8 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                         memset(&tcp_options, 0, sizeof(tcp_options));
                         if (!tcp_options.Read(tcp_header))
                         {
-                            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
+                            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
+                            // DebugFullHeader(mbuf, "ActionClientOnAck 3");
                         }
 
                         // Add to connections
@@ -1044,6 +1062,11 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
     DebugPacket("proxy_server_syn_ack", service_id, ipv4_header, tcp_header);
     RINGLOG_CONDITION(worker_info.globalBase->ringlog_enabled);
 
+    if (tcp_header->tcp_flags & TCP_RST_FLAG)
+    {
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rst_service]++;
+    }
+
     uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
@@ -1072,7 +1095,7 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
             TcpOptions tcp_options{};
             if (!tcp_options.Read(tcp_header))
             {
-                worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
+                worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_service]++;
             }
             tcp_options.mss -= int(sizeof(proxy_v2_ipv4_hdr));
             tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
@@ -1116,7 +1139,7 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
 
         TcpOptions tcp_options{};
         if (!tcp_options.Read(tcp_header))
-            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
+            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_service]++;
 
         bool old_sack_permitted = tcp_options.sack_permitted;
         service_connection_data.connection->window_size_shift = (int)tcp_options.window_scaling - (int)service.config.tcp_options.winscale;
@@ -1189,6 +1212,11 @@ bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_inf
     DebugPacket("proxy_server_ack", service_id, ipv4_header, tcp_header);
     RINGLOG_CONDITION(worker_info.globalBase->ringlog_enabled);
 
+    if (tcp_header->tcp_flags & TCP_RST_FLAG)
+    {
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rst_service]++;
+    }
+
     uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
@@ -1222,7 +1250,7 @@ bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_inf
         memset(&tcp_options, 0, sizeof(tcp_options));
         if (!tcp_options.ReadOnlyTimestampsAndSack(tcp_header))
         {
-            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts]++;
+            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_service]++;
         }
         if (tcp_options.timestamp_value != 0)
         {
@@ -1288,7 +1316,7 @@ bool TcpConnectionStore::GetDataForRetramsits(const proxy_service_config_t& serv
 proxy_service_id_t TcpConnectionStore::GetIndexServiceForNextRetransmit()
 {
     index_start_check_retransmits_++;
-    if (index_start_check_retransmits_ >= YANET_CONFIG_PROXY_SERVICES_SIZE)
+    if (index_start_check_retransmits_ > YANET_CONFIG_PROXY_SERVICES_SIZE)
     {
         index_start_check_retransmits_ = 0;
     }
@@ -1356,22 +1384,22 @@ void ProxyTables::ClearIfNotEqual(const ProxyTables& other, dataplane::memory_ma
     local_pool.ClearIfNotEqual(other.local_pool, memory_manager);
 }
 
-eResult ProxyTables::Allocate(dataplane::memory_manager* memory_manager, tSocketId socket_id, const proxy_service_config_t& service_config)
+eResult ProxyTables::Allocate(dataplane::memory_manager* memory_manager, const proxy_service_config_t& service_config)
 {
-    if (!service_connections.Init(service_config.service_id, service_config.size_connections_table, memory_manager, socket_id, "tcp_proxy.connections." + std::to_string(service_config.service_id) + ".socket." + std::to_string(socket_id)))
+    if (!service_connections.Init(service_config.service_id, service_config.size_connections_table, memory_manager, service_config.socket_id, "tcp_proxy.connections." + std::to_string(service_config.service_id) + ".socket." + std::to_string(service_config.socket_id)))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.ServiceConnections, service: %d\n", service_config.service_id);
         return eResult::errorAllocatingMemory;
     }
 
-    if (!syn_connections.Init(service_config.service_id, service_config.size_syn_table, memory_manager, socket_id, "tcp_proxy.syn_connections." + std::to_string(service_config.service_id) + ".socket." + std::to_string(socket_id)))
+    if (!syn_connections.Init(service_config.service_id, service_config.size_syn_table, memory_manager, service_config.socket_id, "tcp_proxy.syn_connections." + std::to_string(service_config.service_id) + ".socket." + std::to_string(service_config.socket_id)))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.SynConnections, service: %d\n", service_config.service_id);
         return eResult::errorAllocatingMemory;
     }
 
     
-    if (!local_pool.Init(service_config.service_id, service_config.pool_prefix, memory_manager, socket_id))
+    if (!local_pool.Init(service_config.service_id, service_config.pool_prefix, memory_manager, service_config.socket_id))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.LocalPool, service: %d\n", service_config.service_id);
         return eResult::errorAllocatingMemory;

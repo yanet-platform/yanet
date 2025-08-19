@@ -28,6 +28,7 @@ namespace dataplane::proxy
 struct proxy_service_config_t
 {
 	proxy_service_id_t service_id;
+    tSocketId socket_id;
 	tCounterId counter_id;
 
 	// proxy and service address, port
@@ -48,7 +49,7 @@ struct proxy_service_config_t
     uint64_t debug_flags;
 
     bool EnabledFlag(uint8_t flag) const;
-    bool ReadConfig(const controlplane::proxy::service_t& service_info, tSocketId socket_id, tCounterId service_counter_id);
+    bool ReadConfig(const controlplane::proxy::service_t& service_info, tCounterId service_counter_id);
 
     static constexpr uint64_t flag_dont_use_bucket_optimization = (1ul << 0);
     static constexpr uint64_t flag_ignore_size_update_detections = (1ul << 1);
@@ -63,7 +64,7 @@ struct ProxyTables
 
     bool NeedUpdate(const proxy_service_config_t& service_config);
     void ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager);
-    eResult Allocate(dataplane::memory_manager* memory_manager, tSocketId socket_id, const proxy_service_config_t& service_config);
+    eResult Allocate(dataplane::memory_manager* memory_manager, const proxy_service_config_t& service_config);
     void CopyFrom(const ProxyTables& other);    
     void ClearLinks();
     void Clear(dataplane::memory_manager* memory_manager);
@@ -89,7 +90,7 @@ struct proxy_service_on_socket_t
     bool enabled{false};
     std::shared_mutex mutex;
 
-    eResult UpdateFirstStage(dataplane::proxy::proxy_service_t& service, dataplane::memory_manager* memory_manager, tSocketId socket_id);
+    eResult UpdateFirstStage(dataplane::proxy::proxy_service_t& service, dataplane::memory_manager* memory_manager);
     void UpdateSecondStage(dataplane::proxy::proxy_service_t& service, dataplane::memory_manager* memory_manager);
 } __rte_cache_aligned;
 
@@ -164,8 +165,8 @@ class TcpConnectionStore
 {
 public:
     void ActivateSocket(tSocketId socket_id);
-    eResult ServiceUpdateOnSocket(tSocketId socket_id, dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager);
-    void ServiceRemoveOnSocket(tSocketId socket_id, dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager);
+    eResult ServiceUpdateOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager);
+    void ServiceRemoveOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager);
     void ClearAllServices(dataplane::memory_manager* memory_manager);
 
     void CollectGarbage(tSocketId socket_id, uint64_t current_time_ms);
@@ -173,16 +174,16 @@ public:
     // Info
     common::idp::proxy_connections::response GetConnections(proxy_service_id_t service_id);
     common::idp::proxy_syn::response GetSyn(proxy_service_id_t service_id);
-    common::idp::proxy_tables::response GetTables(const std::vector<std::pair<proxy_service_id_t, std::string>>& services);
+    common::idp::proxy_tables::response GetTables(const common::idp::proxy_tables::request& services);
 
 
     bool GetDataForRetramsits(const proxy_service_config_t& service_config, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
     proxy_service_id_t GetIndexServiceForNextRetransmit();
 
 private:
-	std::map<tSocketId, std::array<dataplane::proxy::proxy_service_on_socket_t, YANET_CONFIG_PROXY_SERVICES_SIZE>> proxy_services;
+	std::map<tSocketId, std::array<dataplane::proxy::proxy_service_on_socket_t, YANET_CONFIG_PROXY_SERVICES_SIZE + 1>> proxy_services;
 
-    proxy_service_id_t index_start_check_retransmits_ = YANET_CONFIG_PROXY_SERVICES_SIZE;
+    proxy_service_id_t index_start_check_retransmits_ = YANET_CONFIG_PROXY_SERVICES_SIZE + 1;
     common::globalBase::tFlow next_flow_;
 };
 
