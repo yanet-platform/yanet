@@ -229,16 +229,7 @@ eResult module::neighbor_remove(const common::idp::neighbor_remove::request& req
 
 eResult module::neighbor_clear()
 {
-	auto response = generation_hashtable.update([](neighbor::generation_hashtable& hashtable) {
-		for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
-		{
-			GCC_BUG_UNUSED(socket_id);
-			hashtable_updater.get_pointer()->clear();
-		}
-		return eResult::success;
-	});
-
-	return response;
+	return DumpOSNeighbors();
 }
 
 eResult module::neighbor_flush()
