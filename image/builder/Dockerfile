@@ -54,12 +54,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libyaml-cpp-dev \
     libgtest-dev \
     libgmock-dev \
+    libnl-route-3-dev \
     bison \
     flex \
     libfl-dev \
     netbase \
     gdb \
     vim \
+    tmux \
     devscripts \
     debhelper \
     dupload \
