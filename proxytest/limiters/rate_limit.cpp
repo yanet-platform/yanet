@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <condition_variable>
 #include <future>
+#include <shared_mutex>
 
 #include "dataplane/proxy_limiter.h"
 
@@ -120,61 +122,59 @@ TEST(RateLimitTableTest, Benchmark)
 
 TEST(RateLimitTableTest, BenchmarkConcurrent)
 {
-    unsigned int concurrency = std::thread::hardware_concurrency();
-    if (concurrency == 0)
-    {
-        concurrency = 8;
-    }
-    unsigned int sample_concurrency = std::sqrt(concurrency);
-    unsigned int access_concurrency = sample_concurrency;
-    
-    const unsigned int samples = 64;
+    // unsigned int concurrency = std::thread::hardware_concurrency();
+    // if (concurrency == 0)
+    // {
+    //     concurrency = 8;
+    // }
+    unsigned int concurrency = 8;
+
     const unsigned int iterations = 8'000'000;
-    unsigned int iter_per_future = iterations / access_concurrency;
-    std::array<std::chrono::duration<double>, samples> checks;
-    std::array<std::future<std::chrono::duration<double>>, samples> futures;
-    std::cout << "Samples: " << samples << " (Concurrent: " << sample_concurrency 
-              << ")\nIterations: " << iterations << " (Concurrent: " << access_concurrency << ")\n";
-    for (unsigned int s = 0; s < samples; s += sample_concurrency)
-    {
-        for (unsigned int j = s; j < s + sample_concurrency && j < samples; j++)
-        {
-            futures[j] = std::async(std::launch::async, [&]() -> std::chrono::duration<double> {
-                RateLimitTable ratelimit;
-                ratelimit.Init(iterations, 10, 10, nullptr, 0, "");
-            
-                std::vector<std::future<void>> fs(access_concurrency);
-                std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-                for (unsigned int i = 0; i < access_concurrency; i++)
-                {
-                    fs[i] = std::async(std::launch::async, [=, &ratelimit]() {
-                        unsigned int start = i * iter_per_future;
-                        for (unsigned int k = start; k < start + iter_per_future; k++)
-                        {
-                            ratelimit.Check(k, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
-                        }
-                    });
-                }
-                for (auto& f : fs)
-                {
-                    f.get();
-                }
-                auto find_elapsed = std::chrono::steady_clock::now() - start;
+    unsigned int iters_by_thread = iterations / concurrency;
+
+    RateLimitTable ratelimit;
+    ratelimit.Init(iterations, 10, 10, nullptr, 0, "");
     
-                return find_elapsed;
-            });
-        }
-        for (unsigned int i = s; i < s + sample_concurrency && i < samples; i++)
-        {
-            checks[i] = futures[i].get();
+    std::vector<std::thread> threads;
+    std::cout << "Iterations: " << iterations << " (Concurrent: " << concurrency << ")\n";
+
+    std::shared_mutex thread_sync_mutex;
+    std::condition_variable_any thread_sync_cv;
+    bool thread_sync_ready = false;
+
+    for (unsigned int t = 0; t < concurrency; t++)
+    {
+        threads.emplace_back([&]() {
+            std::shared_lock lock(thread_sync_mutex);
+            thread_sync_cv.wait(lock, [&] { return thread_sync_ready; });
+
+            for (unsigned int i = t * iters_by_thread; i < t * iters_by_thread + iters_by_thread ; i++)
+            {
+                ratelimit.Check(i, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+            }
+        });
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(t, &cpuset);
+        int rc = pthread_setaffinity_np(threads[t].native_handle(), sizeof(cpu_set_t), &cpuset);
+        if (rc != 0) {
+            YANET_LOG_ERROR("Failed to set affinity for syn thread %d: %s\n", t, strerror(rc));
         }
     }
 
-    std::sort(checks.begin(), checks.end());
+    {
+        std::lock_guard lock(thread_sync_mutex);
+        thread_sync_ready = true;
+    }
+    thread_sync_cv.notify_all();
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    for (unsigned int t = 0; t < concurrency; t++)
+    {
+        threads[t].join();
+    }
+    auto elapsed = std::chrono::steady_clock::now() - start;
 
-    std::cout << "Check:\n\tmin: " << std::chrono::duration_cast<std::chrono::milliseconds>(checks[0]).count()
-              << "ms, max: " << std::chrono::duration_cast<std::chrono::milliseconds>(checks[checks.size() - 1]).count()
-              << "ms, mean: " << std::chrono::duration_cast<std::chrono::milliseconds>(checks[checks.size() / 2]).count() << "ms\n";
+    std::cout << "Check: " << std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() << "ms\n";
 }
 
 }
