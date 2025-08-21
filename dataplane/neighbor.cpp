@@ -146,11 +146,6 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 	value.flags |= flag_is_static;
 	value.last_update_timestamp = current_time_provider_();
 
-	YANET_LOG_ERROR("Neighbor insert (controlplane): %s, %s, %s\n",
-	                interface_name.data(),
-	                ip_address.toString().data(),
-	                mac_address.toString().data());
-
 	auto response = generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 		eResult result = eResult::success;
 		for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
@@ -169,7 +164,12 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 		return result;
 	});
 
-	return response;
+	if (response != eResult::success)
+	{
+		return response;
+	}
+
+	return neighbor_flush();
 }
 
 eResult module::neighbor_remove(const common::idp::neighbor_remove::request& request)
@@ -224,7 +224,12 @@ eResult module::neighbor_remove(const common::idp::neighbor_remove::request& req
 		return result;
 	});
 
-	return response;
+	if (response != eResult::success)
+	{
+		return response;
+	}
+
+	return neighbor_flush();
 }
 
 eResult module::neighbor_clear()
@@ -274,19 +279,58 @@ eResult module::DumpOSNeighbors()
 	using Entry = std::tuple<tInterfaceId, ipv6_address_t, std::optional<rte_ether_addr>, bool>;
 
 	std::vector<Entry> dump;
+	std::vector<std::pair<dataplane::neighbor::key, dataplane::neighbor::value>> static_entries;
 	{
 		auto interfaces_guard = generation_interface.current_lock_guard();
-		dump = neighbor_provider->GetHostDump(generation_interface.current().interface_name_to_id);
+		auto& new_interfaces = generation_interface.current();
+		auto& old_interfaces = generation_interface.next();
+		dump = neighbor_provider->GetHostDump(new_interfaces.interface_name_to_id);
+
+		{
+			auto lock = generation_hashtable.current_lock_guard();
+			for (auto it : generation_hashtable.current().hashtable_updater.begin()->second.range())
+			{
+				if (!it.is_valid())
+				{
+					continue;
+				}
+
+				if (it.value()->flags & flag_is_static)
+				{
+					auto key = *it.key();
+					auto to_name = old_interfaces.interface_id_to_name.find(key.interface_id);
+					if (to_name == old_interfaces.interface_id_to_name.cend())
+					{
+						continue;
+					}
+
+					auto to_id = new_interfaces.interface_name_to_id.find(std::get<1>(to_name->second));
+					if (to_id == new_interfaces.interface_name_to_id.cend())
+					{
+						continue;
+					}
+
+					key.interface_id = to_id->second;
+					static_entries.emplace_back(key, *it.value());
+				}
+			}
+		}
 	}
 
 	eResult res = generation_hashtable.update(
 	        [dump,
 	         now = current_time_provider_(),
+	         &static_entries,
 	         this](
 	                neighbor::generation_hashtable& hashtable) {
 		        for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
 		        {
 			        hashtable_updater.get_pointer()->clear();
+
+			        for (const auto& [key, value] : static_entries)
+			        {
+				        hashtable_updater.get_pointer()->insert_or_update(key, value);
+			        }
 
 			        for (const auto& [iface, dst, mac, is_v6] : dump)
 			        {
@@ -447,6 +491,9 @@ void module::resolve(const dataplane::neighbor::key& key)
 	                ip_address.toString().data());
 
 #ifdef CONFIG_YADECAP_AUTOTEST
+	YANET_LOG_INFO("Mocking resolve: %s, %s\n",
+	               interface_name.data(),
+	               ip_address.toString().data());
 	value value;
 	value.ether_address.addr_bytes[0] = 44;
 	value.ether_address.addr_bytes[1] = 44;
@@ -456,7 +503,7 @@ void module::resolve(const dataplane::neighbor::key& key)
 		value.ether_address.addr_bytes[1] = 66;
 	}
 	*((uint32_t*)&value.ether_address.addr_bytes[2]) = rte_hash_crc(key.address.bytes, 16, 0);
-	value.flags = 0;
+	value.flags = 0 | flag_is_static;
 	value.last_update_timestamp = current_time_provider_();
 
 	generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
@@ -474,6 +521,7 @@ void module::resolve(const dataplane::neighbor::key& key)
 		}
 		return eResult::success;
 	});
+	neighbor_flush();
 #else // CONFIG_YADECAP_AUTOTEST
 
 	/// @todo: in first, try resolve like 'ip neig show 10.0.0.1 dev eth0'
