@@ -56,6 +56,7 @@ protected:
 	common::icp::proxy_connections::response proxy_connections(const common::icp::proxy_connections::request& request) const;
 	common::icp::proxy_syn::response proxy_syn(const common::icp::proxy_syn::request& request) const;
 	common::icp::proxy_tables::response proxy_tables(const common::icp::proxy_tables::request& request) const;
+	common::icp::proxy_debug_counters_id::response proxy_debug_counters_id(const common::icp::proxy_debug_counters_id::request& request);
 
     std::map<std::string, proxy_id_t> modules;
     std::map<std::tuple<common::ip_address_t, tPortId, uint8_t>, proxy_service_id_t> services;

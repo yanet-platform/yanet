@@ -174,6 +174,11 @@ public:
 		return get<common::icp::requestType::proxy_tables, common::icp::proxy_tables::response>(request);
 	}
 
+	auto proxy_debug_counters_id(const common::icp::proxy_debug_counters_id::request& request) const
+	{
+		return get<common::icp::requestType::proxy_debug_counters_id, common::icp::proxy_debug_counters_id::response>(request);
+	}
+
 	auto acl_unwind(const common::icp::acl_unwind::request& request) const
 	{
 		return get<common::icp::requestType::acl_unwind, common::icp::acl_unwind::response>(request);

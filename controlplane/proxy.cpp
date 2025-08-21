@@ -20,6 +20,9 @@ eResult proxy_t::init()
     controlPlane->register_command(common::icp::requestType::proxy_tables, [this](const common::icp::request& request) {
         return proxy_tables(std::get<common::icp::proxy_tables::request>(std::get<1>(request)));
     });
+    controlPlane->register_command(common::icp::requestType::proxy_debug_counters_id, [this](const common::icp::request& request) {
+        return proxy_debug_counters_id(std::get<common::icp::proxy_debug_counters_id::request>(std::get<1>(request)));
+    });
 
     controlPlane->register_service(this);
 
@@ -267,4 +270,16 @@ common::icp::proxy_tables::response proxy_t::proxy_tables(const common::icp::pro
     }
 
     return dataplane.proxy_tables(services);
+}
+
+common::icp::proxy_debug_counters_id::response proxy_t::proxy_debug_counters_id(const common::icp::proxy_debug_counters_id::request& request)
+{
+    proxy_service_id_t service_id = request;
+    tCounterId counter_id = service_counters.get_id(service_id);
+    std::vector<std::string> names;
+    for (const auto& name : proxy::names)
+    {
+        names.push_back(name);
+    }
+    return {counter_id, names};
 }

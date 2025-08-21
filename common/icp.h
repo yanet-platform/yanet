@@ -92,6 +92,7 @@ enum class requestType : uint32_t
         proxy_connections,
         proxy_syn,
         proxy_tables,
+        proxy_debug_counters_id,
 	size // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -239,6 +240,8 @@ inline const char* requestType_toString(requestType t)
                         return "proxy_syn";
                 case requestType::proxy_tables:
                         return "proxy_tables";
+                case requestType::proxy_debug_counters_id:
+                        return "proxy_debug_counters_id";
 		case requestType::size:
 			return "unknown";
 	}
@@ -1014,6 +1017,14 @@ using tables = std::tuple<proxy_service_id_t, ///< proxy_service_id
 using response = std::vector<tables>;
 }
 
+namespace proxy_debug_counters_id
+{
+using request = proxy_service_id_t; ///< service_id
+
+using response = std::tuple<uint32_t, ///< index first counter
+                            std::vector<std::string>>; ///< counter names
+}
+
 using request = std::tuple<requestType,
                            std::variant<std::tuple<>,
                                         acl_unwind::request,
@@ -1088,5 +1099,6 @@ using response = std::variant<std::tuple<>,
                               counters_stat::response,
                               proxy_counters::response,
                               proxy_connections::response,
-                              proxy_tables::response>;
+                              proxy_tables::response,
+                              proxy_debug_counters_id::response>;
 }

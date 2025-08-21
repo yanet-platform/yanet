@@ -96,4 +96,16 @@ void tables(std::optional<std::string> service_name)
 	table.Print();
 }
 
+void debug_counter_id(proxy_service_id_t service_id)
+{
+	interface::controlPlane controlplane;
+	const auto [counter_id, counter_names] = controlplane.proxy_debug_counters_id(service_id);
+	std::cout << counter_id;
+	for (const auto& name : counter_names)
+	{
+		std::cout << " " << name;
+	}
+	std::cout << "\n";
+}
+
 }
