@@ -23,7 +23,7 @@ TEST(ServiceConnectionsTest, Benchmark)
         {
             futures[j] = std::async(std::launch::async, [&]() -> std::chrono::duration<double> {
                 dataplane::proxy::ServiceConnections conn;
-                conn.Init(1, iterations, nullptr, 0, 0);
+                conn.Init(1, iterations, nullptr, 0, "");
             
                 std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
                 for (uint32_t i = 0; i < iterations; i++)
@@ -74,7 +74,7 @@ TEST(ServiceConnectionsTest, BenchmarkConcurrent)
         {
             futures[j] = std::async(std::launch::async, [&]() -> std::chrono::duration<double> {
                 dataplane::proxy::ServiceConnections conn;
-                conn.Init(1, iterations, nullptr, 0, 0);
+                conn.Init(1, iterations, nullptr, 0, "");
             
                 std::vector<std::future<void>> fs(access_concurrency);
                 std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
