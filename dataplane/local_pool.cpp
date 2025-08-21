@@ -6,7 +6,8 @@ namespace dataplane::proxy
 constexpr uint32_t NULL_CHUNK = 0xffffffff;
 
 bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
-                     dataplane::memory_manager* memory_manager, tSocketId socket_id, bool include_edge_addresses)
+                     dataplane::memory_manager* memory_manager, tSocketId socket_id,
+                     bool include_edge_addresses, bool rotate_addresses_first)
 {
     if (initialized_)
     {
@@ -17,14 +18,15 @@ bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
         return false;
     }
     prefix_ = prefix;
+    rotate_addr_first_ = rotate_addresses_first;
 
-    uint32_t num_addresses = 1u << (32u - prefix_.mask);
-    if (!include_edge_addresses && num_addresses > 2) 
+    num_addrs_ = 1u << (32u - prefix_.mask);
+    if (!include_edge_addresses && num_addrs_ > 2) 
     {
-        num_addresses -= 2;
+        num_addrs_ -= 2;
         addr_offset_ = 1;
     }
-    uint32_t num_connections = num_addresses * num_ports;
+    uint32_t num_connections = num_addrs_ * num_ports;
     uint32_t num_free_chunks = max_workers * 2;
     uint32_t num_chunks = num_connections / chunk_size;
     
@@ -230,12 +232,22 @@ LocalPoolStat LocalPool::GetStat() const {
 
 inline uint64_t LocalPool::index_to_tuple(uint32_t index) const
 {
+    if (rotate_addr_first_)
+    {
+        return PackTuple(rte_cpu_to_be_32(prefix_.address.address + addr_offset_ + index % num_addrs_),
+                    rte_cpu_to_be_16(min_port + index / num_addrs_));
+    }
     return PackTuple(rte_cpu_to_be_32(prefix_.address.address + addr_offset_ + index / num_ports),
-                      rte_cpu_to_be_16(index % num_ports + min_port));
+                      rte_cpu_to_be_16(min_port + index % num_ports));
 }
 
 inline uint32_t LocalPool::tuple_to_index(uint64_t tuple) const
 {
+    if (rotate_addr_first_)
+    {
+        return (rte_be_to_cpu_16((uint16_t)(tuple & 0xffff)) - min_port) * num_addrs_ + 
+               (rte_be_to_cpu_32((uint32_t)(tuple >> 16)) - prefix_.address.address - addr_offset_);
+    }
     return (rte_be_to_cpu_16((uint16_t)(tuple & 0xffff)) - min_port) + 
            (rte_be_to_cpu_32((uint32_t)(tuple >> 16)) - prefix_.address.address - addr_offset_) * num_ports;
 }
@@ -283,6 +295,8 @@ void LocalPool::CopyFrom(const LocalPool& other)
 {
     prefix_ = other.prefix_;
     addr_offset_ = other.addr_offset_;
+    rotate_addr_first_ = other.rotate_addr_first_;
+    num_addrs_ = other.num_addrs_;
     chunk_queue_ = other.chunk_queue_;
     local_to_client_ = other.local_to_client_;
     local_info_ = other.local_info_;

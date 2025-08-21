@@ -271,7 +271,7 @@ TEST(LocalPoolTest, Allocate)
 {
     common::ipv4_prefix_t prefix("192.168.0.0/30");
     dataplane::proxy::LocalPool pool;
-    pool.Init(0, ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()}, nullptr, 0, false);
+    pool.Init(0, ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()}, nullptr, 0);
 
     uint32_t client_addr = ipv4_address_t::convert(common::ipv4_address_t("192.168.0.1")).address;
     tPortId client_port = 12345;
@@ -305,6 +305,42 @@ TEST(LocalPoolTest, Allocate)
     expect = dataplane::proxy::LocalPool::PackTuple(ip, rte_cpu_to_be_16(33333));
     EXPECT_EQ(pool.Allocate(0, client_addr, client_port), expect);
 };
+
+TEST(LocalPoolTest, RotateAddressesFirst)
+{
+    common::ipv4_prefix_t prefix("192.168.0.0/30");
+    dataplane::proxy::LocalPool pool;
+    pool.Init(0, ipv4_prefix_t{ipv4_address_t{prefix.address()}, prefix.mask()}, nullptr, 0, false, true);
+
+    uint32_t client_addr = ipv4_address_t::convert(common::ipv4_address_t("192.168.0.1")).address;
+    tPortId client_port = 12345;
+
+    uint32_t ip = ipv4_address_t::convert(common::ipv4_address_t("192.168.0.1")).address;
+    uint64_t expect = dataplane::proxy::LocalPool::PackTuple(ip, rte_cpu_to_be_16((uint16_t)32768));
+    EXPECT_EQ(pool.Allocate(0, client_addr, client_port), expect);
+    ip = ipv4_address_t::convert(common::ipv4_address_t("192.168.0.2")).address;
+    expect = dataplane::proxy::LocalPool::PackTuple(ip, rte_cpu_to_be_16((uint16_t)32768));
+    EXPECT_EQ(pool.Allocate(0, client_addr, client_port), expect);
+    EXPECT_EQ(pool.FindClientByLocal(ip, rte_cpu_to_be_16(32768)), 
+              dataplane::proxy::LocalPool::PackTuple(client_addr, client_port));
+
+    ip = ipv4_address_t::convert(common::ipv4_address_t("192.168.0.1")).address;
+    expect = dataplane::proxy::LocalPool::PackTuple(ip, rte_cpu_to_be_16((uint16_t)32769));
+    EXPECT_EQ(pool.Allocate(0, client_addr, client_port), expect);
+    ip = ipv4_address_t::convert(common::ipv4_address_t("192.168.0.2")).address;
+    expect = dataplane::proxy::LocalPool::PackTuple(ip, rte_cpu_to_be_16((uint16_t)32769));
+    EXPECT_EQ(pool.Allocate(0, client_addr, client_port), expect);
+
+    for(uint32_t i = 4; i < 2 * 32768; i++) {pool.Allocate(0, client_addr, client_port);}
+    EXPECT_EQ(pool.Allocate(0, client_addr, client_port), 0);
+
+    pool.Free(0, dataplane::proxy::LocalPool::PackTuple(ip, rte_cpu_to_be_16(33333)));
+    EXPECT_EQ(pool.FindClientByLocal(ip, rte_cpu_to_be_16(33333)), 0);
+    for(uint32_t i = 1; i < dataplane::proxy::LocalPool::chunk_size; i++)
+        pool.Free(0, dataplane::proxy::LocalPool::PackTuple(ip, rte_cpu_to_be_16(33333+i)));
+    expect = dataplane::proxy::LocalPool::PackTuple(ip, rte_cpu_to_be_16(33333));
+    EXPECT_EQ(pool.Allocate(0, client_addr, client_port), expect);
+}
 
 TEST(LocalPoolTestTest, Benchmark)
 {

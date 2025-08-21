@@ -35,7 +35,8 @@ public:
     } __rte_cache_aligned;
 
     bool Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix, 
-              dataplane::memory_manager* memory_manager, tSocketId socket_id, bool include_edge_addresses = false);
+              dataplane::memory_manager* memory_manager, tSocketId socket_id,
+              bool include_edge_addresses = false, bool rotate_addresses_first = false);
 
     uint64_t Allocate(uint32_t worker_id, uint32_t client_addr, tPortId client_port);
     uint64_t FindClientByLocal(uint32_t local_addr, tPortId local_port) const;
@@ -76,6 +77,8 @@ private:
     bool initialized_{false};
     ipv4_prefix_t prefix_;
     uint32_t addr_offset_{0};
+    bool rotate_addr_first_{false};
+    uint32_t num_addrs_{0};
     ConnectionsChunk* chunk_queue_{nullptr};
     uint64_t* local_to_client_{nullptr};
     LocalInfo* local_info_{nullptr};
