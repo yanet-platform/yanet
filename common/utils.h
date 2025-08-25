@@ -123,12 +123,8 @@ class Job
 public:
 	Job() :
 	        run_{false} {}
-
-	template<typename Task, typename... Args>
-	Job(Task&& task, Args&&... args) :
-	        run_(true), thread_(Loop(std::forward(task), std::forward(args)...)) {}
-	Job(Job&& other) = default;
-	Job& operator=(Job&& other) = default;
+	Job(Job&& other) = delete;
+	Job& operator=(Job&& other) = delete;
 	Job(const Job& other) = delete;
 	Job& operator=(const Job& other) = delete;
 	~Job()
@@ -139,19 +135,23 @@ public:
 	template<typename Task, typename... Args>
 	void Run(Task&& task, Args&&... args)
 	{
-		if (Running())
-		{
-			Stop();
-		}
+		Stop();
+
 		run_.store(true, std::memory_order_relaxed);
-		thread_ = std::thread(
-		        [this](Task&& task, Args&&... args) {
-			        while (run_ && std::forward<Task>(task)(std::forward(args)...))
-			        {
-			        }
-		        },
-		        std::forward<Task>(task),
-		        std::forward(args)...);
+
+		auto work_loop = [this,
+		                  task = std::forward<Task>(task),
+		                  args_tuple = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+			while (run_.load(std::memory_order_acquire))
+			{
+				if (!std::apply(task, args_tuple))
+				{
+					break;
+				}
+			}
+		};
+
+		thread_ = std::thread(std::move(work_loop));
 	}
 
 	bool Running() const
@@ -161,7 +161,7 @@ public:
 
 	void Stop()
 	{
-		run_.store(false, std::memory_order_relaxed);
+		run_.store(false, std::memory_order_release);
 		if (thread_.joinable())
 		{
 			thread_.join();

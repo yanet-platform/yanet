@@ -23,7 +23,7 @@ std::variant<Entry, int> ParseNeighbor(
 	}
 	if (auto id = get_id(ifname); id.has_value())
 	{
-		std::get<tInterfaceId>(entry) = id.value();
+		entry.id = id.value();
 	}
 	else
 	{
@@ -41,16 +41,16 @@ std::variant<Entry, int> ParseNeighbor(
 	{
 		case AF_INET:
 		{
-			auto& ip = std::get<ipv6_address_t>(entry);
+			auto& ip = entry.dst;
 			std::fill(std::begin(ip.nap), std::end(ip.nap), 0);
 			ip.mapped_ipv4_address =
 			        ipv4_address_t{*static_cast<uint32_t*>(nl_addr_get_binary_addr(oaddr))};
-			std::get<bool>(entry) = false;
+			entry.v6 = false;
 			break;
 		}
 		case AF_INET6:
-			std::get<ipv6_address_t>(entry).SetBinary(static_cast<uint8_t*>(nl_addr_get_binary_addr(oaddr)));
-			std::get<bool>(entry) = true;
+			entry.dst.SetBinary(static_cast<uint8_t*>(nl_addr_get_binary_addr(oaddr)));
+			entry.v6 = true;
 			break;
 		default:
 			YANET_LOG_INFO("Skipping message with unsupported address family\n");
@@ -61,8 +61,8 @@ std::variant<Entry, int> ParseNeighbor(
 	if (omac)
 	{
 		auto mac = static_cast<uint8_t*>(nl_addr_get_binary_addr(omac));
-		std::get<std::optional<rte_ether_addr>>(entry).emplace();
-		std::copy(mac, mac + RTE_ETHER_ADDR_LEN, std::get<std::optional<rte_ether_addr>>(entry).value().addr_bytes);
+		entry.mac.emplace();
+		std::copy(mac, mac + RTE_ETHER_ADDR_LEN, entry.mac.value().addr_bytes);
 	}
 
 	return entry;
@@ -71,8 +71,9 @@ std::variant<Entry, int> ParseNeighbor(
 std::vector<Entry> Provider::GetHostDump(
         const std::unordered_map<std::string, tInterfaceId>& ids)
 {
-	rtgenmsg rt_hdr = {.rtgen_family = AF_UNSPEC};
-	nl_sock* sk = nl_socket_alloc();
+	auto deleter = [](nl_sock* sk) { nl_socket_free(sk); };
+	std::unique_ptr<nl_sock, decltype(deleter)> usk{nl_socket_alloc(), deleter};
+	nl_sock* sk = usk.get();
 	if (!sk)
 	{
 		YANET_LOG_ERROR("Failed to allocate netlink socket\n");
@@ -113,7 +114,7 @@ std::vector<Entry> Provider::GetHostDump(
 			return std::get<int>(var);
 		}
 		auto& entry = std::get<Entry>(var);
-		if (!std::get<std::optional<rte_ether_addr>>(entry).has_value())
+		if (!entry.mac.has_value())
 		{
 			YANET_LOG_INFO("Skipping message with no MAC address\n");
 			return NL_OK;
@@ -124,24 +125,23 @@ std::vector<Entry> Provider::GetHostDump(
 	if (auto err = nl_connect(sk, NETLINK_ROUTE); err < 0)
 	{
 		YANET_LOG_ERROR("Failed to connect to netlink socket '%s'\n", nl_geterror(err));
-		goto cleanup;
+		return dump;
 	}
 	if (nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM, &WrapAsCallback<decltype(cb)>, &cb))
 	{
 		YANET_LOG_ERROR("Failed to set netlink callback\n");
-		goto cleanup;
+		return dump;
 	}
+	rtgenmsg rt_hdr = {.rtgen_family = AF_UNSPEC};
 	if (nl_send_simple(sk, RTM_GETNEIGH, NLM_F_DUMP, &rt_hdr, sizeof(rt_hdr)) < 0)
 	{
 		YANET_LOG_ERROR("Failed to send netlink request\n");
-		goto cleanup;
+		return dump;
 	}
 	if (int err = nl_recvmsgs_default(sk); err < 0)
 	{
 		YANET_LOG_ERROR("Failed to receive netlink messages %s\n", nl_geterror(err));
 	}
-cleanup:
-	nl_socket_free(sk);
 	return dump;
 }
 
@@ -150,16 +150,17 @@ void Provider::StartMonitor(std::function<std::optional<tInterfaceId>(const char
                             std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
                             std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp)
 {
-	sk_ = nl_socket_alloc();
-	if (!sk_)
+	auto deleter = [](nl_sock* sk) { nl_socket_free(sk); };
+	std::unique_ptr<nl_sock, decltype(deleter)> usk{nl_socket_alloc(), deleter};
+	nl_sock* sk = usk.get();
+	if (!sk)
 	{
 		YANET_LOG_ERROR("Failed to allocate netlink socket\n");
 		return;
 	}
-	if (auto err = nl_connect(sk_, NETLINK_ROUTE); err < 0)
+	if (auto err = nl_connect(sk, NETLINK_ROUTE); err < 0)
 	{
 		YANET_LOG_ERROR("Failed to connect to netlink socket '%s'\n", nl_geterror(err));
-		nl_socket_free(sk_);
 		return;
 	}
 	monitor_callback_ = [get_id, upsert, remove, timestamp](nl_msg* msg) -> int {
@@ -207,25 +208,24 @@ void Provider::StartMonitor(std::function<std::optional<tInterfaceId>(const char
 		}
 		return NL_OK;
 	};
-	if (nl_socket_modify_cb(sk_, NL_CB_VALID, NL_CB_CUSTOM, &WrapAsCallback<decltype(monitor_callback_)>, &monitor_callback_))
+	if (nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM, &WrapAsCallback<decltype(monitor_callback_)>, &monitor_callback_))
 	{
 		YANET_LOG_ERROR("Failed to set netlink callback\n");
-		nl_socket_free(sk_);
 		return;
 	}
-	nl_socket_disable_seq_check(sk_);
-	if (nl_socket_add_membership(sk_, RTNLGRP_NEIGH))
+	nl_socket_disable_seq_check(sk);
+	if (nl_socket_add_membership(sk, RTNLGRP_NEIGH))
 	{
 		YANET_LOG_ERROR("Failed to subscribe to neighbor updates\n");
-		nl_socket_free(sk_);
 		return;
 	}
-	int fd = nl_socket_get_fd(sk_);
-	timeval tv = {.tv_sec = 0, .tv_usec = 100000};
+	int fd = nl_socket_get_fd(sk);
+	timeval tv = {.tv_sec = 0, .tv_usec = SOCKET_TIMEOUT};
 	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)))
 	{
 		YANET_LOG_ERROR("Failed to set socket timeout (%s)\n", strerror(errno));
 	}
+	sk_ = usk.release();
 	monitor_.Run([this]() {
 		int err;
 		if ((err = nl_recvmsgs_default(sk_)) < 0)
@@ -251,6 +251,7 @@ void Provider::StopMonitor()
 {
 	monitor_.Stop();
 	nl_socket_free(sk_);
+	sk_ = nullptr;
 }
 
 Provider::~Provider()
