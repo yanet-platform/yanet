@@ -13,7 +13,13 @@ struct nl_sock;
 namespace netlink
 {
 
-using Entry = std::tuple<tInterfaceId, ipv6_address_t, std::optional<rte_ether_addr>, bool>;
+struct Entry
+{
+	tInterfaceId id;
+	ipv6_address_t dst;
+	std::optional<rte_ether_addr> mac;
+	bool v6;
+};
 
 class Interface
 {
@@ -30,6 +36,8 @@ public:
 
 class Provider : public Interface
 {
+	static constexpr auto SOCKET_TIMEOUT = 100000;
+
 	nl_sock* sk_;
 	std::function<int(nl_msg*)> monitor_callback_;
 	std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert_;

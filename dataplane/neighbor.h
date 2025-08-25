@@ -114,7 +114,23 @@ protected:
 	std::function<void()> on_neighbor_flush_handle_;
 	std::function<std::vector<dataplane::neighbor::key>()> keys_to_resolve_provider_;
 
+	template<typename UpdaterFunc>
+	void TransformHashtables(UpdaterFunc&& updater);
+
 	utils::Job resolve_;
 };
+
+template<typename UpdaterFunc>
+void module::TransformHashtables(UpdaterFunc&& updater)
+{
+	generation_hashtable.update([&](neighbor::generation_hashtable& hashtable) {
+		for (auto& [_, hashtable_updater] : hashtable.hashtable_updater)
+		{
+			updater(*hashtable_updater.get_pointer());
+		}
+		return eResult::success;
+	});
+	neighbor_flush();
+}
 
 }

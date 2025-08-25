@@ -7,24 +7,24 @@
 namespace
 {
 
-class MockProvider : public netlink::Interface
+class MockProvider final : public netlink::Interface
 {
 public:
 	std::vector<netlink::Entry> GetHostDump(
-	        const std::unordered_map<std::string, tInterfaceId>& ids) final
+	        const std::unordered_map<std::string, tInterfaceId>& ids)
 	{
 		return dump_;
 	}
 	void StartMonitor(std::function<std::optional<tInterfaceId>(const char*)> get_id,
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
-	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp) final
+	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp)
 	{
 		upsert_ = std::move(upsert);
 		timestamp_ = std::move(timestamp);
 		remove_ = std::move(remove);
 	}
-	void StopMonitor() final
+	void StopMonitor()
 	{
 	}
 	~MockProvider() final = default;

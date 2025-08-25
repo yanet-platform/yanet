@@ -302,10 +302,12 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	        },
 	        [this]() {
 		        std::vector<dataplane::neighbor::key> keys;
+		        std::mutex mx;
 
 		        for (auto* worker : get_workers())
 		        {
 			        run_on_worker_gc(worker->socketId, [&]() {
+				        std::vector<dataplane::neighbor::key> gc_keys;
 				        for (auto iter : worker->neighbor_resolve.range())
 				        {
 					        iter.lock();
@@ -320,9 +322,17 @@ eResult cDataPlane::init(const std::string& binaryPath,
 					        iter.unset_valid();
 					        iter.unlock();
 
-					        keys.emplace_back(key);
+					        gc_keys.emplace_back(key);
 				        }
-
+				        std::lock_guard<std::mutex> lock(mx);
+				        if (keys.empty())
+				        {
+					        std::swap(keys, gc_keys);
+				        }
+				        else
+				        {
+					        keys.insert(keys.end(), gc_keys.begin(), gc_keys.end());
+				        }
 				        return true;
 			        });
 		        }

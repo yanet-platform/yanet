@@ -250,7 +250,7 @@ void module::StartNetlinkMonitor()
 	neighbor_provider->StartMonitor(
 	        [this](const char* ifname) -> std::optional<tInterfaceId> {
 		        auto interfaces_guard = generation_interface.current_lock_guard();
-		        auto ids = generation_interface.current().interface_name_to_id;
+		        auto& ids = generation_interface.current().interface_name_to_id;
 		        if (auto it = ids.find(ifname); it != ids.end())
 		        {
 			        return it->second;
@@ -264,21 +264,17 @@ void module::StartNetlinkMonitor()
 	        [this](auto... args) { return Remove(args...); },
 	        [this](auto... args) { return UpdateTimestamp(args...); });
 	YANET_LOG_INFO("Netlink monitor started\n");
-	return;
 }
 
 void module::StopNetlinkMonitor()
 {
 	neighbor_provider->StopMonitor();
 	YANET_LOG_INFO("Netlink monitor stopped\n");
-	return;
 }
 
 eResult module::DumpOSNeighbors()
 {
-	using Entry = std::tuple<tInterfaceId, ipv6_address_t, std::optional<rte_ether_addr>, bool>;
-
-	std::vector<Entry> dump;
+	std::vector<netlink::Entry> dump;
 	std::vector<std::pair<dataplane::neighbor::key, dataplane::neighbor::value>> static_entries;
 	{
 		auto interfaces_guard = generation_interface.current_lock_guard();
@@ -318,7 +314,7 @@ eResult module::DumpOSNeighbors()
 	}
 
 	eResult res = generation_hashtable.update(
-	        [dump,
+	        [&dump,
 	         now = current_time_provider_(),
 	         &static_entries,
 	         this](
@@ -334,6 +330,12 @@ eResult module::DumpOSNeighbors()
 
 			        for (const auto& [iface, dst, mac, is_v6] : dump)
 			        {
+				        if (!mac)
+				        {
+					        YANET_LOG_INFO("No MAC address for neighbor in dump\n");
+					        continue;
+				        }
+
 				        hashtable_updater.get_pointer()
 				                ->insert_or_update(
 				                        dataplane::neighbor::key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
@@ -389,11 +391,8 @@ void module::report(nlohmann::json& json)
 
 void module::StartResolveJob()
 {
-	std::vector<dataplane::neighbor::key> keys;
-
-	resolve_.Run([this, keys]() mutable {
-		keys = keys_to_resolve_provider_();
-
+	resolve_.Run([this]() mutable {
+		std::vector<dataplane::neighbor::key> keys = keys_to_resolve_provider_();
 		for (const auto& key : keys)
 		{
 			resolve(key);
@@ -407,59 +406,47 @@ void module::StartResolveJob()
 
 void module::Upsert(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac)
 {
-	generation_hashtable.update([this, iface, &dst, is_v6, &mac](neighbor::generation_hashtable& hashtable) {
-		for (auto& [_, hashtable_updater] : hashtable.hashtable_updater)
+	TransformHashtables([k = key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
+	                     v = value{mac, 0, current_time_provider_()},
+	                     this](dataplane::neighbor::hashtable& hashtable) {
+		if (!hashtable.insert_or_update(k, v))
 		{
-			if (!hashtable_updater.get_pointer()->insert_or_update(
-			            key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
-			            value{mac, 0, current_time_provider_()}))
-			{
-				stats.hashtable_insert_error++;
-			}
-			else
-			{
-				stats.hashtable_insert_success++;
-			}
+			stats.hashtable_insert_error++;
 		}
-		return eResult::success;
+		else
+		{
+			stats.hashtable_insert_success++;
+		}
 	});
-	neighbor_flush();
 }
 
 void module::UpdateTimestamp(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6)
 {
-	generation_hashtable.update([this, iface, &dst, is_v6](neighbor::generation_hashtable& hashtable) {
-		for (auto& [_, hashtable_updater] : hashtable.hashtable_updater)
+	TransformHashtables([k = key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
+	                     this](dataplane::neighbor::hashtable& hashtable) {
+		dataplane::neighbor::value* value;
+		hashtable.lookup(k, value);
+		if (value)
 		{
-			dataplane::neighbor::value* value;
-			hashtable_updater.get_pointer()
-			        ->lookup(key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst}, value);
-			if (value)
-			{
-				value->last_update_timestamp = current_time_provider_();
-				stats.hashtable_insert_success++;
-			}
-			else
-			{
-				stats.hashtable_insert_error++;
-			}
+			value->last_update_timestamp = current_time_provider_();
+			stats.hashtable_insert_success++;
 		}
-		return eResult::success;
+		else
+		{
+			stats.hashtable_insert_error++;
+		}
 	});
-	neighbor_flush();
 }
 
 void module::Remove(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6)
 {
-	generation_hashtable.update([this, iface, &dst, is_v6](neighbor::generation_hashtable& hashtable) {
-		for (auto& [_, hashtable_updater] : hashtable.hashtable_updater)
+	TransformHashtables([k = key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
+	                     this](dataplane::neighbor::hashtable& hashtable) {
+		if (hashtable.remove(k))
 		{
-			hashtable_updater.get_pointer()->remove(key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst});
 			stats.hashtable_remove_success++;
 		}
-		return eResult::success;
 	});
-	neighbor_flush();
 }
 
 void module::resolve(const dataplane::neighbor::key& key)
