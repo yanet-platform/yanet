@@ -26,6 +26,7 @@ dataplane::proxy::proxy_service_config_t GetProxyConfig()
 
     dataplane::proxy::proxy_service_config_t service_config {
         .service_id = service_id,
+        .socket_id = 0,
 	    .counter_id = 0,
         .proxy_addr = proxy_addr,
 	    .proxy_port = proxy_port,
@@ -57,15 +58,13 @@ dataplane::proxy::proxy_service_config_t GetProxyConfig()
 
 void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection_store, dataplane::base::generation& base, proxy_service_id_t service_id)
 {
-    tSocketId socket_id = 0;
-
     base.globalBase = new dataplane::globalBase::generation(nullptr, 0);
     base.globalBase->proxy_services[service_id].config = GetProxyConfig();
     base.globalBase->proxy_services[service_id].UpdateProxyHeader();
 
-    tcp_connection_store.ActivateSocket(socket_id);
-    tcp_connection_store.ServiceUpdateOnSocket(socket_id, base.globalBase->proxy_services[service_id], true, nullptr);
-    tcp_connection_store.ServiceUpdateOnSocket(socket_id, base.globalBase->proxy_services[service_id], false, nullptr);
+    tcp_connection_store.ActivateSocket(0);
+    tcp_connection_store.ServiceUpdateOnSocket(base.globalBase->proxy_services[service_id], true, nullptr);
+    tcp_connection_store.ServiceUpdateOnSocket(base.globalBase->proxy_services[service_id], false, nullptr);
 }
 
 inline void ResetMbuf(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header)
