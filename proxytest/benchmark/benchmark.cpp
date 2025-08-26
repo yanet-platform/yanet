@@ -116,6 +116,18 @@ inline void AdvanceTS(dataplane::proxy::TcpOptions& tcp_options, uint32_t& times
     tcp_options.timestamp_value = timestamp;
 }
 
+inline void AddData(rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, uint32_t data_size)
+{
+    char* data = rte_pktmbuf_append(mbuf, data_size);
+    if (unlikely(data == nullptr))
+    {
+        YANET_LOG_WARNING("NOT ENOUGH TAILROOM\n");
+        return;
+    }
+    memset(data, 1, data_size);
+    ipv4_header->total_length = rte_cpu_to_be_16(rte_pktmbuf_pkt_len(mbuf));
+}
+
 std::shared_mutex thread_sync_mutex;
 std::condition_variable_any thread_sync_cv;
 bool thread_sync_ready = false;
@@ -279,6 +291,7 @@ void NormalFlow(uint32_t worker_id, const Config& config, WorkerArgs args, uint3
             tcp_options.Clear();
             AdvanceTS(tcp_options, timestamp);
             tcp_options.WriteSYN(args.mbuf, ipv4_header, tcp_header);
+            AddData(args.mbuf, ipv4_header, 1024 + 512);
             worker_info.current_time_sec = *args.current_time;
             worker_info.current_time_ms = *args.current_time_ms;
             if (!dataplane::proxy::ActionClientOnAck(args.mbuf, worker_info))
@@ -293,6 +306,7 @@ void NormalFlow(uint32_t worker_id, const Config& config, WorkerArgs args, uint3
             SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
             AdvanceTS(tcp_options, timestamp);
             tcp_options.WriteSYN(args.mbuf, ipv4_header, tcp_header);
+            AddData(args.mbuf, ipv4_header, 1024 + 512);
             worker_info.current_time_sec = *args.current_time;
             worker_info.current_time_ms = *args.current_time_ms;
             if (!dataplane::proxy::ActionServiceOnAck(args.mbuf, worker_info))
@@ -325,6 +339,7 @@ void NormalFlow(uint32_t worker_id, const Config& config, WorkerArgs args, uint3
             tcp_options.Clear();
             AdvanceTS(tcp_options, timestamp);
             tcp_options.WriteSYN(args.mbuf, ipv4_header, tcp_header);
+            AddData(args.mbuf, ipv4_header, 1024 + 512);
             worker_info.current_time_sec = *args.current_time;
             worker_info.current_time_ms = *args.current_time_ms;
             if (!dataplane::proxy::ActionClientOnAck(args.mbuf, worker_info))
@@ -339,6 +354,7 @@ void NormalFlow(uint32_t worker_id, const Config& config, WorkerArgs args, uint3
             SetSeqAck(tcp_header, rte_be_to_cpu_32(tcp_header->recv_ack), rte_be_to_cpu_32(tcp_header->sent_seq) + 1);
             AdvanceTS(tcp_options, timestamp);
             tcp_options.WriteSYN(args.mbuf, ipv4_header, tcp_header);
+            AddData(args.mbuf, ipv4_header, 1024 + 512);
             worker_info.current_time_sec = *args.current_time;
             worker_info.current_time_ms = *args.current_time_ms;
             if (!dataplane::proxy::ActionServiceOnAck(args.mbuf, worker_info))
