@@ -1398,8 +1398,8 @@ eResult ProxyTables::Allocate(dataplane::memory_manager* memory_manager, const p
         return eResult::errorAllocatingMemory;
     }
 
-    
-    if (!local_pool.Init(service_config.service_id, service_config.pool_prefix, memory_manager, service_config.socket_id))
+    bool rotate_addresses_first = (service_config.debug_flags & proxy_service_config_t::flag_local_pool_rotate_addresses_second) == 0;
+    if (!local_pool.Init(service_config.service_id, service_config.pool_prefix, memory_manager, service_config.socket_id, false, rotate_addresses_first))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.LocalPool, service: %d\n", service_config.service_id);
         return eResult::errorAllocatingMemory;

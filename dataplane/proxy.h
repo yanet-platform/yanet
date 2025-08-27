@@ -54,6 +54,7 @@ struct proxy_service_config_t
     static constexpr uint64_t flag_dont_use_bucket_optimization = (1ul << 0);
     static constexpr uint64_t flag_ignore_size_update_detections = (1ul << 1);
     static constexpr uint64_t flag_ignore_check_client_first_ack = (1ul << 2);
+    static constexpr uint64_t flag_local_pool_rotate_addresses_second = (1ul << 3);
 };
 
 struct ProxyTables

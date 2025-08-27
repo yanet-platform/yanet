@@ -11,7 +11,12 @@ MAC_CLIENT = "00:00:00:00:00:01"
 MAC_SERVER = "00:00:00:00:00:0A"
 IP_CLIENT1 = "10.0.2.1"
 IP_CLIENT2 = "10.0.2.2"
+
 IP_PROXY_INT = "10.0.0.1"
+IP_PROXY_INT2 = "10.0.0.2"
+IP_PROXY_INT3 = "10.0.0.3"
+IP_PROXY_INT4 = "10.0.0.4"
+
 IP_SERVER1 = "10.0.3.1"
 IP_SERVER2 = "10.0.3.2"
 IP_SERVER3 = "10.0.3.3"
@@ -53,11 +58,11 @@ def FromClient(src, dst, seq, ack, flags, ttl=64, raw='', options=[]):
 def ToClient(src, dst, seq, ack, flags, ttl=63, raw='', options=[], window=8192):
 	return Ether(src=MAC_PROXY, dst=MAC_CLIENT)/Dot1Q(vlan=100)/IP(src=src, dst=dst, ttl=ttl)/TCP(sport=PORT_PROXY_EXT, dport=PORT_CLIENT, flags=flags, seq=seq, ack=ack, window=window, options=options)/Raw(raw)
 
-def ToServer(src_port, dst, seq, ack, flags, ttl=63, raw='', options=[]):
-	return Ether(src=MAC_PROXY, dst=MAC_SERVER)/Dot1Q(vlan=200)/IP(src=IP_PROXY_INT, dst=dst, ttl=ttl)/TCP(sport=src_port, dport=PORT_SERVER, flags=flags, seq=seq, ack=ack, options=options)/Raw(raw)
+def ToServer(src, dst, seq, ack, flags, ttl=63, raw='', options=[]):
+	return Ether(src=MAC_PROXY, dst=MAC_SERVER)/Dot1Q(vlan=200)/IP(src=src, dst=dst, ttl=ttl)/TCP(sport=PORT_PROXY_INT, dport=PORT_SERVER, flags=flags, seq=seq, ack=ack, options=options)/Raw(raw)
 
-def FromServer(dst_port, src, seq, ack, flags, ttl=64, raw='', options=[]):
-	return Ether(src=MAC_SERVER, dst=MAC_PROXY)/Dot1Q(vlan=200)/IP(src=src, dst=IP_PROXY_INT, ttl=ttl)/TCP(sport=PORT_SERVER, dport=dst_port, flags=flags, seq=seq, ack=ack, options=options)/Raw(raw)
+def FromServer(dst, src, seq, ack, flags, ttl=64, raw='', options=[]):
+	return Ether(src=MAC_SERVER, dst=MAC_PROXY)/Dot1Q(vlan=200)/IP(src=src, dst=dst, ttl=ttl)/TCP(sport=PORT_SERVER, dport=PORT_PROXY_INT, flags=flags, seq=seq, ack=ack, options=options)/Raw(raw)
 
 
 def WriteTest(index, data):
@@ -94,27 +99,27 @@ options_server_syn_proxy = [("MSS", 1260-len_pr), ("SAckOK", ''), ("Timestamp", 
 data_type1 = [
 	(
 		FromClient(IP_CLIENT1, IP_SERVER1, START_CLIENT_SEQ, 0, 'S', options=options_client_syn),
-		ToServer(PORT_PROXY_INT, IP_SERVER1, START_CLIENT_SEQ, 0, 'S', options=options_client_syn)
+		ToServer(IP_PROXY_INT, IP_SERVER1, START_CLIENT_SEQ, 0, 'S', options=options_client_syn)
 	),
 	(
 		FromClient(IP_CLIENT2, IP_SERVER1, START_CLIENT_SEQ2, 0, 'S', options=options_client_syn),
-		ToServer(PORT_PROXY_INT2, IP_SERVER1, START_CLIENT_SEQ2, 0, 'S', options=options_client_syn)
+		ToServer(IP_PROXY_INT2, IP_SERVER1, START_CLIENT_SEQ2, 0, 'S', options=options_client_syn)
 	),
 	(
-		FromServer(PORT_PROXY_INT, IP_SERVER1, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn),
+		FromServer(IP_PROXY_INT, IP_SERVER1, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn),
 		ToClient(IP_SERVER1, IP_CLIENT1, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn)
     ),
 	(
-		FromServer(PORT_PROXY_INT2, IP_SERVER1, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1, 'AS', options=options_server_syn),
+		FromServer(IP_PROXY_INT2, IP_SERVER1, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1, 'AS', options=options_server_syn),
 		ToClient(IP_SERVER1, IP_CLIENT2, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1, 'AS', options=options_server_syn)
     ),
 	(
 		FromClient(IP_CLIENT1, IP_SERVER1, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack),
-		ToServer(PORT_PROXY_INT, IP_SERVER1, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack)
+		ToServer(IP_PROXY_INT, IP_SERVER1, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack)
     ),
 	(
 		FromClient(IP_CLIENT2, IP_SERVER1, START_CLIENT_SEQ2 + 1, START_SERVER_SEQ2 + 1, 'A', raw=data_client1, options=options_client_ack),
-		ToServer(PORT_PROXY_INT2, IP_SERVER1, START_CLIENT_SEQ2 + 1, START_SERVER_SEQ2 + 1, 'A', raw=data_client1, options=options_client_ack)
+		ToServer(IP_PROXY_INT2, IP_SERVER1, START_CLIENT_SEQ2 + 1, START_SERVER_SEQ2 + 1, 'A', raw=data_client1, options=options_client_ack)
     ),
 ]
 
@@ -138,37 +143,37 @@ data_type2 = [
 	# clients ack -> syn server
 	(
 		FromClient(IP_CLIENT1, IP_SERVER2, START_CLIENT_SEQ + 1, SYN_COOKIE + 1, 'A', options=[("Timestamp", (ts_client, ts_proxy))]),
-		ToServer(PORT_PROXY_INT, IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client, 0)), ('WScale', 5)])
+		ToServer(IP_PROXY_INT, IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client, 0)), ('WScale', 5)])
 	),
 	(
 		FromClient(IP_CLIENT2, IP_SERVER2, START_CLIENT_SEQ2 + 1, SYN_COOKIE2 + 1, 'A', options=[("Timestamp", (ts_client, ts_proxy))]),
-		ToServer(PORT_PROXY_INT2, IP_SERVER2, START_CLIENT_SEQ2, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client, 0)), ('WScale', 5)])
+		ToServer(IP_PROXY_INT2, IP_SERVER2, START_CLIENT_SEQ2, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_client, 0)), ('WScale', 5)])
 	),
 	# server synack -> ack clients
 	(
-		FromServer(PORT_PROXY_INT, IP_SERVER2, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
+		FromServer(IP_PROXY_INT, IP_SERVER2, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
 		ToClient(IP_SERVER2, IP_CLIENT1, SYN_COOKIE + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client))])
 	),
 	(
-		FromServer(PORT_PROXY_INT2, IP_SERVER2, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
+		FromServer(IP_PROXY_INT2, IP_SERVER2, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
 		ToClient(IP_SERVER2, IP_CLIENT2, SYN_COOKIE2 + 1, START_CLIENT_SEQ2 + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client))])
 	),
 	# clients ack -> ack server
 	(
 		FromClient(IP_CLIENT1, IP_SERVER2, START_CLIENT_SEQ + 1, SYN_COOKIE + 1, 'A', raw=data_client1),
-		ToServer(PORT_PROXY_INT, IP_SERVER2, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1)
+		ToServer(IP_PROXY_INT, IP_SERVER2, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1)
 	),
 	(
 		FromClient(IP_CLIENT2, IP_SERVER2, START_CLIENT_SEQ2 + 1, SYN_COOKIE2 + 1, 'A', raw=data_client1),
-		ToServer(PORT_PROXY_INT2, IP_SERVER2, START_CLIENT_SEQ2 + 1, START_SERVER_SEQ2 + 1, 'A', raw=data_client1)
+		ToServer(IP_PROXY_INT2, IP_SERVER2, START_CLIENT_SEQ2 + 1, START_SERVER_SEQ2 + 1, 'A', raw=data_client1)
 	),
 	# server ack -> ack clients
 	(
-		FromServer(PORT_PROXY_INT, IP_SERVER2, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
+		FromServer(IP_PROXY_INT, IP_SERVER2, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
 		ToClient(IP_SERVER2, IP_CLIENT1, SYN_COOKIE + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
 	),
 	(
-		FromServer(PORT_PROXY_INT2, IP_SERVER2, START_SERVER_SEQ2 + 1, START_CLIENT_SEQ2 + 1 + len(data_client1), 'A', raw=data_server1), 
+		FromServer(IP_PROXY_INT2, IP_SERVER2, START_SERVER_SEQ2 + 1, START_CLIENT_SEQ2 + 1 + len(data_client1), 'A', raw=data_server1), 
 		ToClient(IP_SERVER2, IP_CLIENT2, SYN_COOKIE2 + 1, START_CLIENT_SEQ2 + 1 + len(data_client1), 'A', raw=data_server1)
 	),
 ]
@@ -181,47 +186,47 @@ data_type3 = [
 	# clients syn -> syn server
 	(
 		FromClient(IP_CLIENT1, IP_SERVER3, START_CLIENT_SEQ, 0, 'S', options=options_client_syn),
-		ToServer(PORT_PROXY_INT, IP_SERVER3, START_CLIENT_SEQ - len_pr, 0, 'S', options=options_client_syn)
+		ToServer(IP_PROXY_INT, IP_SERVER3, START_CLIENT_SEQ - len_pr, 0, 'S', options=options_client_syn)
 	),
 	(
 		FromClient(IP_CLIENT2, IP_SERVER3, START_CLIENT_SEQ2, 0, 'S', options=options_client_syn),
-		ToServer(PORT_PROXY_INT2, IP_SERVER3, START_CLIENT_SEQ2 - len_pr, 0, 'S', options=options_client_syn)
+		ToServer(IP_PROXY_INT2, IP_SERVER3, START_CLIENT_SEQ2 - len_pr, 0, 'S', options=options_client_syn)
 	),
 	# server synack -> synack clients
 	(
-		FromServer(PORT_PROXY_INT, IP_SERVER3, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'AS', options=options_server_syn),
+		FromServer(IP_PROXY_INT, IP_SERVER3, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'AS', options=options_server_syn),
 		ToClient(IP_SERVER3, IP_CLIENT1, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn_proxy)
 	),
 	(
-		FromServer(PORT_PROXY_INT2, IP_SERVER3, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1 - len_pr, 'AS', options=options_server_syn),
+		FromServer(IP_PROXY_INT2, IP_SERVER3, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1 - len_pr, 'AS', options=options_server_syn),
 		ToClient(IP_SERVER3, IP_CLIENT2, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1, 'AS', options=options_server_syn_proxy)
 	),
 	# clients ack -> ack server
 	(
 		FromClient(IP_CLIENT1, IP_SERVER3, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack), 
-		ToServer(PORT_PROXY_INT, IP_SERVER3, START_CLIENT_SEQ + 1 - len_pr, START_SERVER_SEQ + 1, 'A', raw=get_proxy_header(IP_CLIENT1, IP_SERVER3) + data_client1.encode(), options=options_client_ack)
+		ToServer(IP_PROXY_INT, IP_SERVER3, START_CLIENT_SEQ + 1 - len_pr, START_SERVER_SEQ + 1, 'A', raw=get_proxy_header(IP_CLIENT1, IP_SERVER3) + data_client1.encode(), options=options_client_ack)
 	),
 	(
 		FromClient(IP_CLIENT2, IP_SERVER3, START_CLIENT_SEQ2 + 1, START_SERVER_SEQ2 + 1, 'A', raw=data_client1, options=options_client_ack), 
-		ToServer(PORT_PROXY_INT2, IP_SERVER3, START_CLIENT_SEQ2 + 1 - len_pr, START_SERVER_SEQ2 + 1, 'A', raw=get_proxy_header(IP_CLIENT2, IP_SERVER3) + data_client1.encode(), options=options_client_ack)
+		ToServer(IP_PROXY_INT2, IP_SERVER3, START_CLIENT_SEQ2 + 1 - len_pr, START_SERVER_SEQ2 + 1, 'A', raw=get_proxy_header(IP_CLIENT2, IP_SERVER3) + data_client1.encode(), options=options_client_ack)
 	),
 	# server ack -> ack clients
 	(
-		FromServer(PORT_PROXY_INT, IP_SERVER3, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1),
+		FromServer(IP_PROXY_INT, IP_SERVER3, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1),
 		ToClient(IP_SERVER3, IP_CLIENT1, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
 	),
 	(
-		FromServer(PORT_PROXY_INT2, IP_SERVER3, START_SERVER_SEQ2 + 1, START_CLIENT_SEQ2 + 1 + len(data_client1), 'A', raw=data_server1),
+		FromServer(IP_PROXY_INT2, IP_SERVER3, START_SERVER_SEQ2 + 1, START_CLIENT_SEQ2 + 1 + len(data_client1), 'A', raw=data_server1),
 		ToClient(IP_SERVER3, IP_CLIENT2, START_SERVER_SEQ2 + 1, START_CLIENT_SEQ2 + 1 + len(data_client1), 'A', raw=data_server1)
 	),
 	# clients ack -> ack server
 	(
 		FromClient(IP_CLIENT1, IP_SERVER3, START_CLIENT_SEQ + 1 + len(data_client1), START_SERVER_SEQ + 1 + len(data_server1), 'A', raw=data_client2),
-		ToServer(PORT_PROXY_INT, IP_SERVER3, START_CLIENT_SEQ + 1 + len(data_client1), START_SERVER_SEQ + 1 + len(data_server1), 'A', raw=data_client2)
+		ToServer(IP_PROXY_INT, IP_SERVER3, START_CLIENT_SEQ + 1 + len(data_client1), START_SERVER_SEQ + 1 + len(data_server1), 'A', raw=data_client2)
 	),
 	(
 		FromClient(IP_CLIENT2, IP_SERVER3, START_CLIENT_SEQ2 + 1 + len(data_client1), START_SERVER_SEQ2 + 1 + len(data_server1), 'A', raw=data_client2),
-		ToServer(PORT_PROXY_INT2, IP_SERVER3, START_CLIENT_SEQ2 + 1 + len(data_client1), START_SERVER_SEQ2 + 1 + len(data_server1), 'A', raw=data_client2)
+		ToServer(IP_PROXY_INT2, IP_SERVER3, START_CLIENT_SEQ2 + 1 + len(data_client1), START_SERVER_SEQ2 + 1 + len(data_server1), 'A', raw=data_client2)
 	),
 ]
 
@@ -245,37 +250,37 @@ data_type4  = [
 	# clients ack -> syn server
 	(
 		FromClient(IP_CLIENT1, IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE3 + 1, 'A', options=[("Timestamp", (ts_server, ts_proxy))]),
-		ToServer(PORT_PROXY_INT3, IP_SERVER4, START_CLIENT_SEQ - len_pr, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, 0)), ('WScale', 5)])
+		ToServer(IP_PROXY_INT, IP_SERVER4, START_CLIENT_SEQ - len_pr, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, 0)), ('WScale', 5)])
 	),
 	(
 		FromClient(IP_CLIENT2, IP_SERVER4, START_CLIENT_SEQ2 + 1, SYN_COOKIE4 + 1, 'A', options=[("Timestamp", (ts_server, ts_proxy))]),
-		ToServer(PORT_PROXY_INT4, IP_SERVER4, START_CLIENT_SEQ2 - len_pr, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, 0)), ('WScale', 5)])
+		ToServer(IP_PROXY_INT2, IP_SERVER4, START_CLIENT_SEQ2 - len_pr, 0, 'S', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, 0)), ('WScale', 5)])
 	),
 	# server synack -> ack clients
 	(
-		FromServer(PORT_PROXY_INT3, IP_SERVER4, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
+		FromServer(IP_PROXY_INT, IP_SERVER4, START_SERVER_SEQ, START_CLIENT_SEQ + 1 - len_pr, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
 		ToClient(IP_SERVER4, IP_CLIENT1, SYN_COOKIE3 + 1, START_CLIENT_SEQ + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client))])
 	),
 	(
-		FromServer(PORT_PROXY_INT4, IP_SERVER4, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1 - len_pr, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
+		FromServer(IP_PROXY_INT2, IP_SERVER4, START_SERVER_SEQ2, START_CLIENT_SEQ2 + 1 - len_pr, 'SA', options=[("MSS", 1300), ("SAckOK", ''), ("Timestamp", (ts_server, ts_client)), ('WScale', 9), ("NOP", '')]),
 		ToClient(IP_SERVER4, IP_CLIENT2, SYN_COOKIE4 + 1, START_CLIENT_SEQ2 + 1, 'A', options=[("Timestamp", (ts_proxy, ts_client))])
 	),
 	# clients ack -> ack server
 	(
 		FromClient(IP_CLIENT1, IP_SERVER4, START_CLIENT_SEQ + 1, SYN_COOKIE3 + 1, 'A', raw=data_client1),
-		ToServer(PORT_PROXY_INT3, IP_SERVER4, START_CLIENT_SEQ + 1 - len_pr, START_SERVER_SEQ + 1, 'A', raw=get_proxy_header(IP_CLIENT1, IP_SERVER4) + data_client1.encode())
+		ToServer(IP_PROXY_INT, IP_SERVER4, START_CLIENT_SEQ + 1 - len_pr, START_SERVER_SEQ + 1, 'A', raw=get_proxy_header(IP_CLIENT1, IP_SERVER4) + data_client1.encode())
 	),
 	(
 		FromClient(IP_CLIENT2, IP_SERVER4, START_CLIENT_SEQ2 + 1, SYN_COOKIE4 + 1, 'A', raw=data_client1),
-		ToServer(PORT_PROXY_INT4, IP_SERVER4, START_CLIENT_SEQ2 + 1 - len_pr, START_SERVER_SEQ2 + 1, 'A', raw=get_proxy_header(IP_CLIENT2, IP_SERVER4) + data_client1.encode())
+		ToServer(IP_PROXY_INT2, IP_SERVER4, START_CLIENT_SEQ2 + 1 - len_pr, START_SERVER_SEQ2 + 1, 'A', raw=get_proxy_header(IP_CLIENT2, IP_SERVER4) + data_client1.encode())
 	),
 	# server ack -> ack clients
 	(
-		FromServer(PORT_PROXY_INT3, IP_SERVER4, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
+		FromServer(IP_PROXY_INT, IP_SERVER4, START_SERVER_SEQ + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1), 
 		ToClient(IP_SERVER4, IP_CLIENT1, SYN_COOKIE3 + 1, START_CLIENT_SEQ + 1 + len(data_client1), 'A', raw=data_server1)
 	),
 	(
-		FromServer(PORT_PROXY_INT4, IP_SERVER4, START_SERVER_SEQ2 + 1, START_CLIENT_SEQ2 + 1 + len(data_client1), 'A', raw=data_server1), 
+		FromServer(IP_PROXY_INT2, IP_SERVER4, START_SERVER_SEQ2 + 1, START_CLIENT_SEQ2 + 1 + len(data_client1), 'A', raw=data_server1), 
 		ToClient(IP_SERVER4, IP_CLIENT2, SYN_COOKIE4 + 1, START_CLIENT_SEQ2 + 1 + len(data_client1), 'A', raw=data_server1)
 	),
 ]

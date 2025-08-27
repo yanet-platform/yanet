@@ -242,7 +242,7 @@ WriteTest("006", data_type5)
 
 # 007 - Client send SYN, service don't answer, client send ACK
 
-test_007 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT + 1, cport=PORT_CLIENT + 1)
+test_007 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT + 1, proxy_int=ProxyTest.IP_PROXY_INT2)
 
 data_type7 = [
 	(
@@ -297,7 +297,7 @@ WriteTest("008", data_type8)
 
 # 009 - Client send ACK with ack number not equal to seq+1 from server's SYNACK
 
-test_009 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT + 2, cport=PORT_CLIENT + 2)
+test_009 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT + 2, proxy_int=ProxyTest.IP_PROXY_INT3)
 
 data_type9 = [
 	(
@@ -317,7 +317,7 @@ WriteTest("009", data_type9)
 
 # 010 - Server RST
 
-test_010 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT + 3, cport=PORT_CLIENT + 3)
+test_010 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=ProxyTest.START_SERVER_SEQ, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT + 3, proxy_int=ProxyTest.IP_PROXY_INT4)
 
 data_type10_1 = [
     (
@@ -361,7 +361,7 @@ WriteTest("010_2", data_type10_2)
 
 SYN_COOKIE11 = 0xda8fecb2
 
-test_011 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=SYN_COOKIE11, port_proxy=PORT_PROXY_INT + 4, cport=PORT_CLIENT + 4)
+test_011 = ProxyTest(ip_client=IP_CLIENT, ip_server=IP_SERVER1, ip_proxy=IP_SERVER1, start_seq_to_client=SYN_COOKIE11, port_proxy=PORT_PROXY_INT, cport=PORT_CLIENT + 4, proxy_int=ProxyTest.IP_PROXY_INT5)
 
 data_type11 = [
     # First SYN - add record to table SynConnections

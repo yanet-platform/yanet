@@ -34,6 +34,10 @@ class ProxyTest:
     MAC_SERVER = "00:00:00:00:00:0A"
     
     IP_PROXY_INT = "10.0.0.1"
+    IP_PROXY_INT2 = "10.0.0.2"
+    IP_PROXY_INT3 = "10.0.0.3"
+    IP_PROXY_INT4 = "10.0.0.4"
+    IP_PROXY_INT5 = "10.0.0.5"
 
     START_CLIENT_SEQ = 1000
     START_SERVER_SEQ = 2000
@@ -43,13 +47,14 @@ class ProxyTest:
 	
     SIZE_PROXY_HEADER = 28
 
-    def __init__(self, ip_client, ip_server, ip_proxy, start_seq_to_client, port_proxy, cport):
+    def __init__(self, ip_client, ip_server, ip_proxy, start_seq_to_client, port_proxy, cport, proxy_int=IP_PROXY_INT):
         self.ip_client = ip_client
         self.ip_server = ip_server
         self.ip_proxy = ip_proxy
         self.start_seq_to_client = start_seq_to_client
         self.port_proxy = port_proxy
         self.cport = cport
+        self.proxy_int = proxy_int
 
     def FromClient(self, seq_ack, flags, ttl=64, raw='', options=[]):
         seq, ack = unpack_seq_ack(seq_ack, self.START_CLIENT_SEQ, self.start_seq_to_client)
@@ -67,13 +72,13 @@ class ProxyTest:
         dst = self.ip_server
         seq, ack = unpack_seq_ack(seq_ack, self.START_CLIENT_SEQ, self.START_SERVER_SEQ)
         port = self.port_proxy
-        return Ether(src=self.MAC_PROXY, dst=self.MAC_SERVER)/Dot1Q(vlan=200)/IP(src=self.IP_PROXY_INT, dst=dst, ttl=ttl)/TCP(sport=port, dport=self.PORT_SERVER, flags=flags, seq=seq, ack=ack, options=options)/Raw(raw)
+        return Ether(src=self.MAC_PROXY, dst=self.MAC_SERVER)/Dot1Q(vlan=200)/IP(src=self.proxy_int, dst=dst, ttl=ttl)/TCP(sport=port, dport=self.PORT_SERVER, flags=flags, seq=seq, ack=ack, options=options)/Raw(raw)
 
     def FromServer(self, seq_ack, flags, ttl=64, raw='', window=8192, options=[]):
         seq, ack = unpack_seq_ack(seq_ack, self.START_SERVER_SEQ, self.START_CLIENT_SEQ)
         src = self.ip_server
         port = self.port_proxy
-        return Ether(src=self.MAC_SERVER, dst=self.MAC_PROXY)/Dot1Q(vlan=200)/IP(src=src, dst=self.IP_PROXY_INT, ttl=ttl)/TCP(sport=self.PORT_SERVER, dport=port, flags=flags, seq=seq, ack=ack, options=options, window=window)/Raw(raw)
+        return Ether(src=self.MAC_SERVER, dst=self.MAC_PROXY)/Dot1Q(vlan=200)/IP(src=src, dst=self.proxy_int, ttl=ttl)/TCP(sport=self.PORT_SERVER, dport=port, flags=flags, seq=seq, ack=ack, options=options, window=window)/Raw(raw)
 
     def GetProxyHeader(self):
         client_addr = self.ip_client

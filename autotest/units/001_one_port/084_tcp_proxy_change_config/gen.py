@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-sys.path.insert(1, '../083_tcp_proxy')
+sys.path.insert(1, '../084_tcp_proxy')
 
 from proxy_test import *
 from scapy.all import *
@@ -83,7 +83,7 @@ WriteTest("002_1", RemoveAnswers(FullSessionFromClient(test1)))
 
 WriteTest("002_2_1", FullSessionFromClient(test2)[-2:])
 test2.cport = PORT_CLIENT + 1
-test2.port_proxy = PORT_PROXY_INT + 1
+test2.proxy_int = ProxyTest.IP_PROXY_INT2
 WriteTest("002_2_2", FullSessionFromClient(test2))
 
 WriteTest("002_3_1", RemoveAnswers(FullSessionFromClient(test3)[-2:]))	# No old sessions
@@ -97,7 +97,7 @@ WriteTest("002_4", FullSessionFromClient(test4))
 # Changed prefix in local pool - for service IP_SERVER2 all connections cleared
 
 test2.cport = PORT_CLIENT
-test2.port_proxy = PORT_PROXY_INT
+test2.proxy_int = ProxyTest.IP_PROXY_INT
 WriteTest("003_2_1", RemoveAnswers(FullSessionFromClient(test2)[-2:]))	# No old sessions
 WriteTest("003_2_2", FullSessionFromClient(test2))
 
