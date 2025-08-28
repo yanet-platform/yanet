@@ -13,37 +13,86 @@ namespace {
 
 TEST(RateLimitTableTest, RateLimit)
 {
-    const uint64_t max_rate = 10;
-    const uint64_t max_burst = 10;
+    const uint32_t num_connections = 1024;
+    const uint32_t max_rate = 10;
+    const uint32_t max_burst = 10;
 
     RateLimitTable ratelimit;
-    ratelimit.Init(1024, max_rate, max_burst, nullptr, 0, "");
+    ratelimit.Init(num_connections, max_rate, max_burst, 0, nullptr, 0, "");
 
     uint64_t current_time_ms;
     for (uint32_t i = 0; i < max_burst; i++)
     {
         current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        ASSERT_TRUE(ratelimit.Check(0, current_time_ms));
+        ASSERT_TRUE(ratelimit.Check(1, current_time_ms));
     }
     current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    ASSERT_FALSE(ratelimit.Check(0, current_time_ms));
+    ASSERT_FALSE(ratelimit.Check(1, current_time_ms));
     sleep(1);
     for (uint32_t i = 0; i < max_burst; i++)
     {
         current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        ASSERT_TRUE(ratelimit.Check(0, current_time_ms));
+        ASSERT_TRUE(ratelimit.Check(1, current_time_ms));
     }
     current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    ASSERT_FALSE(ratelimit.Check(0, current_time_ms));
+    ASSERT_FALSE(ratelimit.Check(1, current_time_ms));
+
+    uint32_t num_buckets = num_connections / RateLimitBucket::bucket_size;
+    for(uint32_t i = 1; i < RateLimitBucket::bucket_size; i++)
+    {
+        ASSERT_TRUE(ratelimit.Check(i * num_buckets + 1, current_time_ms));
+    }
+    ASSERT_TRUE(ratelimit.Check(RateLimitBucket::bucket_size * num_buckets + 1, current_time_ms));
+}
+
+TEST(RateLimitTableTest, RateLimitWithTimeout)
+{
+    const uint32_t num_connections = 1024;
+    const uint32_t max_rate = 10;
+    const uint32_t max_burst = 10;
+    const uint64_t timeout_ms = 1000;
+
+    RateLimitTable ratelimit;
+    ratelimit.Init(num_connections, max_rate, max_burst, timeout_ms, nullptr, 0, "");
+
+    uint64_t current_time_ms;
+    for (uint32_t i = 0; i < max_burst; i++)
+    {
+        current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        ASSERT_TRUE(ratelimit.Check(1, current_time_ms));
+    }
+    current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    ASSERT_FALSE(ratelimit.Check(1, current_time_ms));
+    sleep(1);
+    for (uint32_t i = 0; i < max_burst; i++)
+    {
+        current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        ASSERT_TRUE(ratelimit.Check(1, current_time_ms));
+    }
+    current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    ASSERT_FALSE(ratelimit.Check(1, current_time_ms));
+
+    uint32_t num_buckets = num_connections / RateLimitBucket::bucket_size;
+    for(uint32_t i = 1; i < RateLimitBucket::bucket_size; i++)
+    {
+        current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        ASSERT_TRUE(ratelimit.Check(i * num_buckets + 1, current_time_ms));
+    }
+    current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    ASSERT_FALSE(ratelimit.Check(RateLimitBucket::bucket_size * num_buckets + 1, current_time_ms));
+    sleep(2);
+    current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    ASSERT_TRUE(ratelimit.Check(RateLimitBucket::bucket_size * num_buckets + 1, current_time_ms));
 }
 
 TEST(RateLimitTableTest, RateLimitConcurrent)
 {
-    const uint64_t max_rate = 10;
-    const uint64_t max_burst = 10;
+    const uint32_t num_connections = 1024;
+    const uint32_t max_rate = 10;
+    const uint32_t max_burst = 10;
 
     RateLimitTable ratelimit;
-    ratelimit.Init(1024, max_rate, max_burst, nullptr, 0, "");
+    ratelimit.Init(num_connections, max_rate, max_burst, 0, nullptr, 0, "");
 
     std::array<std::future<bool>, 8> futures;
 
@@ -94,7 +143,7 @@ TEST(RateLimitTableTest, Benchmark)
         {
             futures[j] = std::async(std::launch::async, [&]() -> std::chrono::duration<double> {
                 RateLimitTable ratelimit;
-                ratelimit.Init(iterations, 10, 10, nullptr, 0, "");
+                ratelimit.Init(iterations, 10, 10, 0, nullptr, 0, "");
             
                 std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
                 for (uint32_t i = 0; i < iterations; i++)
@@ -133,7 +182,7 @@ TEST(RateLimitTableTest, BenchmarkConcurrent)
     unsigned int iters_by_thread = iterations / concurrency;
 
     RateLimitTable ratelimit;
-    ratelimit.Init(iterations, 10, 10, nullptr, 0, "");
+    ratelimit.Init(iterations, 10, 10, 0, nullptr, 0, "");
     
     std::vector<std::thread> threads;
     std::cout << "Iterations: " << iterations << " (Concurrent: " << concurrency << ")\n";
