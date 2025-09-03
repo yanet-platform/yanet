@@ -60,6 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     git \
     libnuma-dev \
+    libnl-route-3-dev \
     libibverbs-dev \
     libpcap-dev \
     libsystemd-dev \
