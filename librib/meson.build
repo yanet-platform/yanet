@@ -11,9 +11,3 @@ libyabird = library('yanet-rib',
                     include_directories: yanet_rootdir,
                     dependencies: dependencies,
                     install: true)
-
-libyabird_static = static_library('yanet-rib',
-                                  sources,
-                                  include_directories: yanet_rootdir,
-                                  dependencies: dependencies,
-                                  install: true)
