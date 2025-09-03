@@ -3,8 +3,10 @@
 #include "type.h"
 #include "memory_manager.h"
 #include "syncookies.h"
+#include "rte_hash_crc.h"
 
 #include <atomic>
+#include <random>
 
 namespace dataplane::proxy
 {
@@ -108,6 +110,15 @@ public:
 
         number_buckets_ = number_buckets;
         timeout_ = timeout_ms;
+#ifdef CONFIG_YADECAP_UNITTEST
+        hash_init_ = 0;
+#else
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<uint32_t> dist(0, std::numeric_limits<uint32_t>::max());
+        hash_init_ = dist(gen);
+#endif
+
         initialized_ = true;
 
         return true;
@@ -169,9 +180,9 @@ public:
         return false;
     }
 
-    inline static uint32_t Hash(uint32_t addr)
+    inline uint32_t Hash(uint32_t addr)
     {
-        return addr;
+        return rte_hash_crc_4byte(addr, hash_init_);
     }
 
     bool NeedUpdate(uint32_t number_connections)
@@ -205,6 +216,7 @@ public:
         buckets_ = other.buckets_;
         number_buckets_ = other.number_buckets_;
         timeout_ = other.timeout_;
+        hash_init_ = other.hash_init_;
         initialized_ = other.initialized_;
     }
 
@@ -213,6 +225,7 @@ public:
         buckets_ = nullptr;
         number_buckets_ = 0;
         timeout_ = 0;
+        hash_init_ = 0;
         initialized_ = false;
     }
 
@@ -232,6 +245,7 @@ private:
     RateLimitBucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;
     uint64_t timeout_ = 0;
+    uint32_t hash_init_ = 0;
     bool initialized_ = false;
 };
 

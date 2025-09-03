@@ -11,6 +11,26 @@ using namespace dataplane::proxy;
 
 namespace {
 
+const std::array<uint32_t, 17> ips = {
+    2,
+    39,
+    72,
+    109,
+    384,
+    421,
+    458,
+    495,
+    644,
+    673,
+    718,
+    747,
+    774,
+    803,
+    844,
+    873,
+    1048
+};
+
 TEST(RateLimitTableTest, RateLimit)
 {
     const uint32_t num_connections = 1024;
@@ -24,30 +44,29 @@ TEST(RateLimitTableTest, RateLimit)
     for (uint32_t i = 0; i < max_burst; i++)
     {
         current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        ASSERT_TRUE(ratelimit.Check(1, current_time_ms));
-        ASSERT_TRUE(ratelimit.CheckAndConsume(1, current_time_ms));
+        ASSERT_TRUE(ratelimit.Check(ips[0], current_time_ms));
+        ASSERT_TRUE(ratelimit.CheckAndConsume(ips[0], current_time_ms));
     }
     current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    ASSERT_FALSE(ratelimit.Check(1, current_time_ms));
-    ASSERT_FALSE(ratelimit.CheckAndConsume(1, current_time_ms));
+    ASSERT_FALSE(ratelimit.Check(ips[0], current_time_ms));
+    ASSERT_FALSE(ratelimit.CheckAndConsume(ips[0], current_time_ms));
     sleep(1);
     for (uint32_t i = 0; i < max_burst; i++)
     {
         current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        ASSERT_TRUE(ratelimit.Check(1, current_time_ms));
-        ASSERT_TRUE(ratelimit.CheckAndConsume(1, current_time_ms));
+        ASSERT_TRUE(ratelimit.Check(ips[0], current_time_ms));
+        ASSERT_TRUE(ratelimit.CheckAndConsume(ips[0], current_time_ms));
     }
     current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    ASSERT_FALSE(ratelimit.Check(1, current_time_ms));
-    ASSERT_FALSE(ratelimit.CheckAndConsume(1, current_time_ms));
+    ASSERT_FALSE(ratelimit.Check(ips[0], current_time_ms));
+    ASSERT_FALSE(ratelimit.CheckAndConsume(ips[0], current_time_ms));
 
-    uint32_t num_buckets = num_connections / RateLimitBucket::bucket_size;
     for(uint32_t i = 1; i < RateLimitBucket::bucket_size; i++)
     {
-        ASSERT_TRUE(ratelimit.Check(i * num_buckets + 1, current_time_ms));
-        ASSERT_TRUE(ratelimit.CheckAndConsume(i * num_buckets + 1, current_time_ms));
+        ASSERT_TRUE(ratelimit.Check(ips[i], current_time_ms));
+        ASSERT_TRUE(ratelimit.CheckAndConsume(ips[i], current_time_ms));
     }
-    ASSERT_TRUE(ratelimit.CheckAndConsume(RateLimitBucket::bucket_size * num_buckets + 1, current_time_ms));
+    ASSERT_TRUE(ratelimit.CheckAndConsume(ips[RateLimitBucket::bucket_size], current_time_ms));
 }
 
 TEST(RateLimitTableTest, RateLimitWithTimeout)
@@ -64,30 +83,29 @@ TEST(RateLimitTableTest, RateLimitWithTimeout)
     for (uint32_t i = 0; i < max_burst; i++)
     {
         current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        ASSERT_TRUE(ratelimit.CheckAndConsume(1, current_time_ms));
+        ASSERT_TRUE(ratelimit.CheckAndConsume(ips[0], current_time_ms));
     }
     current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    ASSERT_FALSE(ratelimit.CheckAndConsume(1, current_time_ms));
+    ASSERT_FALSE(ratelimit.CheckAndConsume(ips[0], current_time_ms));
     sleep(1);
     for (uint32_t i = 0; i < max_burst; i++)
     {
         current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        ASSERT_TRUE(ratelimit.CheckAndConsume(1, current_time_ms));
+        ASSERT_TRUE(ratelimit.CheckAndConsume(ips[0], current_time_ms));
     }
     current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    ASSERT_FALSE(ratelimit.CheckAndConsume(1, current_time_ms));
+    ASSERT_FALSE(ratelimit.CheckAndConsume(ips[0], current_time_ms));
 
-    uint32_t num_buckets = num_connections / RateLimitBucket::bucket_size;
     for(uint32_t i = 1; i < RateLimitBucket::bucket_size; i++)
     {
         current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        ASSERT_TRUE(ratelimit.CheckAndConsume(i * num_buckets + 1, current_time_ms));
+        ASSERT_TRUE(ratelimit.CheckAndConsume(ips[i], current_time_ms));
     }
     current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    ASSERT_FALSE(ratelimit.CheckAndConsume(RateLimitBucket::bucket_size * num_buckets + 1, current_time_ms));
+    ASSERT_FALSE(ratelimit.CheckAndConsume(ips[RateLimitBucket::bucket_size], current_time_ms));
     sleep(2);
     current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    ASSERT_TRUE(ratelimit.CheckAndConsume(RateLimitBucket::bucket_size * num_buckets + 1, current_time_ms));
+    ASSERT_TRUE(ratelimit.CheckAndConsume(ips[RateLimitBucket::bucket_size], current_time_ms));
 }
 
 TEST(RateLimitTableTest, RateLimitConcurrent)
