@@ -24,6 +24,20 @@ struct RateLimitBucket
         rte_spinlock_init(&spinlock);
     }
 
+    bool Check(uint32_t i, uint64_t current_time_ms)
+    {
+        last_times[i] = current_time_ms;
+        if (current_time_ms > edts[i])
+        {
+            return true;
+        }
+        else if (edts[i] - current_time_ms > (capacity - cost))
+        {
+            return false;
+        }
+        return true;
+    }
+
     bool Consume(uint32_t i, uint64_t current_time_ms)
     {
         last_times[i] = current_time_ms;
@@ -100,6 +114,21 @@ public:
     }
 
     bool Check(uint32_t addr, uint64_t current_time_ms)
+    {
+        uint64_t key = Hash(addr);
+        RateLimitBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
+        for (uint32_t i = 0; i < RateLimitBucket::bucket_size; i++)
+        {
+            if (bucket->addresses[i] == addr)
+            {
+                return bucket->Check(i, current_time_ms);
+            }
+        }
+
+        return true;
+    }
+
+    bool CheckAndConsume(uint32_t addr, uint64_t current_time_ms)
     {
         uint64_t key = Hash(addr);
         RateLimitBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
