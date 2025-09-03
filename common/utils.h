@@ -1,9 +1,11 @@
 #pragma once
 
+#include <atomic>
 #include <bitset>
 #include <cstddef>
 #include <iomanip>
 #include <string>
+#include <thread>
 #include <type_traits>
 #include <vector>
 
@@ -113,6 +115,60 @@ std::string bitset_to_hex_string(const std::bitset<N>& bs)
 	}
 	return ss.str();
 }
+
+class Job
+{
+	std::atomic<bool> run_;
+	std::thread thread_;
+
+public:
+	Job() :
+	        run_{false} {}
+	Job(Job&& other) = delete;
+	Job& operator=(Job&& other) = delete;
+	Job(const Job& other) = delete;
+	Job& operator=(const Job& other) = delete;
+	~Job()
+	{
+		Stop();
+	}
+
+	template<typename Task, typename... Args>
+	void Run(Task&& task, Args&&... args)
+	{
+		Stop();
+
+		run_.store(true, std::memory_order_relaxed);
+
+		auto work_loop = [this,
+		                  task = std::forward<Task>(task),
+		                  args_tuple = std::make_tuple(std::forward<Args>(args)...)]() mutable {
+			while (run_.load(std::memory_order_acquire))
+			{
+				if (!std::apply(task, args_tuple))
+				{
+					break;
+				}
+			}
+		};
+
+		thread_ = std::thread(std::move(work_loop));
+	}
+
+	bool Running() const
+	{
+		return thread_.joinable();
+	}
+
+	void Stop()
+	{
+		run_.store(false, std::memory_order_release);
+		if (thread_.joinable())
+		{
+			thread_.join();
+		}
+	}
+};
 
 }
 // namespace utils
