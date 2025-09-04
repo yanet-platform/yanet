@@ -1,227 +1,49 @@
 #include <linux/rtnetlink.h>
 #include <net/if.h>
 #include <netinet/ip_icmp.h>
+#include <netlink/netlink.h>
 #include <unistd.h>
 
-#include "dataplane.h"
+#include "base.h"
 #include "neighbor.h"
-#include "worker.h"
 
-using namespace dataplane::neighbor;
-
-static void parse_rt_attributes(rtattr* rt_attributes[],
-                                unsigned int rt_attributes_size,
-                                rtattr* rta,
-                                int length)
+namespace dataplane::neighbor
 {
-	memset(rt_attributes, 0, sizeof(rtattr*) * (rt_attributes_size + 1));
-	while (RTA_OK(rta, length))
-	{
-		if ((rta->rta_type <= rt_attributes_size) &&
-		    (!rt_attributes[rta->rta_type]))
-		{
-			rt_attributes[rta->rta_type] = rta;
-		}
-
-		rta = RTA_NEXT(rta, length);
-	}
-
-	if (length)
-	{
-		YANET_LOG_WARNING("invalid length: %d of %u\n", length, rta->rta_len);
-	}
-}
-
-static std::string iface_id_to_name(int32_t iface_id)
-{
-	char buffer[IFNAMSIZ];
-	if (if_indextoname(iface_id, buffer) == nullptr)
-	{
-		snprintf(buffer, IFNAMSIZ, "unknown_%i", iface_id);
-	}
-	return buffer;
-}
-
-static void netlink_parse(const std::function<void(const std::string&, const common::ip_address_t&, const common::mac_address_t&)>& callback,
-                          const char* buffer,
-                          const unsigned int buffer_length)
-{
-	rtattr* rt_attributes[NDA_MAX + 1];
-
-	unsigned int offset = 0;
-	while (offset + sizeof(nlmsghdr) <= buffer_length)
-	{
-		nlmsghdr* nl_message_header = (nlmsghdr*)(buffer + offset);
-		uint32_t length = nl_message_header->nlmsg_len;
-
-		if (nl_message_header->nlmsg_type == NLMSG_DONE ||
-		    nl_message_header->nlmsg_type == NLMSG_ERROR)
-		{
-			return;
-		}
-
-		if (nl_message_header->nlmsg_type == RTM_NEWNEIGH ||
-		    nl_message_header->nlmsg_type == RTM_GETNEIGH)
-		{
-			ndmsg* nl_message = (ndmsg*)NLMSG_DATA(nl_message_header);
-			parse_rt_attributes(rt_attributes,
-			                    NDA_MAX,
-			                    (rtattr*)(((char*)(nl_message)) + NLMSG_ALIGN(sizeof(ndmsg))),
-			                    nl_message_header->nlmsg_len - NLMSG_LENGTH(sizeof(*nl_message)));
-
-			if (rt_attributes[NDA_DST] &&
-			    rt_attributes[NDA_LLADDR] &&
-			    nl_message->ndm_ifindex)
-			{
-				std::string interface_name = iface_id_to_name(nl_message->ndm_ifindex);
-
-				unsigned int family = nl_message->ndm_family;
-				if (family == AF_BRIDGE)
-				{
-					if (RTA_PAYLOAD(rt_attributes[NDA_DST]) == sizeof(in6_addr))
-					{
-						family = AF_INET6;
-					}
-					else
-					{
-						family = AF_INET;
-					}
-				}
-
-				common::mac_address_t mac_address((const uint8_t*)RTA_DATA(rt_attributes[NDA_LLADDR]));
-
-				if (family == AF_INET)
-				{
-					common::ipv4_address_t ip_address(rte_be_to_cpu_32(*(const uint32_t*)RTA_DATA(rt_attributes[NDA_DST])));
-					callback(interface_name, ip_address, mac_address);
-				}
-				else if (family == AF_INET6)
-				{
-					common::ipv6_address_t ip_address((const uint8_t*)RTA_DATA(rt_attributes[NDA_DST]));
-					callback(interface_name, ip_address, mac_address);
-				}
-			}
-		}
-
-		offset += NLMSG_ALIGN(length);
-	}
-
-	if (buffer_length - offset)
-	{
-		YANET_LOG_WARNING("extra buffer_length: %u of %u\n", offset, buffer_length);
-	}
-}
-
-static void netlink_neighbor_monitor(const std::function<void(const std::string&, const common::ip_address_t&, const common::mac_address_t&)>& callback)
-{
-	int nl_socket = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-	if (nl_socket < 0)
-	{
-		YANET_LOG_ERROR("socket(): %s\n", strerror(errno));
-		return;
-	}
-
-	sockaddr_nl nl_sockaddr;
-	memset(&nl_sockaddr, 0, sizeof(nl_sockaddr));
-	nl_sockaddr.nl_family = AF_NETLINK;
-	nl_sockaddr.nl_groups = 1u << (RTNLGRP_NEIGH - 1);
-
-	if (bind(nl_socket, (sockaddr*)&nl_sockaddr, sizeof(nl_sockaddr)) < 0)
-	{
-		YANET_LOG_ERROR("bind(): %s\n", strerror(errno));
-		return;
-	}
-
-	char buffer[4096];
-	for (;;)
-	{
-		int buffer_length = recv(nl_socket, buffer, sizeof(buffer), 0);
-		if (buffer_length > 0)
-		{
-			netlink_parse(callback, buffer, buffer_length);
-		}
-		else
-		{
-			break;
-		}
-	}
-
-	close(nl_socket);
-}
-
-static void netlink_neighbor_dump(const std::function<void(const std::string&, const common::ip_address_t&, const common::mac_address_t&)>& callback)
-{
-	int nl_socket = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-	if (nl_socket < 0)
-	{
-		YANET_LOG_ERROR("socket(): %s\n", strerror(errno));
-		return;
-	}
-
-	struct
-	{
-		nlmsghdr nl_msg;
-		ndmsg nd_msg;
-		char buf[256];
-	} request;
-
-	memset(&request, 0, sizeof(request));
-	request.nl_msg.nlmsg_len = NLMSG_LENGTH(sizeof(ndmsg));
-	request.nl_msg.nlmsg_type = RTM_GETNEIGH;
-	request.nl_msg.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
-
-	static std::atomic<uint32_t> sequence = time(nullptr);
-	request.nl_msg.nlmsg_seq = sequence++;
-
-	request.nd_msg.ndm_family = AF_UNSPEC;
-
-	if (send(nl_socket, &request, sizeof(request), 0) == -1)
-	{
-		YANET_LOG_WARNING("neighbor_dump: send(): %s\n",
-		                  strerror(errno));
-		close(nl_socket);
-		return;
-	}
-
-	char buffer[8192];
-	int buffer_length = recv(nl_socket, buffer, sizeof(buffer), 0);
-	if (buffer_length > 0)
-	{
-		netlink_parse(callback, buffer, buffer_length);
-	}
-
-	close(nl_socket);
-}
-
-module::module() :dataplane(nullptr)
+module::module() :neighbor_provider{new netlink::Provider{}}
 {
 	memset(&stats, 0, sizeof(stats));
 }
 
-eResult module::init(cDataPlane* dataplane)
+module::module(netlink::Interface* neigh_prov) :neighbor_provider{neigh_prov}
 {
-	this->dataplane = dataplane;
+	memset(&stats, 0, sizeof(stats));
+}
 
-	auto ht_size = dataplane->getConfigValues().neighbor_ht_size;
+eResult module::init(
+        const std::set<tSocketId>& socket_ids,
+        uint64_t ht_size,
+        std::function<dataplane::neighbor::hashtable*(tSocketId)> ht_allocator,
+        std::function<std::uint32_t()> current_time,
+        std::function<void()> on_neighbor_flush,
+        std::function<std::vector<dataplane::neighbor::key>()> keys_to_resolve)
+{
+	memset(&stats, 0, sizeof(stats));
+	current_time_provider_ = std::move(current_time);
+	on_neighbor_flush_handle_ = std::move(on_neighbor_flush);
+	keys_to_resolve_provider_ = std::move(keys_to_resolve);
+
 	generation_hashtable.fill([&](neighbor::generation_hashtable& hashtable) {
-		for (const auto socket_id : dataplane->get_socket_ids())
+		for (const auto socket_id : socket_ids)
 		{
-			auto* pointer = dataplane->memory_manager.create<dataplane::neighbor::hashtable>("neighbor.ht",
-			                                                                                 socket_id,
-			                                                                                 dataplane::neighbor::hashtable::calculate_sizeof(ht_size));
+			auto* pointer = ht_allocator(socket_id);
 			hashtable.hashtable_updater[socket_id].update_pointer(pointer,
 			                                                      socket_id,
 			                                                      ht_size);
 		}
 	});
-
-	threads.emplace_back([this]() {
-		main_thread();
-	});
-
-	threads.emplace_back([this]() {
-		netlink_thread();
-	});
+	DumpOSNeighbors();
+	StartNetlinkMonitor();
+	StartResolveJob();
 
 	return eResult::success;
 }
@@ -259,6 +81,7 @@ common::idp::neighbor_show::response module::neighbor_show() const
 				auto it = interface_id_to_name.find(key.interface_id);
 				if (it == interface_id_to_name.end())
 				{
+					YANET_LOG_ERROR("Interface_id_to_name not found\n");
 					continue;
 				}
 
@@ -267,7 +90,7 @@ common::idp::neighbor_show::response module::neighbor_show() const
 				std::optional<uint32_t> last_update_timestamp;
 				if (!(value.flags & flag_is_static))
 				{
-					last_update_timestamp = dataplane->get_current_time() - value.last_update_timestamp;
+					last_update_timestamp = current_time_provider_() - value.last_update_timestamp;
 				}
 
 				response.emplace_back(route_name,
@@ -320,7 +143,7 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 	memcpy(value.ether_address.addr_bytes, mac_address.data(), 6);
 	value.flags = 0;
 	value.flags |= flag_is_static;
-	value.last_update_timestamp = dataplane->get_current_time();
+	value.last_update_timestamp = current_time_provider_();
 
 	auto response = generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 		eResult result = eResult::success;
@@ -340,7 +163,12 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 		return result;
 	});
 
-	return response;
+	if (response != eResult::success)
+	{
+		return response;
+	}
+
+	return neighbor_flush();
 }
 
 eResult module::neighbor_remove(const common::idp::neighbor_remove::request& request)
@@ -395,29 +223,135 @@ eResult module::neighbor_remove(const common::idp::neighbor_remove::request& req
 		return result;
 	});
 
-	return response;
+	if (response != eResult::success)
+	{
+		return response;
+	}
+
+	return neighbor_flush();
 }
 
 eResult module::neighbor_clear()
 {
-	auto response = generation_hashtable.update([](neighbor::generation_hashtable& hashtable) {
-		for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
-		{
-			(void)socket_id;
-			hashtable_updater.get_pointer()->clear();
-		}
-		return eResult::success;
-	});
-
-	return response;
+	return DumpOSNeighbors();
 }
 
 eResult module::neighbor_flush()
 {
 	generation_hashtable.switch_generation_with_update([this]() {
-		dataplane->switch_worker_base();
+		on_neighbor_flush_handle_();
 	});
 	return eResult::success;
+}
+
+void module::StartNetlinkMonitor()
+{
+	neighbor_provider->StartMonitor(
+	        [this](const char* ifname) -> std::optional<tInterfaceId> {
+		        auto interfaces_guard = generation_interface.current_lock_guard();
+		        auto& ids = generation_interface.current().interface_name_to_id;
+		        if (auto it = ids.find(ifname); it != ids.end())
+		        {
+			        return it->second;
+		        }
+		        else
+		        {
+			        return std::nullopt;
+		        }
+	        },
+	        [this](auto... args) { return Upsert(args...); },
+	        [this](auto... args) { return Remove(args...); },
+	        [this](auto... args) { return UpdateTimestamp(args...); });
+	YANET_LOG_INFO("Netlink monitor started\n");
+}
+
+void module::StopNetlinkMonitor()
+{
+	neighbor_provider->StopMonitor();
+	YANET_LOG_INFO("Netlink monitor stopped\n");
+}
+
+eResult module::DumpOSNeighbors()
+{
+	std::vector<netlink::Entry> dump;
+	std::vector<std::pair<dataplane::neighbor::key, dataplane::neighbor::value>> static_entries;
+	{
+		auto interfaces_guard = generation_interface.current_lock_guard();
+		auto& new_interfaces = generation_interface.current();
+		auto& old_interfaces = generation_interface.next();
+		dump = neighbor_provider->GetHostDump(new_interfaces.interface_name_to_id);
+
+		{
+			auto lock = generation_hashtable.current_lock_guard();
+			for (auto it : generation_hashtable.current().hashtable_updater.begin()->second.range())
+			{
+				if (!it.is_valid())
+				{
+					continue;
+				}
+
+				if (it.value()->flags & flag_is_static)
+				{
+					auto key = *it.key();
+					auto to_name = old_interfaces.interface_id_to_name.find(key.interface_id);
+					if (to_name == old_interfaces.interface_id_to_name.cend())
+					{
+						continue;
+					}
+
+					auto to_id = new_interfaces.interface_name_to_id.find(std::get<1>(to_name->second));
+					if (to_id == new_interfaces.interface_name_to_id.cend())
+					{
+						continue;
+					}
+
+					key.interface_id = to_id->second;
+					static_entries.emplace_back(key, *it.value());
+				}
+			}
+		}
+	}
+
+	eResult res = generation_hashtable.update(
+	        [&dump,
+	         now = current_time_provider_(),
+	         &static_entries,
+	         this](
+	                neighbor::generation_hashtable& hashtable) {
+		        for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
+		        {
+			        (void)socket_id;
+			        hashtable_updater.get_pointer()->clear();
+
+			        for (const auto& [key, value] : static_entries)
+			        {
+				        hashtable_updater.get_pointer()->insert_or_update(key, value);
+			        }
+
+			        for (const auto& [iface, dst, mac, is_v6] : dump)
+			        {
+				        if (!mac)
+				        {
+					        YANET_LOG_INFO("No MAC address for neighbor in dump\n");
+					        continue;
+				        }
+
+				        hashtable_updater.get_pointer()
+				                ->insert_or_update(
+				                        dataplane::neighbor::key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
+				                        dataplane::neighbor::value{mac.value(), 0, now});
+				        stats.netlink_neighbor_update++;
+			        }
+		        }
+		        return eResult::success;
+	        });
+	if (res != eResult::success)
+	{
+		YANET_LOG_ERROR("Failed to load OS neighbors dump\n");
+		return res;
+	}
+
+	return neighbor_flush();
 }
 
 eResult module::neighbor_update_interfaces(const common::idp::neighbor_update_interfaces::request& request)
@@ -436,66 +370,9 @@ eResult module::neighbor_update_interfaces(const common::idp::neighbor_update_in
 	generation_interface.switch_generation();
 	generation_interface.next_unlock();
 
-	netlink_neighbor_dump([this](const std::string& interface_name,
-	                             const common::ip_address_t& ip_address,
-	                             const common::mac_address_t& mac_address) {
-		tInterfaceId interface_id = 0;
-		{
-			auto lock = generation_interface.current_lock_guard();
-
-			const auto& interface_name_to_id = generation_interface.current().interface_name_to_id;
-			auto it = interface_name_to_id.find(interface_name);
-			if (it == interface_name_to_id.end())
-			{
-				return;
-			}
-			interface_id = it->second;
-		}
-
-		YANET_LOG_DEBUG("netlink: %s, %s -> %s\n",
-		                interface_name.data(),
-		                ip_address.toString().data(),
-		                mac_address.toString().data());
-
-		stats.netlink_neighbor_update++;
-
-		dataplane::neighbor::key key;
-		memset(&key, 0, sizeof(key));
-		key.interface_id = interface_id;
-		key.flags = 0;
-
-		if (ip_address.is_ipv4())
-		{
-			key.address.mapped_ipv4_address = ipv4_address_t::convert(ip_address.get_ipv4());
-		}
-		else
-		{
-			key.address = ipv6_address_t::convert(ip_address.get_ipv6());
-			key.flags |= flag_is_ipv6;
-		}
-
-		value value;
-		memcpy(value.ether_address.addr_bytes, mac_address.data(), RTE_ETHER_ADDR_LEN);
-		value.flags = 0;
-		value.last_update_timestamp = dataplane->get_current_time();
-
-		generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
-			for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
-			{
-				(void)socket_id;
-				if (!hashtable_updater.get_pointer()->insert_or_update(key, value))
-				{
-					stats.hashtable_insert_error++;
-				}
-				else
-				{
-					stats.hashtable_insert_success++;
-				}
-			}
-			return eResult::success;
-		});
-	});
-
+	StopNetlinkMonitor();
+	DumpOSNeighbors();
+	StartNetlinkMonitor();
 	return eResult::success;
 }
 
@@ -514,122 +391,64 @@ void module::report(nlohmann::json& json)
 	json["neighbor"]["resolve"] = stats.resolve;
 }
 
-void module::main_thread()
+void module::StartResolveJob()
 {
-	std::vector<dataplane::neighbor::key> keys;
-
-	for (;;)
-	{
-		keys.clear();
-
-		for (auto* worker : dataplane->get_workers())
-		{
-			dataplane->run_on_worker_gc(worker->socketId, [&]() {
-				for (auto iter : worker->neighbor_resolve.range())
-				{
-					iter.lock();
-					if (!iter.is_valid())
-					{
-						iter.unlock();
-						continue;
-					}
-
-					auto key = *iter.key();
-
-					iter.unset_valid();
-					iter.unlock();
-
-					keys.emplace_back(key);
-				}
-
-				return true;
-			});
-		}
-
+	resolve_.Run([this]() mutable {
+		std::vector<dataplane::neighbor::key> keys = keys_to_resolve_provider_();
 		for (const auto& key : keys)
 		{
 			resolve(key);
 		}
 
-		generation_hashtable.switch_generation_with_update([this]() {
-			dataplane->switch_worker_base();
-		});
-
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	}
+		std::this_thread::sleep_for(std::chrono::milliseconds(PAUSE));
+		return true;
+	});
+	YANET_LOG_INFO("Neighbor resolve job started\n");
 }
 
-void module::netlink_thread()
+void module::Upsert(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac)
 {
-#ifdef CONFIG_YADECAP_AUTOTEST
-	return;
-#endif // CONFIG_YADECAP_AUTOTEST
+	TransformHashtables([k = key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
+	                     v = value{mac, 0, current_time_provider_()},
+	                     this](dataplane::neighbor::hashtable& hashtable) {
+		if (!hashtable.insert_or_update(k, v))
+		{
+			stats.hashtable_insert_error++;
+		}
+		else
+		{
+			stats.hashtable_insert_success++;
+		}
+	});
+}
 
-	for (;;)
-	{
-		netlink_neighbor_monitor([&](const std::string& interface_name,
-		                             const common::ip_address_t& ip_address,
-		                             const common::mac_address_t& mac_address) {
-			tInterfaceId interface_id = 0;
-			{
-				auto lock = generation_interface.current_lock_guard();
+void module::UpdateTimestamp(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6)
+{
+	TransformHashtables([k = key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
+	                     this](dataplane::neighbor::hashtable& hashtable) {
+		dataplane::neighbor::value* value;
+		hashtable.lookup(k, value);
+		if (value)
+		{
+			value->last_update_timestamp = current_time_provider_();
+			stats.hashtable_insert_success++;
+		}
+		else
+		{
+			stats.hashtable_insert_error++;
+		}
+	});
+}
 
-				const auto& interface_name_to_id = generation_interface.current().interface_name_to_id;
-				auto it = interface_name_to_id.find(interface_name);
-				if (it == interface_name_to_id.end())
-				{
-					return;
-				}
-				interface_id = it->second;
-			}
-
-			YANET_LOG_DEBUG("netlink: %s, %s -> %s\n",
-			                interface_name.data(),
-			                ip_address.toString().data(),
-			                mac_address.toString().data());
-
-			stats.netlink_neighbor_update++;
-
-			dataplane::neighbor::key key;
-			memset(&key, 0, sizeof(key));
-			key.interface_id = interface_id;
-			key.flags = 0;
-
-			if (ip_address.is_ipv4())
-			{
-				key.address.mapped_ipv4_address = ipv4_address_t::convert(ip_address.get_ipv4());
-			}
-			else
-			{
-				key.address = ipv6_address_t::convert(ip_address.get_ipv6());
-				key.flags |= flag_is_ipv6;
-			}
-
-			value value;
-			memcpy(value.ether_address.addr_bytes, mac_address.data(), 6);
-			value.flags = 0;
-			value.last_update_timestamp = dataplane->get_current_time();
-
-			generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
-				for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
-				{
-					(void)socket_id;
-					if (!hashtable_updater.get_pointer()->insert_or_update(key, value))
-					{
-						stats.hashtable_insert_error++;
-					}
-					else
-					{
-						stats.hashtable_insert_success++;
-					}
-				}
-				return eResult::success;
-			});
-		});
-
-		YANET_LOG_WARNING("restart neighbor_monitor\n");
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-	}
+void module::Remove(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6)
+{
+	TransformHashtables([k = key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
+	                     this](dataplane::neighbor::hashtable& hashtable) {
+		if (hashtable.remove(k))
+		{
+			stats.hashtable_remove_success++;
+		}
+	});
 }
 
 void module::resolve(const dataplane::neighbor::key& key)
@@ -661,6 +480,9 @@ void module::resolve(const dataplane::neighbor::key& key)
 	                ip_address.toString().data());
 
 #ifdef CONFIG_YADECAP_AUTOTEST
+	YANET_LOG_INFO("Mocking resolve: %s, %s\n",
+	               interface_name.data(),
+	               ip_address.toString().data());
 	value value;
 	value.ether_address.addr_bytes[0] = 44;
 	value.ether_address.addr_bytes[1] = 44;
@@ -670,8 +492,8 @@ void module::resolve(const dataplane::neighbor::key& key)
 		value.ether_address.addr_bytes[1] = 66;
 	}
 	*((uint32_t*)&value.ether_address.addr_bytes[2]) = rte_hash_crc(key.address.bytes, 16, 0);
-	value.flags = 0;
-	value.last_update_timestamp = dataplane->get_current_time();
+	value.flags = 0 | flag_is_static;
+	value.last_update_timestamp = current_time_provider_();
 
 	generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 		for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
@@ -688,6 +510,7 @@ void module::resolve(const dataplane::neighbor::key& key)
 		}
 		return eResult::success;
 	});
+	neighbor_flush();
 #else // CONFIG_YADECAP_AUTOTEST
 
 	/// @todo: in first, try resolve like 'ip neig show 10.0.0.1 dev eth0'
@@ -762,3 +585,5 @@ void module::resolve(const dataplane::neighbor::key& key)
 	close(icmp_socket);
 #endif // CONFIG_YADECAP_AUTOTEST
 }
+
+} // namespace dataplane::neighbor

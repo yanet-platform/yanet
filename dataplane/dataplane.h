@@ -106,6 +106,8 @@ public:
 		return current_time;
 	}
 
+	bool WorkersStarted() { return workers_started_.load(std::memory_order_acquire); }
+
 protected:
 	eResult parseConfig(const std::string& configFilePath);
 	eResult parseJsonPorts(const nlohmann::json& json);
@@ -190,6 +192,8 @@ protected:
 
 	std::mutex switch_worker_base_mutex;
 	uint32_t current_time;
+
+	std::atomic<bool> workers_started_ = false;
 
 	std::vector<std::thread> threads;
 

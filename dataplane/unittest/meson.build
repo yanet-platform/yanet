@@ -23,3 +23,15 @@ unittest = executable('yanet-dataplane-unittest',
 test('dataplane',
      unittest,
      protocol: 'gtest')
+
+unittest_neighbor = executable('yanet-dataplane-unittest-neighbor',
+                               files('neighbor.cpp',
+                                     '../neighbor.cpp',
+                                     '../netlink.cpp',
+                                     'unittest.cpp'),
+                               include_directories: yanet_rootdir,
+                               dependencies: dependencies + dependency('libnl-route-3.0'),
+                               cpp_args: cpp_args_append + '-g',
+                               override_options: 'b_lto=false')
+
+test('neighbor', unittest_neighbor, protocol: 'gtest')

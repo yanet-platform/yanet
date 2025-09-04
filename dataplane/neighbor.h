@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+#include <chrono>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -10,12 +12,16 @@
 #include "common/generation.h"
 #include "common/idp.h"
 #include "common/neighbor.h"
+#include "common/utils.h"
 
 #include "hashtable.h"
+#include "netlink.hpp"
 #include "type.h"
 
 namespace dataplane::neighbor
 {
+
+using namespace std::chrono_literals;
 
 constexpr static uint16_t flag_is_ipv6 = 1 << 0;
 constexpr static uint16_t flag_is_static = 1 << 1;
@@ -59,14 +65,21 @@ public:
 };
 
 //
-
 class module
 {
-public:
-	module();
+	static constexpr auto PAUSE = 10ms;
+	netlink::Interface* neighbor_provider;
 
 public:
-	eResult init(cDataPlane* dataplane);
+	module();
+	module(netlink::Interface* neigh_prov);
+	eResult init(
+	        const std::set<tSocketId>& socket_ids,
+	        uint64_t ht_size,
+	        std::function<dataplane::neighbor::hashtable*(tSocketId)> ht_allocator,
+	        std::function<std::uint32_t()> current_time,
+	        std::function<void()> on_update,
+	        std::function<std::vector<dataplane::neighbor::key>()> keys_to_resolve);
 
 	void update_worker_base(const std::vector<std::tuple<tSocketId, dataplane::base::generation*>>& base_nexts);
 
@@ -80,21 +93,46 @@ public:
 
 	void report(nlohmann::json& json);
 
+	void Upsert(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac);
+	void UpdateTimestamp(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6);
+	void Remove(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6);
+
 protected:
-	void main_thread();
-	void netlink_thread();
+	void StartResolveJob();
+	void StartNetlinkMonitor();
+	void StopNetlinkMonitor();
+	eResult DumpOSNeighbors();
 
 	void resolve(const dataplane::neighbor::key& key);
 
 protected:
-	cDataPlane* dataplane;
-
-	std::vector<std::thread> threads;
-
 	generation_manager<dataplane::neighbor::generation_interface> generation_interface;
 	generation_manager<dataplane::neighbor::generation_hashtable, eResult> generation_hashtable;
 
 	common::neighbor::stats stats;
+
+	std::function<std::uint32_t()> current_time_provider_;
+	std::function<void()> on_neighbor_flush_handle_;
+	std::function<std::vector<dataplane::neighbor::key>()> keys_to_resolve_provider_;
+
+	template<typename UpdaterFunc>
+	void TransformHashtables(UpdaterFunc&& updater);
+
+	utils::Job resolve_;
 };
+
+template<typename UpdaterFunc>
+void module::TransformHashtables(UpdaterFunc&& updater)
+{
+	generation_hashtable.update([&](neighbor::generation_hashtable& hashtable) {
+		for (auto& [_, hashtable_updater] : hashtable.hashtable_updater)
+		{
+			(void)_;
+			updater(*hashtable_updater.get_pointer());
+		}
+		return eResult::success;
+	});
+	neighbor_flush();
+}
 
 }
