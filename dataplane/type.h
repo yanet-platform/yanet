@@ -138,6 +138,7 @@ struct ipv4_address_t
 
 struct ipv6_address_t
 {
+	static constexpr auto LENGTH = 16;
 	static ipv6_address_t convert(const common::ipv6_address_t& address)
 	{
 		ipv6_address_t result;
@@ -164,6 +165,11 @@ struct ipv6_address_t
 		{
 			return convert(address.get_ipv6());
 		}
+	}
+
+	void SetBinary(uint8_t bytes[LENGTH])
+	{
+		std::copy(bytes, bytes + LENGTH, this->bytes);
 	}
 
 	bool operator==(const ipv6_address_t& second) const
@@ -210,13 +216,13 @@ struct ipv6_address_t
 
 	union
 	{
-		uint8_t bytes[16]; ///< @todo: rename to address
+		uint8_t bytes[LENGTH]; ///< @todo: rename to address
 
 		struct
 		{
-			uint8_t nap[12];
+			uint8_t nap[LENGTH - sizeof(ipv4_address_t)];
 			ipv4_address_t mapped_ipv4_address;
-		};
+		} __attribute__((__packed__));
 	};
 };
 

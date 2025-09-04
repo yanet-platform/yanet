@@ -1350,6 +1350,11 @@ void cControlPlane::switchGlobalBase()
 
 void cControlPlane::waitAllWorkers()
 {
+	if (!dataPlane->WorkersStarted())
+	{
+		return;
+	}
+
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
 	for (const auto& [core_id, worker] : dataPlane->workers)

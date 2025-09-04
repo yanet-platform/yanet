@@ -3,6 +3,7 @@ dependencies += libdpdk.get_variable('dpdk_dep')
 dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
+dependencies += dependency('libnl-route-3.0')
 
 sources = files('bus.cpp',
                 'controlplane.cpp',
@@ -14,6 +15,7 @@ sources = files('bus.cpp',
                 'main.cpp',
                 'memory_manager.cpp',
                 'neighbor.cpp',
+                'netlink.cpp',
                 'report.cpp',
                 'sharedmemory.cpp',
                 'sock_dev.cpp',
