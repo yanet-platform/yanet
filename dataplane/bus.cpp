@@ -266,6 +266,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::balancer_real_connections, request);
 		}
+		else if (type == common::idp::requestType::balancerInspectLookup)
+		{
+			response = callWithResponse(&cControlPlane::balancer_inspect_lookup, request);
+		}
 		else if (type == common::idp::requestType::samples)
 		{
 			response = callWithResponse(&cControlPlane::samples, request);

@@ -135,6 +135,11 @@ public:
 		return get<common::idp::requestType::balancer_connection, common::idp::balancer_connection::response>(request);
 	}
 
+	auto balancer_inspect_lookup(const common::idp::BalancerInspectLookup::request& request) const
+	{
+		return get<common::idp::requestType::balancerInspectLookup, common::idp::BalancerInspectLookup::response>(request);
+	}
+
 	auto balancer_service_connections() const
 	{
 		return get<common::idp::requestType::balancer_service_connections, common::idp::balancer_service_connections::response>();

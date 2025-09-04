@@ -217,6 +217,11 @@ struct ipv6_address_t
 		memset(bytes, 0, std::size(bytes));
 	}
 
+	bool operator<(ipv6_address_t other) const
+	{
+		return std::memcmp(bytes, other.bytes, 16) < 0;
+	}
+
 	union
 	{
 		uint8_t bytes[LENGTH]; ///< @todo: rename to address
@@ -565,7 +570,7 @@ struct balancer_real_state_t
 
 struct balancer_service_range_t
 {
-	uint32_t start;
+	const balancer_real_id_t* start;
 	uint32_t size;
 };
 
@@ -573,6 +578,7 @@ struct balancer_service_ring_t
 {
 	balancer_service_range_t ranges[YANET_CONFIG_BALANCER_SERVICES_SIZE];
 	balancer_real_id_t reals[YANET_CONFIG_BALANCER_WEIGHTS_SIZE];
+	uint32_t size = 0;
 };
 
 static_assert(YANET_CONFIG_COUNTERS_SIZE <= 0xFFFFFF, "invalid size");

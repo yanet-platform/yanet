@@ -1943,6 +1943,63 @@ void cDataPlane::switch_worker_base()
 	controlPlane->switchBase();
 }
 
+void cDataPlane::waitAllWorkers()
+{
+	if (!WorkersStarted())
+	{
+		return;
+	}
+
+	YADECAP_MEMORY_BARRIER_COMPILE;
+
+	for (const cWorker* worker : workers_vector)
+	{
+		uint64_t startIteration = worker->iteration;
+		uint64_t nextIteration = startIteration;
+		while (nextIteration - startIteration <= (uint64_t)16)
+		{
+			YADECAP_MEMORY_BARRIER_COMPILE;
+			nextIteration = worker->iteration;
+		}
+	}
+
+	for (const auto& [core_id, worker] : worker_gcs)
+	{
+		GCC_BUG_UNUSED(core_id);
+
+		uint64_t startIteration = worker->iteration;
+		uint64_t nextIteration = startIteration;
+		while (nextIteration - startIteration <= (uint64_t)16)
+		{
+			YADECAP_MEMORY_BARRIER_COMPILE;
+			nextIteration = worker->iteration;
+		}
+	}
+
+	YADECAP_MEMORY_BARRIER_COMPILE;
+}
+
+void cDataPlane::switchGlobalBase()
+{
+	YADECAP_MEMORY_BARRIER_COMPILE;
+
+	{
+		std::lock_guard<std::mutex> guard(currentGlobalBaseId_mutex);
+		currentGlobalBaseId ^= 1;
+	}
+
+	YADECAP_MEMORY_BARRIER_COMPILE;
+
+	switch_worker_base();
+
+	YADECAP_MEMORY_BARRIER_COMPILE;
+}
+
+void cDataPlane::set_worker_base_state_update(bool first_state)
+{
+	first_state_update_global_base = first_state;
+}
+
 eResult cDataPlane::parseConfig(const std::string& configFilePath)
 {
 	eResult result = eResult::success;
@@ -2461,5 +2518,29 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 		return eResult::errorInitEal;
 	}
 
+	return eResult::success;
+}
+
+eResult cDataPlane::UpdateChashWeights()
+{
+	for (auto& [socket, bases] : globalBases)
+	{
+		auto& next = bases[currentGlobalBaseId ^ 1];
+		for (auto& [id, service] : chash_balancer.at(socket).current.services)
+		{
+			std::vector<balancer_real_id_t> weights;
+			auto& svc = next->balancer_services[id];
+			weights.reserve(svc.real_size);
+			balancer_real_id_t* ids_begin = next->balancer_service_reals + svc.real_start;
+			balancer_real_id_t* ids_end = next->balancer_service_reals + svc.real_start + svc.real_size;
+			for (auto it = ids_begin; it != ids_end; ++it)
+			{
+				weights.push_back(next->balancer_real_states[*it].weight);
+			}
+			service.Update(ids_begin,
+			               ids_end,
+			               weights.begin());
+		}
+	}
 	return eResult::success;
 }
