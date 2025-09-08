@@ -442,6 +442,11 @@ public:
 		tcp_options.Debug();
 		timeouts.Debug();
 	}
+
+	std::string Protocol() const
+	{
+		return balancer::from_proto(proto);
+	}
 };
 
 using proxy_services = std::map<service_t::key_t, service_t>;
