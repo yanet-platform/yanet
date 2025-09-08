@@ -1141,7 +1141,7 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
     {
         DebugPacket("\tservice synack client not found", service_id, ipv4_header, tcp_header);
         RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SynAckNoLoc, 0, tcp_header->dst_port));
-        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search_syn_ack]++;
         return false;
     }
     uint32_t client_addr;
@@ -1291,7 +1291,7 @@ bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_inf
     {
         DebugPacket("service ack client not found", service_id, ipv4_header, tcp_header);
         RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckNoLoc, tcp_header->dst_port, 0));
-        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search_ack]++;
         return false;
     }
     uint32_t client_addr;

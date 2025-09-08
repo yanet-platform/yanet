@@ -126,7 +126,6 @@ inline void AddData(rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, uint32_t data_siz
         YANET_LOG_WARNING("NOT ENOUGH TAILROOM\n");
         return;
     }
-    memset(data, 1, data_size);
     ipv4_header->total_length = rte_cpu_to_be_16(rte_pktmbuf_pkt_len(mbuf));
 }
 
@@ -518,7 +517,10 @@ void Benchmark(const Config& config) {
     std::cout << "counters:\n";
     for (uint32_t i = 0; i < ::proxy::names.size(); i++)
     {
-        std::cout << "\t" << ::proxy::names[i] << ": " << syn_stats.counters[i] << "\n";
+        if (syn_stats.counters[i] != 0)
+        {
+            std::cout << "\t" << ::proxy::names[i] << ": " << syn_stats.counters[i] << "\n";
+        }
     }
 
     std::cout << "\nThreads:\n";
@@ -533,6 +535,9 @@ void Benchmark(const Config& config) {
     std::cout << "counters:\n";
     for (uint32_t i = 0; i < ::proxy::names.size(); i++)
     {
-        std::cout << "\t" << ::proxy::names[i] << ": " << stats.counters[i] << "\n";
+        if (stats.counters[i] != 0)
+        {
+            std::cout << "\t" << ::proxy::names[i] << ": " << stats.counters[i] << "\n";
+        }
     }
 }
