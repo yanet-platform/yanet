@@ -63,7 +63,6 @@ struct RateLimitBucket
     uint32_t addresses[bucket_size]{};
     uint32_t cost{};
     uint32_t capacity{};
-    uint32_t ring_idx{};
     rte_spinlock_t spinlock;
 
     void Lock()
@@ -81,7 +80,9 @@ struct RateLimitBucket
 class RateLimitTable
 {
 public:
-    bool Init(uint32_t number_connections, uint32_t max_connection_rate, uint32_t burst_capacity, uint64_t timeout_ms,
+    constexpr static uint64_t timeout_ms = 1000;
+
+    bool Init(uint32_t number_connections, uint32_t max_connection_rate, uint32_t burst_capacity,
               dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
     {
         if (initialized_) return true;
@@ -110,7 +111,6 @@ public:
         }
 
         number_buckets_ = number_buckets;
-        timeout_ = timeout_ms;
 #ifdef CONFIG_YADECAP_UNITTEST
         hash_init_ = 0;
 #else
@@ -154,21 +154,12 @@ public:
                 bucket->Unlock();
                 return result;
             }
-            else if (bucket->addresses[i] == 0 || bucket->last_times[i] + timeout_ < current_time_ms)
+            else if (bucket->addresses[i] == 0 || bucket->last_times[i] + timeout_ms < current_time_ms)
             {
                 free_idx = i;
             }
         }
 
-        if (timeout_ == 0)
-        {
-            bucket->addresses[bucket->ring_idx] = addr;
-            bucket->edts[bucket->ring_idx] = current_time_ms + bucket->cost;
-            bucket->last_times[bucket->ring_idx] = current_time_ms;
-            bucket->ring_idx = (bucket->ring_idx + 1) % RateLimitBucket::bucket_size;
-            bucket->Unlock();
-            return true;
-        }
         if (free_idx != 0xFFFFFFFF)
         {
             bucket->addresses[free_idx] = addr;
@@ -216,7 +207,6 @@ public:
     {
         buckets_ = other.buckets_;
         number_buckets_ = other.number_buckets_;
-        timeout_ = other.timeout_;
         hash_init_ = other.hash_init_;
         initialized_ = other.initialized_;
     }
@@ -225,7 +215,6 @@ public:
     {
         buckets_ = nullptr;
         number_buckets_ = 0;
-        timeout_ = 0;
         hash_init_ = 0;
         initialized_ = false;
     }
@@ -238,14 +227,13 @@ public:
         }
 
         char loc_buf[256];
-        snprintf(loc_buf, sizeof(loc_buf), "initialized_=%d, number_buckets_=%d, timeout_=%lu, buckets_=%p", initialized_, number_buckets_, timeout_, buckets_);
+        snprintf(loc_buf, sizeof(loc_buf), "initialized_=%d, number_buckets_=%d, buckets_=%p", initialized_, number_buckets_, buckets_);
         return std::string(loc_buf);
     }
 
 private:
     RateLimitBucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;
-    uint64_t timeout_ = 0;
     uint32_t hash_init_ = 0;
     bool initialized_ = false;
 };
@@ -253,9 +241,7 @@ private:
 class ConnectionLimitTable
 {
 public:
-    using hashtable_t = ::dataplane::hashtable_mod_spinlock_dynamic<uint32_t, uint32_t, 16>;
-
-    constexpr static uint32_t timeout = 1;
+    using hashtable_t = ::dataplane::hashtable_mod_spinlock_dynamic<uint32_t, uint64_t, 16>;
 
     bool Init(uint32_t number_connections,
               dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
@@ -285,12 +271,12 @@ public:
         return true;
     }
 
-    bool Exists(uint32_t addr, uint32_t current_time)
+    bool Exists(uint32_t addr, uint64_t current_time_ms)
     {
-        uint32_t* last_time = nullptr;
+        uint64_t* until = nullptr;
         ::dataplane::spinlock_nonrecursive_t* lock = nullptr;
-        table_->lookup(addr, last_time, lock);
-        if (last_time && *last_time + timeout >= current_time)
+        table_->lookup(addr, until, lock);
+        if (until && *until > current_time_ms)
         {
             lock->unlock();
             return true;
@@ -299,9 +285,14 @@ public:
         return false;
     }
 
-    bool Add(uint32_t addr, uint32_t current_time)
+    bool Add(uint32_t addr, uint64_t current_time_ms, uint64_t timeout_ms)
     {
-        return table_->insert_or_update(addr, current_time);
+        constexpr static uint64_t min_timeout_dist = 3000;
+        static thread_local std::random_device rd;
+        static thread_local std::mt19937 gen(rd());
+        std::uniform_int_distribution<uint64_t> dist(timeout_ms, timeout_ms + std::max(min_timeout_dist, timeout_ms / 5));
+        uint64_t time_until_ms = current_time_ms + dist(gen);
+        return table_->insert_or_update(addr, time_until_ms);
     }
 
     void Remove(uint32_t addr)

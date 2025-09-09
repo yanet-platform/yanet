@@ -13,24 +13,25 @@ namespace {
 TEST(ConnectionLimitTableTest, ConnLimit)
 {
     const uint32_t num_connections = 1024;
+    const uint64_t timeout = 1000;
 
     ConnectionLimitTable connlimit;
     ASSERT_TRUE(connlimit.Init(num_connections, nullptr, 0, ""));
 
-    uint32_t current_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    uint64_t current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     ASSERT_FALSE(connlimit.Exists(1, current_time));
-    current_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-    ASSERT_TRUE(connlimit.Add(1, current_time));
+    current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    ASSERT_TRUE(connlimit.Add(1, current_time, timeout));
     ASSERT_TRUE(connlimit.Exists(1, current_time));
 
-    current_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-    ASSERT_TRUE(connlimit.Add(2, current_time));
+    current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    ASSERT_TRUE(connlimit.Add(2, current_time, timeout));
     ASSERT_TRUE(connlimit.Exists(2, current_time));
     connlimit.Remove(2);
     ASSERT_FALSE(connlimit.Exists(2, current_time));
 
-    sleep(2);
-    current_time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    sleep(4);
+    current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     ASSERT_FALSE(connlimit.Exists(1, current_time));
 }
 
@@ -62,7 +63,7 @@ TEST(ConnectionLimitTableTest, Benchmark)
                 std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
                 for (uint32_t i = 0; i < iterations; i++)
                 {
-                    connlimit.Add(i, 0);
+                    connlimit.Add(i, 0, 1000);
                 }
                 auto find_elapsed = std::chrono::steady_clock::now() - start;
 
@@ -150,7 +151,7 @@ TEST(ConnectionLimitTableTest, BenchmarkConcurrent)
                         unsigned int start = i * iter_per_future;
                         for (unsigned int k = start; k < start + iter_per_future; k++)
                         {
-                            connlimit.Add(k, 0);
+                            connlimit.Add(k, 0, 1000);
                         }
                     });
                 }
