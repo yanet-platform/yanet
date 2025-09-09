@@ -4,6 +4,7 @@
 #include "memory_manager.h"
 #include "syncookies.h"
 #include "rte_hash_crc.h"
+#include "hashtable.h"
 
 #include <atomic>
 #include <random>
@@ -249,175 +250,78 @@ private:
     bool initialized_ = false;
 };
 
-struct ConnectionLimitBucket
-{
-    static constexpr uint32_t bucket_size = 16;
-
-    ConnectionLimitBucket()
-    {
-        rte_spinlock_init(&spinlock);
-    }
-
-    uint32_t addresses[bucket_size]{};
-    uint32_t connections[bucket_size]{};
-    rte_spinlock_t spinlock;
-
-    void Lock()
-    {
-        rte_spinlock_lock(&spinlock);
-    }
-
-    void Unlock()
-    {
-        rte_spinlock_unlock(&spinlock);
-    }
-
-} __rte_cache_aligned;
-
 class ConnectionLimitTable
 {
 public:
-    bool Init(uint32_t number_connections, uint32_t max_connections,
+    using hashtable_t = ::dataplane::hashtable_mod_spinlock_dynamic<uint32_t, uint32_t, 16>;
+
+    constexpr static uint32_t timeout = 1;
+
+    bool Init(uint32_t number_connections,
               dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
     {
         if (initialized_) return true;
         
-        uint32_t number_buckets = number_connections / ConnectionLimitBucket::bucket_size;        
-#ifdef CONFIG_YADECAP_UNITTEST
-        buckets_ = new ConnectionLimitBucket[number_buckets]{};
+        #ifdef CONFIG_YADECAP_UNITTEST
+        void* pointer = malloc(hashtable_t::calculate_sizeof(number_connections));
+        if (pointer == nullptr)
+        {
+            return false;
+        }
+        memset(pointer, 0, hashtable_t::calculate_sizeof(number_connections));
+        table_ = new (reinterpret_cast<hashtable_t*>(pointer)) hashtable_t();
 #else
-        buckets_ = memory_manager->create_static_array<ConnectionLimitBucket>(name.data(), number_buckets, socket_id);
+        table_ = memory_manager->create<hashtable_t>(name.data(), socket_id, hashtable_t::calculate_sizeof(number_connections));
 #endif
-
-        if (buckets_ == nullptr)
+        if (table_ == nullptr)
         {
             return false;
         }
 
-        max_conns_ = max_connections;
-        number_buckets_ = number_buckets;
+        table_updater_.update_pointer(table_, socket_id, number_connections);
+
         initialized_ = true;
 
         return true;
     }
 
-    bool Add(uint32_t addr)
+    bool Exists(uint32_t addr, uint32_t current_time)
     {
-        uint64_t key = Hash(addr);
-        ConnectionLimitBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
-        bucket->Lock();
-        uint32_t free_idx = 0xFFFFFFFF;
-        for (uint32_t i = 0; i < ConnectionLimitBucket::bucket_size; i++)
+        uint32_t* last_time = nullptr;
+        ::dataplane::spinlock_nonrecursive_t* lock = nullptr;
+        table_->lookup(addr, last_time, lock);
+        if (last_time && *last_time + timeout >= current_time)
         {
-            if (bucket->addresses[i] == addr)
-            {
-                if (bucket->connections[i] < max_conns_)
-                {
-                    bucket->connections[i]++;
-                    bucket->Unlock();
-                    return true;
-                }
-                else
-                {
-                    bucket->Unlock();
-                    return false;
-                }
-            } 
-            else if (bucket->addresses[i] == 0 && free_idx == 0xFFFFFFFF)
-            {
-                free_idx = i;
-            }
-        }
-        if (free_idx != 0xFFFFFFFF)
-        {
-            bucket->addresses[free_idx] = addr;
-            bucket->connections[free_idx] = 1;
-            bucket->Unlock();
+            lock->unlock();
             return true;
         }
-
-        bucket->Unlock();
+        lock->unlock();
         return false;
     }
 
-    void Remove(uint32_t addr, uint32_t num)
+    bool Add(uint32_t addr, uint32_t current_time)
     {
-        uint64_t key = Hash(addr);
-        ConnectionLimitBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
-        bucket->Lock();
-        for (uint32_t i = 0; i < ConnectionLimitBucket::bucket_size; i++)
-        {
-            if (bucket->addresses[i] == addr)
-            {
-                bucket->connections[i] -= std::min(num, bucket->connections[i]);
-                bucket->Unlock();
-                return;
-            }
-        }
-        bucket->Unlock();
+        return table_->insert_or_update(addr, current_time);
     }
 
-    inline static uint32_t Hash(uint32_t addr)
+    void Remove(uint32_t addr)
     {
-        return addr;
+        table_->remove(addr);
     }
 
-    bool NeedUpdate(uint32_t number_connections)
+    uint32_t Size()
     {
-        return (number_buckets_ != number_connections / ConnectionLimitBucket::bucket_size) || !initialized_;
+        return table_updater_.get_stats().keys_count;
     }
 
-    void ClearIfNotEqual(const ConnectionLimitTable& other, dataplane::memory_manager* memory_manager)
+    hashtable_t::range_t GC(uint32_t offset, uint32_t step)
     {
-        if (buckets_ != other.buckets_ && buckets_ != nullptr)
-        {
-            Clear(memory_manager);
-        }
-    }
-
-    void Clear(dataplane::memory_manager* memory_manager)
-    {
-        if (buckets_ != nullptr)
-        {
-#ifdef CONFIG_YADECAP_UNITTEST
-            delete buckets_;
-#else
-            memory_manager->destroy(buckets_);
-#endif
-        }
-        ClearLinks();
-    }
-
-    void CopyFrom(const ConnectionLimitTable& other)
-    {
-        buckets_ = other.buckets_;
-        number_buckets_ = other.number_buckets_;
-        initialized_ = other.initialized_;
-    }
-
-    void ClearLinks()
-    {
-        buckets_ = nullptr;
-        number_buckets_ = 0;
-        initialized_ = false;
-    }
-
-    std::string Debug() const
-    {
-        if (!initialized_)
-        {
-            return "not initialized";
-        }
-
-        char loc_buf[256];
-        snprintf(loc_buf, sizeof(loc_buf), "initialized_=%d, number_buckets_=%d, buckets_=%p", initialized_, number_buckets_, buckets_);
-        return std::string(loc_buf);
+        return table_updater_.gc(offset, step);
     }
 
 private:
-    ConnectionLimitBucket* buckets_ = nullptr;
-    uint32_t number_buckets_ = 0;
-    uint32_t max_conns_ = 0;
+    hashtable_t::updater table_updater_;
+    hashtable_t* table_;
     bool initialized_ = false;
 };
 
