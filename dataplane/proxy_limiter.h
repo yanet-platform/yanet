@@ -243,7 +243,7 @@ class ConnectionLimitTable
 public:
     using hashtable_t = ::dataplane::hashtable_mod_spinlock_dynamic<uint32_t, uint64_t, 16>;
 
-    bool Init(uint32_t number_connections,
+    bool Init(uint32_t number_connections, uint64_t timeout_ms,
               dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
     {
         if (initialized_) return true;
@@ -266,6 +266,8 @@ public:
 
         table_updater_.update_pointer(table_, socket_id, number_connections);
 
+        number_connections_ = number_connections;
+        timeout_ = timeout_ms;
         initialized_ = true;
 
         return true;
@@ -285,12 +287,12 @@ public:
         return false;
     }
 
-    bool Add(uint32_t addr, uint64_t current_time_ms, uint64_t timeout_ms)
+    bool Add(uint32_t addr, uint64_t current_time_ms)
     {
         constexpr static uint64_t min_timeout_dist = 3000;
         static thread_local std::random_device rd;
         static thread_local std::mt19937 gen(rd());
-        std::uniform_int_distribution<uint64_t> dist(timeout_ms, timeout_ms + std::max(min_timeout_dist, timeout_ms / 5));
+        std::uniform_int_distribution<uint64_t> dist(timeout_, timeout_ + std::max(min_timeout_dist, timeout_ / 5));
         uint64_t time_until_ms = current_time_ms + dist(gen);
         return table_->insert_or_update(addr, time_until_ms);
     }
@@ -310,9 +312,65 @@ public:
         return table_updater_.gc(offset, step);
     }
 
+    bool NeedUpdate(uint32_t number_connections)
+    {
+        return (number_connections_ != number_connections) || !initialized_;
+    }
+
+    void ClearIfNotEqual(const ConnectionLimitTable& other, dataplane::memory_manager* memory_manager)
+    {
+        if (table_ != other.table_ && table_ != nullptr)
+        {
+            Clear(memory_manager);
+        }
+    }
+
+    void Clear(dataplane::memory_manager* memory_manager)
+    {
+        if (table_ != nullptr)
+        {
+#ifdef CONFIG_YADECAP_UNITTEST
+            delete table_;
+#else
+            memory_manager->destroy(table_);
+#endif
+        }
+        ClearLinks();
+    }
+
+    void CopyFrom(const ConnectionLimitTable& other)
+    {
+        table_ = other.table_;
+        number_connections_ = other.number_connections_;
+        timeout_ = other.timeout_;
+        initialized_ = other.initialized_;
+    }
+
+    void ClearLinks()
+    {
+        table_ = nullptr;
+        number_connections_ = 0;
+        timeout_ = 0;
+        initialized_ = false;
+    }
+
+    std::string Debug() const
+    {
+        if (!initialized_)
+        {
+            return "not initialized";
+        }
+
+        char loc_buf[256];
+        snprintf(loc_buf, sizeof(loc_buf), "initialized_=%d, number_connections_=%d, table_=%p", initialized_, number_connections_, table_);
+        return std::string(loc_buf);
+    }
+
 private:
     hashtable_t::updater table_updater_;
     hashtable_t* table_;
+    uint32_t number_connections_ = 0;
+    uint64_t timeout_ = 0;
     bool initialized_ = false;
 };
 

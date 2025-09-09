@@ -16,16 +16,16 @@ TEST(ConnectionLimitTableTest, ConnLimit)
     const uint64_t timeout = 1000;
 
     ConnectionLimitTable connlimit;
-    ASSERT_TRUE(connlimit.Init(num_connections, nullptr, 0, ""));
+    ASSERT_TRUE(connlimit.Init(num_connections, timeout, nullptr, 0, ""));
 
     uint64_t current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     ASSERT_FALSE(connlimit.Exists(1, current_time));
     current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-    ASSERT_TRUE(connlimit.Add(1, current_time, timeout));
+    ASSERT_TRUE(connlimit.Add(1, current_time));
     ASSERT_TRUE(connlimit.Exists(1, current_time));
 
     current_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
-    ASSERT_TRUE(connlimit.Add(2, current_time, timeout));
+    ASSERT_TRUE(connlimit.Add(2, current_time));
     ASSERT_TRUE(connlimit.Exists(2, current_time));
     connlimit.Remove(2);
     ASSERT_FALSE(connlimit.Exists(2, current_time));
@@ -58,12 +58,12 @@ TEST(ConnectionLimitTableTest, Benchmark)
                                                                             std::chrono::duration<double>,
                                                                             std::chrono::duration<double>> {
                 ConnectionLimitTable connlimit;
-                connlimit.Init(iterations, nullptr, 0, "");
+                connlimit.Init(iterations, 1000, nullptr, 0, "");
             
                 std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
                 for (uint32_t i = 0; i < iterations; i++)
                 {
-                    connlimit.Add(i, 0, 1000);
+                    connlimit.Add(i, 0);
                 }
                 auto find_elapsed = std::chrono::steady_clock::now() - start;
 
@@ -141,7 +141,7 @@ TEST(ConnectionLimitTableTest, BenchmarkConcurrent)
                                                                             std::chrono::duration<double>,
                                                                             std::chrono::duration<double>> {
                 ConnectionLimitTable connlimit;
-                connlimit.Init(iterations, nullptr, 0, "");
+                connlimit.Init(iterations, 1000, nullptr, 0, "");
             
                 std::vector<std::future<void>> fs(access_concurrency);
                 std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
@@ -151,7 +151,7 @@ TEST(ConnectionLimitTableTest, BenchmarkConcurrent)
                         unsigned int start = i * iter_per_future;
                         for (unsigned int k = start; k < start + iter_per_future; k++)
                         {
-                            connlimit.Add(k, 0, 1000);
+                            connlimit.Add(k, 0);
                         }
                     });
                 }
