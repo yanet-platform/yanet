@@ -1181,6 +1181,24 @@ void config_parser_t::loadConfig_proxy_timeouts(const nlohmann::json& moduleJson
 	timeouts.established = TimeoutValue(moduleJson, "established", default_timeouts.established);
 }
 
+void config_parser_t::loadConfig_proxy_rate_limit(const nlohmann::json& moduleJson,
+												 controlplane::proxy::rate_limit_t& rate_limit,
+												 const controlplane::proxy::rate_limit_t& default_rate_limit)
+{
+	rate_limit.size = moduleJson.value("sizeRateLimit", default_rate_limit.size);
+	rate_limit.rate = moduleJson.value("rateLimit", default_rate_limit.rate);
+	rate_limit.burst = moduleJson.value("burstLimit", default_rate_limit.burst);
+}
+
+void config_parser_t::loadConfig_proxy_connection_limit(const nlohmann::json& moduleJson,
+														 controlplane::proxy::connection_limit_t& connection_limit,
+														 const controlplane::proxy::connection_limit_t& default_connection_limit)
+{
+	connection_limit.size = moduleJson.value("sizeConnectionLimit", default_connection_limit.size);
+	connection_limit.limit = moduleJson.value("connectionLimit", default_connection_limit.limit);
+	connection_limit.timeout = moduleJson.value("timeoutConnectionLimit", default_connection_limit.timeout);
+}
+
 void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
                                        const std::string& moduleId,
                                        const nlohmann::json& moduleJson,
@@ -1224,6 +1242,8 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 	loadConfig_proxy_timeouts(moduleJson, proxy.timeouts, controlplane::proxy::timeouts_t());
 	proxy.debug_flags = moduleJson.value("debugFlags", 0);
 
+	loadConfig_proxy_rate_limit(moduleJson, proxy.rate_limit, controlplane::proxy::rate_limit_t());
+	loadConfig_proxy_connection_limit(moduleJson, proxy.connection_limit, controlplane::proxy::connection_limit_t());
 
 	if (moduleJson["services"].is_string())
 	{
@@ -1325,6 +1345,9 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 		loadConfig_proxy_tcp_options(service_json, service.tcp_options, proxy.tcp_options);
 		loadConfig_proxy_timeouts(service_json, service.timeouts, proxy.timeouts);
 		service.debug_flags = service_json.value("debugFlags", proxy.debug_flags);
+
+		loadConfig_proxy_rate_limit(service_json, service.rate_limit, proxy.rate_limit);
+		loadConfig_proxy_connection_limit(service_json, service.connection_limit, proxy.connection_limit);
 
 		// check duplicates
 		if (proxy.services.find(service.Key()) != proxy.services.end())

@@ -350,13 +350,47 @@ public:
 	uint32_t established{YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED};
 };
 
+class rate_limit_t
+{
+public:
+	rate_limit_t() = default;
+
+	SERIALIZABLE(size, rate, burst);
+
+	void Debug() const
+	{
+		YANET_LOG_WARNING("\tRate limit: size=%u, rate=%u, burst=%u\n", size, rate, burst);
+	}
+
+	uint32_t size{};
+	uint32_t rate{};
+	uint32_t burst{};
+};
+
+class connection_limit_t
+{
+public:
+	connection_limit_t() = default;
+
+	SERIALIZABLE(size, limit, timeout);
+
+	void Debug() const
+	{
+		YANET_LOG_WARNING("\tConnection limit: size=%u, limit=%d, timeout=%d\n", size, limit, timeout);
+	}
+
+	uint32_t size{};
+	uint32_t limit{};
+	uint32_t timeout{YANET_PROXY_DEFAULT_CONNECTION_LIMIT_TIMEOUT};
+};
+
 class service_t
 {
 public:
 	service_t() = default;
 
 	SERIALIZABLE(service_id, socket_id, service, proxy_addr, proxy_port, proto, upstream_addr, upstream_port, size_connections_table, 
-		size_syn_table, flow, upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts);
+		size_syn_table, flow, upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts, rate_limit, connection_limit);
 
 	using key_t = std::tuple<common::ip_address_t, tPortId, uint8_t>;
 
@@ -386,6 +420,9 @@ public:
 	tcp_options_t tcp_options;
 	timeouts_t timeouts;
 	uint64_t debug_flags;
+
+	rate_limit_t rate_limit;
+	connection_limit_t connection_limit;
 
 	key_t Key() const
 	{
@@ -433,6 +470,9 @@ public:
 	tcp_options_t tcp_options;
 	timeouts_t timeouts;
 	uint64_t debug_flags;
+
+	rate_limit_t rate_limit;
+	connection_limit_t connection_limit;
 };
 
 }

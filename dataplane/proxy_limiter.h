@@ -21,13 +21,7 @@ struct RateLimitBucket
         rte_spinlock_init(&spinlock);
     }
 
-    RateLimitBucket(uint32_t cost, uint32_t capacity)
-        : cost(cost), capacity(capacity)
-    {
-        rte_spinlock_init(&spinlock);
-    }
-
-    bool Check(uint32_t i, uint64_t current_time_ms)
+    bool Check(uint32_t i, uint64_t current_time_ms, uint32_t cost, uint32_t capacity)
     {
         last_times[i] = current_time_ms;
         if (current_time_ms > edts[i])
@@ -41,7 +35,7 @@ struct RateLimitBucket
         return true;
     }
 
-    bool Consume(uint32_t i, uint64_t current_time_ms)
+    bool Consume(uint32_t i, uint64_t current_time_ms, uint32_t cost, uint32_t capacity)
     {
         last_times[i] = current_time_ms;
         if (current_time_ms > edts[i])
@@ -61,8 +55,6 @@ struct RateLimitBucket
     uint64_t last_times[bucket_size]{};
 
     uint32_t addresses[bucket_size]{};
-    uint32_t cost{};
-    uint32_t capacity{};
     rte_spinlock_t spinlock;
 
     void Lock()
@@ -93,16 +85,12 @@ public:
         }
         
         uint32_t number_buckets = number_connections / RateLimitBucket::bucket_size;        
-        uint32_t cost = 1000 / max_connection_rate;
+        cost_ = 1000 / max_connection_rate;
+        capacity_ = burst_capacity * cost_;
 #ifdef CONFIG_YADECAP_UNITTEST
         buckets_ = new RateLimitBucket[number_buckets]{};
-        for (uint64_t i = 0; i < number_buckets; i++)
-		{
-            buckets_[i].cost = cost;
-            buckets_[i].capacity = burst_capacity * cost;
-		}
 #else
-        buckets_ = memory_manager->create_static_array<RateLimitBucket>(name.data(), number_buckets, socket_id, cost, burst_capacity * cost);
+        buckets_ = memory_manager->create_static_array<RateLimitBucket>(name.data(), number_buckets, socket_id);
 #endif
 
         if (buckets_ == nullptr)
@@ -125,6 +113,12 @@ public:
         return true;
     }
 
+    void Update(uint32_t max_connection_rate, uint32_t burst_capacity)
+    {
+        cost_ = 1000 / max_connection_rate;
+        capacity_ = burst_capacity * cost_;
+    }
+
     bool Check(uint32_t addr, uint64_t current_time_ms)
     {
         uint64_t key = Hash(addr);
@@ -133,7 +127,7 @@ public:
         {
             if (bucket->addresses[i] == addr)
             {
-                return bucket->Check(i, current_time_ms);
+                return bucket->Check(i, current_time_ms, cost_, capacity_);
             }
         }
 
@@ -150,7 +144,7 @@ public:
         {
             if (bucket->addresses[i] == addr)
             {
-                bool result = bucket->Consume(i, current_time_ms);
+                bool result = bucket->Consume(i, current_time_ms, cost_, capacity_);
                 bucket->Unlock();
                 return result;
             }
@@ -163,7 +157,7 @@ public:
         if (free_idx != 0xFFFFFFFF)
         {
             bucket->addresses[free_idx] = addr;
-            bucket->edts[free_idx] = current_time_ms + bucket->cost;
+            bucket->edts[free_idx] = current_time_ms + cost_;
             bucket->last_times[free_idx] = current_time_ms;
             bucket->Unlock();
             return true;
@@ -177,7 +171,7 @@ public:
         return rte_hash_crc_4byte(addr, hash_init_);
     }
 
-    bool NeedUpdate(uint32_t number_connections)
+    bool NeedReallocate(uint32_t number_connections)
     {
         return (number_buckets_ != number_connections / RateLimitBucket::bucket_size) || !initialized_;
     }
@@ -235,6 +229,8 @@ private:
     RateLimitBucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;
     uint32_t hash_init_ = 0;
+    uint32_t cost_ = 0;
+    uint32_t capacity_ = 0;
     bool initialized_ = false;
 };
 
@@ -271,6 +267,11 @@ public:
         initialized_ = true;
 
         return true;
+    }
+
+    void Update(uint64_t timeout_ms)
+    {
+        timeout_ = timeout_ms;
     }
 
     bool Exists(uint32_t addr, uint64_t current_time_ms)
@@ -312,7 +313,7 @@ public:
         return table_updater_.gc(offset, step);
     }
 
-    bool NeedUpdate(uint32_t number_connections)
+    bool NeedReallocate(uint32_t number_connections)
     {
         return (number_connections_ != number_connections) || !initialized_;
     }

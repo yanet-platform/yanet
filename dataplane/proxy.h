@@ -13,6 +13,7 @@
 #include "memory_manager.h"
 #include "proxy_connections.h"
 #include "proxy_debug.h"
+#include "proxy_limiter.h"
 #include "syncookies.h"
 #include "type.h"
 
@@ -48,6 +49,9 @@ struct proxy_service_config_t
 	controlplane::proxy::timeouts_t timeouts;
     uint64_t debug_flags;
 
+    controlplane::proxy::rate_limit_t rate_limit;
+    controlplane::proxy::connection_limit_t connection_limit;
+
     bool EnabledFlag(uint8_t flag) const;
     bool ReadConfig(const controlplane::proxy::service_t& service_info, tCounterId service_counter_id);
 
@@ -62,6 +66,8 @@ struct ProxyTables
     dataplane::proxy::LocalPool local_pool;
     dataplane::proxy::ServiceConnections service_connections;
     dataplane::proxy::ServiceSynConnections syn_connections;
+    dataplane::proxy::RateLimitTable rate_limit;
+    dataplane::proxy::ConnectionLimitTable connection_limit;
 
     bool NeedUpdate(const proxy_service_config_t& service_config);
     void ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager);
@@ -77,6 +83,8 @@ struct proxy_service_t
     proxy_service_config_t config;
 	proxy::proxy_v2_ipv4_hdr proxy_header;
 	ProxyTables tables;
+    RateLimitTable* rate_limit_table = nullptr;
+    ConnectionLimitTable* connection_limit_table = nullptr;
     SynCookies syn_cookie;
 
     void Debug() const;
@@ -88,6 +96,10 @@ struct proxy_service_on_socket_t
     proxy_service_config_t config;
 	ProxyTables tables_work;
     ProxyTables tables_tmp;
+    RateLimitTable rate_limit_table_work;
+    RateLimitTable rate_limit_table_tmp;
+    ConnectionLimitTable connection_limit_table_work;
+    ConnectionLimitTable connection_limit_table_tmp;
     bool enabled{false};
     std::shared_mutex mutex;
 

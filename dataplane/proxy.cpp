@@ -353,6 +353,10 @@ bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& se
 	timeouts.syn_recv = 1000 * service_info.timeouts.syn_recv;
 	timeouts.established = 1000 * service_info.timeouts.established;
 
+    rate_limit = service_info.rate_limit;
+    connection_limit = service_info.connection_limit;
+    connection_limit.timeout = 1000 * connection_limit.timeout;
+
     return true;
 }
 
@@ -368,6 +372,49 @@ eResult proxy_service_on_socket_t::UpdateFirstStage(dataplane::proxy::proxy_serv
         }
     }
     service.tables.CopyFrom(tables_tmp);
+
+    if (service.config.rate_limit.size > 0)
+    {
+        if (rate_limit_table_tmp.NeedReallocate(service.config.rate_limit.size))
+        {
+            rate_limit_table_tmp.ClearIfNotEqual(rate_limit_table_work, memory_manager);
+            rate_limit_table_tmp.ClearLinks();
+            if (!rate_limit_table_tmp.Init(service.config.rate_limit.size, service.config.rate_limit.rate, service.config.rate_limit.burst,
+                                           memory_manager, service.config.socket_id, "tcp_proxy.rate_limit." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id)))
+            {
+                YANET_LOG_ERROR("Error initialization TcpProxy.RateLimit, service: %d\n", service.config.service_id);
+                return eResult::errorAllocatingMemory;
+            }
+        }
+        rate_limit_table_tmp.Update(service.config.rate_limit.rate, service.config.rate_limit.burst);
+        service.rate_limit_table = &rate_limit_table_tmp;
+    }
+    else
+    {
+        service.rate_limit_table = nullptr;
+    }
+
+    if (service.config.connection_limit.size > 0)
+    {
+        if (connection_limit_table_tmp.NeedReallocate(service.config.connection_limit.size))
+        {
+            connection_limit_table_tmp.ClearIfNotEqual(connection_limit_table_work, memory_manager);
+            connection_limit_table_tmp.ClearLinks();
+            if (!connection_limit_table_tmp.Init(service.config.connection_limit.size, service.config.connection_limit.timeout,
+                                                 memory_manager, service.config.socket_id, "tcp_proxy.connection_limit." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id)))
+            {
+                YANET_LOG_ERROR("Error initialization TcpProxy.ConnectionLimit, service: %d\n", service.config.service_id);
+                return eResult::errorAllocatingMemory;
+            }
+        }
+        connection_limit_table_tmp.Update(service.config.connection_limit.timeout);
+        service.connection_limit_table = &connection_limit_table_tmp;
+    }
+    else
+    {
+        service.connection_limit_table = nullptr;
+    }
+
     config = service.config;
     enabled = true;
 
@@ -379,6 +426,28 @@ void proxy_service_on_socket_t::UpdateSecondStage(dataplane::proxy::proxy_servic
     tables_work.ClearIfNotEqual(tables_tmp, memory_manager);
     tables_work.CopyFrom(tables_tmp);
 	service.tables.CopyFrom(tables_work);
+
+    if (service.config.rate_limit.size > 0)
+    {
+        rate_limit_table_work.ClearIfNotEqual(rate_limit_table_tmp, memory_manager);
+        rate_limit_table_work.CopyFrom(rate_limit_table_tmp);
+        service.rate_limit_table = &rate_limit_table_work;
+    }
+    else
+    {
+        service.rate_limit_table = nullptr;
+    }
+
+    if (service.config.connection_limit.size > 0)
+    {
+        connection_limit_table_work.ClearIfNotEqual(connection_limit_table_tmp, memory_manager);
+        connection_limit_table_work.CopyFrom(connection_limit_table_tmp);
+        service.connection_limit_table = &connection_limit_table_work;
+    }
+    else
+    {
+        service.connection_limit_table = nullptr;
+    }
 }
 
 eResult TcpConnectionStore::ServiceUpdateOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager)
@@ -1374,7 +1443,9 @@ bool ProxyTables::NeedUpdate(const proxy_service_config_t& service_config)
     // YANET_LOG_WARNING("NeedUpdate %d check: con=(%d, %ld), syn=(%d, %ld) need=(%d, %d, %d)\n", service_config.service_id,
     //     service_config.size_connections_table, service_connections.Capacity(), service_config.size_syn_table, syn_connections.Capacity(),
     //     service_connections.NeedUpdate(service_config.size_connections_table), syn_connections.NeedUpdate(service_config.size_syn_table), local_pool.NeedUpdate(service_config.pool_prefix));
-    return service_connections.NeedUpdate(service_config.size_connections_table) || syn_connections.NeedUpdate(service_config.size_syn_table) || local_pool.NeedUpdate(service_config.pool_prefix);
+    return service_connections.NeedUpdate(service_config.size_connections_table)
+            || syn_connections.NeedUpdate(service_config.size_syn_table)
+            || local_pool.NeedUpdate(service_config.pool_prefix);
 }
 
 void ProxyTables::ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager)

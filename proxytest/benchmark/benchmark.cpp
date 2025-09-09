@@ -51,6 +51,8 @@ dataplane::proxy::proxy_service_config_t GetProxyConfig()
             .established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED,
         },
         .debug_flags = 0,
+        .rate_limit = {},
+        .connection_limit = {},
     };
 
     return service_config;

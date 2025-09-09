@@ -41,6 +41,8 @@ protected:
 	void loadConfig_proxy_services(controlplane::base_t& baseNext, controlplane::proxy::config_t& proxy, const nlohmann::json& json, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_proxy_tcp_options(const nlohmann::json& moduleJson, controlplane::proxy::tcp_options_t& options, const controlplane::proxy::tcp_options_t& default_tcp_options);
 	void loadConfig_proxy_timeouts(const nlohmann::json& moduleJson, controlplane::proxy::timeouts_t& timeouts, const controlplane::proxy::timeouts_t& default_timeouts);
+	void loadConfig_proxy_rate_limit(const nlohmann::json& moduleJson, controlplane::proxy::rate_limit_t& rate_limit, const controlplane::proxy::rate_limit_t& default_rate_limit);
+	void loadConfig_proxy_connection_limit(const nlohmann::json& moduleJson, controlplane::proxy::connection_limit_t& connection_limit, const controlplane::proxy::connection_limit_t& default_connection_limit);
 	void loadConfig_proxy_fill_sockets(controlplane::base_t& baseNext);
 
 	void loadConfig_variables(controlplane::base_t& baseNext, const nlohmann::json& json);
