@@ -149,6 +149,8 @@ def BuildBrokenSynPacket():
     write(tcp_data, 4, ProxyTest.START_CLIENT_SEQ, 4) # seq
     tcp_data[12] = 0x40 # header size - 4 < 5 - incorrect
     tcp_data[13] = 0x02 # syn flag
+    tcp_data[16] = 0x50 # 16-17 - tcp chksum
+    tcp_data[17] = 0xd4
     write(tcp_data, 14, 8192, 2) # window size
     
     request = Ether(src=ProxyTest.MAC_CLIENT, dst=ProxyTest.MAC_PROXY) \
