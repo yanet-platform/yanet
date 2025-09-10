@@ -1188,6 +1188,17 @@ void config_parser_t::loadConfig_proxy_rate_limit(const nlohmann::json& moduleJs
 	rate_limit.size = moduleJson.value("sizeRateLimit", default_rate_limit.size);
 	rate_limit.rate = moduleJson.value("rateLimit", default_rate_limit.rate);
 	rate_limit.burst = moduleJson.value("burstLimit", default_rate_limit.burst);
+	if (rate_limit.size != 0)
+	{
+		if (!IsPower2(rate_limit.size))
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "sizeRateLimit must be 0 or power of 2");
+		}
+		if (rate_limit.rate == 0)
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "rateLimit must not be 0");
+		}
+	}
 }
 
 void config_parser_t::loadConfig_proxy_connection_limit(const nlohmann::json& moduleJson,
@@ -1197,6 +1208,17 @@ void config_parser_t::loadConfig_proxy_connection_limit(const nlohmann::json& mo
 	connection_limit.size = moduleJson.value("sizeConnectionLimit", default_connection_limit.size);
 	connection_limit.limit = moduleJson.value("connectionLimit", default_connection_limit.limit);
 	connection_limit.timeout = moduleJson.value("timeoutConnectionLimit", default_connection_limit.timeout);
+	if (connection_limit.size != 0)
+	{
+		if (!IsPower2(connection_limit.size))
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "sizeConnectionLimit must be 0 or power of 2");
+		}
+		if (connection_limit.limit == 0)
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "connectionLimit must not be 0");
+		}
+	}
 }
 
 void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
