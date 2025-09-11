@@ -28,7 +28,7 @@ struct RateLimitBucket
         {
             return true;
         }
-        else if (edts[i] - current_time_ms > (capacity - cost))
+        else if (capacity == 0 || edts[i] - current_time_ms > (capacity - cost))
         {
             return false;
         }
@@ -43,7 +43,7 @@ struct RateLimitBucket
             edts[i] = current_time_ms + cost;
             return true;
         }
-        else if (edts[i] - current_time_ms > (capacity - cost))
+        else if (capacity == 0 || edts[i] - current_time_ms > (capacity - cost))
         {
             return false;
         }
@@ -78,9 +78,9 @@ public:
               dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
     {
         if (initialized_) return true;
-        if (max_connection_rate > 1000)
+        if (max_connection_rate == 0 || max_connection_rate > 1000)
         {
-            YANET_LOG_ERROR("max_connection_rate must not be greater than 1000");
+            YANET_LOG_ERROR("max_connection_rate must be between 1 and 1000");
             return false;
         }
         
@@ -243,6 +243,12 @@ public:
               dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
     {
         if (initialized_) return true;
+
+        if (timeout_ms == 0)
+        {
+            YANET_LOG_ERROR("timeout_ms must be greater than 0\n");
+            return false;
+        }
         
         #ifdef CONFIG_YADECAP_UNITTEST
         void* pointer = malloc(hashtable_t::calculate_sizeof(number_connections));
