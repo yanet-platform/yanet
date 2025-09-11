@@ -775,6 +775,17 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
     RINGLOG_CONDITION(worker_info.globalBase->ringlog_enabled && worker_info.globalBase->ringlog_value == ipv4_header->src_addr);
     bool action = true;
 
+    if (service.connection_limit_table && service.connection_limit_table->Exists(ipv4_header->src_addr, worker_info.current_time_ms))
+    {
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::cl_packets_dropped]++;
+        return false;
+    }
+    if (service.rate_limit_table && !service.rate_limit_table->Check(ipv4_header->src_addr, worker_info.current_time_ms))
+    {
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
+        return false;
+    }
+
     uint32_t chksum_work = CheckSumBeforeUpdate(ipv4_header, tcp_header);
     SynConnectionData syn_connection_data;
     switch (service.tables.syn_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, worker_info.current_time_ms, syn_connection_data, !service.config.EnabledFlag(dataplane::proxy::proxy_service_config_t::flag_dont_use_bucket_optimization)))
@@ -902,6 +913,12 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
     bool action = true;
     uint32_t chksum_work = CheckSumBeforeUpdate(ipv4_header, tcp_header);
     uint32_t size_proxy_header = 0;
+
+    if (service.connection_limit_table && service.connection_limit_table->Exists(ipv4_header->src_addr, worker_info.current_time_ms))
+    {
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::cl_packets_dropped]++;
+        return false;
+    }
 
     ServiceConnectionData service_connection_data;
     switch (service.tables.service_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, worker_info.current_time_ms, service_connection_data, false))
@@ -1041,6 +1058,11 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::ack_invalid_ack_number]++;
                     action = false;
                 }
+                else if (service.rate_limit_table && !service.rate_limit_table->CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
+                {
+                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
+                    action = false;
+                }
                 else
                 {
                     DebugPacket("\tadd to service", service_id, ipv4_header, tcp_header);
@@ -1080,6 +1102,11 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                     RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::AckBadCookie, tcp_header->src_port, 0));
 
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
+                    action = false;
+                }
+                else if (service.rate_limit_table && !service.rate_limit_table->CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
+                {
+                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
                     action = false;
                 }
                 else

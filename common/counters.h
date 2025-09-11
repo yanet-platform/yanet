@@ -84,7 +84,10 @@ constexpr std::array names = std::array{"packets_in",
 										"ack_invalid_ack_number",
 										"pkts_with_corrupted_tcp_opts_client",
 										"pkts_with_corrupted_tcp_opts_service",
-										"rst_service"};
+										"rst_service",
+										"cl_packets_dropped",
+										"rl_packets_dropped"
+									};
 
 enum class service_counter : tCounterId
 {
@@ -112,6 +115,8 @@ enum class service_counter : tCounterId
 	pkts_with_corrupted_tcp_opts_client,
 	pkts_with_corrupted_tcp_opts_service,
 	rst_service,
+	cl_packets_dropped,
+	rl_packets_dropped,
 	size
 };
 
