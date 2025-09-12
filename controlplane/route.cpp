@@ -1629,6 +1629,9 @@ void route_t::AddRequestForEachSocket(common::idp::updateGlobalBase::request& gl
 	});
 }
 
+namespace
+{
+
 void AddRequestInterface(
         std::vector<route::tunnel_value_interface_t>& request_interface,
         const route::generation_t& generation,
@@ -1654,6 +1657,8 @@ void AddRequestInterface(
 		                               default_nexthop);
 	}
 }
+
+} // namespace
 
 bool route_t::MakePerSocketRequest(
         common::idp::updateGlobalBase::request& globalbase,
@@ -1846,14 +1851,14 @@ void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globa
 			});
 		}
 
-		const auto& [weight_start, weight_size, weight_is_fallback] = tunnel_weights.insert(weights);
-		update_weight_start = weight_start;
-		update_weight_size = weight_size;
+		const auto& [weight, weight_is_fallback] = tunnel_weights.insert(weights);
+		update_weight_start = weight.start;
+		update_weight_size = weight.size;
 
 		if (weight_is_fallback)
 		{
-			tunnel_value_lookup[value_id][socket_id].resize(weight_size);
-			weight_total = weight_size;
+			tunnel_value_lookup[value_id][socket_id].resize(weight.size);
+			weight_total = weight.size;
 		}
 
 		for (auto& [nexthop, egress_interface_name, label, peer_id, origin_as, weight_percent] : tunnel_value_lookup[value_id][socket_id])
