@@ -387,11 +387,7 @@ eResult proxy_service_on_socket_t::UpdateFirstStage(dataplane::proxy::proxy_serv
             }
         }
         rate_limit_table_tmp.Update(service.config.rate_limit.rate, service.config.rate_limit.burst);
-        service.rate_limit_table = &rate_limit_table_tmp;
-    }
-    else
-    {
-        service.rate_limit_table = nullptr;
+        service.rate_limit_table.CopyFrom(rate_limit_table_tmp);
     }
 
     if (service.config.connection_limit.size > 0)
@@ -408,11 +404,7 @@ eResult proxy_service_on_socket_t::UpdateFirstStage(dataplane::proxy::proxy_serv
             }
         }
         connection_limit_table_tmp.Update(service.config.connection_limit.timeout);
-        service.connection_limit_table = &connection_limit_table_tmp;
-    }
-    else
-    {
-        service.connection_limit_table = nullptr;
+        service.connection_limit_table.CopyFrom(connection_limit_table_tmp);
     }
 
     config = service.config;
@@ -431,22 +423,14 @@ void proxy_service_on_socket_t::UpdateSecondStage(dataplane::proxy::proxy_servic
     {
         rate_limit_table_work.ClearIfNotEqual(rate_limit_table_tmp, memory_manager);
         rate_limit_table_work.CopyFrom(rate_limit_table_tmp);
-        service.rate_limit_table = &rate_limit_table_work;
-    }
-    else
-    {
-        service.rate_limit_table = nullptr;
+        service.rate_limit_table.CopyFrom(rate_limit_table_work);
     }
 
     if (service.config.connection_limit.size > 0)
     {
         connection_limit_table_work.ClearIfNotEqual(connection_limit_table_tmp, memory_manager);
         connection_limit_table_work.CopyFrom(connection_limit_table_tmp);
-        service.connection_limit_table = &connection_limit_table_work;
-    }
-    else
-    {
-        service.connection_limit_table = nullptr;
+        service.connection_limit_table.CopyFrom(connection_limit_table_work);
     }
 }
 
@@ -586,7 +570,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
 
                 for (const auto& iter : connections)
                 {
-                    if (iter.second > service.config.connection_limit.limit)
+                    if (iter.second >= service.config.connection_limit.limit)
                     {
                         service.connection_limit_table_work.Add(iter.first, current_time_ms);
                     }
@@ -696,6 +680,7 @@ common::idp::proxy_blacklist_add::response TcpConnectionStore::AddBlacklist(prox
 {
     common::ipv4_address_t address_ipv4(address);
     uint32_t address_be = rte_cpu_to_be_32(address_ipv4);
+    uint64_t current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     common::idp::proxy_blacklist_add::response response;
     if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
     {
@@ -703,8 +688,7 @@ common::idp::proxy_blacklist_add::response TcpConnectionStore::AddBlacklist(prox
         {
             if (all_services[service_id].config.connection_limit.size == 0) continue;
             std::unique_lock lock(all_services[service_id].mutex);
-            YANET_LOG_WARNING("ADD %p\n", &all_services[service_id].connection_limit_table_work);
-            if(!all_services[service_id].connection_limit_table_work.Add(address_be, (uint64_t)timeout * 1000))
+            if(!all_services[service_id].connection_limit_table_work.Add(address_be, current_time_ms, (uint64_t)timeout * 1000))
             {
                 YANET_LOG_ERROR("Failed to add address to blacklist\n");
             }
@@ -849,12 +833,12 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
     RINGLOG_CONDITION(worker_info.globalBase->ringlog_enabled && worker_info.globalBase->ringlog_value == ipv4_header->src_addr);
     bool action = true;
 
-    if (service.connection_limit_table && service.connection_limit_table->Exists(ipv4_header->src_addr, worker_info.current_time_ms))
+    if (service.connection_limit_table.Exists(ipv4_header->src_addr, worker_info.current_time_ms))
     {
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::cl_packets_dropped]++;
         return false;
     }
-    if (service.rate_limit_table && !service.rate_limit_table->Check(ipv4_header->src_addr, worker_info.current_time_ms))
+    if (!service.rate_limit_table.Check(ipv4_header->src_addr, worker_info.current_time_ms))
     {
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
         return false;
@@ -988,7 +972,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
     uint32_t chksum_work = CheckSumBeforeUpdate(ipv4_header, tcp_header);
     uint32_t size_proxy_header = 0;
 
-    if (service.connection_limit_table && service.connection_limit_table->Exists(ipv4_header->src_addr, worker_info.current_time_ms))
+    if (service.connection_limit_table.Exists(ipv4_header->src_addr, worker_info.current_time_ms))
     {
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::cl_packets_dropped]++;
         return false;
@@ -1132,7 +1116,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::ack_invalid_ack_number]++;
                     action = false;
                 }
-                else if (service.rate_limit_table && !service.rate_limit_table->CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
+                else if (!service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
                 {
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
                     action = false;
@@ -1178,7 +1162,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
                     action = false;
                 }
-                else if (service.rate_limit_table && !service.rate_limit_table->CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
+                else if (!service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
                 {
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
                     action = false;

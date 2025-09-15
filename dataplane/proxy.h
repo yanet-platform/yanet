@@ -84,8 +84,8 @@ struct proxy_service_t
     proxy_service_config_t config;
 	proxy::proxy_v2_ipv4_hdr proxy_header;
 	ProxyTables tables;
-    RateLimitTable* rate_limit_table = nullptr;
-    ConnectionLimitTable* connection_limit_table = nullptr;
+    RateLimitTable rate_limit_table;
+    ConnectionLimitTable connection_limit_table;
     SynCookies syn_cookie;
 
     void Debug() const;

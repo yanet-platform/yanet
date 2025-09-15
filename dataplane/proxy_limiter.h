@@ -121,6 +121,8 @@ public:
 
     bool Check(uint32_t addr, uint64_t current_time_ms)
     {
+        if (unlikely(!initialized_)) return true;
+
         uint64_t key = Hash(addr);
         RateLimitBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
         for (uint32_t i = 0; i < RateLimitBucket::bucket_size; i++)
@@ -136,6 +138,8 @@ public:
 
     bool CheckAndConsume(uint32_t addr, uint64_t current_time_ms)
     {
+        if (unlikely(!initialized_)) return true;
+
         uint64_t key = Hash(addr);
         RateLimitBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
         uint32_t free_idx = 0xFFFFFFFF;
@@ -202,6 +206,8 @@ public:
         buckets_ = other.buckets_;
         number_buckets_ = other.number_buckets_;
         hash_init_ = other.hash_init_;
+        cost_ = other.cost_;
+        capacity_ = other.capacity_;
         initialized_ = other.initialized_;
     }
 
@@ -210,7 +216,13 @@ public:
         buckets_ = nullptr;
         number_buckets_ = 0;
         hash_init_ = 0;
+        cost_ = 0;
+        capacity_ = 0;
         initialized_ = false;
+    }
+
+    bool IsInitialized() const {
+        return initialized_;
     }
 
     std::string Debug() const
@@ -378,6 +390,10 @@ public:
         number_connections_ = 0;
         timeout_ = 0;
         initialized_ = false;
+    }
+
+    bool IsInitialized() const {
+        return initialized_;
     }
 
     std::string Debug() const

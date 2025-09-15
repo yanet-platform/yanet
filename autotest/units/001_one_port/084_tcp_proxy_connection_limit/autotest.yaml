@@ -1,0 +1,40 @@
+steps:
+- cli:
+  - rib static insert default 10.0.1.0/24 10.0.1.1
+  - rib static insert default 10.0.2.0/24 10.0.2.1
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+- cli:
+  - proxy blacklist add type1 10.0.2.1 1
+  - proxy blacklist type1
+
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+
+- sleep: 4
+
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+
+- sleep: 1
+
+- sendPackets:
+  - port: kni0
+    send: 004-send.pcap
+    expect: 004-expect.pcap
+
+- cli:
+  - proxy connections type
+  - proxy syn type
+  - rib static remove default 10.0.1.0/24 10.0.1.1
+  - rib static remove default 10.0.2.0/24 10.0.2.1
+  - rib prefixes
