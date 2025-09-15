@@ -84,6 +84,8 @@ enum class requestType : uint32_t
         proxy_connections,
         proxy_syn,
         proxy_tables,
+        proxy_blacklist,
+        proxy_blacklist_add,
         getPhysicalPortsFull,
         proxy_services_clear,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
@@ -868,6 +870,25 @@ using tables = std::tuple<proxy_service_id_t, ///< proxy_service_id
 using response = std::vector<tables>;
 }
 
+namespace proxy_blacklist
+{
+using request = proxy_service_id_t;
+
+using entry = std::tuple<std::string, ///< ip
+                         uint64_t>; /// time_until
+
+using response = std::vector<entry>;
+}
+
+namespace proxy_blacklist_add
+{
+using request = std::tuple<proxy_service_id_t, ///< service id
+                           std::string, ///< address
+                           uint32_t>; /// timeout
+
+using response = std::tuple<>;
+}
+
 namespace balancer_connection
 {
 using connection = std::tuple<common::ip_address_t, ///< client_ip
@@ -1104,6 +1125,7 @@ using request = std::tuple<requestType,
                                         neighbor_update_interfaces::request,
                                         memory_manager_update::request,
                                         proxy_tables::request,
+                                        proxy_blacklist_add::request,
                                         getPhysicalPortsFull::request>>;
 
 using response = std::variant<std::tuple<>,
@@ -1139,5 +1161,6 @@ using response = std::variant<std::tuple<>,
                               memory_manager_stats::response,
                               proxy_connections::response,
                               proxy_tables::response,
+                              proxy_blacklist::response,
                               getPhysicalPortsFull::response>;
 }

@@ -189,7 +189,9 @@ public:
     common::idp::proxy_connections::response GetConnections(proxy_service_id_t service_id);
     common::idp::proxy_syn::response GetSyn(proxy_service_id_t service_id);
     common::idp::proxy_tables::response GetTables(const common::idp::proxy_tables::request& services);
+    common::idp::proxy_blacklist::response GetBlacklist(proxy_service_id_t service_id);
 
+    common::idp::proxy_blacklist_add::response AddBlacklist(proxy_service_id_t service_id, const std::string& address, uint32_t timeout);
 
     bool GetDataForRetramsits(const proxy_service_config_t& service_config, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
     proxy_service_id_t GetIndexServiceForNextRetransmit();

@@ -560,6 +560,39 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 service.tables_work.syn_connections.ProcessAllConnectionsWithLocking(condition, action);
             }
 
+            if (service.config.connection_limit.size > 0)
+            {
+                for (auto& iter : service.connection_limit_table_work.GC(0, service.config.connection_limit.size))
+                {
+                    iter.lock();
+                    if (!iter.is_valid())
+                    {
+                        iter.unlock();
+                        continue;
+                    }
+
+                    if (*iter.value() < current_time_ms)
+                        iter.unset_valid();
+
+                    iter.unlock();
+                }
+
+                std::unordered_map<uint32_t, uint32_t> connections;
+                auto count_connections = [&connections](uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
+                    // TODO: check whitelist
+                    connections[address]++;
+                };
+                service.tables_work.service_connections.ProcessAllConnectionsWithoutLocking(count_connections);
+
+                for (const auto& iter : connections)
+                {
+                    if (iter.second > service.config.connection_limit.limit)
+                    {
+                        service.connection_limit_table_work.Add(iter.first, current_time_ms);
+                    }
+                }
+            }
+
             service.mutex.unlock();
         }
     }
@@ -636,6 +669,47 @@ common::idp::proxy_tables::response TcpConnectionStore::GetTables(const common::
         }
     }
 
+    return response;
+}
+
+common::idp::proxy_blacklist::response TcpConnectionStore::GetBlacklist(proxy_service_id_t service_id)
+{
+    common::idp::proxy_blacklist::response response;
+    if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
+    {
+        for (auto& [socket_id, all_services] : proxy_services)
+        {
+            if (all_services[service_id].config.connection_limit.size == 0) continue;
+            std::shared_lock lock(all_services[service_id].mutex);
+
+            for (auto& iter : all_services[service_id].connection_limit_table_work.Range(0, all_services[service_id].config.connection_limit.size))
+            {
+                if (!iter.is_valid()) continue;
+                response.emplace_back(common::ipv4_address_t(rte_be_to_cpu_32(*iter.key())).toString(), *iter.value());
+            }
+        }
+    }
+    return response;
+}
+
+common::idp::proxy_blacklist_add::response TcpConnectionStore::AddBlacklist(proxy_service_id_t service_id, const std::string& address, uint32_t timeout)
+{
+    common::ipv4_address_t address_ipv4(address);
+    uint32_t address_be = rte_cpu_to_be_32(address_ipv4);
+    common::idp::proxy_blacklist_add::response response;
+    if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
+    {
+        for (auto& [socket_id, all_services] : proxy_services)
+        {
+            if (all_services[service_id].config.connection_limit.size == 0) continue;
+            std::unique_lock lock(all_services[service_id].mutex);
+            YANET_LOG_WARNING("ADD %p\n", &all_services[service_id].connection_limit_table_work);
+            if(!all_services[service_id].connection_limit_table_work.Add(address_be, (uint64_t)timeout * 1000))
+            {
+                YANET_LOG_ERROR("Failed to add address to blacklist\n");
+            }
+        }
+    }
     return response;
 }
 

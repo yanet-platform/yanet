@@ -165,6 +165,16 @@ public:
 		return get<common::idp::requestType::proxy_tables, common::idp::proxy_tables::response>(request);
 	}
 
+	auto proxy_blacklist(const common::idp::proxy_blacklist::request& request) const
+	{
+		return get<common::idp::requestType::proxy_blacklist, common::idp::proxy_blacklist::response>(request);
+	}
+
+	auto proxy_blacklist_add(const common::idp::proxy_blacklist_add::request& request) const
+	{
+		return get<common::idp::requestType::proxy_blacklist_add, common::idp::proxy_blacklist_add::response>(request);
+	}
+
 	auto limits() const
 	{
 		return get<common::idp::requestType::limits, common::idp::limits::response>();

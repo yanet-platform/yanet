@@ -96,6 +96,46 @@ void tables(std::optional<std::string> service_name)
 	table.Print();
 }
 
+void blacklist(std::string service_name)
+{
+	if (service_name.empty())
+	{
+		throw std::invalid_argument("service_name is empty");
+	}
+
+	interface::controlPlane controlplane;
+	const auto response = controlplane.proxy_blacklist(service_name);
+
+	TablePrinter table{};
+	table.insert_row("service_name",
+					 "ip",
+					 "timeout");
+	for (const auto& record : response)
+	{
+		table.insert_row(record);
+	}
+	table.Print();
+}
+
+void blacklist_add(std::string service_name, std::string ip, uint32_t timeout)
+{
+	if (service_name.empty())
+	{
+		throw std::invalid_argument("service_name is empty");
+	}
+	if (ip.empty())
+	{
+		throw std::invalid_argument("ip is empty");
+	}
+	if (timeout == 0)
+	{
+		throw std::invalid_argument("timeout is empty");
+	}
+
+	interface::controlPlane controlplane;
+	controlplane.proxy_blacklist_add({service_name, ip, timeout});
+}
+
 void debug_counter_id(proxy_service_id_t service_id)
 {
 	interface::controlPlane controlplane;

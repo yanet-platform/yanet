@@ -250,7 +250,7 @@ public:
             return false;
         }
         
-        #ifdef CONFIG_YADECAP_UNITTEST
+#ifdef CONFIG_YADECAP_UNITTEST
         void* pointer = malloc(hashtable_t::calculate_sizeof(number_connections));
         if (pointer == nullptr)
         {
@@ -258,15 +258,17 @@ public:
         }
         memset(pointer, 0, hashtable_t::calculate_sizeof(number_connections));
         table_ = new (reinterpret_cast<hashtable_t*>(pointer)) hashtable_t();
+        table_updater_ = new hashtable_t::updater();
 #else
         table_ = memory_manager->create<hashtable_t>(name.data(), socket_id, hashtable_t::calculate_sizeof(number_connections));
+        table_updater_ = memory_manager->create_static<hashtable_t::updater>((name + ".updater").data(), socket_id);
 #endif
-        if (table_ == nullptr)
+        if (table_ == nullptr || table_updater_ == nullptr)
         {
             return false;
         }
 
-        table_updater_.update_pointer(table_, socket_id, number_connections);
+        table_updater_->update_pointer(table_, socket_id, number_connections);
 
         number_connections_ = number_connections;
         timeout_ = timeout_ms;
@@ -282,6 +284,8 @@ public:
 
     bool Exists(uint32_t addr, uint64_t current_time_ms)
     {
+        if (unlikely(!initialized_)) return false;
+
         uint64_t* until = nullptr;
         ::dataplane::spinlock_nonrecursive_t* lock = nullptr;
         table_->lookup(addr, until, lock);
@@ -296,27 +300,40 @@ public:
 
     bool Add(uint32_t addr, uint64_t current_time_ms)
     {
+        return Add(addr, current_time_ms, timeout_);
+    }
+
+    bool Add(uint32_t addr, uint64_t current_time_ms, uint64_t timeout_ms)
+    {
+        if (unlikely(!initialized_)) return true;
+
         constexpr static uint64_t min_timeout_dist = 3000;
         static thread_local std::random_device rd;
         static thread_local std::mt19937 gen(rd());
-        std::uniform_int_distribution<uint64_t> dist(timeout_, timeout_ + std::max(min_timeout_dist, timeout_ / 5));
+        std::uniform_int_distribution<uint64_t> dist(timeout_ms, timeout_ms + std::max(min_timeout_dist, timeout_ms / 5));
         uint64_t time_until_ms = current_time_ms + dist(gen);
         return table_->insert_or_update(addr, time_until_ms);
     }
 
     void Remove(uint32_t addr)
     {
+        if (unlikely(!initialized_)) return;
         table_->remove(addr);
     }
 
     uint32_t Size()
     {
-        return table_updater_.get_stats().keys_count;
+        return table_updater_->get_stats().keys_count;
+    }
+
+    hashtable_t::range_t Range(uint32_t offset, uint32_t step)
+    {
+        return table_updater_->range(offset, step);
     }
 
     hashtable_t::range_t GC(uint32_t offset, uint32_t step)
     {
-        return table_updater_.gc(offset, step);
+        return table_updater_->gc(offset, step);
     }
 
     bool NeedReallocate(uint32_t number_connections)
@@ -348,6 +365,7 @@ public:
     void CopyFrom(const ConnectionLimitTable& other)
     {
         table_ = other.table_;
+        table_updater_ = other.table_updater_;
         number_connections_ = other.number_connections_;
         timeout_ = other.timeout_;
         initialized_ = other.initialized_;
@@ -356,6 +374,7 @@ public:
     void ClearLinks()
     {
         table_ = nullptr;
+        table_updater_ = nullptr;
         number_connections_ = 0;
         timeout_ = 0;
         initialized_ = false;
@@ -374,8 +393,8 @@ public:
     }
 
 private:
-    hashtable_t::updater table_updater_;
     hashtable_t* table_;
+    hashtable_t::updater* table_updater_;
     uint32_t number_connections_ = 0;
     uint64_t timeout_ = 0;
     bool initialized_ = false;

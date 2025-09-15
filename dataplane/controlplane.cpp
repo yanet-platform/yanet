@@ -1009,6 +1009,18 @@ common::idp::proxy_tables::response cControlPlane::proxy_tables(const common::id
 	return dataPlane->tcp_connection_store.GetTables(request);
 }
 
+common::idp::proxy_blacklist::response cControlPlane::proxy_blacklist(const common::idp::proxy_blacklist::request& request)
+{
+	auto service_id = request;
+	return dataPlane->tcp_connection_store.GetBlacklist(service_id);
+}
+
+common::idp::proxy_blacklist_add::response cControlPlane::proxy_blacklist_add(const common::idp::proxy_blacklist_add::request& request)
+{
+	const auto& [service_id, address, timeout] = request;
+	return dataPlane->tcp_connection_store.AddBlacklist(service_id, address, timeout);
+}
+
 eResult cControlPlane::unrdup_vip_to_balancers(const common::idp::unrdup_vip_to_balancers::request& request)
 {
 	return vip_to_balancers.apply([&](auto& vtb) {

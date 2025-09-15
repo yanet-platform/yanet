@@ -174,6 +174,14 @@ public:
 		return get<common::icp::requestType::proxy_tables, common::icp::proxy_tables::response>(request);
 	}
 
+	auto proxy_blacklist(const common::icp::proxy_blacklist::request& request) const {
+		return get<common::icp::requestType::proxy_blacklist, common::icp::proxy_blacklist::response>(request);
+	}
+
+	auto proxy_blacklist_add(const common::icp::proxy_blacklist_add::request& request) const {
+		return get<common::icp::requestType::proxy_blacklist_add, common::icp::proxy_blacklist_add::response>(request);
+	}
+
 	auto proxy_debug_counters_id(const common::icp::proxy_debug_counters_id::request& request) const
 	{
 		return get<common::icp::requestType::proxy_debug_counters_id, common::icp::proxy_debug_counters_id::response>(request);

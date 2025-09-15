@@ -317,6 +317,14 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::proxy_tables, request);
 		}
+		else if (type == common::idp::requestType::proxy_blacklist)
+		{
+			response = callWithResponse(&cControlPlane::proxy_blacklist, request);
+		}
+		else if (type == common::idp::requestType::proxy_blacklist_add)
+		{
+			response = callWithResponse(&cControlPlane::proxy_blacklist_add, request);
+		}
 		else if (type == common::idp::requestType::samples)
 		{
 			response = callWithResponse(&cControlPlane::samples, request);
