@@ -13,9 +13,12 @@ void counters()
 	const auto response = controlplane.proxy_counters();
 	
     TablePrinter table;
-	constexpr std::tuple row = std::tuple_cat(std::tie("id", "service", "ip", "proto", "port"),
-                        			  		  proxy::names);
-	table.insert_row(row);
+	std::vector<std::string> row = {"id", "service", "ip", "proto", "port"};
+	for (tCounterId counter = 0; counter < static_cast<tCounterId>(proxy::service_counter::size); counter++)
+	{
+		row.push_back(proxy::service_counter_toString(static_cast<proxy::service_counter>(counter)));
+	}
+	table.insert_row(row.begin(), row.end());
 
 	for (const auto& record : response)
 	{

@@ -976,7 +976,7 @@ using response = std::vector<std::tuple<proxy_service_id_t, ///< service_id
                                         std::string, ///< ip
                                         std::string, ///< proto
                                         uint32_t, ///< port
-                                        std::array<uint64_t, proxy::names.size()>>>;
+                                        std::array<uint64_t, static_cast<size_t>(proxy::service_counter::size)>>>;
 }
 
 namespace proxy_connections

@@ -778,9 +778,9 @@ void proxy_counters()
 	{
 		const auto& counters = std::get<2>(record);
 		std::vector<influxdb_format::value_t> values;
-		for (uint32_t i = 0; i < proxy::names.size(); i++)
+		for (tCounterId counter = 0; counter < static_cast<tCounterId>(proxy::service_counter::size); counter++)
 		{
-			values.emplace_back(proxy::names[i], counters[i]);
+			values.emplace_back(proxy::service_counter_toString(static_cast<proxy::service_counter>(counter)), counters[counter]);
 		}
 		influxdb_format::print("proxy_counters",
 							   {{"service_id", std::get<0>(record)},

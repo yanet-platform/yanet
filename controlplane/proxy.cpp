@@ -282,10 +282,10 @@ common::icp::proxy_debug_counters_id::response proxy_t::proxy_debug_counters_id(
     proxy_service_id_t service_id = request;
     tCounterId counter_id = service_counters.get_id(service_id);
     std::vector<std::string> names;
-    for (const auto& name : proxy::names)
-    {
-        names.push_back(name);
-    }
+    for (tCounterId counter = 0; counter < static_cast<tCounterId>(proxy::service_counter::size); counter++)
+	{
+		names.push_back(proxy::service_counter_toString(static_cast<proxy::service_counter>(counter)));
+	}
     return {counter_id, names};
 }
 
