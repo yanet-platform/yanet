@@ -109,13 +109,17 @@ void blacklist(std::string service_name)
 	interface::controlPlane controlplane;
 	const auto response = controlplane.proxy_blacklist(service_name);
 
+	uint64_t current_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+
 	TablePrinter table{};
 	table.insert_row("service_name",
 					 "ip",
-					 "timeout");
-	for (const auto& record : response)
+					 "time_until_ms",
+					 "time_left_ms");
+	for (const auto& [service_name, ip, time_until] : response)
 	{
-		table.insert_row(record);
+		uint64_t time_left = time_until > current_time_ms ? time_until - current_time_ms : 0;
+		table.insert_row(service_name, ip, time_until, time_left);
 	}
 	table.Print();
 }
