@@ -169,5 +169,15 @@ public:
 	}
 };
 
+// helper type for the variant visitor
+template<class... Ts>
+struct Visitor : Ts...
+{
+	using Ts::operator()...;
+};
+// explicit deduction guide (not needed as of C++20)
+template<class... Ts>
+Visitor(Ts...) -> Visitor<Ts...>;
+
 }
 // namespace utils
