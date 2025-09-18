@@ -448,6 +448,33 @@ public:
 	{
 		return balancer::from_proto(proto);
 	}
+
+	bool SatisfyConditions(std::optional<common::ip_address_t> proxy_addr, std::optional<uint8_t> proto, std::optional<uint16_t> proxy_port) const
+	{
+		if (proxy_addr.has_value() && (*proxy_addr != this->proxy_addr))
+		{
+			return false;
+		}
+		else if (proto.has_value() && (*proto != this->proto))
+		{
+			return false;
+		}
+		else if (proxy_port.has_value() && (*proxy_port != this->proxy_port))
+		{
+			return false;
+		}
+		return true;
+	}
+
+	common::proxy::ServiceHeader GetHeader() const
+	{
+		return {.service_id = service_id,
+		        .service = service,
+		        .proxy_addr = proxy_addr,
+		        .proxy_port = proxy_port,
+		        .proto = proto,
+				.socket_id = socket_id};
+	}
 };
 
 using proxy_services = std::map<service_t::key_t, service_t>;

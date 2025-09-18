@@ -1009,6 +1009,11 @@ common::idp::proxy_tables::response cControlPlane::proxy_tables(const common::id
 	return dataPlane->tcp_connection_store.GetTables(request);
 }
 
+common::idp::proxy_buckets::response cControlPlane::proxy_buckets(const common::idp::proxy_buckets::request& request)
+{
+	return dataPlane->tcp_connection_store.GetBuckets(request);
+}
+
 common::idp::proxy_blacklist::response cControlPlane::proxy_blacklist(const common::idp::proxy_blacklist::request& request)
 {
 	auto service_id = request;

@@ -165,6 +165,11 @@ public:
 		return get<common::idp::requestType::proxy_tables, common::idp::proxy_tables::response>(request);
 	}
 
+	auto proxy_buckets(const common::idp::proxy_buckets::request& request) const
+	{
+		return get<common::idp::requestType::proxy_buckets, common::idp::proxy_buckets::response>(request);
+	}
+
 	auto proxy_blacklist(const common::idp::proxy_blacklist::request& request) const
 	{
 		return get<common::idp::requestType::proxy_blacklist, common::idp::proxy_blacklist::response>(request);

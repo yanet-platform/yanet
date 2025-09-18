@@ -2330,6 +2330,14 @@ void config_parser_t::loadConfig_proxy_fill_sockets(controlplane::base_t& baseNe
 			throw error_result_t(eResult::invalidConfigurationFile, "For proxy module: " + moduleId + " number of sockets: " + std::to_string(iter->second.size()));
 		}
 		proxy.socket_id = *iter->second.begin();
+		if (proxy.socket_id == (unsigned int)(-1))
+		{
+#ifdef SMALL_MEMORY_RELEASE
+			proxy.socket_id = 0;
+#else
+			throw error_result_t(eResult::invalidConfigurationFile, "For proxy module: " + moduleId + " socket_id = -1");
+#endif
+		}
 		YANET_LOG_INFO("proxy module %s load on socket: %d\n", moduleId.c_str(), proxy.socket_id);
 		auto iter_proxy = proxy_modules_by_sockets.find(proxy.socket_id);
 		if (iter_proxy != proxy_modules_by_sockets.end())

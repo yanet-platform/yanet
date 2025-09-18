@@ -84,6 +84,7 @@ enum class requestType : uint32_t
         proxy_connections,
         proxy_syn,
         proxy_tables,
+        proxy_buckets,
         proxy_blacklist,
         proxy_blacklist_add,
         getPhysicalPortsFull,
@@ -851,23 +852,16 @@ using response = std::vector<connection>;
 
 namespace proxy_tables
 {
-using request = std::vector<std::tuple<proxy_service_id_t, ///< service id
-                                       tSocketId, ///< socket id
-                                       std::string>>; ///< service name
+using request = std::vector<common::proxy::ServiceHeader>;
 
-using tables = std::tuple<proxy_service_id_t, ///< proxy_service_id
-                          std::string, ///< service_name
-                          tSocketId, ///< socket
-                          size_t, ///< connections
-                          size_t, ///< max connections
-                          size_t, ///< syn connections
-                          size_t, ///< max syn connections
-                          common::ip_prefix_t, ///< local pool prefix
-                          uint32_t, ///< total addresses
-                          uint32_t, ///< free addresses
-                          uint32_t>; ///< used addresses
+using response = std::vector<common::proxy::AllTablesInfo>;
+}
 
-using response = std::vector<tables>;
+namespace proxy_buckets
+{
+using request = std::vector<common::proxy::ServiceHeader>;
+
+using response = std::vector<common::proxy::BucketsInfo>;
 }
 
 namespace proxy_blacklist
@@ -1161,6 +1155,7 @@ using response = std::variant<std::tuple<>,
                               memory_manager_stats::response,
                               proxy_connections::response,
                               proxy_tables::response,
+                              proxy_buckets::response,
                               proxy_blacklist::response,
                               getPhysicalPortsFull::response>;
 }

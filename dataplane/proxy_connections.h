@@ -503,6 +503,30 @@ public:
         initialized_ = false;
     }
 
+    void FillStat(common::proxy::OneTableInfo& stat) const
+    {
+        stat.size = Capacity();
+        stat.count = 0;
+        stat.max_bucket_size = 0;
+        for (const Bucket& bucket : *this)
+        {
+            stat.count += bucket.num_allocated;
+            stat.max_bucket_size = (bucket.num_allocated < stat.max_bucket_size ? stat.max_bucket_size : bucket.num_allocated);
+        }
+    }
+
+    std::vector<size_t> BucketsStat() const
+    {
+        uint32_t size = Bucket::bucket_size + 1;
+        std::vector<size_t> result(size, 0);
+        for (uint32_t index = 0; index < number_buckets_; index++)
+        {
+            uint32_t count = buckets_[index].num_allocated;
+            result[(count > size ? size : count)]++;
+        }
+        return result;
+    }
+
     std::string Debug() const
     {
         if (!initialized_)

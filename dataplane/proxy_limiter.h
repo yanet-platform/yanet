@@ -237,6 +237,18 @@ public:
         return std::string(loc_buf);
     }
 
+    void FillStat(common::proxy::OneTableInfo& stat) const
+    {
+        stat.size = RateLimitBucket::bucket_size * number_buckets_;
+        stat.count = 0;
+        stat.max_bucket_size = 0;
+    }
+
+    std::vector<size_t> BucketsStat() const
+    {
+        return {};
+    }
+
 private:
     RateLimitBucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;
@@ -333,7 +345,7 @@ public:
         table_->remove(addr);
     }
 
-    uint32_t Size()
+    uint32_t Size() const
     {
         return table_updater_->get_stats().keys_count;
     }
@@ -406,6 +418,18 @@ public:
         char loc_buf[256];
         snprintf(loc_buf, sizeof(loc_buf), "initialized_=%d, number_connections_=%d, table_=%p", initialized_, number_connections_, table_);
         return std::string(loc_buf);
+    }
+
+    void FillStat(common::proxy::OneTableInfo& stat) const
+    {
+        stat.size = number_connections_;
+        stat.count =  0; // Size();
+        stat.max_bucket_size = 0;
+    }
+
+    std::vector<size_t> BucketsStat() const
+    {
+        return {};
     }
 
 private:

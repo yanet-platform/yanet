@@ -92,6 +92,7 @@ enum class requestType : uint32_t
         proxy_connections,
         proxy_syn,
         proxy_tables,
+        proxy_buckets,
         proxy_debug_counters_id,
         proxy_blacklist,
         proxy_blacklist_add,
@@ -242,6 +243,8 @@ inline const char* requestType_toString(requestType t)
                         return "proxy_syn";
                 case requestType::proxy_tables:
                         return "proxy_tables";
+                case requestType::proxy_buckets:
+                        return "proxy_buckets";
                 case requestType::proxy_debug_counters_id:
                         return "proxy_debug_counters_id";
                 case requestType::proxy_blacklist:
@@ -969,14 +972,20 @@ using response = std::tuple<common_info,
                             std::vector<one_size_info>>;
 }
 
+namespace proxy_common_types
+{
+using request_optional = std::tuple<std::optional<common::ip_address_t>, ///< proxy_ip
+                                    std::optional<uint8_t>, ///< proto
+                                    std::optional<uint16_t>>; ///< proxy_port
+
+}
+
 namespace proxy_counters
 {
-using response = std::vector<std::tuple<proxy_service_id_t, ///< service_id
-                                        std::string, ///< service_name
-                                        std::string, ///< ip
-                                        std::string, ///< proto
-                                        uint32_t, ///< port
-                                        std::array<uint64_t, static_cast<size_t>(proxy::service_counter::size)>>>;
+using request = proxy_common_types::request_optional;
+
+using response = std::vector<std::tuple<common::proxy::ServiceHeader, ///< service info
+                                        std::array<uint64_t, static_cast<size_t>(::proxy::service_counter::size)>>>; ///< counters
 }
 
 namespace proxy_connections
@@ -1009,21 +1018,16 @@ using response = std::vector<connection>;
 
 namespace proxy_tables
 {
-using request = std::optional<std::string>; ///< service_name
+using request = proxy_common_types::request_optional;
 
-using tables = std::tuple<proxy_service_id_t, ///< proxy_service_id
-                          std::string, ///< service_name
-                          tSocketId, ///< socket
-                          size_t, ///< connections
-                          size_t, ///< max connections
-                          size_t, ///< syn connections
-                          size_t, ///< max syn connections
-                          common::ip_prefix_t, ///< local pool prefix
-                          uint32_t, ///< total addresses
-                          uint32_t, ///< free addresses
-                          uint32_t>; ///< used addresses
+using response = std::vector<common::proxy::AllTablesInfo>;
+}
 
-using response = std::vector<tables>;
+namespace proxy_buckets
+{
+using request = proxy_common_types::request_optional;
+
+using response = std::vector<common::proxy::BucketsInfo>;
 }
 
 namespace proxy_debug_counters_id
@@ -1070,7 +1074,7 @@ using request = std::tuple<requestType,
                                         getFwList::request,
                                         loadConfig::request,
                                         convert::request,
-                                        proxy_tables::request,
+                                        proxy_common_types::request_optional,
                                         proxy_blacklist_add::request>>;
 
 
@@ -1131,6 +1135,7 @@ using response = std::variant<std::tuple<>,
                               proxy_counters::response,
                               proxy_connections::response,
                               proxy_tables::response,
+                              proxy_buckets::response,
                               proxy_debug_counters_id::response,
                               proxy_blacklist::response>;
 

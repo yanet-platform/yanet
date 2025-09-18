@@ -8,8 +8,8 @@ eResult proxy_t::init()
 {
     service_counters.init(&controlPlane->counter_manager);
 
-    controlPlane->register_command(common::icp::requestType::proxy_counters, [this]() {
-		return proxy_counters();
+    controlPlane->register_command(common::icp::requestType::proxy_counters, [this](const common::icp::request& request) {
+		return proxy_counters(std::get<common::icp::proxy_counters::request>(std::get<1>(request)));
 	});
     controlPlane->register_command(common::icp::requestType::proxy_connections, [this](const common::icp::request& request) {
         return proxy_connections(std::get<common::icp::proxy_connections::request>(std::get<1>(request)));
@@ -19,6 +19,9 @@ eResult proxy_t::init()
     });
     controlPlane->register_command(common::icp::requestType::proxy_tables, [this](const common::icp::request& request) {
         return proxy_tables(std::get<common::icp::proxy_tables::request>(std::get<1>(request)));
+    });
+    controlPlane->register_command(common::icp::requestType::proxy_buckets, [this](const common::icp::request& request) {
+        return proxy_buckets(std::get<common::icp::proxy_buckets::request>(std::get<1>(request)));
     });
     controlPlane->register_command(common::icp::requestType::proxy_debug_counters_id, [this](const common::icp::request& request) {
         return proxy_debug_counters_id(std::get<common::icp::proxy_debug_counters_id::request>(std::get<1>(request)));
@@ -152,8 +155,9 @@ void proxy_t::counters_gc_thread()
 	}
 }
 
-common::icp::proxy_counters::response proxy_t::proxy_counters() const
+common::icp::proxy_counters::response proxy_t::proxy_counters(const common::icp::proxy_counters::request& request) const
 {
+    const auto& [proxy_ip, proto, proxy_port] = request;
 	common::icp::proxy_counters::response response;
 
 	generations_config.current_lock();
@@ -169,6 +173,10 @@ common::icp::proxy_counters::response proxy_t::proxy_counters() const
 		for (const auto& iter_service : config.services)
 		{
             const controlplane::proxy::service_t& service = iter_service.second;
+            if (!service.SatisfyConditions(proxy_ip, proto, proxy_port))
+            {
+                continue;
+            }
             proxy_service_id_t service_id = service.service_id;
             if (used_id.find(service_id) != used_id.end())
             {
@@ -186,7 +194,7 @@ common::icp::proxy_counters::response proxy_t::proxy_counters() const
                     counts[i] = (it->second)[i];
 			}
 
-            response.emplace_back(service_id, service_name, service.proxy_addr.toString(), service.Protocol(), service.proxy_port, counts);
+            response.emplace_back(service.GetHeader(), counts);
 		}
 	}
 
@@ -247,8 +255,8 @@ common::icp::proxy_syn::response proxy_t::proxy_syn(const common::icp::proxy_syn
 
 common::icp::proxy_tables::response proxy_t::proxy_tables(const common::icp::proxy_tables::request& request) const
 {
+    const auto& [proxy_ip, proto, proxy_port] = request;
     common::icp::proxy_tables::response response;
-    const std::optional<std::string>& service_name = request;
 
     generations_config.current_lock();
     std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
@@ -260,21 +268,39 @@ common::icp::proxy_tables::response proxy_t::proxy_tables(const common::icp::pro
         for (const auto& iter_service : config.services)
         {
             const controlplane::proxy::service_t& service = iter_service.second;
-            if (service_name.has_value())
+            if (service.SatisfyConditions(proxy_ip, proto, proxy_port))
             {
-                if (service.service.find(*service_name) != std::string::npos)
-                {
-                    services.emplace_back(service.service_id, service.socket_id, service.service);
-                }
-            }
-            else
-            {
-                services.emplace_back(service.service_id, service.socket_id, service.service);
+                services.emplace_back(service.GetHeader());
             }
         }
     }
 
     return dataplane.proxy_tables(services);
+}
+
+common::icp::proxy_buckets::response proxy_t::proxy_buckets(const common::icp::proxy_buckets::request& request) const
+{
+    const auto& [proxy_ip, proto, proxy_port] = request;
+    common::icp::proxy_buckets::response response;
+
+    generations_config.current_lock();
+    std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
+    generations_config.current_unlock();
+
+    common::idp::proxy_buckets::request services;
+    for (auto& [module, config] : config_proxies)
+    {
+        for (const auto& iter_service : config.services)
+        {
+            const controlplane::proxy::service_t& service = iter_service.second;
+            if (service.SatisfyConditions(proxy_ip, proto, proxy_port))
+            {
+                services.emplace_back(service.GetHeader());
+            }
+        }
+    }
+
+    return dataplane.proxy_buckets(services);
 }
 
 common::icp::proxy_debug_counters_id::response proxy_t::proxy_debug_counters_id(const common::icp::proxy_debug_counters_id::request& request)

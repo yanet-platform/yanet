@@ -7,10 +7,24 @@
 namespace proxy
 {
 
-void counters()
+std::tuple<std::string, common::ip_address_t, std::string, uint16_t> ServiceTie(const common::proxy::ServiceHeader& service)
 {
+	std::string proto(controlplane::balancer::from_proto(service.proto));
+	return std::tie(service.service, service.proxy_addr, proto, service.proxy_port);
+}
+
+void counters(std::optional<common::ip_address_t> proxy_ip,
+              std::optional<std::string> proto_string,
+              std::optional<uint16_t> proxy_port)
+{
+	std::optional<uint8_t> proto;
+	if (proto_string)
+	{
+		proto = controlplane::balancer::to_proto(*proto_string);
+	}
+
     interface::controlPlane controlplane;
-	const auto response = controlplane.proxy_counters();
+	const auto response = controlplane.proxy_counters({proxy_ip, proto, proxy_port});
 	
     TablePrinter table;
 	std::vector<std::string> row = {"id", "service", "ip", "proto", "port"};
@@ -22,8 +36,8 @@ void counters()
 
 	for (const auto& record : response)
 	{
-		const auto& [service_id, service_name, service_ip, service_proto, service_port, counters] = record;
-		const std::tuple row = std::tuple_cat(std::tie(service_id, service_name, service_ip, service_proto, service_port), counters);
+		const auto& [service_info, counters] = record;
+		const std::tuple row = std::tuple_cat(std::tie(service_info.service_id), ServiceTie(service_info), counters);
         table.insert_row(row);
     }
 
@@ -56,7 +70,6 @@ void syn(std::string service_name)
 {
 	interface::controlPlane controlplane;
 	const auto response = controlplane.proxy_syn(service_name);
-	// YANET_LOG_WARNING("\tsyn service_name=%s, response.size()=%ld\n", service_name.c_str(), response.size());
 
 	TablePrinter table;
 	table.insert_row("service_name",
@@ -74,29 +87,91 @@ void syn(std::string service_name)
 	table.Print();
 }
 
-void tables(std::optional<std::string> service_name)
+void tables(std::optional<common::ip_address_t> proxy_ip,
+            std::optional<std::string> proto_string,
+            std::optional<uint16_t> proxy_port)
 {
+	std::optional<uint8_t> proto;
+	if (proto_string)
+	{
+		proto = controlplane::balancer::to_proto(*proto_string);
+	}
+
 	interface::controlPlane controlplane;
-	const auto response = controlplane.proxy_tables(service_name);
+	const auto response = controlplane.proxy_tables({proxy_ip, proto, proxy_port});
 
 	TablePrinter table;
-	table.insert_row("service_id",
-					 "service_name",
-					 "socket_id",
-					 "connections",
-					 "max_connections",
-					 "syn_connections",
-					 "max_syn_connections",
-					 "prefix",
-					 "total_addresses",
-					 "free_addresses",
-					 "used_addresses");
+	table.insert_row("id", "service", "ip", "proto", "port", "socket_id",
+					 "con_size", "con_count", "con_bucket",
+					 "syn_size", "syn_count", "syn_bucket",
+					 "lp_size", "lp_count",
+					 "rl_size", "rl_count", "rl_bucket",
+					 "cl_size", "cl_count", "cl_bucket");
 	for (const auto& record : response)
 	{
-		table.insert_row(record);
+		const auto& header = record.header;
+		const std::tuple row = std::tuple_cat(std::tie(header.service_id),
+		                                      ServiceTie(header),
+		                                      std::tie(header.socket_id),
+		                                      record.connections.info(),
+		                                      record.syn_connections.info(),
+		                                      record.local_pool.info_short(),
+		                                      record.rate_limiter.info(),
+		                                      record.connection_limiter.info());
+		table.insert_row(row);
 	}
 
 	table.Print();
+}
+
+void buckets(std::optional<common::ip_address_t> proxy_ip,
+             std::optional<std::string> proto_string,
+             std::optional<uint16_t> proxy_port)
+{
+	std::optional<uint8_t> proto;
+	if (proto_string)
+	{
+		proto = controlplane::balancer::to_proto(*proto_string);
+	}
+
+    interface::controlPlane controlplane;
+	const auto response = controlplane.proxy_buckets({proxy_ip, proto, proxy_port});
+
+	size_t max_count = 0;
+	for (const auto& [service_info, table_name, counts] : response)
+	{
+		GCC_BUG_UNUSED(service_info);
+		GCC_BUG_UNUSED(table_name);
+		max_count = std::max(max_count, counts.size());
+	}
+	
+    TablePrinter table;
+	std::vector<std::string> row = {"id", "service", "ip", "proto", "port", "socket_id", "table"};
+	for (size_t count = 0; count < max_count; count++)
+	{
+		row.push_back(std::to_string(count));
+	}
+	table.insert_row(row.begin(), row.end());
+
+	for (const auto& [service_info, table_name, counts] : response)
+	{
+		const auto& [name, addr, proto, port] = ServiceTie(service_info);
+		std::vector<std::string> row = {std::to_string(service_info.service_id), name, addr.toString(), proto, std::to_string(port), std::to_string(service_info.socket_id), table_name};
+		for (size_t count: counts)
+		{
+			if (count == 0)
+			{
+				row.push_back("-");
+			}
+			else
+			{
+				row.push_back(std::to_string(count));
+			}
+		}
+        table.insert_row(row.begin(), row.end());
+    }
+
+    table.Print();
 }
 
 void blacklist(std::string service_name)

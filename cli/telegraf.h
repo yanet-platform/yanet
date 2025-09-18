@@ -772,19 +772,22 @@ inline void acl()
 void proxy_counters()
 {
 	interface::controlPlane controlplane;
-	const auto response = controlplane.proxy_counters();
+	const auto response = controlplane.proxy_counters({std::nullopt, std::nullopt, std::nullopt});
 
 	for (const auto& record : response)
 	{
-		const auto& counters = std::get<2>(record);
+		const auto& [service_info, counters] = record;
 		std::vector<influxdb_format::value_t> values;
 		for (tCounterId counter = 0; counter < static_cast<tCounterId>(proxy::service_counter::size); counter++)
 		{
 			values.emplace_back(proxy::service_counter_toString(static_cast<proxy::service_counter>(counter)), counters[counter]);
 		}
+		std::string proto(controlplane::balancer::from_proto(service_info.proto));
 		influxdb_format::print("proxy_counters",
-							   {{"service_id", std::get<0>(record)},
-								{"service_name", std::get<1>(record)}},
+							   {{"service_name", service_info.service},
+								{"service_ip", service_info.proxy_addr},
+								{"service_proto", proto},
+								{"service_port", service_info.proxy_port}},
 							   values);
     }
 }

@@ -632,22 +632,58 @@ common::idp::proxy_tables::response TcpConnectionStore::GetTables(const common::
 {
     common::idp::proxy_tables::response response;
 
-    for (const auto& [service_id, socket_id, service_name] : services)
+    for (const auto& service_info : services)
     {
-        if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
+        if (service_info.service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
         {
             for (auto& [service_socket_id, all_services] : proxy_services)
             {
-                if (service_socket_id == socket_id)
+                if (service_socket_id == service_info.socket_id)
                 {
-                    std::shared_lock lock(all_services[service_id].mutex);
-                    const ProxyTables& current = all_services[service_id].tables_work;
-                    LocalPoolStat stat = current.local_pool.GetStat();
+                    std::shared_lock lock(all_services[service_info.service_id].mutex);
+                    const ProxyTables& current = all_services[service_info.service_id].tables_work;
 
-                    response.emplace_back(service_id, service_name, socket_id,
-                        current.service_connections.Size(), current.service_connections.Capacity(),
-                        current.syn_connections.Size(), current.syn_connections.Capacity(),
-                        stat.prefix, stat.total_addresses, stat.free_addresses, stat.used_addresses);
+                    common::proxy::AllTablesInfo info;
+                    info.header = service_info;
+
+                    current.service_connections.FillStat(info.connections);
+                    current.syn_connections.FillStat(info.syn_connections);
+
+                    LocalPoolStat stat = current.local_pool.GetStat();
+                    info.local_pool.size = stat.total_addresses;
+                    info.local_pool.count = stat.used_addresses;
+
+                    current.rate_limit.FillStat(info.rate_limiter);
+                    current.connection_limit.FillStat(info.connection_limiter);
+
+                    response.push_back(info);
+                }
+            }
+        }
+    }
+
+    return response;
+}
+
+common::idp::proxy_buckets::response TcpConnectionStore::GetBuckets(const common::idp::proxy_buckets::request& services)
+{
+    common::idp::proxy_buckets::response response;
+
+    for (const auto& service_info : services)
+    {
+        if (service_info.service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
+        {
+            for (auto& [service_socket_id, all_services] : proxy_services)
+            {
+                if (service_socket_id == service_info.socket_id)
+                {
+                    std::shared_lock lock(all_services[service_info.service_id].mutex);
+                    const ProxyTables& current = all_services[service_info.service_id].tables_work;
+
+                    response.push_back({service_info, "connections", current.service_connections.BucketsStat()});
+                    response.push_back({service_info, "syn_connections", current.syn_connections.BucketsStat()});
+                    response.push_back({service_info, "rate_limit", current.rate_limit.BucketsStat()});
+                    response.push_back({service_info, "connection_limit", current.connection_limit.BucketsStat()});
                 }
             }
         }

@@ -2537,6 +2537,63 @@ inline void hash_combine(std::size_t& s, const T& v)
 	s ^= h(v) + 0x9e3779b9 + (s << 6) + (s >> 2);
 }
 
+namespace proxy
+{
+
+struct ServiceHeader
+{
+	proxy_service_id_t service_id;
+	std::string service;
+	common::ip_address_t proxy_addr;
+    tPortId proxy_port;
+	uint8_t proto;
+	tSocketId socket_id;
+
+	SERIALIZABLE(service_id, socket_id, service, proxy_addr, proxy_port, proto);
+};
+
+struct OneTableInfo
+{
+	size_t size;
+	size_t count;
+	size_t max_bucket_size;
+
+	SERIALIZABLE(size, count, max_bucket_size);
+
+	std::tuple<size_t, size_t, size_t> info() const
+	{
+		return std::tie(size, count, max_bucket_size);
+	}
+
+	std::tuple<size_t, size_t> info_short() const
+	{
+		return std::tie(size, count);
+	}
+};
+
+struct AllTablesInfo
+{
+	ServiceHeader header;
+	OneTableInfo connections;
+	OneTableInfo syn_connections;
+	OneTableInfo local_pool;
+	OneTableInfo rate_limiter;
+	OneTableInfo connection_limiter;
+
+	SERIALIZABLE(header, connections, syn_connections, local_pool, rate_limiter, connection_limiter);
+};
+
+struct BucketsInfo
+{
+	ServiceHeader header;
+	std::string table_name;
+	std::vector<size_t> counts;
+
+	SERIALIZABLE(header, table_name, counts);
+};
+
+}
+
 }
 
 // specialization of std::hash

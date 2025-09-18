@@ -68,7 +68,9 @@ steps:
 
 - cli:
   - proxy counters
+  - telegraf proxy
   - proxy tables
+  - proxy buckets
   - proxy connections type
   - proxy syn type
 
