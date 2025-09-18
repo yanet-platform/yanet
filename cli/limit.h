@@ -21,6 +21,12 @@ void summary()
 	             "maximum",
 	             "percent");
 
+	table.insert("name",
+	             "socket_id",
+	             "current",
+	             "maximum",
+	             "percent");
+
 	for (const auto& [name, socket_id, current, maximum] : response)
 	{
 		double percent = 0.0;
