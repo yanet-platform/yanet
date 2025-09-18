@@ -51,3 +51,8 @@ option('custom_hash_structures',
        type: 'boolean',
        value: true,
        description: 'Use flat emhash7::HashMap instead of a regular std::unordered_map when applicable.')
+
+option('small_memory',
+       type: 'boolean',
+       value: false,
+       description: 'Allocate less memory')

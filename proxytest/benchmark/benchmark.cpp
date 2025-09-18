@@ -77,7 +77,7 @@ inline void ResetMbuf(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** 
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
     metadata->network_headerOffset = 18;
     metadata->transport_headerOffset = 38;
-    metadata->flow.data.proxy_service_id = 1;
+    metadata->flow.data.proxy_service.id = 1;
     *ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     *tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
 }
@@ -92,7 +92,7 @@ void CreateMbuf(rte_mbuf** mbuf)
     dataplane::metadata* metadata = YADECAP_METADATA(*mbuf);
     metadata->network_headerOffset = 18;
     metadata->transport_headerOffset = 38;
-    metadata->flow.data.proxy_service_id = 1;
+    metadata->flow.data.proxy_service.id = 1;
 }
 
 inline void SetIPAddresses(rte_ipv4_hdr* ipv4_header, uint32_t src_addr, uint32_t dst_addr)
@@ -515,11 +515,11 @@ void Benchmark(const Config& config) {
     std::cout << "SYNs dropped: " << syn_stats.client_syn_dropped << std::endl;
     std::cout << "SYNACKs dropped: " << syn_stats.server_synack_dropped << std::endl;
     std::cout << "counters:\n";
-    for (uint32_t i = 0; i < ::proxy::names.size(); i++)
+    for (uint32_t i = 0; i < (uint32_t)::proxy::service_counter::size; i++)
     {
         if (syn_stats.counters[i] != 0)
         {
-            std::cout << "\t" << ::proxy::names[i] << ": " << syn_stats.counters[i] << "\n";
+            std::cout << "\t" << ::proxy::service_counter_toString(::proxy::service_counter(i)) << ": " << syn_stats.counters[i] << "\n";
         }
     }
 
@@ -533,11 +533,11 @@ void Benchmark(const Config& config) {
     std::cout << "Client ACKs dropped: " << stats.client_ack_dropped << std::endl;
     std::cout << "Server ACKs dropped: " << stats.server_ack_dropped << std::endl;
     std::cout << "counters:\n";
-    for (uint32_t i = 0; i < ::proxy::names.size(); i++)
+    for (uint32_t i = 0; i < (uint32_t)::proxy::service_counter::size; i++)
     {
         if (stats.counters[i] != 0)
         {
-            std::cout << "\t" << ::proxy::names[i] << ": " << stats.counters[i] << "\n";
+            std::cout << "\t" <<::proxy::service_counter_toString(::proxy::service_counter(i)) << ": " << stats.counters[i] << "\n";
         }
     }
 }

@@ -32,6 +32,10 @@ if get_option('enable_acl_debug')
     compiler_args += '-DACL_DEBUG'
 endif
 
+if get_option('small_memory')
+    compiler_args += '-DSMALL_MEMORY_RELEASE'
+endif
+
 if get_option('custom_hash_structures')
     # These are header-only libraries without their own meson.build
     emhash_dep = declare_dependency(include_directories: 'subprojects/emhash')
