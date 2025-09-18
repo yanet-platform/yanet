@@ -21,7 +21,7 @@ namespace dataplane::proxy
 inline void DebugFullHeader(rte_mbuf* mbuf, const char* message)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-    proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
+    proxy_service_id_t service_id = metadata->flow.data.proxy_service.id;
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
 

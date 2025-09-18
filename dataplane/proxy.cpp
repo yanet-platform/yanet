@@ -563,8 +563,8 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
 
                 std::unordered_map<uint32_t, uint32_t> connections;
                 auto count_connections = [&connections](uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
-                    // TODO: check whitelist
-                    connections[address]++;
+                    if (!connection.FlagEnabled(Connection::flag_whitelist))
+                        connections[address]++;
                 };
                 service.tables_work.service_connections.ProcessAllConnectionsWithoutLocking(count_connections);
 
@@ -820,7 +820,7 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 	
-    proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
+    proxy_service_id_t service_id = metadata->flow.data.proxy_service.id;
     dataplane::proxy::proxy_service_t& service = worker_info.globalBase->proxy_services[service_id];
 
 	worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::packets_in]++;
@@ -838,7 +838,7 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::cl_packets_dropped]++;
         return false;
     }
-    if (!service.rate_limit_table.Check(ipv4_header->src_addr, worker_info.current_time_ms))
+    if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.Check(ipv4_header->src_addr, worker_info.current_time_ms))
     {
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
         return false;
@@ -958,7 +958,7 @@ uint32_t CheckSynCookie(const proxy_service_t& service, rte_ipv4_hdr* ipv4_heade
 bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-    proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
+    proxy_service_id_t service_id = metadata->flow.data.proxy_service.id;
     dataplane::proxy::proxy_service_t& service = worker_info.globalBase->proxy_services[service_id];
 
     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::packets_in]++;
@@ -1116,7 +1116,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::ack_invalid_ack_number]++;
                     action = false;
                 }
-                else if (!service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
+                else if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
                 {
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
                     action = false;
@@ -1133,11 +1133,15 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                     service_connection_data.connection->client_start_seq = syn_connection_data.connection->client_start_seq;
                     syn_connection_data.bucket->Clear(syn_connection_data.idx);
                     syn_connection_data.Unlock();
-
+                    
                     service_connection_data.connection->flags = flags;
                     service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
                     service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
-
+                    if (metadata->flow.data.proxy_service.whitelist)
+                    {
+                        service_connection_data.connection->SetFlag(Connection::flag_whitelist);
+                    }
+                    
                     if (service.config.send_proxy_header)
                     {
                             tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, sizeof(proxy_v2_ipv4_hdr));
@@ -1162,7 +1166,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
                     action = false;
                 }
-                else if (!service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
+                else if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
                 {
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
                     action = false;
@@ -1199,7 +1203,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                         service_connection_data.connection->timestamp_proxy_first = tcp_options.timestamp_echo;
                         service_connection_data.connection->timestamp_client_last = tcp_options.timestamp_value;
                         service_connection_data.connection->cookie_data = cookie_data;
-
+                        
                         tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, 1 + (service.config.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
 
                         TcpOptions cookie_options = SynCookies::UnpackData(cookie_data);
@@ -1214,6 +1218,10 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                         }
                         service_connection_data.connection->flags = Connection::flag_from_synkookie | flags;
                         service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
+                        if (metadata->flow.data.proxy_service.whitelist)
+                        {
+                            service_connection_data.connection->SetFlag(Connection::flag_whitelist);
+                        }
 
                         cookie_options.Write(mbuf, &ipv4_header, &tcp_header);
                         ipv4_header->time_to_live = 64;
@@ -1244,7 +1252,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
 bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-    proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
+    proxy_service_id_t service_id = metadata->flow.data.proxy_service.id;
     dataplane::proxy::proxy_service_t& service = worker_info.globalBase->proxy_services[service_id];
 
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
@@ -1397,7 +1405,7 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
 bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-    proxy_service_id_t service_id = metadata->flow.data.proxy_service_id;
+    proxy_service_id_t service_id = metadata->flow.data.proxy_service.id;
     dataplane::proxy::proxy_service_t& service = worker_info.globalBase->proxy_services[service_id];
 
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);

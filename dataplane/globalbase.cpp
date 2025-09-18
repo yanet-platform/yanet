@@ -856,7 +856,7 @@ static bool checkFlow(const common::globalBase::tFlow& flow)
 			 flow.type == common::globalBase::eFlowType::proxy_server_ack ||
 			 flow.type == common::globalBase::eFlowType::proxy_client_icmp)
 	{
-		if (flow.data.proxy_service_id > YANET_CONFIG_PROXY_SERVICES_SIZE)
+		if (flow.data.proxy_service.id > YANET_CONFIG_PROXY_SERVICES_SIZE)
 		{
 			return false;
 		}

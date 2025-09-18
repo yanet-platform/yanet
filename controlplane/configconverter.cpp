@@ -1953,6 +1953,29 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		controlplane::base::acl_rule_network_ipv4_t client_rule_network({common::ipv4_prefix_default}, {common::ipv4_prefix_t(service.proxy_addr)});
 		controlplane::base::acl_rule_transport_tcp_t client_rule_transport{range_t{0x0000, 0xFFFF}, range_t{service.proxy_port}};
 		
+		for (const auto& prefix : service.whitelist)
+		{
+			// whitelist
+			controlplane::base::acl_rule_network_ipv4_t wl_rule_network({common::ipv4_prefix_t(prefix)}, {common::ipv4_prefix_t{service.proxy_addr}});
+			{
+				// client_syn
+				common::globalBase::tFlow flow = convertToFlow(nextModule, "client_syn");	
+				flow.data.proxy_service.id = service.service_id;
+				flow.data.proxy_service.whitelist = 1;
+				client_rule_transport.flags = {TCP_SYN_FLAG, TCP_ACK_FLAG};
+				acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(wl_rule_network, client_rule_transport, flow));
+			}
+
+			{
+				// client_ack
+				common::globalBase::tFlow flow = convertToFlow(nextModule, "client_ack");	
+				flow.data.proxy_service.id = service.service_id;
+				flow.data.proxy_service.whitelist = 1;
+				client_rule_transport.flags = {0, TCP_SYN_FLAG};
+				acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(wl_rule_network, client_rule_transport, flow));
+			}
+		}
+
 		for (const auto& prefix : service.blacklist)
 		{
 			// blacklist
@@ -1964,7 +1987,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// client_syn
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_syn");	
-			flow.data.proxy_service_id = service.service_id;
+			flow.data.proxy_service.id = service.service_id;
 			client_rule_transport.flags = {TCP_SYN_FLAG, TCP_ACK_FLAG};
 			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
 		}
@@ -1972,7 +1995,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// client_ack
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_ack");	
-			flow.data.proxy_service_id = service.service_id;
+			flow.data.proxy_service.id = service.service_id;
 			client_rule_transport.flags = {0, TCP_SYN_FLAG};
 			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
 		}
@@ -1980,7 +2003,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// client_icmp
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_icmp");	
-			flow.data.proxy_service_id = service.service_id;
+			flow.data.proxy_service.id = service.service_id;
 			ranges_t ping_types(values_t({ICMP_ECHO}));
 			ranges_t ping_codes(values_t({ICMP_ECHOREPLY}));
 			controlplane::base::acl_rule_transport_icmpv4_t rule_ping(ping_types, ping_codes);
@@ -1993,7 +2016,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// server_syn_ack
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "server_syn_ack");	
-			flow.data.proxy_service_id = service.service_id;
+			flow.data.proxy_service.id = service.service_id;
 			server_rule_transport.flags = {TCP_SYN_FLAG | TCP_ACK_FLAG , 0};
 			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
 		}
@@ -2001,7 +2024,7 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// server_ack
 			common::globalBase::tFlow flow = convertToFlow(nextModule, "server_ack");	
-			flow.data.proxy_service_id = service.service_id;
+			flow.data.proxy_service.id = service.service_id;
 			server_rule_transport.flags = {0, TCP_SYN_FLAG};
 			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
 		}

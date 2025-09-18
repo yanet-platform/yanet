@@ -44,6 +44,7 @@ struct Connection
     static constexpr uint32_t flag_clear_sack = 1u << 4;
     static constexpr uint32_t flag_no_timestamps = 1u << 5;
     static constexpr uint32_t flag_timestamp_fail = 1u << 6;
+    static constexpr uint32_t flag_whitelist = 1u << 7;
 
     void Clear() {
         local = 0;
@@ -60,7 +61,7 @@ struct Connection
         service_flags = 0;
     }
 
-    bool FlagEnabled(uint32_t flag)
+    bool FlagEnabled(uint32_t flag) const
     {
         return (flags & flag) != 0;
     }

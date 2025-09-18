@@ -415,6 +415,7 @@ public:
 	common::globalBase::tFlow flow;
 	std::vector<common::ipv4_prefix_t> upstream_nets;
 	std::set<common::ip_prefix_t> blacklist;
+	std::set<common::ip_prefix_t> whitelist;
 	bool send_proxy_header;
 
 	tcp_options_t tcp_options;
@@ -470,6 +471,7 @@ public:
 	common::globalBase::tFlow flow;
 	std::vector<common::ipv4_prefix_t> upstream_nets;
 	std::set<common::ip_prefix_t> blacklist;
+	std::set<common::ip_prefix_t> whitelist;
 	bool send_proxy_header;
 
 	tcp_options_t tcp_options;

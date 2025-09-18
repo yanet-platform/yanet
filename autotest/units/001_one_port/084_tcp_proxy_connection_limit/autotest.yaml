@@ -32,6 +32,18 @@ steps:
     send: 004-send.pcap
     expect: 004-expect.pcap
 
+- sendPackets:
+  - port: kni0
+    send: 005-send.pcap
+    expect: 005-expect.pcap
+
+- sleep: 1
+
+- sendPackets:
+  - port: kni0
+    send: 005_2-send.pcap
+    expect: 005_2-expect.pcap
+
 - cli:
   - proxy connections type
   - proxy syn type

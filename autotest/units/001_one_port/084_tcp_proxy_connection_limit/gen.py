@@ -10,11 +10,13 @@ MAC_PROXY = "00:11:22:33:44:55"
 MAC_CLIENT = "00:00:00:00:00:01"
 MAC_SERVER = "00:00:00:00:00:0A"
 IP_CLIENT1 = "10.0.2.1"
+IP_CLIENT2 = "10.0.2.2"
 
 IP_PROXY_INT = "10.0.0.1"
 IP_PROXY_INT2 = "10.0.0.2"
 IP_PROXY_INT3 = "10.0.0.3"
 IP_PROXY_INT4 = "10.0.0.4"
+IP_PROXY_INT5 = "10.0.0.5"
 
 IP_SERVER1 = "10.0.1.1"
 
@@ -148,3 +150,55 @@ data_type4 = [
 ]
 
 WriteTest("004", data_type4)
+
+# 005 - whitelist part 1
+
+data_type5 = [
+	# 1st connection
+	(
+		FromClient(IP_CLIENT2, IP_SERVER1, PORT_CLIENT, START_CLIENT_SEQ, 0, 'S', options=options_client_syn),
+		ToServer(IP_PROXY_INT3, IP_SERVER1, START_CLIENT_SEQ, 0, 'S', options=options_client_syn)
+	),
+	(
+		FromServer(IP_PROXY_INT3, IP_SERVER1, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn),
+		ToClient(IP_SERVER1, IP_CLIENT2, PORT_CLIENT, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn)
+    ),
+	(
+		FromClient(IP_CLIENT2, IP_SERVER1, PORT_CLIENT, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack),
+		ToServer(IP_PROXY_INT3, IP_SERVER1, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack)
+    ),
+	# 2nd connection
+	(
+		FromClient(IP_CLIENT2, IP_SERVER1, PORT_CLIENT + 1, START_CLIENT_SEQ, 0, 'S', options=options_client_syn),
+		ToServer(IP_PROXY_INT4, IP_SERVER1, START_CLIENT_SEQ, 0, 'S', options=options_client_syn)
+	),
+	(
+		FromServer(IP_PROXY_INT4, IP_SERVER1, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn),
+		ToClient(IP_SERVER1, IP_CLIENT2, PORT_CLIENT + 1, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn)
+    ),
+	(
+		FromClient(IP_CLIENT2, IP_SERVER1, PORT_CLIENT + 1, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack),
+		ToServer(IP_PROXY_INT4, IP_SERVER1, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack)
+    ),
+]
+
+WriteTest("005", data_type5)
+
+# conn limit reached, but address is in whitelist
+# 3rd connection
+data_type5_2 = [
+	(
+		FromClient(IP_CLIENT2, IP_SERVER1, PORT_CLIENT + 2, START_CLIENT_SEQ, 0, 'S', options=options_client_syn),
+		ToServer(IP_PROXY_INT5, IP_SERVER1, START_CLIENT_SEQ, 0, 'S', options=options_client_syn)
+	),
+	(
+		FromServer(IP_PROXY_INT5, IP_SERVER1, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn),
+		ToClient(IP_SERVER1, IP_CLIENT2, PORT_CLIENT + 2, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn)
+    ),
+	(
+		FromClient(IP_CLIENT2, IP_SERVER1, PORT_CLIENT + 2, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack),
+		ToServer(IP_PROXY_INT5, IP_SERVER1, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack)
+    )
+]
+
+WriteTest("005_2", data_type5_2)

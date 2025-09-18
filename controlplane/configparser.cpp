@@ -1122,14 +1122,14 @@ uint32_t TimeoutValue(const nlohmann::json& moduleJson, const std::string& name,
 	return (exist(moduleJson, "timeouts") ? moduleJson["timeouts"].value(name, default_value) : default_value);
 }
 
-void LoadBlackList(const nlohmann::json& moduleJson, const std::string& rootFilePath, std::set<common::ip_prefix_t>& blacklist)
+void LoadSubnetList(const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::string& name, std::set<common::ip_prefix_t>& list)
 {
-	if (!exist(moduleJson, "blacklist"))
+	if (!exist(moduleJson, name))
 	{
 		return;
 	}
 
-	auto json_blacklist = moduleJson["blacklist"];
+	auto json_blacklist = moduleJson[name];
 	if (json_blacklist.is_string())
 	{
 		std::string includePath = json_blacklist;
@@ -1145,14 +1145,14 @@ void LoadBlackList(const nlohmann::json& moduleJson, const std::string& rootFile
 		std::string prefix;
 		while (std::getline(includeFileStream, prefix))
 		{
-			blacklist.insert(common::ip_prefix_t(prefix));
+			list.insert(common::ip_prefix_t(prefix));
 		}
 	}
 	else
 	{
 		for (const auto& prefix : json_blacklist)
 		{
-			blacklist.insert(common::ip_prefix_t(prefix));
+			list.insert(common::ip_prefix_t(prefix));
 		}
 	}
 }
@@ -1257,7 +1257,8 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 			throw error_result_t(eResult::invalidConfigurationFile, "empty list of upstream nets for proxy module");
 		}
 	}
-	LoadBlackList(moduleJson, rootFilePath, proxy.blacklist);
+	LoadSubnetList(moduleJson, rootFilePath, "blacklist", proxy.blacklist);
+	LoadSubnetList(moduleJson, rootFilePath, "whitelist", proxy.whitelist);
 	proxy.send_proxy_header = moduleJson.value("proxyHeader", YANET_PROXY_DEFAULT_USE_PROXY_HEADER);
 
 	loadConfig_proxy_tcp_options(moduleJson, proxy.tcp_options, controlplane::proxy::tcp_options_t());
@@ -1361,7 +1362,9 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 
 		service.upstream_nets = proxy.upstream_nets;
 		service.blacklist = proxy.blacklist;
-		LoadBlackList(service_json, rootFilePath, service.blacklist);
+		service.whitelist = proxy.whitelist;
+		LoadSubnetList(service_json, rootFilePath, "blacklist", service.blacklist);
+		LoadSubnetList(service_json, rootFilePath, "whitelist", service.whitelist);
 		service.send_proxy_header = service_json.value("proxyHeader", proxy.send_proxy_header);
 
 		loadConfig_proxy_tcp_options(service_json, service.tcp_options, proxy.tcp_options);

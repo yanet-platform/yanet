@@ -2175,7 +2175,12 @@ union tFlowData
 	nat46clat_id_t nat46clat_id;
 	dregress_id_t dregressId;
 	tun64_id_t tun64Id;
-	proxy_service_id_t proxy_service_id;
+	
+	struct
+	{
+		uint8_t whitelist : 1;
+		proxy_service_id_t id : 31;
+	} proxy_service;
 
 	struct
 	{
