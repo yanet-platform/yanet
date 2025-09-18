@@ -21,6 +21,7 @@ SlowWorker::SlowWorker(cWorker* worker,
         from_gcs_{std::move(from_gcs)},
         slow_worker_{worker},
         mempool_{mempool},
+        stats_{},
         fragmentation_(
                 SlowWorkerSender(),
                 slow_worker_->dataPlane->getConfigValues().fragmentation),
