@@ -2573,12 +2573,12 @@ struct OneTableInfo
 
 struct AllTablesInfo
 {
-	ServiceHeader header;
-	OneTableInfo connections;
-	OneTableInfo syn_connections;
-	OneTableInfo local_pool;
-	OneTableInfo rate_limiter;
-	OneTableInfo connection_limiter;
+	ServiceHeader header{};
+	OneTableInfo connections{};
+	OneTableInfo syn_connections{};
+	OneTableInfo local_pool{};
+	OneTableInfo rate_limiter{};
+	OneTableInfo connection_limiter{};
 
 	SERIALIZABLE(header, connections, syn_connections, local_pool, rate_limiter, connection_limiter);
 };

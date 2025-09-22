@@ -51,10 +51,19 @@ struct RateLimitBucket
         return true;
     }
 
+    void Clear(uint32_t idx)
+    {
+        edts[idx] = 0;
+        last_times[idx] = 0;
+        addresses[idx] = 0;
+        num_allocated--;
+    }
+
     uint64_t edts[bucket_size]{};
     uint64_t last_times[bucket_size]{};
 
     uint32_t addresses[bucket_size]{};
+    uint32_t num_allocated{};
     rte_spinlock_t spinlock;
 
     void Lock()
@@ -67,6 +76,53 @@ struct RateLimitBucket
         rte_spinlock_unlock(&spinlock);
     }
 
+    class Iterator
+    {
+    public:
+        Iterator(const RateLimitBucket* bucket, uint32_t conn_idx) 
+            : bucket_(bucket), conn_idx_(conn_idx) 
+        {
+            while (conn_idx_ < bucket_size && bucket_->addresses[conn_idx_] == 0) conn_idx_++;
+        }
+
+        uint32_t& operator*()
+        {
+            return conn_idx_;
+        }
+
+        Iterator& operator++()
+        {
+            conn_idx_++;
+            while (conn_idx_ < bucket_size && bucket_->addresses[conn_idx_] == 0) conn_idx_++;
+            return *this;
+        }
+        Iterator operator++(int)
+        {
+            Iterator tmp = *this;
+            operator++();
+            return tmp;
+        }
+
+        friend bool operator==(const Iterator& lhs, const Iterator& rhs)
+        {
+            return lhs.bucket_ == rhs.bucket_ && lhs.conn_idx_ == rhs.conn_idx_;
+        }
+        friend bool operator!=(const Iterator& lhs, const Iterator& rhs)
+        {
+            return lhs.bucket_ != rhs.bucket_ || lhs.conn_idx_ != rhs.conn_idx_;
+        }
+
+    private:
+        const RateLimitBucket* bucket_;
+        uint32_t conn_idx_;
+    };
+
+    using iterator_type = Iterator;
+
+    iterator_type begin() { return Iterator(this, 0); }
+    iterator_type end() { return Iterator(this, bucket_size); }
+    iterator_type begin() const { return Iterator(this, 0); }
+    iterator_type end() const { return Iterator(this, bucket_size); }
 } __rte_cache_aligned;
 
 class RateLimitTable
@@ -237,16 +293,141 @@ public:
         return std::string(loc_buf);
     }
 
+    template<typename T>
+    class Iterator
+    {
+    public:
+        Iterator(const RateLimitTable* table, uint32_t bucket_idx) 
+            : table_(table), bucket_idx_(bucket_idx)
+        {
+            if (unlikely(!table_->initialized_)) {
+                bucket_idx_ = table_->number_buckets_;
+                return;
+            }
+            while (bucket_idx_ < table_->number_buckets_ &&
+                   table_->buckets_[bucket_idx_].num_allocated == 0) 
+                bucket_idx_++;
+            if (bucket_idx_ < table_->number_buckets_) 
+                bucket_ = &table_->buckets_[bucket_idx_];
+        }
+
+        T& operator*()
+        {
+            return *bucket_;
+        }
+        T* operator->() 
+        {
+            return bucket_;
+        }
+
+        Iterator& operator++()
+        {
+            bucket_idx_++;
+            while (bucket_idx_ < table_->number_buckets_ &&
+                   table_->buckets_[bucket_idx_].num_allocated == 0) 
+                bucket_idx_++;
+            if (bucket_idx_ < table_->number_buckets_) 
+                bucket_ = &table_->buckets_[bucket_idx_];
+            return *this;
+        }
+        Iterator operator++(int)
+        {
+            Iterator tmp = *this;
+            operator++();
+            return tmp;
+        }
+
+        friend bool operator==(const Iterator& lhs, const Iterator& rhs)
+        {
+            return lhs.table_ == rhs.table_ && lhs.bucket_idx_ == rhs.bucket_idx_;
+        }
+        friend bool operator!=(const Iterator& lhs, const Iterator& rhs)
+        {
+            return lhs.table_ != rhs.table_ || lhs.bucket_idx_ != rhs.bucket_idx_;
+        }
+
+    private:
+        const RateLimitTable* table_;
+        uint32_t bucket_idx_;
+        T* bucket_;
+    };
+
+    using iterator_type = Iterator<RateLimitBucket>;
+    using const_iterator_type = Iterator<const RateLimitBucket>;
+
+    iterator_type begin() { return Iterator<RateLimitBucket>(this, 0); }
+    iterator_type end() { return Iterator<RateLimitBucket>(this, number_buckets_); }
+    const_iterator_type begin() const { return Iterator<const RateLimitBucket>(this, 0); }
+    const_iterator_type end() const { return Iterator<const RateLimitBucket>(this, number_buckets_); }
+
+    template <typename Function>
+    void ProcessAllConnectionsWithoutLocking(Function func)
+    {
+        for (auto& bucket : *this)
+        {
+            for (uint32_t idx : bucket)
+            {
+                func(bucket.addresses[idx], bucket.last_times[idx]);
+            }
+        }
+    }
+
+    template <typename FunctionCondition, typename FunctionAction>
+    void ProcessAllConnectionsWithLocking(FunctionCondition condition, FunctionAction action)
+    {
+        for (auto& bucket : *this)
+        {
+            bool fulfilled = false;
+            for (uint32_t idx : bucket)
+            {
+                if (condition(bucket.addresses[idx], bucket.last_times[idx]))
+                {
+                    fulfilled = true;
+                    break;
+                }
+            }
+
+            if (fulfilled)
+            {
+                bucket.Lock();
+                for (uint32_t idx : bucket)
+                {
+                    if (condition(bucket.addresses[idx], bucket.last_times[idx]))
+                    {
+                        action(idx, bucket);
+                    }
+                }
+                bucket.Unlock();
+            }
+        }
+    }
+
     void FillStat(common::proxy::OneTableInfo& stat) const
     {
-        stat.size = RateLimitBucket::bucket_size * number_buckets_;
+        if (unlikely(!initialized_)) return;
+
+        stat.size = number_buckets_ * RateLimitBucket::bucket_size;
         stat.count = 0;
         stat.max_bucket_size = 0;
+        for (const RateLimitBucket& bucket : *this)
+        {
+            stat.count += bucket.num_allocated;
+            stat.max_bucket_size = (bucket.num_allocated < stat.max_bucket_size ? stat.max_bucket_size : bucket.num_allocated);
+        }
     }
 
     std::vector<size_t> BucketsStat() const
-    {
-        return {};
+    {  
+        uint32_t size = RateLimitBucket::bucket_size + 1;
+        std::vector<size_t> result(size, 0);
+        if (unlikely(!initialized_)) return result;
+
+        for (const RateLimitBucket& bucket: *this)
+        {
+            uint32_t count = bucket.num_allocated;
+            result[(count > size ? size : count)]++;
+        }
+        return result;
     }
 
 private:
@@ -422,14 +603,25 @@ public:
 
     void FillStat(common::proxy::OneTableInfo& stat) const
     {
+        if (unlikely(!initialized_)) return;
+
+        const hashtable_t::stats_t& stats = table_updater_->get_stats();
         stat.size = number_connections_;
-        stat.count =  0; // Size();
-        stat.max_bucket_size = 0;
+        stat.count =  stats.keys_count;
+        stat.max_bucket_size = stats.longest_chain;
     }
 
     std::vector<size_t> BucketsStat() const
     {
-        return {};
+        std::vector<size_t> result(hashtable_t::keys_in_chunk_size + 1, 0);
+        if (unlikely(!initialized_)) return result;
+        
+        const hashtable_t::stats_t& stats = table_updater_->get_stats();
+        for (uint32_t i = 0; i < result.size(); i++)
+        {
+            result[i] = stats.keys_in_chunks[i];
+        }
+        return result;
     }
 
 private:

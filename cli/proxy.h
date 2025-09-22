@@ -155,6 +155,7 @@ void buckets(std::optional<common::ip_address_t> proxy_ip,
 
 	for (const auto& [service_info, table_name, counts] : response)
 	{
+		if (counts[0] == 0) continue;
 		const auto& [name, addr, proto, port] = ServiceTie(service_info);
 		std::vector<std::string> row = {std::to_string(service_info.service_id), name, addr.toString(), proto, std::to_string(port), std::to_string(service_info.socket_id), table_name};
 		for (size_t count: counts)

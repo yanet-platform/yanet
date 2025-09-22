@@ -389,6 +389,11 @@ eResult proxy_service_on_socket_t::UpdateFirstStage(dataplane::proxy::proxy_serv
         rate_limit_table_tmp.Update(service.config.rate_limit.rate, service.config.rate_limit.burst);
         service.rate_limit_table.CopyFrom(rate_limit_table_tmp);
     }
+    else
+    {
+        rate_limit_table_tmp.ClearLinks();
+        service.rate_limit_table.CopyFrom(rate_limit_table_tmp);
+    }
 
     if (service.config.connection_limit.size > 0)
     {
@@ -404,6 +409,11 @@ eResult proxy_service_on_socket_t::UpdateFirstStage(dataplane::proxy::proxy_serv
             }
         }
         connection_limit_table_tmp.Update(service.config.connection_limit.timeout);
+        service.connection_limit_table.CopyFrom(connection_limit_table_tmp);
+    }
+    else
+    {
+        connection_limit_table_tmp.ClearLinks();
         service.connection_limit_table.CopyFrom(connection_limit_table_tmp);
     }
 
@@ -542,6 +552,20 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 };
 
                 service.tables_work.syn_connections.ProcessAllConnectionsWithLocking(condition, action);
+            }
+
+            if (service.config.rate_limit.size > 0)
+            {
+                uint64_t time_to_clear = current_time_ms - RateLimitTable::timeout_ms;
+                auto condition = [time_to_clear] (uint32_t address, uint64_t last_time) {
+                    return last_time < time_to_clear;
+                };
+
+                auto action = [&service](uint32_t conn_idx, auto& bucket) {
+                    bucket.Clear(conn_idx);
+                };
+
+                service.tables_work.rate_limit.ProcessAllConnectionsWithLocking(condition, action);
             }
 
             if (service.config.connection_limit.size > 0)
