@@ -10,8 +10,8 @@ steps:
     expect: 001-expect.pcap
 
 - cli:
-  - proxy blacklist add type1 10.0.2.1 1
-  - proxy blacklist type1
+  - proxy blacklist add 10.0.1.1 tcp 80 10.0.2.1 1
+  - proxy blacklist 10.0.1.1 tcp 80
 
 - sendPackets:
   - port: kni0
@@ -45,8 +45,8 @@ steps:
     expect: 005_2-expect.pcap
 
 - cli:
-  - proxy connections type
-  - proxy syn type
+  - proxy connections 10.0.1.1 tcp 80
+  - proxy syn 10.0.1.1 tcp 80
   - rib static remove default 10.0.1.0/24 10.0.1.1
   - rib static remove default 10.0.2.0/24 10.0.2.1
   - rib prefixes

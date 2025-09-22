@@ -19,14 +19,14 @@ steps:
 
 - cli:
   - proxy counters
-  - proxy connections service2
-  - proxy connections service3
+  - proxy connections 10.0.5.2 tcp 80
+  - proxy connections 10.0.5.3 tcp 80
 
 - reload: controlplane2.conf
 
 - cli:
-  - proxy connections service2
-  - proxy connections service3
+  - proxy connections 10.0.5.2 tcp 80
+  - proxy connections 10.0.5.3 tcp 80
 
 - sendPackets:
   - port: kni0
@@ -55,8 +55,8 @@ steps:
 
 - cli:
   - proxy counters
-  - proxy connections service2
-  - proxy connections service3
+  - proxy connections 10.0.5.2 tcp 80
+  - proxy connections 10.0.5.3 tcp 80
 
 - reload: controlplane3.conf
 
@@ -82,7 +82,7 @@ steps:
 
 
 - cli:
-  - proxy connections service2
+  - proxy connections 10.0.5.2 tcp 80
   - rib static remove default 10.0.5.0/24 10.0.1.1
   - rib static remove default 10.0.2.0/24 10.0.2.1
   - rib prefixes

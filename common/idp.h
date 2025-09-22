@@ -826,7 +826,8 @@ using response = std::vector<state>;
 
 namespace proxy_connections
 {
-using request = proxy_service_id_t; ///< proxy_service_id
+using request = std::tuple<proxy_service_id_t,
+                           std::optional<common::ipv4_prefix_t>>;
 
 using connection = std::tuple<uint32_t, ///< src_addr
                               uint16_t, ///< src_port
@@ -839,7 +840,8 @@ using response = std::vector<connection>;
 
 namespace proxy_syn
 {
-using request = proxy_service_id_t; ///< proxy_service_id
+using request = std::tuple<proxy_service_id_t,
+                           std::optional<common::ipv4_prefix_t>>;
 
 using connection = std::tuple<uint32_t, ///< src_addr
                               uint16_t, ///< src_port
@@ -1119,6 +1121,7 @@ using request = std::tuple<requestType,
                                         neighbor_update_interfaces::request,
                                         memory_manager_update::request,
                                         proxy_tables::request,
+                                        proxy_connections::request,
                                         proxy_blacklist_add::request,
                                         getPhysicalPortsFull::request>>;
 

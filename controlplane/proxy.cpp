@@ -204,7 +204,8 @@ common::icp::proxy_counters::response proxy_t::proxy_counters(const common::icp:
 common::icp::proxy_connections::response proxy_t::proxy_connections(const common::icp::proxy_connections::request& request) const
 {
     common::icp::proxy_connections::response response;
-    const std::string& service_name = request;
+    const auto& [request_proxy_part, prefix_client] = request;
+    const auto& [proxy_ip, proto, proxy_port] = request_proxy_part;
 
     generations_config.current_lock();
     std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
@@ -215,22 +216,21 @@ common::icp::proxy_connections::response proxy_t::proxy_connections(const common
         for (const auto& iter_service : config.services)
         {
             const controlplane::proxy::service_t& service = iter_service.second;
-            if (service.service.find(service_name) != std::string::npos)
+            if (service.SatisfyConditions(proxy_ip, proto, proxy_port))
             {
-                const auto& connections = dataplane.proxy_connections(service.service_id);
-                for (const auto& connection : connections)
-                    response.push_back(std::tuple_cat(std::make_tuple(service.service), connection));
+                return dataplane.proxy_connections({service.service_id, prefix_client});
             }
         }
     }
 
-    return response;
+    return {};
 }
 
 common::icp::proxy_syn::response proxy_t::proxy_syn(const common::icp::proxy_syn::request& request) const
 {
     common::icp::proxy_syn::response response;
-    const std::string& service_name = request;
+    const auto& [request_proxy_part, prefix_client] = request;
+    const auto& [proxy_ip, proto, proxy_port] = request_proxy_part;
 
     generations_config.current_lock();
     std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
@@ -241,16 +241,14 @@ common::icp::proxy_syn::response proxy_t::proxy_syn(const common::icp::proxy_syn
         for (const auto& iter_service : config.services)
         {
             const controlplane::proxy::service_t& service = iter_service.second;
-            if (service.service.find(service_name) != std::string::npos)
+            if (service.SatisfyConditions(proxy_ip, proto, proxy_port))
             {
-                const auto& syns = dataplane.proxy_syn(service.service_id);
-                for (const auto& syn : syns)
-                    response.push_back(std::tuple_cat(std::make_tuple(service.service), syn));
+                return dataplane.proxy_syn({service.service_id, prefix_client});
             }
         }
     }
 
-    return response;
+    return {};
 }
 
 common::icp::proxy_tables::response proxy_t::proxy_tables(const common::icp::proxy_tables::request& request) const
@@ -318,7 +316,7 @@ common::icp::proxy_debug_counters_id::response proxy_t::proxy_debug_counters_id(
 common::icp::proxy_blacklist::response proxy_t::proxy_blacklist(const common::icp::proxy_blacklist::request& request)
 {
     common::icp::proxy_blacklist::response response;
-    const std::string& service_name = request;
+    const auto& [proxy_ip, proto, proxy_port] = request;
 
     generations_config.current_lock();
     std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
@@ -329,11 +327,13 @@ common::icp::proxy_blacklist::response proxy_t::proxy_blacklist(const common::ic
         for (const auto& iter_service : config.services)
         {
             const controlplane::proxy::service_t& service = iter_service.second;
-            if (service.service.find(service_name) != std::string::npos)
+            if (service.SatisfyConditions(proxy_ip, proto, proxy_port))
             {
                 const auto& blacklist = dataplane.proxy_blacklist(service.service_id);
                 for (const auto& entry : blacklist)
-                    response.push_back(std::tuple_cat(std::make_tuple(service.service), entry));
+                {
+                    response.push_back(entry);
+                }
             }
         }
     }
@@ -344,7 +344,8 @@ common::icp::proxy_blacklist::response proxy_t::proxy_blacklist(const common::ic
 common::icp::proxy_blacklist_add::response proxy_t::proxy_blacklist_add(const common::icp::proxy_blacklist_add::request& request)
 {
     common::icp::proxy_blacklist_add::response response;
-    auto [service_name, address, timeout] = request;
+    const auto& [request_proxy_part, address, timeout] = request;
+    const auto& [proxy_ip, proto, proxy_port] = request_proxy_part;
 
     generations_config.current_lock();
     std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
@@ -355,7 +356,7 @@ common::icp::proxy_blacklist_add::response proxy_t::proxy_blacklist_add(const co
         for (const auto& iter_service : config.services)
         {
             const controlplane::proxy::service_t& service = iter_service.second;
-            if (service.service == service_name)
+            if (service.SatisfyConditions(proxy_ip, proto, proxy_port))
             {
                 dataplane.proxy_blacklist_add({service.service_id, address, timeout});
             }

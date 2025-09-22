@@ -974,10 +974,13 @@ using response = std::tuple<common_info,
 
 namespace proxy_common_types
 {
+using request_proxy_part = std::tuple<common::ip_address_t, ///< proxy_ip
+                                      uint8_t, ///< proto
+                                      uint16_t>; ///< proxy_port
+
 using request_optional = std::tuple<std::optional<common::ip_address_t>, ///< proxy_ip
                                     std::optional<uint8_t>, ///< proto
                                     std::optional<uint16_t>>; ///< proxy_port
-
 }
 
 namespace proxy_counters
@@ -990,10 +993,10 @@ using response = std::vector<std::tuple<common::proxy::ServiceHeader, ///< servi
 
 namespace proxy_connections
 {
-using request = std::string; ///< service_name
+using request = std::tuple<proxy_common_types::request_proxy_part, ///< service_info
+                           std::optional<common::ipv4_prefix_t>>; ///< prefix client
 
-using connection = std::tuple<std::string, ///< service_name
-                              uint32_t, ///< src_addr
+using connection = std::tuple<uint32_t, ///< src_addr
                               uint16_t, ///< src_port
                               uint32_t, ///< local_addr
                               uint16_t, ///< local_port
@@ -1004,16 +1007,16 @@ using response = std::vector<connection>;
 
 namespace proxy_syn
 {
-using request = std::string; ///< service_name
+using request = std::tuple<proxy_common_types::request_proxy_part, ///< service_info
+                           std::optional<common::ipv4_prefix_t>>; ///< prefix client
 
-using connection = std::tuple<std::string, ///< service_name
-                              uint32_t, ///< src_addr
+using connection = std::tuple<uint32_t, ///< src_addr
                               uint16_t, ///< src_port
                               uint32_t, ///< local_addr
                               uint16_t, ///< local_port
                               tSocketId>; ///< socket id
 
-using response = std::vector<connection>;        
+using response = std::vector<connection>;
 }
 
 namespace proxy_tables
@@ -1040,10 +1043,9 @@ using response = std::tuple<uint32_t, ///< index first counter
 
 namespace proxy_blacklist
 {
-using request = std::string; ///< service_name
+using request = proxy_common_types::request_proxy_part; ///< service_info
 
-using entry = std::tuple<std::string, ///< service_name
-                         std::string, ///< ip
+using entry = std::tuple<std::string, ///< ip
                          uint64_t>; /// time_until
 
 using response = std::vector<entry>;
@@ -1051,8 +1053,8 @@ using response = std::vector<entry>;
 
 namespace proxy_blacklist_add
 {
-using request = std::tuple<std::string, ///< service_name
-                           std::string, ///< address
+using request = std::tuple<proxy_common_types::request_proxy_part, ///< service_info
+                           common::ipv4_address_t, ///< address
                            uint32_t>; /// timeout
 
 using response = std::tuple<>;
@@ -1075,6 +1077,8 @@ using request = std::tuple<requestType,
                                         loadConfig::request,
                                         convert::request,
                                         proxy_common_types::request_optional,
+                                        proxy_common_types::request_proxy_part,
+                                        proxy_connections::request,
                                         proxy_blacklist_add::request>>;
 
 

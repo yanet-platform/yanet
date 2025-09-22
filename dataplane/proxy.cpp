@@ -608,7 +608,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
 
 // Info
 
-common::idp::proxy_connections::response TcpConnectionStore::GetConnections(proxy_service_id_t service_id)
+common::idp::proxy_connections::response TcpConnectionStore::GetConnections(proxy_service_id_t service_id, std::optional<common::ipv4_prefix_t> client_prefix)
 {
     common::idp::proxy_connections::response response;
     if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
@@ -617,11 +617,14 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(prox
         {
             std::shared_lock lock(all_services[service_id].mutex);
             
-            auto get_connections = [&response, socket_id] (uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
+            auto get_connections = [&response, socket_id, &client_prefix] (uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
                 uint32_t local_addr;
                 uint16_t local_port;
                 ServiceConnections::Unpack(connection.local, local_addr, local_port);
-                response.emplace_back(address, port, local_addr, local_port, socket_id);
+                if (!client_prefix.has_value() || client_prefix->subnetFor(rte_cpu_to_be_32(address)))
+                {
+                    response.emplace_back(address, port, local_addr, local_port, socket_id);
+                }
             };
 
             all_services[service_id].tables_work.service_connections.ProcessAllConnectionsWithoutLocking(get_connections);
@@ -630,7 +633,7 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(prox
     return response;
 }
 
-common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t service_id)
+common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t service_id, std::optional<common::ipv4_prefix_t> client_prefix)
 {
     common::idp::proxy_syn::response response;
     if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
@@ -639,11 +642,14 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t s
         {
             std::shared_lock lock(all_services[service_id].mutex);
 
-            auto get_connections = [&response, socket_id] (uint32_t address, tPortId port, uint64_t last_time, const SynConnection& connection) {
+            auto get_connections = [&response, socket_id, &client_prefix] (uint32_t address, tPortId port, uint64_t last_time, const SynConnection& connection) {
                 uint32_t local_addr;
                 uint16_t local_port;
                 ServiceConnections::Unpack(connection.local, local_addr, local_port);
-                response.emplace_back(address, port, local_addr, local_port, socket_id);
+                if (!client_prefix.has_value() || client_prefix->subnetFor(rte_cpu_to_be_32(address)))
+                {
+                    response.emplace_back(address, port, local_addr, local_port, socket_id);
+                }
             };
 
             all_services[service_id].tables_work.syn_connections.ProcessAllConnectionsWithoutLocking(get_connections);

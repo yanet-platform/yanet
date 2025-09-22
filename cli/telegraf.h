@@ -784,10 +784,44 @@ void proxy_counters()
 		}
 		std::string proto(controlplane::balancer::from_proto(service_info.proto));
 		influxdb_format::print("proxy_counters",
-							   {{"service_name", service_info.service},
-								{"service_ip", service_info.proxy_addr},
-								{"service_proto", proto},
-								{"service_port", service_info.proxy_port}},
+							   {{"service", service_info.service},
+								{"ip", service_info.proxy_addr},
+								{"proto", proto},
+								{"port", service_info.proxy_port}},
+							   values);
+    }
+}
+
+void AddProxyTablesFields(const common::proxy::OneTableInfo& info, std::vector<influxdb_format::value_t>& values, const std::string& prefix, bool full)
+{
+	values.emplace_back((prefix + "size").c_str(), info.size);
+	values.emplace_back((prefix + "count").c_str(), info.count);
+	if (full)
+	{
+		values.emplace_back((prefix + "bucket").c_str(), info.max_bucket_size);
+	}
+}
+
+void proxy_tables()
+{
+	interface::controlPlane controlplane;
+	const auto response = controlplane.proxy_tables({std::nullopt, std::nullopt, std::nullopt});
+
+	for (const auto& record : response)
+	{
+		const auto& [service_info, connections, syn_connections, local_pool, rate_limiter, connection_limiter] = record;
+		std::vector<influxdb_format::value_t> values;
+		AddProxyTablesFields(connections, values, "con_", true);
+		AddProxyTablesFields(syn_connections, values, "syn_", true);
+		AddProxyTablesFields(local_pool, values, "lp_", false);
+		AddProxyTablesFields(rate_limiter, values, "rl_", true);
+		AddProxyTablesFields(connection_limiter, values, "cl_", true);
+		std::string proto(controlplane::balancer::from_proto(service_info.proto));
+		influxdb_format::print("proxy_tables",
+							   {{"service", service_info.service},
+								{"ip", service_info.proxy_addr},
+								{"proto", proto},
+								{"port", service_info.proxy_port}},
 							   values);
     }
 }

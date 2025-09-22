@@ -68,17 +68,16 @@ steps:
 
 - cli:
   - proxy counters
-  - telegraf proxy
   - proxy tables
-  - proxy buckets
-  - proxy connections type
-  - proxy syn type
+  - proxy buckets 10.0.1.1
+  - proxy connections 10.0.1.1 tcp 80
+  - proxy syn 10.0.1.1 tcp 80
 
 - sleep: 5
 
 - cli:
-  - proxy connections type
-  - proxy syn type
+  - proxy connections 10.0.1.1 tcp 80
+  - proxy syn 10.0.1.1 tcp 80
   - rib static remove default 10.0.1.0/24 10.0.1.1
   - rib static remove default 10.0.2.0/24 10.0.2.1
   - rib prefixes
