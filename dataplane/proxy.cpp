@@ -889,8 +889,6 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
     proxy_service_id_t service_id = metadata->flow.data.proxy_service.id;
     dataplane::proxy::proxy_service_t& service = worker_info.globalBase->proxy_services[service_id];
 
-	worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::packets_in]++;
-    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::bytes_in] += mbuf->pkt_len;
     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::syn_count]++;
 
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
@@ -901,15 +899,20 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
 
     if (service.connection_limit_table.Exists(ipv4_header->src_addr, worker_info.current_time_ms))
     {
-        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::cl_packets_dropped]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_connection_limit]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_bytes] += mbuf->pkt_len;
         return false;
     }
     if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.Check(ipv4_header->src_addr, worker_info.current_time_ms))
     {
-        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_bytes] += mbuf->pkt_len;
         return false;
     }
 
+    bool is_syn_ack = false;
     uint32_t chksum_work = CheckSumBeforeUpdate(ipv4_header, tcp_header);
     SynConnectionData syn_connection_data;
     switch (service.tables.syn_connections.FindAndLock(ipv4_header->src_addr, tcp_header->src_port, worker_info.current_time_ms, syn_connection_data, !service.config.EnabledFlag(dataplane::proxy::proxy_service_config_t::flag_dont_use_bucket_optimization)))
@@ -920,8 +923,7 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
 		    RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SynOverflow, tcp_header->src_port, 0));
 
             PrepareSynAckToClient(service, mbuf, ipv4_header, tcp_header, worker_info.counters, worker_info.current_time_sec);
-            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
-            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;
+            is_syn_ack = true;
             break;
         }
         case TableSearchResult::Found:
@@ -931,6 +933,7 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
             if (++syn_connection_data.connection->retransmits_from_client > 3)
             {
                 PrepareSynAckToClient(service, mbuf, ipv4_header, tcp_header, worker_info.counters, worker_info.current_time_sec);
+                is_syn_ack = true;
             }
             else
             {
@@ -967,6 +970,20 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
     if (action)
     {
         CheckSumAfterUpdate(service, ipv4_header, tcp_header, chksum_work, 0);
+        if (is_syn_ack)
+        {
+            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::syn_cookie_count]++;
+        }
+        else
+        {
+            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_client_packets]++;
+            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_client_bytes] += mbuf->pkt_len;
+        }
+    }
+    else
+    {
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_bytes] += mbuf->pkt_len;
     }
 
     return action;
@@ -1027,9 +1044,6 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
     proxy_service_id_t service_id = metadata->flow.data.proxy_service.id;
     dataplane::proxy::proxy_service_t& service = worker_info.globalBase->proxy_services[service_id];
 
-    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::packets_in]++;
-    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::bytes_in] += mbuf->pkt_len;
-
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_client_ack", service_id, ipv4_header, tcp_header);
@@ -1040,7 +1054,9 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
 
     if (service.connection_limit_table.Exists(ipv4_header->src_addr, worker_info.current_time_ms))
     {
-        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::cl_packets_dropped]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_connection_limit]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_bytes] += mbuf->pkt_len;
         return false;
     }
 
@@ -1184,7 +1200,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                 }
                 else if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
                 {
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
+                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
                     action = false;
                 }
                 else
@@ -1234,11 +1250,14 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                 }
                 else if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
                 {
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rl_packets_dropped]++;
+                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::success_check_syn_cookie]++;
+                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
                     action = false;
                 }
                 else
                 {
+                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::success_check_syn_cookie]++;
+                    
                     // get from local
                     uint64_t local = service.tables.local_pool.Allocate(worker_info.worker_id, ipv4_header->src_addr, tcp_header->src_port);
                     if (local == 0)
@@ -1310,6 +1329,13 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
         ipv4_header->dst_addr = service.config.upstream_addr;
         tcp_header->dst_port = service.config.upstream_port;
         CheckSumAfterUpdate(service, ipv4_header, tcp_header, chksum_work, size_proxy_header);
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_client_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_client_bytes] += mbuf->pkt_len;
+    }
+    else
+    {
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_bytes] += mbuf->pkt_len;
     }
 
     return action;
@@ -1325,6 +1351,7 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
     DebugPacket("proxy_server_syn_ack", service_id, ipv4_header, tcp_header);
     RINGLOG_CONDITION(worker_info.globalBase->ringlog_enabled);
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::service_syn_ack_count]++;
 
     if (tcp_header->tcp_flags & TCP_RST_FLAG)
     {
@@ -1337,6 +1364,8 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
         DebugPacket("\tservice synack client not found", service_id, ipv4_header, tcp_header);
         RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SynAckNoLoc, 0, tcp_header->dst_port));
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search_syn_ack]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_bytes] += mbuf->pkt_len;
         return false;
     }
     uint32_t client_addr;
@@ -1372,8 +1401,8 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
         tcp_header->dst_port = client_port;
         CheckSumAfterUpdate(service, ipv4_header, tcp_header, chksum_work, 0);
 
-        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
-        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;			
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_service_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_service_bytes] += mbuf->pkt_len;			
 
         return true;
     }
@@ -1387,6 +1416,8 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
 
         service_connection_data.Unlock();
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_answer_service_syn_ack]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_bytes] += mbuf->pkt_len;
         return false;
     }
 
@@ -1460,10 +1491,17 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
     tcp_header->src_port = service.config.proxy_port;
     tcp_header->dst_port = client_port;
     
-    CheckSumAfterUpdate(service, ipv4_header, tcp_header, chksum_work, 0);
-
-    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
-    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;
+    if (action)
+    {
+        CheckSumAfterUpdate(service, ipv4_header, tcp_header, chksum_work, 0);
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_service_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_service_bytes] += mbuf->pkt_len;			
+    }
+    else
+    {
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_bytes] += mbuf->pkt_len;
+    }
     			
     return action;
 }
@@ -1490,6 +1528,8 @@ bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_inf
         DebugPacket("service ack client not found", service_id, ipv4_header, tcp_header);
         RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckNoLoc, tcp_header->dst_port, 0));
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_search_ack]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_bytes] += mbuf->pkt_len;
         return false;
     }
     uint32_t client_addr;
@@ -1503,6 +1543,8 @@ bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_inf
         DebugPacket("service ack connection not found", service_id, ipv4_header, tcp_header);
         service_connection_data.Unlock();
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_search_client_service_ack]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_bytes] += mbuf->pkt_len;
         RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckNoCon, client_port, tcp_header->dst_port));
         return false;
     }
@@ -1545,8 +1587,8 @@ bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_inf
 
     CheckSumAfterUpdate(service, ipv4_header, tcp_header, chksum_work, 0);
 
-    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::packets_out]++;
-    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::bytes_out] += mbuf->pkt_len;			
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_service_packets]++;
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_service_bytes] += mbuf->pkt_len;			
 
     return true;
 }

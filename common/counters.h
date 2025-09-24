@@ -63,12 +63,19 @@ namespace proxy
 
 enum class service_counter : tCounterId
 {
-	packets_in,
-	bytes_in,
-	packets_out,
-	bytes_out,
+	forward_client_packets,
+	forward_client_bytes,
+	forward_service_packets,
+	forward_service_bytes,
 	syn_count,
 	ping_count,
+	syn_retransmits_count,
+	syn_cookie_count,
+	drop_client_packets,
+	drop_client_bytes,
+	drop_service_packets,
+	drop_service_bytes,
+	drop_blacklist,
 	service_bucket_overflow,
 	failed_local_pool_allocation,
 	failed_local_pool_search_ack,
@@ -79,6 +86,8 @@ enum class service_counter : tCounterId
 	failed_search_client_service_ack,
 	new_connections,
 	new_syn_connections,
+	success_check_syn_cookie,
+	service_syn_ack_count,
 	error_service_config_timestamps,
 	error_service_config_sack,
 	error_service_config_mss,
@@ -87,8 +96,12 @@ enum class service_counter : tCounterId
 	pkts_with_corrupted_tcp_opts_client,
 	pkts_with_corrupted_tcp_opts_service,
 	rst_service,
-	cl_packets_dropped,
-	rl_packets_dropped,
+	drop_connection_limit,
+	drop_rate_limit,
+	connection_limiter_new,
+	connection_limiter_remove,
+	connection_limiter_overflow,
+	rate_limiter_overflow,
 	size
 };
 
@@ -96,18 +109,32 @@ inline const char* service_counter_toString(service_counter counter)
 {
 	switch (counter)
 	{
-		case service_counter::packets_in:
-			return "packets_in";
-		case service_counter::bytes_in:
-			return "bytes_in";
-		case service_counter::packets_out:
-			return "packets_out";
-		case service_counter::bytes_out:
-			return "bytes_out";
+		case service_counter::forward_client_packets:
+			return "forward_client_packets";
+		case service_counter::forward_client_bytes:
+			return "forward_client_bytes";
+		case service_counter::forward_service_packets:
+			return "forward_service_packets";
+		case service_counter::forward_service_bytes:
+			return "forward_service_bytes";
 		case service_counter::syn_count:
 			return "syn_count";
 		case service_counter::ping_count:
 			return "ping_count";
+		case service_counter::syn_retransmits_count:
+			return "syn_retransmits_count";
+		case service_counter::syn_cookie_count:
+			return "syn_cookie_count";
+		case service_counter::drop_client_packets:
+			return "drop_client_packets";
+		case service_counter::drop_client_bytes:
+			return "drop_client_bytes";
+		case service_counter::drop_service_packets:
+			return "drop_service_packets";
+		case service_counter::drop_service_bytes:
+			return "drop_service_bytes";
+		case service_counter::drop_blacklist:
+			return "drop_blacklist";
 		case service_counter::service_bucket_overflow:
 			return "service_bucket_overflow";
 		case service_counter::failed_local_pool_allocation:
@@ -128,6 +155,10 @@ inline const char* service_counter_toString(service_counter counter)
 			return "new_connections";
 		case service_counter::new_syn_connections:
 			return "new_syn_connections";
+		case service_counter::success_check_syn_cookie:
+			return "success_check_syn_cookie";
+		case service_counter::service_syn_ack_count:
+			return "service_syn_ack_count";
 		case service_counter::error_service_config_timestamps:
 			return "error_service_config_timestamps";
 		case service_counter::error_service_config_sack:
@@ -144,10 +175,18 @@ inline const char* service_counter_toString(service_counter counter)
 			return "pkts_with_corrupted_tcp_opts_service";
 		case service_counter::rst_service:
 			return "rst_service";
-		case service_counter::cl_packets_dropped:
-			return "cl_packets_dropped";
-		case service_counter::rl_packets_dropped:
-			return "rl_packets_dropped";
+		case service_counter::drop_connection_limit:
+			return "drop_connection_limit";
+		case service_counter::drop_rate_limit:
+			return "drop_rate_limit";
+		case service_counter::connection_limiter_new:
+			return "connection_limiter_new";
+		case service_counter::connection_limiter_remove:
+			return "connection_limiter_remove";
+		case service_counter::connection_limiter_overflow:
+			return "connection_limiter_overflow";
+		case service_counter::rate_limiter_overflow:
+			return "rate_limiter_overflow";
 		case service_counter::size:
 			return "unknown";
 	}

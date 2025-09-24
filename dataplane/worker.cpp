@@ -6324,10 +6324,6 @@ inline void cWorker::proxy_client_icmp_handle()
 		// 		common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(),
 		// 		common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str());
 
-		counters[service.config.counter_id + (tCounterId)proxy::service_counter::packets_in]++;
-		counters[service.config.counter_id + (tCounterId)proxy::service_counter::bytes_in] += mbuf->pkt_len;
-		counters[service.config.counter_id + (tCounterId)proxy::service_counter::packets_out]++;
-		counters[service.config.counter_id + (tCounterId)proxy::service_counter::bytes_out] += mbuf->pkt_len;
 		counters[service.config.counter_id + (tCounterId)proxy::service_counter::ping_count]++;
 
 		uint32_t tmp_for_swap = ipv4Header->src_addr;
