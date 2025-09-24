@@ -511,7 +511,7 @@ void TcpConnectionStore::ClearAllServices(dataplane::memory_manager* memory_mana
     }
 }
 
-void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_time_ms)
+void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_time_ms, dataplane::memory_manager* memory_manager)
 {
     // YANET_LOG_WARNING("TcpConnectionStore::CollectGarbage: current_time=%d\n", current_time);
     auto iter_service = proxy_services.find(socket_id);
@@ -585,19 +585,48 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                     iter.unlock();
                 }
 
-                std::unordered_map<uint32_t, uint32_t> connections;
-                auto count_connections = [&connections](uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
+                using hashtable_t = hashtable_mod_dynamic<uint32_t, uint32_t, 16>;
+                constexpr static size_t initial_connections_size = 1024;
+                static size_t connections_size = initial_connections_size;
+                static std::random_device rd;
+                static std::mt19937 gen(rd());
+                std::uniform_int_distribution<uint32_t> dist(0, std::numeric_limits<uint32_t>::max());
+                uint32_t salt = dist(gen);
+                bool insert_fail = false;
+                std::string name = "tcp_proxy.gc.count_connections." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id);
+                hashtable_t* connections = memory_manager->create<hashtable_t>(name.c_str(), socket_id, hashtable_t::calculate_sizeof(connections_size));
+                auto count_connections = [&connections, &insert_fail, salt](uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
                     if (!connection.FlagEnabled(Connection::flag_whitelist))
-                        connections[address]++;
-                };
-                service.tables_work.service_connections.ProcessAllConnectionsWithoutLocking(count_connections);
-
-                for (const auto& iter : connections)
-                {
-                    if (iter.second >= service.config.connection_limit.limit)
                     {
-                        service.connection_limit_table_work.Add(iter.first, current_time_ms);
+                        uint32_t* count = nullptr;
+                        uint32_t hash = connections->lookup(address + salt, count);
+                        if (count)
+                        {
+                            (*count)++;
+                        }
+                        else if (!connections->insert(hash, address + salt, 1))
+                        {
+                            insert_fail = true;
+                        }
                     }
+                };
+                if (connections != nullptr)
+                {
+                    hashtable_t::updater connections_updater;
+                    connections_updater.update_pointer(connections, socket_id, connections_size);
+
+                    service.tables_work.service_connections.ProcessAllConnectionsWithoutLocking(count_connections);
+                    if (insert_fail) connections_size = std::min(connections_size * 2, (size_t)service.config.size_connections_table);
+
+                    for (auto& iter : connections_updater.range())
+                    {
+                        if (!iter.is_valid()) continue;
+                        if (*iter.value() >= service.config.connection_limit.limit)
+                        {
+                            service.connection_limit_table_work.Add(*iter.key() - salt, current_time_ms);
+                        }
+                    }
+                    memory_manager->destroy(connections);
                 }
             }
 

@@ -183,7 +183,7 @@ public:
     void ServiceRemoveOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager);
     void ClearAllServices(dataplane::memory_manager* memory_manager);
 
-    void CollectGarbage(tSocketId socket_id, uint64_t current_time_ms);
+    void CollectGarbage(tSocketId socket_id, uint64_t current_time_ms, dataplane::memory_manager* memory_manager);
 
     // Info
     common::idp::proxy_connections::response GetConnections(proxy_service_id_t service_id, std::optional<common::ipv4_prefix_t> client_prefix);
