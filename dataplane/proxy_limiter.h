@@ -517,7 +517,17 @@ public:
         static thread_local std::mt19937 gen(rd());
         std::uniform_int_distribution<uint64_t> dist(timeout_ms, timeout_ms + std::max(min_timeout_dist, timeout_ms / 5));
         uint64_t time_until_ms = current_time_ms + dist(gen);
-        return table_->insert_or_update(addr, time_until_ms);
+        
+        uint64_t* value;
+        spinlock_nonrecursive_t* locker;
+        uint32_t hash = table_->lookup(addr, value, locker);
+        bool result = true;
+        if (value == nullptr)
+        {
+            result = table_->insert(hash, addr, time_until_ms);
+        }
+        locker->unlock();
+        return result;
     }
 
     void Remove(uint32_t addr)

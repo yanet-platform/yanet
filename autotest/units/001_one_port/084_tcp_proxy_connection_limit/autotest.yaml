@@ -11,6 +11,7 @@ steps:
 
 - cli:
   - proxy blacklist add 10.0.1.1 tcp 80 10.0.2.1 1
+  - proxy blacklist add 10.0.1.1 tcp 80 10.0.2.10 60
   - proxy blacklist 10.0.1.1 tcp 80
 
 - sendPackets:
@@ -43,6 +44,11 @@ steps:
   - port: kni0
     send: 005_2-send.pcap
     expect: 005_2-expect.pcap
+
+# timeout should be unchanged
+- cli:
+  - proxy blacklist add 10.0.1.1 tcp 80 10.0.2.10 60
+  - proxy blacklist 10.0.1.1 tcp 80
 
 - cli:
   - proxy connections 10.0.1.1 tcp 80
