@@ -1194,9 +1194,9 @@ void config_parser_t::loadConfig_proxy_rate_limit(const nlohmann::json& moduleJs
 		{
 			throw error_result_t(eResult::invalidConfigurationFile, "sizeRateLimit must be 0 or power of 2");
 		}
-		if (rate_limit.rate == 0 || rate_limit.rate > 1000)
+		if (rate_limit.rate == 0)
 		{
-			throw error_result_t(eResult::invalidConfigurationFile, "rateLimit must be between 1 and 1000");
+			throw error_result_t(eResult::invalidConfigurationFile, "rateLimit must not be 0");
 		}
 	}
 }

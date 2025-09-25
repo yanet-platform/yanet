@@ -21,47 +21,39 @@ struct RateLimitBucket
         rte_spinlock_init(&spinlock);
     }
 
-    bool Check(uint32_t i, uint64_t current_time_ms, uint32_t cost, uint32_t capacity)
+    bool Check(uint32_t i, uint64_t current_time_ms, uint32_t rate, uint32_t cost, uint32_t capacity)
     {
+        uint32_t elapsed = current_time_ms - last_times[i];
+        tokens[i] = std::min(capacity, tokens[i] + (elapsed * rate));
         last_times[i] = current_time_ms;
-        if (current_time_ms > edts[i])
-        {
-            return true;
-        }
-        else if (capacity == 0 || edts[i] - current_time_ms > (capacity - cost))
-        {
-            return false;
-        }
-        return true;
+        return tokens[i] >= cost;
     }
 
-    bool Consume(uint32_t i, uint64_t current_time_ms, uint32_t cost, uint32_t capacity)
+    bool Consume(uint32_t i, uint64_t current_time_ms, uint32_t rate, uint32_t cost, uint32_t capacity)
     {
+        uint32_t elapsed = current_time_ms - last_times[i];
+        tokens[i] = std::min(capacity, tokens[i] + (elapsed * rate));
         last_times[i] = current_time_ms;
-        if (current_time_ms > edts[i])
+
+        if (tokens[i] >= cost)
         {
-            edts[i] = current_time_ms + cost;
+            tokens[i] -= cost;
             return true;
         }
-        else if (capacity == 0 || edts[i] - current_time_ms > (capacity - cost))
-        {
-            return false;
-        }
-        edts[i] += cost;
-        return true;
+        return false;
     }
 
     void Clear(uint32_t idx)
     {
-        edts[idx] = 0;
         last_times[idx] = 0;
+        tokens[idx] = 0;
         addresses[idx] = 0;
         num_allocated--;
     }
 
-    uint64_t edts[bucket_size]{};
     uint64_t last_times[bucket_size]{};
-
+    
+    uint32_t tokens[bucket_size]{};
     uint32_t addresses[bucket_size]{};
     uint32_t num_allocated{};
     rte_spinlock_t spinlock;
@@ -134,15 +126,16 @@ public:
               dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
     {
         if (initialized_) return true;
-        if (max_connection_rate == 0 || max_connection_rate > 1000)
+        if (max_connection_rate == 0)
         {
-            YANET_LOG_ERROR("max_connection_rate must be between 1 and 1000");
+            YANET_LOG_ERROR("max_connection_rate must not be 0\n");
             return false;
         }
         
-        uint32_t number_buckets = number_connections / RateLimitBucket::bucket_size;        
-        cost_ = 1000 / max_connection_rate;
-        capacity_ = burst_capacity * cost_;
+        uint32_t number_buckets = number_connections / RateLimitBucket::bucket_size;     
+        rate_ = std::max(max_connection_rate / 1000, 1u);   
+        cost_ = std::max(1000 / max_connection_rate, 1u);
+        capacity_ = std::max(burst_capacity * cost_, cost_);
 #ifdef CONFIG_YADECAP_UNITTEST
         buckets_ = new RateLimitBucket[number_buckets]{};
 #else
@@ -171,8 +164,9 @@ public:
 
     void Update(uint32_t max_connection_rate, uint32_t burst_capacity)
     {
-        cost_ = 1000 / max_connection_rate;
-        capacity_ = burst_capacity * cost_;
+        rate_ = std::max(max_connection_rate / 1000, 1u);   
+        cost_ = std::max(1000 / max_connection_rate, 1u);
+        capacity_ = std::max(burst_capacity * cost_, cost_);
     }
 
     bool Check(uint32_t addr, uint64_t current_time_ms)
@@ -185,7 +179,7 @@ public:
         {
             if (bucket->addresses[i] == addr)
             {
-                return bucket->Check(i, current_time_ms, cost_, capacity_);
+                return bucket->Check(i, current_time_ms, rate_, cost_, capacity_);
             }
         }
 
@@ -204,7 +198,7 @@ public:
         {
             if (bucket->addresses[i] == addr)
             {
-                bool result = bucket->Consume(i, current_time_ms, cost_, capacity_);
+                bool result = bucket->Consume(i, current_time_ms, rate_, cost_, capacity_);
                 bucket->Unlock();
                 return result;
             }
@@ -217,7 +211,7 @@ public:
         if (free_idx != 0xFFFFFFFF)
         {
             bucket->addresses[free_idx] = addr;
-            bucket->edts[free_idx] = current_time_ms + cost_;
+            bucket->tokens[free_idx] = capacity_ - (cost_ * rate_);
             bucket->last_times[free_idx] = current_time_ms;
             bucket->Unlock();
             return true;
@@ -262,6 +256,7 @@ public:
         buckets_ = other.buckets_;
         number_buckets_ = other.number_buckets_;
         hash_init_ = other.hash_init_;
+        rate_ = other.rate_;
         cost_ = other.cost_;
         capacity_ = other.capacity_;
         initialized_ = other.initialized_;
@@ -272,6 +267,7 @@ public:
         buckets_ = nullptr;
         number_buckets_ = 0;
         hash_init_ = 0;
+        rate_ = 0;
         cost_ = 0;
         capacity_ = 0;
         initialized_ = false;
@@ -434,6 +430,7 @@ private:
     RateLimitBucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;
     uint32_t hash_init_ = 0;
+    uint32_t rate_ = 0;
     uint32_t cost_ = 0;
     uint32_t capacity_ = 0;
     bool initialized_ = false;
@@ -517,7 +514,7 @@ public:
         static thread_local std::mt19937 gen(rd());
         std::uniform_int_distribution<uint64_t> dist(timeout_ms, timeout_ms + std::max(min_timeout_dist, timeout_ms / 5));
         uint64_t time_until_ms = current_time_ms + dist(gen);
-        
+
         uint64_t* value;
         spinlock_nonrecursive_t* locker;
         uint32_t hash = table_->lookup(addr, value, locker);
