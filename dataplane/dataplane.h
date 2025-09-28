@@ -192,7 +192,6 @@ protected:
 	eResult InitRxQueues();
 	eResult initSharedMemory();
 	void init_worker_base();
-	eResult InitRingsForRetransmits(tCoreId core, tSocketId socket_id);
 
 	eResult allocateSharedMemory();
 	eResult splitSharedMemoryPerWorkers();
@@ -235,10 +234,6 @@ protected:
 	std::mutex currentGlobalBaseId_mutex;
 	uint8_t currentGlobalBaseId;
 	bool first_state_update_global_base;
-
-	// tcp proxy
-	rte_ring* ring_retransmit_free_;
-	rte_ring* ring_retransmit_send_;
 
 public:
 	std::map<tSocketId, dataplane::globalBase::atomic*> globalBaseAtomics;

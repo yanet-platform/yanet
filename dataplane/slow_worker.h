@@ -39,8 +39,7 @@ private:
 	dataplane::KernelInterfaceWorker kni_worker_;
 
 	// tcp proxy
-	rte_ring* ring_retransmit_free_;
-	rte_ring* ring_retransmit_send_;
+	dataplane::proxy::TcpConnectionStore* tcp_connection_store_;
 
 	auto SlowWorkerSender()
 	{
@@ -64,8 +63,7 @@ public:
 	           rte_mempool* mempool,
 	           bool use_kni,
 	           uint32_t sw_icmp_out_rate_limit,
-			   rte_ring* ring_retransmit_free,
-			   rte_ring* ring_retransmit_send);
+			   dataplane::proxy::TcpConnectionStore* tcp_connection_store);
 	SlowWorker(const SlowWorker&) = delete;
 	SlowWorker(SlowWorker&& other);
 	SlowWorker& operator=(const SlowWorker&) = delete;
@@ -117,7 +115,7 @@ public:
 		DequeueGC();
 		fragmentation_.handle();
 		dregress_.handle();
-		// SendRentransmits();
+		SendRentransmits();
 
 		if (config_.use_kernel_interface)
 		{

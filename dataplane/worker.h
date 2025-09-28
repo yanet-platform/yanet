@@ -258,6 +258,7 @@ public:
 	YANET_NEVER_INLINE void slowWorkerTranslation(rte_mbuf* mbuf, const dataplane::globalBase::tNat64stateless& nat64stateless, const dataplane::globalBase::nat64stateless_translation_t& translation, bool direction); /** true: ingress, false: egress */
 	const dataplane::base::generation& CurrentBase() { return bases[localBaseId & 1]; }
 	void IncrementCounter(common::globalBase::static_counter_type type) { counters[(uint32_t)type]++; }
+	void IncrementCounter(tCounterId counter_id) { counters[counter_id]++; }
 	[[nodiscard]] uint32_t CurrentTime() const { return basePermanently.globalBaseAtomic->currentTime; }
 	[[nodiscard]] uint64_t CurrentTimeMs() const { return basePermanently.globalBaseAtomic->current_time_ms; }
 

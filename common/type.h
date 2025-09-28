@@ -1989,6 +1989,7 @@ enum class static_counter_type : uint32_t
 	acl_egress_v4_broken_packet,
 	acl_egress_v6_broken_packet,
 	slow_worker_normal_priority_rate_limit_exceeded,
+	proxy_error_retransmit,
 	size
 };
 

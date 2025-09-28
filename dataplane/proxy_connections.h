@@ -71,12 +71,12 @@ struct Connection
         flags |= flag;
     }
 
-    bool CreatedFromSynCookie()
+    bool CreatedFromSynCookie() const
     {
         return FlagEnabled(flag_from_synkookie);
     }
 
-    bool NeedRetransmit()
+    bool NeedRetransmit() const
     {
         return CreatedFromSynCookie() && !FlagEnabled(flag_sent_rentransmit_syn_to_server | flag_nonempty_ack_from_client);
     }

@@ -145,6 +145,7 @@ public:
 		counters_named["balancer_icmp_sent_to_real"] = common::globalBase::static_counter_type::balancer_icmp_sent_to_real;
 		counters_named["balancer_icmp_out_rate_limit_reached"] = common::globalBase::static_counter_type::balancer_icmp_out_rate_limit_reached;
 		counters_named["slow_worker_normal_priority_rate_limit_exceeded"] = common::globalBase::static_counter_type::slow_worker_normal_priority_rate_limit_exceeded;
+		counters_named["proxy_error_retransmit"] = common::globalBase::static_counter_type::proxy_error_retransmit;
 
 		counters_named["acl_ingress_v4_broken_packet"] = common::globalBase::static_counter_type::acl_ingress_v4_broken_packet;
 		counters_named["acl_ingress_v6_broken_packet"] = common::globalBase::static_counter_type::acl_ingress_v6_broken_packet;

@@ -20,9 +20,6 @@
 #define MAX_SIZE_TCP_OPTIONS 40
 #define TCP_OPTIONS_MAX_COUNT 12
 
-#define TIMEOUT_RETRANSMIT 1000 // todo
-#define MAX_COUNT_RETRANSMITS_ALL_SERVICES (uint32_t)128 // todo - must be a power of 2
-
 namespace dataplane::proxy
 {
 
@@ -31,6 +28,7 @@ struct proxy_service_config_t
 	proxy_service_id_t service_id;
     tSocketId socket_id;
 	tCounterId counter_id;
+    common::globalBase::tFlow proxy_flow;
 
 	// proxy and service address, port
 	uint32_t proxy_addr;
@@ -156,6 +154,7 @@ struct DataForRetransmit
     uint32_t tcp_options_len;
     uint8_t tcp_options_data[MAX_SIZE_TCP_OPTIONS];
     common::globalBase::tFlow flow;
+    tCounterId counter_id;
 };
 
 struct WorkerInfo
@@ -174,16 +173,22 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
 bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
 bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
 
+struct ConnectionStoreOnSocket
+{
+    std::array<dataplane::proxy::proxy_service_on_socket_t, YANET_CONFIG_PROXY_SERVICES_SIZE + 1> proxy_services;
+    rte_ring* ring_retransmit_free;
+    rte_ring* ring_retransmit_send;
+};
 
 class TcpConnectionStore
 {
 public:
-    void ActivateSocket(tSocketId socket_id);
+    eResult ActivateSocket(tSocketId socket_id, dataplane::memory_manager* memory_manager);
     eResult ServiceUpdateOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager);
     void ServiceRemoveOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager);
     void ClearAllServices(dataplane::memory_manager* memory_manager);
-
-    void CollectGarbage(tSocketId socket_id, uint64_t current_time_ms, dataplane::memory_manager* memory_manager);
+    void CollectGarbage(tSocketId socket_id, uint64_t current_time_ms, dataplane::memory_manager* memory_manager, proxy_service_id_t& start_proxy_retransmit_service);
+    utils::StaticVector<std::pair<rte_ring*, rte_ring*>, 8> GetRetransmitRings();
 
     // Info
     common::idp::proxy_connections::response GetConnections(proxy_service_id_t service_id, std::optional<common::ipv4_prefix_t> client_prefix);
@@ -191,17 +196,11 @@ public:
     common::idp::proxy_tables::response GetTables(const common::idp::proxy_tables::request& services);
     common::idp::proxy_buckets::response GetBuckets(const common::idp::proxy_buckets::request& services);
     common::idp::proxy_blacklist::response GetBlacklist(proxy_service_id_t service_id);
-
     common::idp::proxy_blacklist_add::response AddBlacklist(proxy_service_id_t service_id, const std::string& address, uint32_t timeout);
 
-    bool GetDataForRetramsits(const proxy_service_config_t& service_config, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send);
-    proxy_service_id_t GetIndexServiceForNextRetransmit();
-
 private:
-	std::map<tSocketId, std::array<dataplane::proxy::proxy_service_on_socket_t, YANET_CONFIG_PROXY_SERVICES_SIZE + 1>> proxy_services;
-
-    proxy_service_id_t index_start_check_retransmits_ = YANET_CONFIG_PROXY_SERVICES_SIZE + 1;
-    common::globalBase::tFlow next_flow_;
+	std::map<tSocketId, ConnectionStoreOnSocket> data_on_sockets_;
+    std::mutex mutex_;
 };
 
 }

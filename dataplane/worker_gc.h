@@ -119,5 +119,5 @@ public:
 	uint32_t sample_gc_step;
 
 	dataplane::proxy::TcpConnectionStore* tcp_connection_store_;
-	uint32_t last_time_proxy_gc = 0;
+	proxy_service_id_t start_proxy_retransmit_service_ = 0;
 };

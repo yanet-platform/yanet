@@ -310,9 +310,72 @@ void TcpOptions::Clear()
     memset(sack_finish, 0, sizeof(sack_finish));
 }
 
-void TcpConnectionStore::ActivateSocket(tSocketId socket_id)
+eResult TcpConnectionStore::ActivateSocket(tSocketId socket_id, dataplane::memory_manager* memory_manager)
 {
-    proxy_services[socket_id];
+    std::lock_guard<std::mutex> guard(mutex_);
+
+	auto iter = data_on_sockets_.find(socket_id);
+	if (iter != data_on_sockets_.end())
+	{
+		return eResult::success;
+	}
+
+	ConnectionStoreOnSocket& store_on_socket = data_on_sockets_[socket_id];
+
+    // check YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS is power of 2
+    assert((YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS & (YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS - 1)) == 0);
+
+	store_on_socket.ring_retransmit_free = rte_ring_create("tcp_proxy.retransmits_free",
+	                                                       YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS,
+	                                                       socket_id,
+	                                                       RING_F_SP_ENQ | RING_F_SC_DEQ);
+	if (!store_on_socket.ring_retransmit_free)
+	{
+        YANET_LOG_ERROR("Error create ring tcp_proxy.retransmits_free, errno: %d\n", rte_errno);
+		return eResult::errorInitRing;
+	}
+
+	auto* data_for_retransmits = memory_manager->create_static_array<DataForRetransmit>(
+	        "tcp_proxy.data_for_retransmits",
+	        YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS - 1,
+	        socket_id);
+	if (!data_for_retransmits)
+	{
+		return eResult::errorAllocatingMemory;
+	}
+	for (uint32_t index = 0; index < YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS - 1; index++)
+	{
+		rte_ring_sp_enqueue(store_on_socket.ring_retransmit_free, (void*)&data_for_retransmits[index]);
+	}
+
+	store_on_socket.ring_retransmit_send = rte_ring_create("tcp_proxy.retransmits_send",
+	                                                       YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS,
+	                                                       socket_id,
+	                                                       RING_F_SP_ENQ | RING_F_SC_DEQ);
+	if (!store_on_socket.ring_retransmit_send)
+	{
+        YANET_LOG_ERROR("Error create ring tcp_proxy.retransmits_send, errno: %d\n", rte_errno);
+		return eResult::errorInitRing;
+	}
+
+	return eResult::success;
+}
+
+utils::StaticVector<std::pair<rte_ring*, rte_ring*>, 8> TcpConnectionStore::GetRetransmitRings()
+{
+    std::lock_guard<std::mutex> guard(mutex_);
+    utils::StaticVector<std::pair<rte_ring*, rte_ring*>, 8> rings;
+
+    for (const auto& iter_socket : data_on_sockets_)
+    {
+        const ConnectionStoreOnSocket& data_on_socket = iter_socket.second;
+        if (rings.size() < rings.capacity())
+        {
+            rings.push_back(std::make_pair(data_on_socket.ring_retransmit_free, data_on_socket.ring_retransmit_send));
+        }
+    }
+
+    return rings;
 }
 
 bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& service_info, tCounterId service_counter_id)
@@ -320,6 +383,7 @@ bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& se
 	service_id = service_info.service_id;
     socket_id = service_info.socket_id;
 	counter_id = service_counter_id;
+    proxy_flow = service_info.flow;
 
 	// proxy and service address, port
 	proxy_addr = ipv4_address_t::convert(service_info.proxy_addr.get_ipv4()).address;
@@ -446,14 +510,14 @@ void proxy_service_on_socket_t::UpdateSecondStage(dataplane::proxy::proxy_servic
 
 eResult TcpConnectionStore::ServiceUpdateOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager)
 {
-	auto iter_service = proxy_services.find(service.config.socket_id);
-	if (iter_service == proxy_services.end())
+	auto iter_data_on_socket = data_on_sockets_.find(service.config.socket_id);
+	if (iter_data_on_socket == data_on_sockets_.end())
 	{
 		YADECAP_LOG_ERROR("not found proxy service config for socketId: '%u' in ServiceUpdateOnSocket\n", service.config.socket_id);
 		return eResult::invalidId;
 	}
 
-    dataplane::proxy::proxy_service_on_socket_t& service_on_socket = iter_service->second[service.config.service_id];
+    dataplane::proxy::proxy_service_on_socket_t& service_on_socket = iter_data_on_socket->second.proxy_services[service.config.service_id];
 	std::unique_lock lock(service_on_socket.mutex);
     // YANET_LOG_WARNING("\tservice_main service_connections: %p\n", &service_on_socket.tables.service_connections);
 
@@ -474,8 +538,8 @@ eResult TcpConnectionStore::ServiceUpdateOnSocket(dataplane::proxy::proxy_servic
 
 void TcpConnectionStore::ServiceRemoveOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager)
 {
-    auto iter_service = proxy_services.find(service.config.socket_id);
-	if (iter_service == proxy_services.end())
+    auto iter_data_on_socket = data_on_sockets_.find(service.config.socket_id);
+	if (iter_data_on_socket == data_on_sockets_.end())
 	{
 		YADECAP_LOG_ERROR("not found proxy service config for socketId: '%u' in ServiceRemoveOnSocket\n", service.config.socket_id);
 		return;
@@ -483,7 +547,7 @@ void TcpConnectionStore::ServiceRemoveOnSocket(dataplane::proxy::proxy_service_t
 
     service.tables.ClearLinks();
 
-	dataplane::proxy::proxy_service_on_socket_t& service_on_socket = iter_service->second[service.config.service_id];
+	dataplane::proxy::proxy_service_on_socket_t& service_on_socket = iter_data_on_socket->second.proxy_services[service.config.service_id];
 	std::unique_lock lock(service_on_socket.mutex);
 
     service_on_socket.enabled = false;
@@ -501,9 +565,9 @@ void TcpConnectionStore::ClearAllServices(dataplane::memory_manager* memory_mana
 {
     for (proxy_service_id_t service_id = 0; service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE; service_id++)
     {
-        for (auto& iter : proxy_services)
+        for (auto& iter_data_on_socket : data_on_sockets_)
         {
-            dataplane::proxy::proxy_service_on_socket_t& service_on_socket = iter.second[service_id];
+            dataplane::proxy::proxy_service_on_socket_t& service_on_socket = iter_data_on_socket.second.proxy_services[service_id];
             std::unique_lock lock(service_on_socket.mutex);
             service_on_socket.tables_work.ClearLinks();
             service_on_socket.tables_tmp.ClearLinks();
@@ -511,22 +575,25 @@ void TcpConnectionStore::ClearAllServices(dataplane::memory_manager* memory_mana
     }
 }
 
-void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_time_ms, dataplane::memory_manager* memory_manager)
+void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_time_ms, dataplane::memory_manager* memory_manager, proxy_service_id_t& start_proxy_retransmit_service)
 {
     // YANET_LOG_WARNING("TcpConnectionStore::CollectGarbage: current_time=%d\n", current_time);
-    auto iter_service = proxy_services.find(socket_id);
-	if (iter_service == proxy_services.end())
+    auto iter_data_on_socket = data_on_sockets_.find(socket_id);
+	if (iter_data_on_socket == data_on_sockets_.end())
 	{
 		YADECAP_LOG_ERROR("not found proxy service config for socketId: '%u' in CollectGarbage\n", socket_id);
 		return;
 	}
+    ConnectionStoreOnSocket& data_on_socket = iter_data_on_socket->second;
 
+    bool was_overflow_ring_retransmit = false;
     for (proxy_service_id_t index = 0; index <= YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
     {
-        proxy_service_on_socket_t& service = iter_service->second[index];
+        proxy_service_on_socket_t& service = data_on_socket.proxy_services[index];
         if (service.mutex.try_lock())
         {
             {
+                // Clear in table Connections
                 uint64_t time_to_clear = current_time_ms - service.config.timeouts.established;
                 auto condition = [time_to_clear] (uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
                     return (last_time < time_to_clear) || ((connection.service_flags & TCP_RST_FLAG) != 0);
@@ -541,6 +608,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
             }
 
             {
+                // Clear in table SynConnections
                 uint64_t time_to_clear = current_time_ms - service.config.timeouts.syn_recv;
                 auto condition = [time_to_clear] (uint32_t address, tPortId port, uint64_t last_time, const SynConnection& connection) {
                     return last_time < time_to_clear;
@@ -556,6 +624,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
 
             if (service.config.rate_limit.size > 0)
             {
+                // Work RateLimit
                 uint64_t time_to_clear = current_time_ms - RateLimitTable::timeout_ms;
                 auto condition = [time_to_clear] (uint32_t address, uint64_t last_time) {
                     return last_time < time_to_clear;
@@ -570,6 +639,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
 
             if (service.config.connection_limit.size > 0)
             {
+                // Work ConnectionLimit
                 for (auto& iter : service.connection_limit_table_work.GC(0, service.config.connection_limit.size))
                 {
                     iter.lock();
@@ -630,8 +700,67 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 }
             }
 
+            if (!was_overflow_ring_retransmit && index >= start_proxy_retransmit_service)
+            {
+                // Check retransmits
+                uint64_t time_to_retransmit = current_time_ms - service.config.timeouts.syn_rto;
+                auto condition = [time_to_retransmit, was_overflow_ring_retransmit] (uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
+                    return !was_overflow_ring_retransmit && (last_time < time_to_retransmit) && connection.NeedRetransmit();
+                };
+
+                auto action = [&data_on_socket, &service, &was_overflow_ring_retransmit](uint32_t conn_idx, auto& bucket) {
+                    Connection& connection = bucket.connections[conn_idx];
+
+                    // Get free structure for data retransmit
+                    DataForRetransmit* data;
+                    if (rte_ring_dequeue(data_on_socket.ring_retransmit_free, (void**)&data) != 0)
+                    {
+                        was_overflow_ring_retransmit = true;
+                        return;
+                    }
+
+                    // Fill data for retransmit
+                    TcpOptions tcp_options = SynCookies::UnpackData(connection.cookie_data);
+                    tcp_options.timestamp_value = connection.timestamp_client_last;
+                    tcp_options.timestamp_echo = 0;
+                    data->tcp_options_len = tcp_options.WriteBuffer(data->tcp_options_data);
+
+                    #if TCP_PROXY_FULL_DEBUG == 1
+                    YANET_LOG_WARNING("Add to retransmit, cookie_data=%d, tcp_options=%s, flags=%u\n", connection.cookie_data, tcp_options.DebugInfo().c_str(), connection.flags);
+                    #endif
+
+                    data->service_id = service.config.service_id;
+                    ServiceConnections::Unpack(connection.local, data->src, data->sport);
+                    data->dst = service.config.upstream_addr;
+                    data->dport = service.config.upstream_port;
+                    data->client_start_seq = connection.client_start_seq;
+                    data->flow = service.config.proxy_flow;
+                    data->counter_id = service.config.counter_id + (tCounterId)::proxy::service_counter::syn_retransmits_count;
+
+                    // Enqueue data to ring
+                    if (rte_ring_enqueue(data_on_socket.ring_retransmit_send, (void*)data) != 0)
+                    {
+                        was_overflow_ring_retransmit = true;
+                        return;
+                    }
+
+                    bucket.connections[conn_idx].SetSentRetransmit();
+                };
+
+                service.tables_work.service_connections.ProcessAllConnectionsWithLocking(condition, action);
+                if (was_overflow_ring_retransmit)
+                {
+                    start_proxy_retransmit_service = index;
+                }
+            }
+
             service.mutex.unlock();
         }
+    }
+
+    if (!was_overflow_ring_retransmit)
+    {
+        start_proxy_retransmit_service = 0;
     }
 }
 
@@ -642,9 +771,10 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(prox
     common::idp::proxy_connections::response response;
     if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
     {
-        for (auto& [socket_id, all_services] : proxy_services)
+        for (auto& [socket_id, data_on_socket] : data_on_sockets_)
         {
-            std::shared_lock lock(all_services[service_id].mutex);
+            proxy_service_on_socket_t& service = data_on_socket.proxy_services[service_id];
+            std::shared_lock lock(service.mutex);
             
             auto get_connections = [&response, socket_id, &client_prefix] (uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
                 uint32_t local_addr;
@@ -656,7 +786,7 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(prox
                 }
             };
 
-            all_services[service_id].tables_work.service_connections.ProcessAllConnectionsWithoutLocking(get_connections);
+            service.tables_work.service_connections.ProcessAllConnectionsWithoutLocking(get_connections);
         }
     }
     return response;
@@ -667,9 +797,10 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t s
     common::idp::proxy_syn::response response;
     if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
     {
-        for (auto& [socket_id, all_services] : proxy_services)
+        for (auto& [socket_id, data_on_socket] : data_on_sockets_)
         {
-            std::shared_lock lock(all_services[service_id].mutex);
+            proxy_service_on_socket_t& service = data_on_socket.proxy_services[service_id];
+            std::shared_lock lock(service.mutex);
 
             auto get_connections = [&response, socket_id, &client_prefix] (uint32_t address, tPortId port, uint64_t last_time, const SynConnection& connection) {
                 uint32_t local_addr;
@@ -681,7 +812,7 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t s
                 }
             };
 
-            all_services[service_id].tables_work.syn_connections.ProcessAllConnectionsWithoutLocking(get_connections);
+            service.tables_work.syn_connections.ProcessAllConnectionsWithoutLocking(get_connections);
         }
     }
     return response;
@@ -695,12 +826,13 @@ common::idp::proxy_tables::response TcpConnectionStore::GetTables(const common::
     {
         if (service_info.service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
         {
-            for (auto& [service_socket_id, all_services] : proxy_services)
+            for (auto& [service_socket_id, data_on_socket] : data_on_sockets_)
             {
                 if (service_socket_id == service_info.socket_id)
                 {
-                    std::shared_lock lock(all_services[service_info.service_id].mutex);
-                    const ProxyTables& current = all_services[service_info.service_id].tables_work;
+                    proxy_service_on_socket_t& service = data_on_socket.proxy_services[service_info.service_id];
+                    std::shared_lock lock(service.mutex);
+                    const ProxyTables& current = service.tables_work;
 
                     common::proxy::AllTablesInfo info;
                     info.header = service_info;
@@ -732,12 +864,13 @@ common::idp::proxy_buckets::response TcpConnectionStore::GetBuckets(const common
     {
         if (service_info.service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
         {
-            for (auto& [service_socket_id, all_services] : proxy_services)
+            for (auto& [service_socket_id, data_on_socket] : data_on_sockets_)
             {
                 if (service_socket_id == service_info.socket_id)
                 {
-                    std::shared_lock lock(all_services[service_info.service_id].mutex);
-                    const ProxyTables& current = all_services[service_info.service_id].tables_work;
+                    proxy_service_on_socket_t& service = data_on_socket.proxy_services[service_info.service_id];
+                    std::shared_lock lock(service.mutex);
+                    const ProxyTables& current = service.tables_work;
 
                     response.push_back({service_info, "connections", current.service_connections.BucketsStat()});
                     response.push_back({service_info, "syn_connections", current.syn_connections.BucketsStat()});
@@ -756,12 +889,13 @@ common::idp::proxy_blacklist::response TcpConnectionStore::GetBlacklist(proxy_se
     common::idp::proxy_blacklist::response response;
     if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
     {
-        for (auto& [socket_id, all_services] : proxy_services)
+        for (auto& [socket_id, data_on_socket] : data_on_sockets_)
         {
-            if (all_services[service_id].config.connection_limit.size == 0) continue;
-            std::shared_lock lock(all_services[service_id].mutex);
+            proxy_service_on_socket_t& service = data_on_socket.proxy_services[service_id];
+            if (service.config.connection_limit.size == 0) continue;
+            std::shared_lock lock(service.mutex);
 
-            for (auto& iter : all_services[service_id].connection_limit_table_work.Range(0, all_services[service_id].config.connection_limit.size))
+            for (auto& iter : service.connection_limit_table_work.Range(0, service.config.connection_limit.size))
             {
                 if (!iter.is_valid()) continue;
                 response.emplace_back(common::ipv4_address_t(rte_be_to_cpu_32(*iter.key())).toString(), *iter.value());
@@ -779,11 +913,12 @@ common::idp::proxy_blacklist_add::response TcpConnectionStore::AddBlacklist(prox
     common::idp::proxy_blacklist_add::response response;
     if (service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
     {
-        for (auto& [socket_id, all_services] : proxy_services)
+        for (auto& [socket_id, data_on_socket] : data_on_sockets_)
         {
-            if (all_services[service_id].config.connection_limit.size == 0) continue;
-            std::unique_lock lock(all_services[service_id].mutex);
-            if(!all_services[service_id].connection_limit_table_work.Add(address_be, current_time_ms, (uint64_t)timeout * 1000))
+            proxy_service_on_socket_t& service = data_on_socket.proxy_services[service_id];
+            if (service.config.connection_limit.size == 0) continue;
+            std::unique_lock lock(service.mutex);
+            if(!service.connection_limit_table_work.Add(address_be, current_time_ms, (uint64_t)timeout * 1000))
             {
                 YANET_LOG_ERROR("Failed to add address to blacklist\n");
             }
@@ -1286,7 +1421,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                 else
                 {
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::success_check_syn_cookie]++;
-                    
+
                     // get from local
                     uint64_t local = service.tables.local_pool.Allocate(worker_info.worker_id, ipv4_header->src_addr, tcp_header->src_port);
                     if (local == 0)
@@ -1621,92 +1756,6 @@ bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_inf
 
     return true;
 }
-
-bool TcpConnectionStore::GetDataForRetramsits(const proxy_service_config_t& service_config, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send)
-{
-    // uint64_t current_time = current_time_ms;
-    // return updater_proxy_tables[service_config.service_id].GetDataForRetramsits(service_config, next_flow_, current_time, ring_retransmit_free, ring_retransmit_send);
-
-    //     uint32_t GetDataForRetramsits(std::function<bool(Bucket&, uint32_t, uint64_t)> func)
-    // {
-    //     if (unlikely(!initialized_)) return 0;
-        
-    //     uint32_t count = 0;
-    //     bool stop = false;
-    //     for (uint32_t index = 0; (index < number_buckets_) && !stop; index++)
-    //     {
-    //         Bucket& bucket = buckets_[index];
-    //         bucket.Lock();
-    //         for (uint32_t i = 0; i < Bucket::bucket_size; i++)
-    //         {
-    //             if (bucket.addresses[i] != 0 && func(bucket, i)) 
-    //                 break;
-    //         }
-    //         bucket.Unlock();
-    //     }
-
-    //     return count;
-    // }
-
-
-    return false;
-}
-
-proxy_service_id_t TcpConnectionStore::GetIndexServiceForNextRetransmit()
-{
-    index_start_check_retransmits_++;
-    if (index_start_check_retransmits_ > YANET_CONFIG_PROXY_SERVICES_SIZE)
-    {
-        index_start_check_retransmits_ = 0;
-    }
-    return index_start_check_retransmits_;
-}
-
-// bool UpdaterProxyTables::GetDataForRetramsits(const proxy_service_config_t& service_config, common::globalBase::tFlow next_flow, uint64_t current_time, rte_ring* ring_retransmit_free, rte_ring* ring_retransmit_send)
-// {
-//     bool result = true;
-//     std::lock_guard<std::mutex> guard(mutex);
-//     tables[active_index].service_connections.GetDataForRetramsits([&](ServiceConnections::Bucket& bucket, uint32_t conn_idx) -> bool {
-//         Connection& connection = bucket.connections[conn_idx];
-//         if ((bucket.last_times[conn_idx] + service_config.timeouts.syn_rto <= current_time) && connection.UseForRetransmit()) {
-//             DataForRetransmit* data;
-//             if (rte_ring_dequeue(ring_retransmit_free, (void**)&data) != 0)
-//             {
-//                 result = false;
-//                 return true;
-//             }
-
-//             TcpOptions tcp_options = SynCookies::UnpackData(connection.cookie_data);
-//             tcp_options.timestamp_value = connection.timestamp_client_last;
-//             tcp_options.timestamp_echo = 0;
-
-//             data->tcp_options_len = tcp_options.WriteBuffer(data->tcp_options_data);
-
-// #if TCP_PROXY_FULL_DEBUG == 1
-//             YANET_LOG_WARNING("Add to retransmit, cookie_data=%d, tcp_options=%s, flags=%u\n", connection.cookie_data, tcp_options.DebugInfo().c_str(), connection.flags);
-// #endif
-
-//             data->service_id = service_config.service_id;
-//             ServiceConnections::Unpack(connection.local, data->src, data->sport);
-//             ServiceConnections::Unpack(service_key, 
-//             data->dst = service_config.upstream_addr;
-//             data->dport = service_config.upstream_port;
-//             data->client_start_seq = connection.client_start_seq;
-//             data->flow = next_flow;
-
-//             if (rte_ring_enqueue(ring_retransmit_send, (void*)data) != 0)
-//             {
-//                 result = false;
-//                 return true;
-//             }
-
-//             connection.flags |= Connection::flag_sent_rentransmit_syn_to_server;
-//         };
-//         return false;
-//     });
-//     return result;
-// }
-
 
 bool ProxyTables::NeedUpdate(const proxy_service_config_t& service_config)
 {

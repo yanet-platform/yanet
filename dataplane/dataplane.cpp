@@ -854,7 +854,11 @@ eResult cDataPlane::initGlobalBases()
 			return result;
 		}
 
-		tcp_connection_store.ActivateSocket(socketId);
+		result = tcp_connection_store.ActivateSocket(socketId, &memory_manager);
+		if (result != eResult::success)
+		{
+			return result;
+		}
 
 		socket_ids.emplace(socketId);
 	}
@@ -875,7 +879,11 @@ eResult cDataPlane::initGlobalBases()
 			return result;
 		}
 
-		tcp_connection_store.ActivateSocket(socketId);
+		result = tcp_connection_store.ActivateSocket(socketId, &memory_manager);
+		if (result != eResult::success)
+		{
+			return result;
+		}
 
 		socket_ids.emplace(socketId);
 	}
@@ -1266,19 +1274,6 @@ eResult cDataPlane::InitSlowWorker(tCoreId core, const std::set<tCoreId>& worker
 		}
 	}
 
-	rte_ring* ring_retransmit_free = nullptr;
-	rte_ring* ring_retransmit_send = nullptr;
-	if (first)
-	{
-		eResult result = InitRingsForRetransmits(core, socket_id);
-		if (result != eResult::success)
-		{
-			return result;
-		}
-		ring_retransmit_free = ring_retransmit_free_;
-		ring_retransmit_send = ring_retransmit_send_;
-	}
-
 	auto slow = new dataplane::SlowWorker(worker,
 	                                      std::move(ports_to_service),
 	                                      std::move(workers_to_service),
@@ -1287,47 +1282,13 @@ eResult cDataPlane::InitSlowWorker(tCoreId core, const std::set<tCoreId>& worker
 	                                      socket_cplane_mempools.at(socket_id),
 	                                      config.use_kernel_interface,
 	                                      config.SWICMPOutRateLimit,
-										  ring_retransmit_free,
-										  ring_retransmit_send);
+										  (first ? &tcp_connection_store : nullptr));
 	if (!slow)
 	{
 		return eResult::dataplaneIsBroken;
 	}
 	slow_workers.emplace(core, slow);
 	++tx_queues_;
-	return eResult::success;
-}
-
-eResult cDataPlane::InitRingsForRetransmits(tCoreId core, tSocketId socket_id)
-{
-	ring_retransmit_free_ = rte_ring_create(("ring_retransmit_free_" + std::to_string(core)).c_str(),
-	                                        MAX_COUNT_RETRANSMITS_ALL_SERVICES,
-	                                        socket_id,
-	                                        RING_F_SP_ENQ | RING_F_SC_DEQ);
-	if (!ring_retransmit_free_)
-	{
-		return eResult::errorInitRing;
-	}
-
-	auto* data_for_retransmits = memory_manager.create_static_array<dataplane::proxy::DataForRetransmit>("slow_worker.data_for_retransmits", MAX_COUNT_RETRANSMITS_ALL_SERVICES - 1, socket_id);
-	if (!data_for_retransmits)
-	{
-		return eResult::errorAllocatingMemory;
-	}
-	for (uint32_t index = 0; index < MAX_COUNT_RETRANSMITS_ALL_SERVICES - 1; index++)
-	{
-		rte_ring_sp_enqueue(ring_retransmit_free_, (void*)&data_for_retransmits[index]);
-	}
-
-	ring_retransmit_send_ = rte_ring_create(("ring_retransmit_send_" + std::to_string(core)).c_str(),
-	                                        MAX_COUNT_RETRANSMITS_ALL_SERVICES,
-	                                        socket_id,
-	                                        RING_F_SP_ENQ | RING_F_SC_DEQ);
-	if (!ring_retransmit_send_)
-	{
-		return eResult::errorInitRing;
-	}
-
 	return eResult::success;
 }
 
@@ -1531,21 +1492,6 @@ void cDataPlane::start()
 	});
 
 	bus.run();
-
-	// threads.emplace_back([this]() {
-	// 	auto iter_bases = globalBases.begin();
-	// 	for (;;)
-	// 	{
-	// 		bool work = true;
-	// 		for (uint32_t index = 0; (index < YANET_CONFIG_PROXY_SERVICES_SIZE) && work; index++)
-	// 		{
-	// 			proxy_service_id_t service_id = tcp_connection_store.GetIndexServiceForNextRetransmit();
-	// 			const dataplane::proxy::proxy_service_t& service = iter_bases->second[currentGlobalBaseId & 1]->proxy_services[service_id];;
-	// 			work = tcp_connection_store.GetDataForRetramsits(service, ring_retransmit_free_, ring_retransmit_send_);
-	// 		}
-	// 		std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	// 	}
-	// });
 
 	threads.emplace_back([this]() {
 		for (;;)

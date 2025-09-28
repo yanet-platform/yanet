@@ -1212,10 +1212,6 @@ void worker_gc_t::balancer_state_clear()
 
 void worker_gc_t::handle_proxy_gc()
 {
-	if (current_time != last_time_proxy_gc)
-	{
-		const auto& base = bases[local_base_id & 1];
-		tcp_connection_store_->CollectGarbage(socket_id, current_time_ms, &base.globalBase->dataPlane->memory_manager);
-		last_time_proxy_gc = current_time;
-	}
+	const auto& base = bases[local_base_id & 1];
+	tcp_connection_store_->CollectGarbage(socket_id, current_time_ms, &base.globalBase->dataPlane->memory_manager, start_proxy_retransmit_service_);
 }

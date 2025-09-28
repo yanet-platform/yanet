@@ -259,8 +259,12 @@ nlohmann::json cReport::convertWorker(const cWorker* worker)
 		json["static_counters"]["balancer_icmp_failed_to_clone"] = worker->counters[(tCounterId)static_counter_type::balancer_icmp_failed_to_clone];
 		json["static_counters"]["balancer_icmp_clone_forwarded"] = worker->counters[(tCounterId)static_counter_type::balancer_icmp_clone_forwarded];
 		json["static_counters"]["balancer_fragment_drops"] = worker->counters[(tCounterId)static_counter_type::balancer_fragment_drops];
-
+		json["static_counters"]["acl_ingress_v4_broken_packet"] = worker->counters[(tCounterId)static_counter_type::acl_ingress_v4_broken_packet];
+		json["static_counters"]["acl_ingress_v6_broken_packet"] = worker->counters[(tCounterId)static_counter_type::acl_ingress_v6_broken_packet];
+		json["static_counters"]["acl_egress_v4_broken_packet"] = worker->counters[(tCounterId)static_counter_type::acl_egress_v4_broken_packet];
+		json["static_counters"]["acl_egress_v6_broken_packet"] = worker->counters[(tCounterId)static_counter_type::acl_egress_v6_broken_packet];
 		json["static_counters"]["slow_worker_normal_priority_rate_limit_exceeded"] = worker->counters[(tCounterId)static_counter_type::slow_worker_normal_priority_rate_limit_exceeded];
+		json["static_counters"]["proxy_error_retransmit"] = worker->counters[(tCounterId)static_counter_type::proxy_error_retransmit];
 	}
 
 	return json;
