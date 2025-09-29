@@ -20,10 +20,15 @@ dataplane::proxy::proxy_service_config_t GetProxyConfig()
     uint32_t size_syn_table = 0;
 
     proxy_service_id_t service_id = 1;
+    common::globalBase::tFlow proxy_flow;
+    controlplane::proxy::rate_limit_t rate_limit;
+    controlplane::proxy::connection_limit_t connection_limit;
 
     dataplane::proxy::proxy_service_config_t service_config {
         .service_id = service_id,
+        .socket_id = 0,
 	    .counter_id = 0,
+        .proxy_flow = proxy_flow,
         .proxy_addr = proxy_addr,
 	    .proxy_port = proxy_port,
 	    .upstream_addr = upstream_addr,
@@ -47,6 +52,8 @@ dataplane::proxy::proxy_service_config_t GetProxyConfig()
             .established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED,
         },
         .debug_flags = 0,
+        .rate_limit = rate_limit,
+        .connection_limit = connection_limit,
     };
 
     return service_config;
@@ -54,7 +61,6 @@ dataplane::proxy::proxy_service_config_t GetProxyConfig()
 
 void InitializeProxyService(dataplane::proxy::proxy_service_config_t& service_config, dataplane::globalBase::generation** globalBaseResult)
 {
-    tSocketId socket_id = 0;
     proxy_service_id_t service_id = service_config.service_id;
 
     dataplane::globalBase::generation* globalBase = new dataplane::globalBase::generation(nullptr, 0);
@@ -62,9 +68,10 @@ void InitializeProxyService(dataplane::proxy::proxy_service_config_t& service_co
     globalBase->proxy_services[service_id].UpdateProxyHeader();
 
     dataplane::proxy::TcpConnectionStore tcp_connection_store;
-    tcp_connection_store.ActivateSocket(0);
-    ASSERT_EQ(tcp_connection_store.ServiceUpdateOnSocket(socket_id, globalBase->proxy_services[service_id], true, nullptr), eResult::success);
-    ASSERT_EQ(tcp_connection_store.ServiceUpdateOnSocket(socket_id, globalBase->proxy_services[service_id], false, nullptr), eResult::success);
+    tcp_connection_store.ActivateSocket(0, nullptr);
+    dataplane::proxy::proxy_service_t& service = globalBase->proxy_services[service_id];
+    ASSERT_EQ(tcp_connection_store.ServiceUpdateOnSocket(service, true, nullptr), eResult::success);
+    ASSERT_EQ(tcp_connection_store.ServiceUpdateOnSocket(service, false, nullptr), eResult::success);
 
     *globalBaseResult = globalBase;
 }
@@ -138,7 +145,7 @@ TEST(ServiceSynConnectionsTest, SynFlood)
                 mbuf->buf_len = 100;
                 mbuf->pkt_len = 100;
 
-                metadata->flow.data.proxy_service_id = 1;
+                metadata->flow.data.proxy_service.id = 1;
 
                 ASSERT_TRUE(dataplane::proxy::ActionClientOnSyn(mbuf, worker_info));
             }
@@ -168,7 +175,7 @@ TEST(ServiceSynConnectionsTest, Benchmark)
         {
             futures[j] = std::async(std::launch::async, [&]() -> std::chrono::duration<double> {
                 dataplane::proxy::ServiceSynConnections syn;
-                syn.Init(1, iterations, nullptr, 0, 0);
+                syn.Init(1, iterations, nullptr, 0, "");
             
                 std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
                 for (uint32_t i = 0; i < iterations; i++)
@@ -219,7 +226,7 @@ TEST(ServiceSynConnectionsTest, BenchmarkConcurrent)
         {
             futures[j] = std::async(std::launch::async, [&]() -> std::chrono::duration<double> {
                 dataplane::proxy::ServiceSynConnections syn;
-                syn.Init(1, iterations, nullptr, 0, 0);
+                syn.Init(1, iterations, nullptr, 0, "");
             
                 std::vector<std::future<void>> fs(access_concurrency);
                 std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();

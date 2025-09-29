@@ -322,6 +322,9 @@ eResult TcpConnectionStore::ActivateSocket(tSocketId socket_id, dataplane::memor
 
 	ConnectionStoreOnSocket& store_on_socket = data_on_sockets_[socket_id];
 
+#ifdef CONFIG_YADECAP_UNITTEST
+    GCC_BUG_UNUSED(store_on_socket);
+#else
     // check YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS is power of 2
     assert((YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS & (YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS - 1)) == 0);
 
@@ -357,6 +360,7 @@ eResult TcpConnectionStore::ActivateSocket(tSocketId socket_id, dataplane::memor
         YANET_LOG_ERROR("Error create ring tcp_proxy.retransmits_send, errno: %d\n", rte_errno);
 		return eResult::errorInitRing;
 	}
+#endif
 
 	return eResult::success;
 }

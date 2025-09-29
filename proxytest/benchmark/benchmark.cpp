@@ -23,11 +23,15 @@ common::ringlog::LogInfo ringlog;
 dataplane::proxy::proxy_service_config_t GetProxyConfig()
 {
     proxy_service_id_t service_id = 1;
+    common::globalBase::tFlow proxy_flow;
+    controlplane::proxy::rate_limit_t rate_limit;
+    controlplane::proxy::connection_limit_t connection_limit;
 
     dataplane::proxy::proxy_service_config_t service_config {
         .service_id = service_id,
         .socket_id = 0,
 	    .counter_id = 0,
+        .proxy_flow = proxy_flow,
         .proxy_addr = proxy_addr,
 	    .proxy_port = proxy_port,
 	    .upstream_addr = upstream_addr,
@@ -51,8 +55,8 @@ dataplane::proxy::proxy_service_config_t GetProxyConfig()
             .established = YANET_PROXY_DEFAULT_TIMEOUT_ESTABLISHED,
         },
         .debug_flags = 0,
-        .rate_limit = {},
-        .connection_limit = {},
+        .rate_limit = rate_limit,
+        .connection_limit = connection_limit,
     };
 
     return service_config;
@@ -64,7 +68,7 @@ void InitializeProxyService(dataplane::proxy::TcpConnectionStore& tcp_connection
     base.globalBase->proxy_services[service_id].config = GetProxyConfig();
     base.globalBase->proxy_services[service_id].UpdateProxyHeader();
 
-    tcp_connection_store.ActivateSocket(0);
+    tcp_connection_store.ActivateSocket(0, nullptr);
     tcp_connection_store.ServiceUpdateOnSocket(base.globalBase->proxy_services[service_id], true, nullptr);
     tcp_connection_store.ServiceUpdateOnSocket(base.globalBase->proxy_services[service_id], false, nullptr);
 }
@@ -422,7 +426,8 @@ void Benchmark(const Config& config) {
     std::thread gc_thread = std::thread([&]() {
         while (!finished)
 		{
-            tcp_connection_store.CollectGarbage(0, current_time_ms);
+            proxy_service_id_t start_proxy_retransmit_service = 0;
+            tcp_connection_store.CollectGarbage(0, current_time_ms, nullptr, start_proxy_retransmit_service);
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
     });
