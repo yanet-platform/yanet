@@ -93,6 +93,7 @@ enum class requestType : uint32_t
         proxy_syn,
         proxy_tables,
         proxy_buckets,
+        proxy_bins,
         proxy_debug_counters_id,
         proxy_blacklist,
         proxy_blacklist_add,
@@ -245,6 +246,8 @@ inline const char* requestType_toString(requestType t)
                         return "proxy_tables";
                 case requestType::proxy_buckets:
                         return "proxy_buckets";
+                case requestType::proxy_bins:
+                        return "proxy_bins";
                 case requestType::proxy_debug_counters_id:
                         return "proxy_debug_counters_id";
                 case requestType::proxy_blacklist:
@@ -1033,6 +1036,13 @@ using request = proxy_common_types::request_optional;
 using response = std::vector<common::proxy::BucketsInfo>;
 }
 
+namespace proxy_bins
+{
+using request = proxy_common_types::request_optional;
+
+using response = std::vector<common::proxy::ConnCountInfo>;
+}
+
 namespace proxy_debug_counters_id
 {
 using request = proxy_service_id_t; ///< service_id
@@ -1140,6 +1150,7 @@ using response = std::variant<std::tuple<>,
                               proxy_connections::response,
                               proxy_tables::response,
                               proxy_buckets::response,
+                              proxy_bins::response,
                               proxy_debug_counters_id::response,
                               proxy_blacklist::response>;
 

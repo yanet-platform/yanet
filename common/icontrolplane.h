@@ -179,6 +179,11 @@ public:
 		return get<common::icp::requestType::proxy_buckets, common::icp::proxy_buckets::response>(request);
 	}
 
+	auto proxy_bins(const common::icp::proxy_bins::request& request) const
+	{
+		return get<common::icp::requestType::proxy_bins, common::icp::proxy_bins::response>(request);
+	}
+
 	auto proxy_blacklist(const common::icp::proxy_blacklist::request& request) const {
 		return get<common::icp::requestType::proxy_blacklist, common::icp::proxy_blacklist::response>(request);
 	}

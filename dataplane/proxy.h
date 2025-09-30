@@ -196,6 +196,7 @@ public:
     common::idp::proxy_syn::response GetSyn(proxy_service_id_t service_id, std::optional<common::ipv4_prefix_t> client_prefix);
     common::idp::proxy_tables::response GetTables(const common::idp::proxy_tables::request& services);
     common::idp::proxy_buckets::response GetBuckets(const common::idp::proxy_buckets::request& services);
+    common::idp::proxy_bins::response GetConnCountBins(const common::idp::proxy_bins::request& services);
     common::idp::proxy_blacklist::response GetBlacklist(proxy_service_id_t service_id);
     common::idp::proxy_blacklist_add::response AddBlacklist(proxy_service_id_t service_id, const std::string& address, uint32_t timeout);
 

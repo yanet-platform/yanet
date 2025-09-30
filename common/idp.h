@@ -85,6 +85,7 @@ enum class requestType : uint32_t
         proxy_syn,
         proxy_tables,
         proxy_buckets,
+        proxy_bins,
         proxy_blacklist,
         proxy_blacklist_add,
         getPhysicalPortsFull,
@@ -866,6 +867,13 @@ using request = std::vector<common::proxy::ServiceHeader>;
 using response = std::vector<common::proxy::BucketsInfo>;
 }
 
+namespace proxy_bins
+{
+using request = std::vector<common::proxy::ServiceHeader>;
+
+using response = std::vector<common::proxy::ConnCountInfo>;
+}
+
 namespace proxy_blacklist
 {
 using request = proxy_service_id_t;
@@ -1159,6 +1167,7 @@ using response = std::variant<std::tuple<>,
                               proxy_connections::response,
                               proxy_tables::response,
                               proxy_buckets::response,
+                              proxy_bins::response,
                               proxy_blacklist::response,
                               getPhysicalPortsFull::response>;
 }

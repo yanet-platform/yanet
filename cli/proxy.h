@@ -188,6 +188,51 @@ void buckets(std::optional<common::ip_address_t> proxy_ip,
     table.Print();
 }
 
+void bins(std::optional<common::ip_address_t> proxy_ip,
+		  std::optional<std::string> proto_string,
+		  std::optional<uint16_t> proxy_port)
+{
+	std::optional<uint8_t> proto;
+	if (proto_string)
+	{
+		proto = controlplane::balancer::to_proto(*proto_string);
+	}
+
+    interface::controlPlane controlplane;
+	const auto response = controlplane.proxy_bins({proxy_ip, proto, proxy_port});
+
+    TablePrinter table;
+	std::vector<std::string> row_first = {"id", "service", "ip", "proto", "port", "socket_id"};
+	for (uint32_t treshold : common::proxy::conn_count_tresholds)
+	{
+		row_first.push_back("<" + std::to_string(treshold));
+	}
+	row_first.push_back(">=" + std::to_string(common::proxy::conn_count_tresholds[common::proxy::conn_count_tresholds.size()-1]));
+	row_first.push_back("max");
+	table.insert_row(row_first.begin(), row_first.end());
+
+	for (const auto& [service_info, counts, max_conn_count] : response)
+	{
+		const auto& [name, addr, proto, port] = ServiceTie(service_info);
+		std::vector<std::string> row = {std::to_string(service_info.service_id), name, addr.toString(), proto, std::to_string(port), std::to_string(service_info.socket_id)};
+		for (uint32_t count : counts)
+		{
+			if (count == 0)
+			{
+				row.push_back("-");
+			}
+			else
+			{
+				row.push_back(std::to_string(count));
+			}
+		}
+		row.push_back(std::to_string(max_conn_count));
+        table.insert_row(row.begin(), row.end());
+    }
+
+    table.Print();
+}
+
 void blacklist(common::ip_address_t proxy_ip, std::string proto_string, uint16_t proxy_port)
 {
 	uint8_t proto = controlplane::balancer::to_proto(proto_string);

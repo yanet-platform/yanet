@@ -631,12 +631,54 @@ public:
         return result;
     }
 
+    
+    void AddConnCountStats(std::array<uint32_t, common::proxy::conn_count_tresholds.size() + 1> counts, uint32_t max_count, uint64_t current_time_ms)
+    {
+        bool next_period = false;
+        if (current_time_ms - conn_stats_.period_start >= conn_stats_.period)
+        {
+            conn_stats_.index ^= 1;
+            next_period = true;
+            conn_stats_.period_start = current_time_ms;
+        }
+        for (uint32_t i = 0; i < conn_stats_.bins[conn_stats_.index].size(); i++)
+        {
+            if (next_period)
+            {
+                conn_stats_.bins[conn_stats_.index][i] = 0;
+                conn_stats_.max_conn_count[conn_stats_.index] = 0;
+            }
+            if (conn_stats_.bins[conn_stats_.index][i] < counts[i])
+                conn_stats_.bins[conn_stats_.index][i] = counts[i];
+            if (conn_stats_.max_conn_count[conn_stats_.index] < max_count)
+                conn_stats_.max_conn_count[conn_stats_.index] = max_count;
+        }
+    }
+    
+    common::proxy::ConnCountInfo GetConnCountStats()
+    {
+        common::proxy::ConnCountInfo result{};
+        for (uint32_t i = 0; i < conn_stats_.bins[0].size(); i++)
+            result.counts[i] = std::max(conn_stats_.bins[0][i], conn_stats_.bins[1][i]);
+        result.max_conn_count = std::max(conn_stats_.max_conn_count[0], conn_stats_.max_conn_count[1]);
+        return result;
+    }
+
 private:
     hashtable_t* table_;
     hashtable_t::updater* table_updater_;
     uint32_t number_connections_ = 0;
     uint64_t timeout_ = 0;
     bool initialized_ = false;
+    
+    struct
+    {
+        const uint64_t period = 60000;
+        uint64_t period_start{};
+        uint32_t index{};
+        std::array<uint32_t, common::proxy::conn_count_tresholds.size() + 1> bins[2]{};
+        uint32_t max_conn_count[2]{};
+    } conn_stats_;
 };
 
 }

@@ -594,6 +594,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
     for (proxy_service_id_t index = 0; index <= YANET_CONFIG_PROXY_SERVICES_SIZE; index++)
     {
         proxy_service_on_socket_t& service = data_on_socket.proxy_services[index];
+        if (!service.enabled) continue;
         if (service.mutex.try_lock())
         {
             {
@@ -652,54 +653,69 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                         iter.unlock();
                         continue;
                     }
-
+    
                     if (*iter.value() < current_time_ms)
                         iter.unset_valid();
-
+    
                     iter.unlock();
                 }
+            }
 
-                using hashtable_t = hashtable_mod_dynamic<uint32_t, uint32_t, 16>;
-                static std::random_device rd;
-                static std::mt19937 gen(rd());
-                std::uniform_int_distribution<uint32_t> dist(0, std::numeric_limits<uint32_t>::max());
-                uint32_t salt = dist(gen);
-                bool insert_fail = false;
-                std::string name = "tcp_proxy.gc.count_connections." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id);
-                hashtable_t* connections = memory_manager->create<hashtable_t>(name.c_str(), socket_id, hashtable_t::calculate_sizeof(service.connection_count_size));
-                auto count_connections = [&connections, &insert_fail, salt](uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
-                    if (!connection.FlagEnabled(Connection::flag_whitelist))
-                    {
-                        uint32_t* count = nullptr;
-                        uint32_t hash = connections->lookup(address + salt, count);
-                        if (count)
-                        {
-                            (*count)++;
-                        }
-                        else if (!connections->insert(hash, address + salt, 1))
-                        {
-                            insert_fail = true;
-                        }
-                    }
-                };
-                if (connections != nullptr)
+            constexpr uint32_t whitelist_bit = 1u << 31;  
+            using hashtable_t = hashtable_mod_dynamic<uint32_t, uint32_t, 16>;
+            static std::random_device rd;
+            static std::mt19937 gen(rd());
+            std::uniform_int_distribution<uint32_t> dist(0, std::numeric_limits<uint32_t>::max());
+            uint32_t salt = dist(gen);
+            bool insert_fail = false;
+            std::string name = "tcp_proxy.gc.count_connections." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id);
+            hashtable_t* connections = memory_manager->create<hashtable_t>(name.c_str(), socket_id, hashtable_t::calculate_sizeof(service.connection_count_size));
+            auto count_connections = [&connections, &insert_fail, salt](uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
+                uint32_t init_value = whitelist_bit * connection.FlagEnabled(Connection::flag_whitelist) + 1;
+                uint32_t* count = nullptr;
+                uint32_t hash = connections->lookup(address + salt, count);
+                if (count)
                 {
-                    hashtable_t::updater connections_updater;
-                    connections_updater.update_pointer(connections, socket_id, service.connection_count_size);
+                    (*count)++;
+                }
+                else if (!connections->insert(hash, address + salt, init_value))
+                {
+                    insert_fail = true;
+                }
+            };
+            if (connections != nullptr)
+            {
+                hashtable_t::updater connections_updater;
+                connections_updater.update_pointer(connections, socket_id, service.connection_count_size);
 
-                    service.tables_work.service_connections.ProcessAllConnectionsWithoutLocking(count_connections);
-                    if (insert_fail) service.connection_count_size = std::min(service.connection_count_size * 2, (size_t)service.config.size_connections_table);
+                service.tables_work.service_connections.ProcessAllConnectionsWithoutLocking(count_connections);
+                if (insert_fail) service.connection_count_size = std::min(service.connection_count_size * 2, (size_t)service.config.size_connections_table);
 
-                    for (auto& iter : connections_updater.range())
+                std::array<uint32_t, common::proxy::conn_count_tresholds.size() + 1> counts{};
+                uint32_t max_count{};
+                for (auto& iter : connections_updater.range())
+                {
+                    if (!iter.is_valid() || (*iter.value() & whitelist_bit)) continue;
+                    uint32_t value = *iter.value() & ~whitelist_bit;
+                    if (service.config.connection_limit.size > 0 && value >= service.config.connection_limit.limit)
                     {
-                        if (!iter.is_valid()) continue;
-                        if (*iter.value() >= service.config.connection_limit.limit)
+                        service.connection_limit_table_work.Add(*iter.key() - salt, current_time_ms);
+                    }
+
+                    if (max_count < value) max_count = value;
+                    for (uint32_t i = 0; i < common::proxy::conn_count_tresholds.size(); i++)
+                    {
+                        if (value < common::proxy::conn_count_tresholds[i])
                         {
-                            service.connection_limit_table_work.Add(*iter.key() - salt, current_time_ms);
+                            counts[i]++;
+                            break;
                         }
                     }
-                    memory_manager->destroy(connections);
+                    if (value >= common::proxy::conn_count_tresholds[common::proxy::conn_count_tresholds.size()-1])
+                        counts[common::proxy::conn_count_tresholds.size()]++;
                 }
+                service.connection_limit_table_work.AddConnCountStats(counts, max_count, current_time_ms);
+                memory_manager->destroy(connections);
             }
 
             if (!was_overflow_ring_retransmit && index >= start_proxy_retransmit_service)
@@ -878,6 +894,32 @@ common::idp::proxy_buckets::response TcpConnectionStore::GetBuckets(const common
                     response.push_back({service_info, "syn_connections", current.syn_connections.BucketsStat()});
                     response.push_back({service_info, "rate_limit", current.rate_limit.BucketsStat()});
                     response.push_back({service_info, "connection_limit", current.connection_limit.BucketsStat()});
+                }
+            }
+        }
+    }
+
+    return response;
+}
+
+common::idp::proxy_bins::response TcpConnectionStore::GetConnCountBins(const common::idp::proxy_bins::request& services)
+{
+    common::idp::proxy_bins::response response;
+
+    for (const auto& service_info : services)
+    {
+        if (service_info.service_id <= YANET_CONFIG_PROXY_SERVICES_SIZE)
+        {
+            for (auto& [service_socket_id, data_on_socket] : data_on_sockets_)
+            {
+                if (service_socket_id == service_info.socket_id)
+                {
+                    proxy_service_on_socket_t& service = data_on_socket.proxy_services[service_info.service_id];
+                    std::shared_lock lock(service.mutex);
+
+                    common::proxy::ConnCountInfo info = service.connection_limit_table_work.GetConnCountStats();
+                    info.header = service_info;
+                    response.push_back(info);
                 }
             }
         }

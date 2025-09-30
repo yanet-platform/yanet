@@ -2593,6 +2593,16 @@ struct BucketsInfo
 	SERIALIZABLE(header, table_name, counts);
 };
 
+constexpr static std::array<uint32_t, 10> conn_count_tresholds = {1<<7, 1<<8, 1<<9, 1<<10, 1<<11, 1<<12, 1<<13, 1<<14, 1<<15, 1<<16};
+struct ConnCountInfo
+{
+	ServiceHeader header{};
+	std::array<uint32_t, conn_count_tresholds.size() + 1> counts{};
+	uint32_t max_conn_count{};
+
+	SERIALIZABLE(header, counts, max_conn_count);
+};
+
 }
 
 }

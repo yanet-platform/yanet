@@ -1014,6 +1014,11 @@ common::idp::proxy_buckets::response cControlPlane::proxy_buckets(const common::
 	return dataPlane->tcp_connection_store.GetBuckets(request);
 }
 
+common::idp::proxy_bins::response cControlPlane::proxy_bins(const common::idp::proxy_bins::request& request)
+{
+	return dataPlane->tcp_connection_store.GetConnCountBins(request);
+}
+
 common::idp::proxy_blacklist::response cControlPlane::proxy_blacklist(const common::idp::proxy_blacklist::request& request)
 {
 	auto service_id = request;

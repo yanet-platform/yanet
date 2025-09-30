@@ -57,6 +57,7 @@ protected:
 	common::icp::proxy_syn::response proxy_syn(const common::icp::proxy_syn::request& request) const;
 	common::icp::proxy_tables::response proxy_tables(const common::icp::proxy_tables::request& request) const;
 	common::icp::proxy_buckets::response proxy_buckets(const common::icp::proxy_buckets::request& request) const;
+	common::icp::proxy_bins::response proxy_bins(const common::icp::proxy_bins::request& request) const;
 	common::icp::proxy_debug_counters_id::response proxy_debug_counters_id(const common::icp::proxy_debug_counters_id::request& request);
 	common::icp::proxy_blacklist::response proxy_blacklist(const common::icp::proxy_blacklist::request& request);
 	common::icp::proxy_blacklist_add::response proxy_blacklist_add(const common::icp::proxy_blacklist_add::request& request);

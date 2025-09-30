@@ -23,6 +23,9 @@ eResult proxy_t::init()
     controlPlane->register_command(common::icp::requestType::proxy_buckets, [this](const common::icp::request& request) {
         return proxy_buckets(std::get<common::icp::proxy_buckets::request>(std::get<1>(request)));
     });
+    controlPlane->register_command(common::icp::requestType::proxy_bins, [this](const common::icp::request& request) {
+        return proxy_bins(std::get<common::icp::proxy_bins::request>(std::get<1>(request)));
+    });
     controlPlane->register_command(common::icp::requestType::proxy_debug_counters_id, [this](const common::icp::request& request) {
         return proxy_debug_counters_id(std::get<common::icp::proxy_debug_counters_id::request>(std::get<1>(request)));
     });
@@ -299,6 +302,31 @@ common::icp::proxy_buckets::response proxy_t::proxy_buckets(const common::icp::p
     }
 
     return dataplane.proxy_buckets(services);
+}
+
+common::icp::proxy_bins::response proxy_t::proxy_bins(const common::icp::proxy_bins::request& request) const
+{
+    const auto& [proxy_ip, proto, proxy_port] = request;
+    common::icp::proxy_bins::response response;
+
+    generations_config.current_lock();
+    std::map<std::string, controlplane::proxy::config_t> config_proxies = generations_config.current().config_proxies;
+    generations_config.current_unlock();
+
+    common::idp::proxy_bins::request services;
+    for (auto& [module, config] : config_proxies)
+    {
+        for (const auto& iter_service : config.services)
+        {
+            const controlplane::proxy::service_t& service = iter_service.second;
+            if (service.SatisfyConditions(proxy_ip, proto, proxy_port))
+            {
+                services.emplace_back(service.GetHeader());
+            }
+        }
+    }
+
+    return dataplane.proxy_bins(services);
 }
 
 common::icp::proxy_debug_counters_id::response proxy_t::proxy_debug_counters_id(const common::icp::proxy_debug_counters_id::request& request)
