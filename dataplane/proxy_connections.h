@@ -4,6 +4,7 @@
 #include "syncookies.h"
 
 #include <mutex>
+#include <rte_hash_crc.h>
 
 namespace dataplane::proxy
 {
@@ -269,6 +270,11 @@ public:
         }
 
         number_buckets_ = number_buckets;
+
+        std::mt19937 gen;
+        std::uniform_int_distribution<uint32_t> dist(0, std::numeric_limits<uint32_t>::max());
+        init_value_hash_ = dist(gen);
+
         initialized_ = true;
 
         return true;
@@ -447,11 +453,6 @@ public:
         return TableSearchResult::NotFound;
     }
 
-    inline static uint64_t Hash(uint32_t addr, tPortId port)
-    {
-        return addr ^ port;
-    }
-
     inline static uint64_t Pack(uint32_t addr, tPortId port)
     {
         return (((uint64_t)addr) << 16) | (uint64_t)port;
@@ -542,7 +543,13 @@ public:
 private:
     Bucket* buckets_ = nullptr;
     uint32_t number_buckets_ = 0;
+    uint32_t init_value_hash_ = 0;
     bool initialized_ = false;
+
+    inline uint64_t Hash(uint32_t addr, tPortId port)
+    {
+        return rte_hash_crc_8byte(Pack(addr, port), init_value_hash_);
+    }
 };
 
 using ServiceConnections = ConnectionsTable<Connection>;
