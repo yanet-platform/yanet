@@ -497,19 +497,13 @@ void proxy_service_on_socket_t::UpdateSecondStage(dataplane::proxy::proxy_servic
     tables_work.CopyFrom(tables_tmp);
 	service.tables.CopyFrom(tables_work);
 
-    if (service.config.rate_limit.size > 0)
-    {
-        rate_limit_table_work.ClearIfNotEqual(rate_limit_table_tmp, memory_manager);
-        rate_limit_table_work.CopyFrom(rate_limit_table_tmp);
-        service.rate_limit_table.CopyFrom(rate_limit_table_work);
-    }
+    rate_limit_table_work.ClearIfNotEqual(rate_limit_table_tmp, memory_manager);
+    rate_limit_table_work.CopyFrom(rate_limit_table_tmp);
+    service.rate_limit_table.CopyFrom(rate_limit_table_work);
 
-    if (service.config.connection_limit.size > 0)
-    {
-        connection_limit_table_work.ClearIfNotEqual(connection_limit_table_tmp, memory_manager);
-        connection_limit_table_work.CopyFrom(connection_limit_table_tmp);
-        service.connection_limit_table.CopyFrom(connection_limit_table_work);
-    }
+    connection_limit_table_work.ClearIfNotEqual(connection_limit_table_tmp, memory_manager);
+    connection_limit_table_work.CopyFrom(connection_limit_table_tmp);
+    service.connection_limit_table.CopyFrom(connection_limit_table_work);
 }
 
 eResult TcpConnectionStore::ServiceUpdateOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager)
