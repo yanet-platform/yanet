@@ -95,10 +95,6 @@ struct proxy_service_on_socket_t
     proxy_service_config_t config;
 	ProxyTables tables_work;
     ProxyTables tables_tmp;
-    RateLimitTable rate_limit_table_work;
-    RateLimitTable rate_limit_table_tmp;
-    ConnectionLimitTable connection_limit_table_work;
-    ConnectionLimitTable connection_limit_table_tmp;
     size_t connection_count_size = 1024;
     bool enabled{false};
     std::shared_mutex mutex;

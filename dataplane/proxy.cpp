@@ -443,46 +443,46 @@ eResult proxy_service_on_socket_t::UpdateFirstStage(dataplane::proxy::proxy_serv
 
     if (service.config.rate_limit.size > 0)
     {
-        if (rate_limit_table_tmp.NeedReallocate(service.config.rate_limit.size))
+        if (tables_tmp.rate_limit.NeedReallocate(service.config.rate_limit.size))
         {
-            rate_limit_table_tmp.ClearIfNotEqual(rate_limit_table_work, memory_manager);
-            rate_limit_table_tmp.ClearLinks();
-            if (!rate_limit_table_tmp.Init(service.config.rate_limit.size, service.config.rate_limit.rate, service.config.rate_limit.burst,
+            tables_tmp.rate_limit.ClearIfNotEqual(tables_work.rate_limit, memory_manager);
+            tables_tmp.rate_limit.ClearLinks();
+            if (!tables_tmp.rate_limit.Init(service.config.rate_limit.size, service.config.rate_limit.rate, service.config.rate_limit.burst,
                                            memory_manager, service.config.socket_id, "tcp_proxy.rate_limit." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id)))
             {
                 YANET_LOG_ERROR("Error initialization TcpProxy.RateLimit, service: %d\n", service.config.service_id);
                 return eResult::errorAllocatingMemory;
             }
         }
-        rate_limit_table_tmp.Update(service.config.rate_limit.rate, service.config.rate_limit.burst);
-        service.rate_limit_table.CopyFrom(rate_limit_table_tmp);
+        tables_tmp.rate_limit.Update(service.config.rate_limit.rate, service.config.rate_limit.burst);
+        service.rate_limit_table.CopyFrom(tables_tmp.rate_limit);
     }
     else
     {
-        rate_limit_table_tmp.ClearLinks();
-        service.rate_limit_table.CopyFrom(rate_limit_table_tmp);
+        tables_tmp.rate_limit.ClearLinks();
+        service.rate_limit_table.CopyFrom(tables_tmp.rate_limit);
     }
 
     if (service.config.connection_limit.size > 0)
     {
-        if (connection_limit_table_tmp.NeedReallocate(service.config.connection_limit.size))
+        if (tables_tmp.connection_limit.NeedReallocate(service.config.connection_limit.size))
         {
-            connection_limit_table_tmp.ClearIfNotEqual(connection_limit_table_work, memory_manager);
-            connection_limit_table_tmp.ClearLinks();
-            if (!connection_limit_table_tmp.Init(service.config.connection_limit.size, service.config.connection_limit.timeout,
+            tables_tmp.connection_limit.ClearIfNotEqual(tables_work.connection_limit, memory_manager);
+            tables_tmp.connection_limit.ClearLinks();
+            if (!tables_tmp.connection_limit.Init(service.config.connection_limit.size, service.config.connection_limit.timeout,
                                                  memory_manager, service.config.socket_id, "tcp_proxy.connection_limit." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id)))
             {
                 YANET_LOG_ERROR("Error initialization TcpProxy.ConnectionLimit, service: %d\n", service.config.service_id);
                 return eResult::errorAllocatingMemory;
             }
         }
-        connection_limit_table_tmp.Update(service.config.connection_limit.timeout);
-        service.connection_limit_table.CopyFrom(connection_limit_table_tmp);
+        tables_tmp.connection_limit.Update(service.config.connection_limit.timeout);
+        service.connection_limit_table.CopyFrom(tables_tmp.connection_limit);
     }
     else
     {
-        connection_limit_table_tmp.ClearLinks();
-        service.connection_limit_table.CopyFrom(connection_limit_table_tmp);
+        tables_tmp.connection_limit.ClearLinks();
+        service.connection_limit_table.CopyFrom(tables_tmp.connection_limit);
     }
 
     config = service.config;
@@ -497,13 +497,19 @@ void proxy_service_on_socket_t::UpdateSecondStage(dataplane::proxy::proxy_servic
     tables_work.CopyFrom(tables_tmp);
 	service.tables.CopyFrom(tables_work);
 
-    rate_limit_table_work.ClearIfNotEqual(rate_limit_table_tmp, memory_manager);
-    rate_limit_table_work.CopyFrom(rate_limit_table_tmp);
-    service.rate_limit_table.CopyFrom(rate_limit_table_work);
+    YANET_LOG_WARNING("CLEAR\n");
+    tables_work.rate_limit.ClearIfNotEqual(tables_tmp.rate_limit, memory_manager);
+    YANET_LOG_WARNING("COPY\n");
+    tables_work.rate_limit.CopyFrom(tables_tmp.rate_limit);
+    YANET_LOG_WARNING("COPY 2\n");
+    service.rate_limit_table.CopyFrom(tables_work.rate_limit);
 
-    connection_limit_table_work.ClearIfNotEqual(connection_limit_table_tmp, memory_manager);
-    connection_limit_table_work.CopyFrom(connection_limit_table_tmp);
-    service.connection_limit_table.CopyFrom(connection_limit_table_work);
+    YANET_LOG_WARNING("CLEAR\n");
+    tables_work.connection_limit.ClearIfNotEqual(tables_tmp.connection_limit, memory_manager);
+    YANET_LOG_WARNING("COPY\n");
+    tables_work.connection_limit.CopyFrom(tables_tmp.connection_limit);
+    YANET_LOG_WARNING("COPY 2\n");
+    service.connection_limit_table.CopyFrom(tables_work.connection_limit);
 }
 
 eResult TcpConnectionStore::ServiceUpdateOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager)
@@ -621,7 +627,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 service.tables_work.syn_connections.ProcessAllConnectionsWithLocking(condition, action);
             }
 
-            if (service.config.rate_limit.size > 0)
+            if (service.tables_work.rate_limit.IsInitialized())
             {
                 // Work RateLimit
                 uint64_t time_to_clear = current_time_ms - RateLimitTable::timeout_ms;
@@ -636,10 +642,10 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 service.tables_work.rate_limit.ProcessAllConnectionsWithLocking(condition, action);
             }
 
-            if (service.config.connection_limit.size > 0)
+            if (service.tables_work.connection_limit.IsInitialized())
             {
                 // Work ConnectionLimit
-                for (auto& iter : service.connection_limit_table_work.GC(0, service.config.connection_limit.size))
+                for (auto& iter : service.tables_work.connection_limit.GC(0, service.config.connection_limit.size))
                 {
                     iter.lock();
                     if (!iter.is_valid())
@@ -691,9 +697,9 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 {
                     if (!iter.is_valid() || (*iter.value() & whitelist_bit)) continue;
                     uint32_t value = *iter.value() & ~whitelist_bit;
-                    if (service.config.connection_limit.size > 0 && value >= service.config.connection_limit.limit)
+                    if (service.tables_work.connection_limit.IsInitialized() && value >= service.config.connection_limit.limit)
                     {
-                        service.connection_limit_table_work.Add(*iter.key() - salt, current_time_ms);
+                        service.tables_work.connection_limit.Add(*iter.key() - salt, current_time_ms);
                     }
 
                     if (max_count < value) max_count = value;
@@ -708,7 +714,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                     if (value >= common::proxy::conn_count_tresholds[common::proxy::conn_count_tresholds.size()-1])
                         counts[common::proxy::conn_count_tresholds.size()]++;
                 }
-                service.connection_limit_table_work.AddConnCountStats(counts, max_count, current_time_ms);
+                service.tables_work.connection_limit.AddConnCountStats(counts, max_count, current_time_ms);
                 memory_manager->destroy(connections);
             }
 
@@ -911,7 +917,7 @@ common::idp::proxy_bins::response TcpConnectionStore::GetConnCountBins(const com
                     proxy_service_on_socket_t& service = data_on_socket.proxy_services[service_info.service_id];
                     std::shared_lock lock(service.mutex);
 
-                    common::proxy::ConnCountInfo info = service.connection_limit_table_work.GetConnCountStats();
+                    common::proxy::ConnCountInfo info = service.tables_work.connection_limit.GetConnCountStats();
                     info.header = service_info;
                     response.push_back(info);
                 }
@@ -933,7 +939,7 @@ common::idp::proxy_blacklist::response TcpConnectionStore::GetBlacklist(proxy_se
             if (service.config.connection_limit.size == 0) continue;
             std::shared_lock lock(service.mutex);
 
-            for (auto& iter : service.connection_limit_table_work.Range(0, service.config.connection_limit.size))
+            for (auto& iter : service.tables_work.connection_limit.Range(0, service.config.connection_limit.size))
             {
                 if (!iter.is_valid()) continue;
                 response.emplace_back(common::ipv4_address_t(rte_be_to_cpu_32(*iter.key())).toString(), *iter.value());
@@ -956,7 +962,7 @@ common::idp::proxy_blacklist_add::response TcpConnectionStore::AddBlacklist(prox
             proxy_service_on_socket_t& service = data_on_socket.proxy_services[service_id];
             if (service.config.connection_limit.size == 0) continue;
             std::unique_lock lock(service.mutex);
-            if(!service.connection_limit_table_work.Add(address_be, current_time_ms, (uint64_t)timeout * 1000))
+            if(!service.tables_work.connection_limit.Add(address_be, current_time_ms, (uint64_t)timeout * 1000))
             {
                 YANET_LOG_ERROR("Failed to add address to blacklist\n");
             }
