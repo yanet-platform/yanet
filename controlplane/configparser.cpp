@@ -1172,6 +1172,19 @@ void config_parser_t::loadConfig_proxy_tcp_options(const nlohmann::json& moduleJ
 	options.timestamps = moduleJson.value("timestamps", default_tcp_options.timestamps);
 }
 
+common::proxy::limit_mode LimitMode(const nlohmann::json& moduleJson, const std::string& name, common::proxy::limit_mode default_value)
+{
+	if (!exist(moduleJson, name)) return default_value;
+	const std::string& mode = moduleJson.value(name, "off");
+	if (mode == "off")
+		return common::proxy::limit_mode::off;
+	if (mode == "on")
+		return common::proxy::limit_mode::on;
+	if (mode == "dry")
+		return common::proxy::limit_mode::dry;
+	return common::proxy::limit_mode::off;
+}
+
 void config_parser_t::loadConfig_proxy_timeouts(const nlohmann::json& moduleJson,
                                                 controlplane::proxy::timeouts_t& timeouts,
                                                 const controlplane::proxy::timeouts_t& default_timeouts)
@@ -1185,40 +1198,35 @@ void config_parser_t::loadConfig_proxy_rate_limit(const nlohmann::json& moduleJs
 												 controlplane::proxy::rate_limit_t& rate_limit,
 												 const controlplane::proxy::rate_limit_t& default_rate_limit)
 {
+
+	rate_limit.mode = LimitMode(moduleJson, "rateLimitMode", default_rate_limit.mode);
 	rate_limit.size = moduleJson.value("sizeRateLimit", default_rate_limit.size);
 	rate_limit.rate = moduleJson.value("rateLimit", default_rate_limit.rate);
 	rate_limit.burst = moduleJson.value("burstLimit", default_rate_limit.burst);
-	if (rate_limit.size != 0)
-	{
-		if (!IsPower2(rate_limit.size))
-		{
-			throw error_result_t(eResult::invalidConfigurationFile, "sizeRateLimit must be 0 or power of 2");
-		}
-		if (rate_limit.rate == 0)
-		{
-			throw error_result_t(eResult::invalidConfigurationFile, "rateLimit must not be 0");
-		}
-	}
+	if (rate_limit.mode == common::proxy::limit_mode::off) return;
+	if (rate_limit.size == 0)
+		throw error_result_t(eResult::invalidConfigurationFile, "sizeRateLimit must be greater than 0");
+	if (!IsPower2(rate_limit.size))
+		throw error_result_t(eResult::invalidConfigurationFile, "sizeRateLimit must be power of 2");
+	if (rate_limit.rate == 0)
+		throw error_result_t(eResult::invalidConfigurationFile, "rateLimit must be greater than 0");
 }
 
 void config_parser_t::loadConfig_proxy_connection_limit(const nlohmann::json& moduleJson,
 														 controlplane::proxy::connection_limit_t& connection_limit,
 														 const controlplane::proxy::connection_limit_t& default_connection_limit)
 {
+	connection_limit.mode = LimitMode(moduleJson, "connectionLimitMode", default_connection_limit.mode);
 	connection_limit.size = moduleJson.value("sizeConnectionLimit", default_connection_limit.size);
 	connection_limit.limit = moduleJson.value("connectionLimit", default_connection_limit.limit);
 	connection_limit.timeout = moduleJson.value("timeoutConnectionLimit", default_connection_limit.timeout);
-	if (connection_limit.size != 0)
-	{
-		if (!IsPower2(connection_limit.size))
-		{
-			throw error_result_t(eResult::invalidConfigurationFile, "sizeConnectionLimit must be 0 or power of 2");
-		}
-		if (connection_limit.limit == 0)
-		{
-			throw error_result_t(eResult::invalidConfigurationFile, "connectionLimit must not be 0");
-		}
-	}
+	if (connection_limit.mode == common::proxy::limit_mode::off) return;
+	if (connection_limit.size == 0)
+		throw error_result_t(eResult::invalidConfigurationFile, "sizeConnectionLimit must be greater than 0");
+	if (!IsPower2(connection_limit.size))
+		throw error_result_t(eResult::invalidConfigurationFile, "sizeConnectionLimit must be power of 2");
+	if (connection_limit.limit == 0)
+		throw error_result_t(eResult::invalidConfigurationFile, "connectionLimit must be greater than 0");
 }
 
 void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,

@@ -1,6 +1,7 @@
 steps:
 - cli:
   - rib static insert default 10.0.1.0/24 10.0.1.1
+  - rib static insert default 10.0.1.0/24 10.0.1.2
   - rib static insert default 10.0.2.0/24 10.0.2.1
   - rib prefixes
 
@@ -53,6 +54,25 @@ steps:
 - cli:
   - proxy connections 10.0.1.1 tcp 80
   - proxy syn 10.0.1.1 tcp 80
+
+- sendPackets:
+  - port: kni0
+    send: 006-send.pcap
+    expect: 006-expect.pcap
+
+- cli:
+  - proxy blacklist add 10.0.1.2 tcp 80 10.0.2.1 1
+  - proxy blacklist 10.0.1.2 tcp 80
+
+- sendPackets:
+  - port: kni0
+    send: 007-send.pcap
+    expect: 007-expect.pcap
+
+- cli:
   - rib static remove default 10.0.1.0/24 10.0.1.1
+  - rib static remove default 10.0.1.0/24 10.0.1.2
   - rib static remove default 10.0.2.0/24 10.0.2.1
-  - rib prefixes
+  - proxy connections 10.0.1.2 tcp 80
+  - proxy syn 10.0.1.2 tcp 80
+  - proxy counters 10.0.1.2 tcp 80

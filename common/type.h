@@ -2603,6 +2603,27 @@ struct ConnCountInfo
 	SERIALIZABLE(header, counts, max_conn_count);
 };
 
+enum class limit_mode : uint32_t
+{
+	off,
+	on,
+	dry
+};
+
+inline const char* limit_mode_toString(limit_mode mode)
+{
+	switch(mode)
+	{
+	case limit_mode::off:
+		return "off";
+	case limit_mode::on:
+		return "on";
+	case limit_mode::dry:
+		return "dry";
+	}
+	return "unknown";
+}
+
 }
 
 }

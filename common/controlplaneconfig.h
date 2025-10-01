@@ -355,13 +355,14 @@ class rate_limit_t
 public:
 	rate_limit_t() = default;
 
-	SERIALIZABLE(size, rate, burst);
+	SERIALIZABLE(mode, size, rate, burst);
 
 	void Debug() const
 	{
-		YANET_LOG_WARNING("\tRate limit: size=%u, rate=%u, burst=%u\n", size, rate, burst);
+		YANET_LOG_WARNING("\tRate limit: mode=%s, size=%u, rate=%u, burst=%u\n", limit_mode_toString(mode), size, rate, burst);
 	}
 
+	common::proxy::limit_mode mode{};
 	uint32_t size{};
 	uint32_t rate{};
 	uint32_t burst{};
@@ -372,13 +373,14 @@ class connection_limit_t
 public:
 	connection_limit_t() = default;
 
-	SERIALIZABLE(size, limit, timeout);
+	SERIALIZABLE(mode, size, limit, timeout);
 
 	void Debug() const
 	{
-		YANET_LOG_WARNING("\tConnection limit: size=%u, limit=%d, timeout=%d\n", size, limit, timeout);
+		YANET_LOG_WARNING("\tConnection limit: mode=%s, size=%u, limit=%d, timeout=%d\n", limit_mode_toString(mode), size, limit, timeout);
 	}
 
+	common::proxy::limit_mode mode{};
 	uint32_t size{};
 	uint32_t limit{};
 	uint32_t timeout{YANET_PROXY_DEFAULT_CONNECTION_LIMIT_TIMEOUT};

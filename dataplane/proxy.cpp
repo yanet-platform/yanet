@@ -447,7 +447,7 @@ eResult proxy_service_on_socket_t::UpdateFirstStage(dataplane::proxy::proxy_serv
         {
             tables_tmp.rate_limit.ClearIfNotEqual(tables_work.rate_limit, memory_manager);
             tables_tmp.rate_limit.ClearLinks();
-            if (!tables_tmp.rate_limit.Init(service.config.rate_limit.size, service.config.rate_limit.rate, service.config.rate_limit.burst,
+            if (!tables_tmp.rate_limit.Init(service.config.rate_limit.mode, service.config.rate_limit.size, service.config.rate_limit.rate, service.config.rate_limit.burst,
                                            memory_manager, service.config.socket_id, "tcp_proxy.rate_limit." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id)))
             {
                 YANET_LOG_ERROR("Error initialization TcpProxy.RateLimit, service: %d\n", service.config.service_id);
@@ -469,7 +469,7 @@ eResult proxy_service_on_socket_t::UpdateFirstStage(dataplane::proxy::proxy_serv
         {
             tables_tmp.connection_limit.ClearIfNotEqual(tables_work.connection_limit, memory_manager);
             tables_tmp.connection_limit.ClearLinks();
-            if (!tables_tmp.connection_limit.Init(service.config.connection_limit.size, service.config.connection_limit.timeout,
+            if (!tables_tmp.connection_limit.Init(service.config.connection_limit.mode, service.config.connection_limit.size, service.config.connection_limit.timeout,
                                                  memory_manager, service.config.socket_id, "tcp_proxy.connection_limit." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id)))
             {
                 YANET_LOG_ERROR("Error initialization TcpProxy.ConnectionLimit, service: %d\n", service.config.service_id);
@@ -621,7 +621,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 service.tables_work.syn_connections.ProcessAllConnectionsWithLocking(condition, action);
             }
 
-            if (service.tables_work.rate_limit.IsInitialized())
+            if (service.tables_work.rate_limit.Mode() != common::proxy::limit_mode::off)
             {
                 // Work RateLimit
                 uint64_t time_to_clear = current_time_ms - RateLimitTable::timeout_ms;
@@ -636,7 +636,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 service.tables_work.rate_limit.ProcessAllConnectionsWithLocking(condition, action);
             }
 
-            if (service.tables_work.connection_limit.IsInitialized())
+            if (service.tables_work.connection_limit.Mode() != common::proxy::limit_mode::off)
             {
                 // Work ConnectionLimit
                 for (auto& iter : service.tables_work.connection_limit.GC(0, service.config.connection_limit.size))
@@ -670,7 +670,8 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 service.connection_counter.ForEach([&service, &max_count, &counts, current_time_ms](uint32_t address, uint32_t count) {
                     if (count & whitelist_bit) return;
                     count = count & ~whitelist_bit;
-                    if (service.tables_work.connection_limit.IsInitialized() && count >= service.config.connection_limit.limit)
+                    if (service.tables_work.connection_limit.Mode() != common::proxy::limit_mode::off
+                        && count >= service.config.connection_limit.limit)
                     {
                         service.tables_work.connection_limit.Add(address, current_time_ms);
                     }
@@ -1083,14 +1084,14 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_connection_limit]++;
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_packets]++;
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_bytes] += mbuf->pkt_len;
-        return false;
+        if (service.connection_limit_table.Mode() == common::proxy::limit_mode::on) return false;
     }
     if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.Check(ipv4_header->src_addr, worker_info.current_time_ms))
     {
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_packets]++;
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_bytes] += mbuf->pkt_len;
-        return false;
+        if (service.rate_limit_table.Mode() == common::proxy::limit_mode::on) return false;
     }
 
     bool is_syn_ack = false;
@@ -1238,7 +1239,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_connection_limit]++;
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_packets]++;
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_bytes] += mbuf->pkt_len;
-        return false;
+        if (service.connection_limit_table.Mode() == common::proxy::limit_mode::on) return false;
     }
 
     ServiceConnectionData service_connection_data;
@@ -1382,7 +1383,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                 else if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
                 {
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
-                    action = false;
+                    if (service.rate_limit_table.Mode() == common::proxy::limit_mode::on) action = false;
                 }
                 else
                 {
@@ -1433,7 +1434,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                 {
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::success_check_syn_cookie]++;
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
-                    action = false;
+                    if (service.rate_limit_table.Mode() == common::proxy::limit_mode::on) action = false;
                 }
                 else
                 {

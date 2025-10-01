@@ -122,7 +122,7 @@ class RateLimitTable
 public:
     constexpr static uint64_t timeout_ms = 1000;
 
-    bool Init(uint32_t number_connections, uint32_t max_connection_rate, uint32_t burst_capacity,
+    bool Init(common::proxy::limit_mode mode, uint32_t number_connections, uint32_t max_connection_rate, uint32_t burst_capacity,
               dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
     {
         if (initialized_) return true;
@@ -157,6 +157,7 @@ public:
         hash_init_ = dist(gen);
 #endif
 
+        mode_ = mode;
         initialized_ = true;
 
         return true;
@@ -171,7 +172,7 @@ public:
 
     bool Check(uint32_t addr, uint64_t current_time_ms)
     {
-        if (unlikely(!initialized_)) return true;
+        if (mode_ == common::proxy::limit_mode::off) return true;
 
         uint64_t key = Hash(addr);
         RateLimitBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
@@ -188,7 +189,7 @@ public:
 
     bool CheckAndConsume(uint32_t addr, uint64_t current_time_ms)
     {
-        if (unlikely(!initialized_)) return true;
+        if (mode_ == common::proxy::limit_mode::off) return true;
 
         uint64_t key = Hash(addr);
         RateLimitBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
@@ -260,6 +261,7 @@ public:
         cost_ = other.cost_;
         capacity_ = other.capacity_;
         initialized_ = other.initialized_;
+        mode_ = other.mode_;
     }
 
     void ClearLinks()
@@ -271,10 +273,16 @@ public:
         cost_ = 0;
         capacity_ = 0;
         initialized_ = false;
+        mode_ = common::proxy::limit_mode::off;
     }
 
     bool IsInitialized() const {
         return initialized_;
+    }
+
+    common::proxy::limit_mode Mode() const
+    {
+        return mode_;
     }
 
     std::string Debug() const
@@ -434,6 +442,7 @@ private:
     uint32_t cost_ = 0;
     uint32_t capacity_ = 0;
     bool initialized_ = false;
+    common::proxy::limit_mode mode_{};
 };
 
 class ConnectionLimitTable
@@ -441,7 +450,7 @@ class ConnectionLimitTable
 public:
     using hashtable_t = ::dataplane::hashtable_mod_spinlock_dynamic<uint32_t, uint64_t, 16>;
 
-    bool Init(uint32_t number_connections, uint64_t timeout_ms,
+    bool Init(common::proxy::limit_mode mode, uint32_t number_connections, uint64_t timeout_ms,
               dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
     {
         if (initialized_) return true;
@@ -474,6 +483,7 @@ public:
 
         number_connections_ = number_connections;
         timeout_ = timeout_ms;
+        mode_ = mode;
         initialized_ = true;
 
         return true;
@@ -486,7 +496,7 @@ public:
 
     bool Exists(uint32_t addr, uint64_t current_time_ms)
     {
-        if (unlikely(!initialized_)) return false;
+        if (mode_ == common::proxy::limit_mode::off) return false;
 
         uint64_t* until = nullptr;
         ::dataplane::spinlock_nonrecursive_t* lock = nullptr;
@@ -507,7 +517,7 @@ public:
 
     bool Add(uint32_t addr, uint64_t current_time_ms, uint64_t timeout_ms)
     {
-        if (unlikely(!initialized_)) return true;
+        if (mode_ == common::proxy::limit_mode::off) return true;
 
         constexpr static uint64_t min_timeout_dist = 3000;
         static thread_local std::random_device rd;
@@ -529,7 +539,7 @@ public:
 
     void Remove(uint32_t addr)
     {
-        if (unlikely(!initialized_)) return;
+        if (mode_ == common::proxy::limit_mode::off) return;
         table_->remove(addr);
     }
 
@@ -581,6 +591,7 @@ public:
         number_connections_ = other.number_connections_;
         timeout_ = other.timeout_;
         initialized_ = other.initialized_;
+        mode_ = other.mode_;
     }
 
     void ClearLinks()
@@ -590,10 +601,16 @@ public:
         number_connections_ = 0;
         timeout_ = 0;
         initialized_ = false;
+        mode_ = common::proxy::limit_mode::off;
     }
 
     bool IsInitialized() const {
         return initialized_;
+    }
+
+    common::proxy::limit_mode Mode() const
+    {
+        return mode_;
     }
 
     std::string Debug() const
@@ -631,7 +648,6 @@ public:
         return result;
     }
 
-    
     void AddConnCountStats(std::array<uint32_t, common::proxy::conn_count_tresholds.size() + 1> counts, uint32_t max_count, uint64_t current_time_ms)
     {
         bool next_period = false;
@@ -670,6 +686,7 @@ private:
     uint32_t number_connections_ = 0;
     uint64_t timeout_ = 0;
     bool initialized_ = false;
+    common::proxy::limit_mode mode_{};
     
     struct
     {

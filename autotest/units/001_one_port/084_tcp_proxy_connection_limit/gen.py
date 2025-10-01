@@ -19,8 +19,9 @@ IP_PROXY_INT4 = "10.0.0.4"
 IP_PROXY_INT5 = "10.0.0.5"
 
 IP_SERVER1 = "10.0.1.1"
+IP_SERVER2 = "10.0.1.2"
 
-PORT_SERVER = 8080
+PORT_SERVER = 8080	
 PORT_PROXY_EXT = 80
 PORT_PROXY_INT = 32768
 PORT_PROXY_INT2 = 32769
@@ -202,3 +203,43 @@ data_type5_2 = [
 ]
 
 WriteTest("005_2", data_type5_2)
+
+# dry run
+
+# 006 - before blacklist
+
+data_type6 = [
+	(
+		FromClient(IP_CLIENT1, IP_SERVER2, PORT_CLIENT, START_CLIENT_SEQ, 0, 'S', options=options_client_syn),
+		ToServer(IP_PROXY_INT, IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=options_client_syn)
+	),
+	(
+		FromServer(IP_PROXY_INT, IP_SERVER2, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn),
+		ToClient(IP_SERVER2, IP_CLIENT1, PORT_CLIENT, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn)
+    ),
+	(
+		FromClient(IP_CLIENT1, IP_SERVER2, PORT_CLIENT, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack),
+		ToServer(IP_PROXY_INT, IP_SERVER2, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack)
+    ),
+]
+
+WriteTest("006", data_type6)
+
+# 007 - after blacklist
+
+data_type7 = [
+	(
+		FromClient(IP_CLIENT1, IP_SERVER2, PORT_CLIENT + 1, START_CLIENT_SEQ, 0, 'S', options=options_client_syn),
+		ToServer(IP_PROXY_INT2, IP_SERVER2, START_CLIENT_SEQ, 0, 'S', options=options_client_syn)
+	),
+	(
+		FromServer(IP_PROXY_INT2, IP_SERVER2, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn),
+		ToClient(IP_SERVER2, IP_CLIENT1, PORT_CLIENT + 1, START_SERVER_SEQ, START_CLIENT_SEQ + 1, 'AS', options=options_server_syn)
+    ),
+	(
+		FromClient(IP_CLIENT1, IP_SERVER2, PORT_CLIENT + 1, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack),
+		ToServer(IP_PROXY_INT2, IP_SERVER2, START_CLIENT_SEQ + 1, START_SERVER_SEQ + 1, 'A', raw=data_client1, options=options_client_ack)
+    ),
+]
+
+WriteTest("007", data_type7)
