@@ -497,18 +497,12 @@ void proxy_service_on_socket_t::UpdateSecondStage(dataplane::proxy::proxy_servic
     tables_work.CopyFrom(tables_tmp);
 	service.tables.CopyFrom(tables_work);
 
-    YANET_LOG_WARNING("CLEAR\n");
     tables_work.rate_limit.ClearIfNotEqual(tables_tmp.rate_limit, memory_manager);
-    YANET_LOG_WARNING("COPY\n");
     tables_work.rate_limit.CopyFrom(tables_tmp.rate_limit);
-    YANET_LOG_WARNING("COPY 2\n");
     service.rate_limit_table.CopyFrom(tables_work.rate_limit);
 
-    YANET_LOG_WARNING("CLEAR\n");
     tables_work.connection_limit.ClearIfNotEqual(tables_tmp.connection_limit, memory_manager);
-    YANET_LOG_WARNING("COPY\n");
     tables_work.connection_limit.CopyFrom(tables_tmp.connection_limit);
-    YANET_LOG_WARNING("COPY 2\n");
     service.connection_limit_table.CopyFrom(tables_work.connection_limit);
 }
 
@@ -661,61 +655,40 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 }
             }
 
-            constexpr uint32_t whitelist_bit = 1u << 31;  
-            using hashtable_t = hashtable_mod_dynamic<uint32_t, uint32_t, 16>;
-            static std::random_device rd;
-            static std::mt19937 gen(rd());
-            std::uniform_int_distribution<uint32_t> dist(0, std::numeric_limits<uint32_t>::max());
-            uint32_t salt = dist(gen);
-            bool insert_fail = false;
+            constexpr static uint32_t whitelist_bit = 1u << 31;
             std::string name = "tcp_proxy.gc.count_connections." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id);
-            hashtable_t* connections = memory_manager->create<hashtable_t>(name.c_str(), socket_id, hashtable_t::calculate_sizeof(service.connection_count_size));
-            auto count_connections = [&connections, &insert_fail, salt](uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
-                uint32_t init_value = whitelist_bit * connection.FlagEnabled(Connection::flag_whitelist) + 1;
-                uint32_t* count = nullptr;
-                uint32_t hash = connections->lookup(address + salt, count);
-                if (count)
-                {
-                    (*count)++;
-                }
-                else if (!connections->insert(hash, address + salt, init_value))
-                {
-                    insert_fail = true;
-                }
-            };
-            if (connections != nullptr)
+            if(service.connection_counter.Init(memory_manager, name, socket_id, service.config.size_connections_table))
             {
-                hashtable_t::updater connections_updater;
-                connections_updater.update_pointer(connections, socket_id, service.connection_count_size);
-
+                auto count_connections = [&service](uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
+                    uint32_t init_value = whitelist_bit * connection.FlagEnabled(Connection::flag_whitelist) + 1;
+                    service.connection_counter.Add(address, init_value);
+                };
                 service.tables_work.service_connections.ProcessAllConnectionsWithoutLocking(count_connections);
-                if (insert_fail) service.connection_count_size = std::min(service.connection_count_size * 2, (size_t)service.config.size_connections_table);
-
+    
                 std::array<uint32_t, common::proxy::conn_count_tresholds.size() + 1> counts{};
                 uint32_t max_count{};
-                for (auto& iter : connections_updater.range())
-                {
-                    if (!iter.is_valid() || (*iter.value() & whitelist_bit)) continue;
-                    uint32_t value = *iter.value() & ~whitelist_bit;
-                    if (service.tables_work.connection_limit.IsInitialized() && value >= service.config.connection_limit.limit)
+                service.connection_counter.ForEach([&service, &max_count, &counts, current_time_ms](uint32_t address, uint32_t count) {
+                    if (count & whitelist_bit) return;
+                    count = count & ~whitelist_bit;
+                    if (service.tables_work.connection_limit.IsInitialized() && count >= service.config.connection_limit.limit)
                     {
-                        service.tables_work.connection_limit.Add(*iter.key() - salt, current_time_ms);
+                        service.tables_work.connection_limit.Add(address, current_time_ms);
                     }
-
-                    if (max_count < value) max_count = value;
+    
+                    if (max_count < count) max_count = count;
                     for (uint32_t i = 0; i < common::proxy::conn_count_tresholds.size(); i++)
                     {
-                        if (value < common::proxy::conn_count_tresholds[i])
+                        if (count < common::proxy::conn_count_tresholds[i])
                         {
                             counts[i]++;
                             break;
                         }
                     }
-                    if (value >= common::proxy::conn_count_tresholds[common::proxy::conn_count_tresholds.size()-1])
+                    if (count >= common::proxy::conn_count_tresholds[common::proxy::conn_count_tresholds.size()-1])
                         counts[common::proxy::conn_count_tresholds.size()]++;
-                }
+                });
                 service.tables_work.connection_limit.AddConnCountStats(counts, max_count, current_time_ms);
-                memory_manager->destroy(connections);
+                service.connection_counter.Clear();
             }
 
             if (!was_overflow_ring_retransmit && index >= start_proxy_retransmit_service)

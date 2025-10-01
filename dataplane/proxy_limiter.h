@@ -681,4 +681,75 @@ private:
     } conn_stats_;
 };
 
+class ConnectionCounter
+{
+public:
+    using hashtable_t = hashtable_mod_dynamic<uint32_t, uint32_t, 16>;
+
+    bool Init(memory_manager* memory_manager, const std::string& name, tSocketId socket_id, size_t max_size)
+    {
+        if (insert_fail_)
+        {
+            insert_fail_ = false;
+            connection_count_size_ = std::min(connection_count_size_ * 2, max_size);
+            memory_manager->destroy(table_);
+            table_ = nullptr;
+        }
+        if (table_ != nullptr) return true;
+
+        table_ = memory_manager->create<hashtable_t>(name.c_str(), socket_id, hashtable_t::calculate_sizeof(connection_count_size_));
+        if (table_ == nullptr)
+            return false;
+        table_updater_.update_pointer(table_, socket_id, connection_count_size_);
+
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+        std::uniform_int_distribution<uint32_t> dist(0, std::numeric_limits<uint32_t>::max());
+        salt_ = dist(gen);
+
+        return true;
+    }
+
+    void Add(uint32_t address, uint32_t init_val)
+    {
+        if (unlikely(table_ == nullptr)) return;
+
+        uint32_t* count = nullptr;
+        uint32_t hash = table_->lookup(address + salt_, count);
+        if (count)
+        {
+            (*count)++;
+        }
+        else if (!table_->insert(hash, address + salt_, init_val))
+        {
+            insert_fail_ = true;
+        }
+    }
+
+    void Clear()
+    {
+        if (unlikely(table_ == nullptr)) return;
+
+        table_->clear();
+    }
+
+    void ForEach(std::function<void(uint32_t, uint32_t)> func)
+    {
+        if (unlikely(table_ == nullptr)) return;
+
+        for (auto& iter : table_updater_.range())
+        {
+            if (!iter.is_valid()) continue;
+            func(*iter.key() - salt_, *iter.value());
+        }
+    }
+
+private:
+    hashtable_t* table_ = nullptr;
+    hashtable_t::updater table_updater_{};
+    size_t connection_count_size_ = 1024;
+    bool insert_fail_ = false;
+    uint32_t salt_ = 0;
+};
+
 }
