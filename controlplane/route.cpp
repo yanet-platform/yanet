@@ -1,5 +1,6 @@
 #include "route.h"
 #include "common/icp.h"
+#include "common/utils.h"
 #include "controlplane.h"
 #include "controlplane/route.h"
 
@@ -1608,307 +1609,260 @@ void route_t::tunnel_value_remove(const uint32_t& value_id)
 	}
 }
 
+void route_t::AddRequestForEachSocket(common::idp::updateGlobalBase::request& globalbase,
+                                      uint32_t value_id,
+                                      common::globalBase::eNexthopType nexthop)
+{
+	controlPlane->forEachSocket([this, value_id, nexthop, &globalbase](const tSocketId& socket_id) {
+		tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
+		                                                      common::globalBase::InterfaceName(nexthop),
+		                                                      3, ///< @todo: DEFINE
+		                                                      0,
+		                                                      0,
+		                                                      1.00);
+
+		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
+		                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
+		                                                                                          socket_id,
+		                                                                                          nexthop,
+		                                                                                          {}));
+	});
+}
+
+namespace
+{
+
+void AddRequestInterface(
+        std::vector<route::tunnel_value_interface_t>& request_interface,
+        const route::generation_t& generation,
+        const ip_address_t& default_nexthop,
+        const ip_address_t& nexthop,
+        uint32_t label,
+        uint32_t peer_id,
+        uint32_t origin_as,
+        uint32_t weight)
+{
+	auto interface = generation.get_interface_by_neighbor(default_nexthop);
+	if (interface)
+	{
+		const auto& [interface_id, interface_name] = **interface;
+
+		request_interface.emplace_back(nexthop,
+		                               interface_id,
+		                               label,
+		                               interface_name,
+		                               peer_id,
+		                               origin_as,
+		                               weight,
+		                               default_nexthop);
+	}
+}
+
+} // namespace
+
+bool route_t::MakePerSocketRequest(
+        common::idp::updateGlobalBase::request& globalbase,
+        uint32_t value_id,
+        const route::tunnel_value_key_t& value_key)
+{
+	const auto& visitor = utils::Visitor{
+	        [&](const route::tunnel_destination_interface_t& nexthops) {
+		        for (const auto& nexthop : nexthops)
+		        {
+			        if (std::get<common::ip_address_t>(nexthop).is_default())
+			        {
+				        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
+				        return true;
+			        }
+		        }
+		        return false;
+	        },
+	        [&](const route::tunnel_destination_legacy_t& nexthops) {
+		        for (const auto& nexthop : nexthops)
+		        {
+			        if (nexthop.is_default())
+			        {
+				        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
+				        return true;
+			        }
+		        }
+		        return false;
+	        },
+	        [](const route::directly_connected_destination_t&) { return false; },
+	        [&](uint32_t virtual_port_id) {
+		        AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::repeat);
+		        return true;
+	        },
+	        [](route::tunnel_destination_default_t) { return false; }};
+	return std::visit(visitor, std::get<route::tunnel_destination_t>(value_key));
+}
+
+std::vector<route::tunnel_value_interface_t> route_t::MakeTunnelValueRequestInterface(
+        common::idp::updateGlobalBase::request& globalbase,
+        const route::generation_t& generation,
+        uint32_t value_id,
+        const route::tunnel_value_key_t& value_key)
+{
+	std::vector<route::tunnel_value_interface_t> request_interface;
+
+	const auto& visitor = utils::Visitor{
+	        [&](const route::tunnel_destination_interface_t& nexthops) {
+		        for (const auto& [nexthop, label, peer_id, origin_as, weight] : nexthops)
+		        {
+			        if (nexthop.is_ipv4())
+			        {
+				        for (const auto& default_nexthop : tunnel_defaults_v4)
+				        {
+					        AddRequestInterface(request_interface, generation, default_nexthop, nexthop, label, peer_id, origin_as, weight);
+				        }
+			        }
+			        else
+			        {
+				        for (const auto& default_nexthop : tunnel_defaults_v6)
+				        {
+					        AddRequestInterface(request_interface, generation, default_nexthop, nexthop, label, peer_id, origin_as, weight);
+				        }
+			        }
+		        }
+	        },
+	        [&](const route::tunnel_destination_legacy_t& nexthops) {
+		        for (const auto& nexthop : nexthops)
+		        {
+			        AddRequestInterface(request_interface, generation, nexthop, nexthop, 3, 0, 0, 1);
+		        }
+	        },
+	        [&](const route::directly_connected_destination_t& directly_connected) {
+		        const auto& [interface_id, interface_name] = directly_connected;
+
+		        request_interface.emplace_back(ipv4_address_t(), ///< default
+		                                       interface_id,
+		                                       3, ///< @todo: DEFINE
+		                                       interface_name,
+		                                       0,
+		                                       0,
+		                                       1,
+		                                       ipv4_address_t()); ///< default
+	        },
+	        [](uint32_t virtual_port_id) {},
+	        [&, &fallback = std::get<common::ip_prefix_t>(value_key)](route::tunnel_destination_default_t) {
+		        if (fallback.is_ipv4())
+		        {
+			        for (const auto& default_nexthop : tunnel_defaults_v4)
+			        {
+				        AddRequestInterface(request_interface, generation, default_nexthop, default_nexthop, 3, 0, 0, 1);
+			        }
+		        }
+		        else
+		        {
+			        for (const auto& default_nexthop : tunnel_defaults_v6)
+			        {
+				        AddRequestInterface(request_interface, generation, default_nexthop, default_nexthop, 3, 0, 0, 1);
+			        }
+		        }
+	        }};
+
+	std::visit(visitor, std::get<route::tunnel_destination_t>(value_key));
+
+	if (request_interface.size() > YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE)
+	{
+		/// @todo: stats
+		YANET_LOG_ERROR("YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE exceeded, truncated from %ld to %d",
+		                request_interface.size(),
+		                YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE);
+		request_interface.resize(YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE);
+	}
+
+	return request_interface;
+}
+
 void route_t::tunnel_value_compile(common::idp::updateGlobalBase::request& globalbase,
                                    const route::generation_t& generation,
                                    const uint32_t& value_id,
                                    const route::tunnel_value_key_t& value_key)
 {
-	std::vector<route::tunnel_value_interface_t> request_interface;
-
-	const auto& [vrf_priority, destination, fallback] = value_key;
-	GCC_BUG_UNUSED(vrf_priority); ///< @todo: VRF
-
-	tunnel_value_lookup[value_id].clear();
-
-	if (const auto nexthops = std::get_if<route::tunnel_destination_interface_t>(&destination))
+	if (MakePerSocketRequest(globalbase, value_id, value_key))
 	{
-		for (const auto& [nexthop, label, peer_id, origin_as, weight] : *nexthops)
-		{
-			if (nexthop.is_default())
-			{
-				controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
-					tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
-					                                                      "linux",
-					                                                      3, ///< @todo: DEFINE
-					                                                      0,
-					                                                      0,
-					                                                      1.00);
-
-					globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
-					                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
-					                                                                                          socket_id,
-					                                                                                          common::globalBase::eNexthopType::controlPlane,
-					                                                                                          {}));
-				});
-
-				return;
-			}
-
-			if (nexthop.is_ipv4())
-			{
-				for (const auto& default_nexthop : tunnel_defaults_v4)
-				{
-					auto interface = generation.get_interface_by_neighbor(default_nexthop);
-					if (interface)
-					{
-						const auto& [interface_id, interface_name] = **interface;
-
-						request_interface.emplace_back(nexthop,
-						                               interface_id,
-						                               label,
-						                               interface_name,
-						                               peer_id,
-						                               origin_as,
-						                               weight,
-						                               default_nexthop);
-					}
-				}
-			}
-			else
-			{
-				for (const auto& default_nexthop : tunnel_defaults_v6)
-				{
-					auto interface = generation.get_interface_by_neighbor(default_nexthop);
-					if (interface)
-					{
-						const auto& [interface_id, interface_name] = **interface;
-
-						request_interface.emplace_back(nexthop,
-						                               interface_id,
-						                               label,
-						                               interface_name,
-						                               peer_id,
-						                               origin_as,
-						                               weight,
-						                               default_nexthop);
-					}
-				}
-			}
-		}
-	}
-	else if (const auto nexthops = std::get_if<route::tunnel_destination_legacy_t>(&destination))
-	{
-		for (const auto& nexthop : *nexthops)
-		{
-			if (nexthop.is_default())
-			{
-				controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
-					tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
-					                                                      "linux",
-					                                                      3, ///< @todo: DEFINE
-					                                                      0,
-					                                                      0,
-					                                                      1.00);
-
-					globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
-					                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
-					                                                                                          socket_id,
-					                                                                                          common::globalBase::eNexthopType::controlPlane,
-					                                                                                          {}));
-				});
-
-				return;
-			}
-
-			auto interface = generation.get_interface_by_neighbor(nexthop);
-			if (interface)
-			{
-				const auto& [interface_id, interface_name] = **interface;
-
-				request_interface.emplace_back(nexthop,
-				                               interface_id,
-				                               3, ///< @todo: DEFINE
-				                               interface_name,
-				                               0,
-				                               0,
-				                               1,
-				                               nexthop);
-			}
-		}
-	}
-	else if (const auto directly_connected = std::get_if<route::directly_connected_destination_t>(&destination))
-	{
-		const auto& [interface_id, interface_name] = *directly_connected;
-
-		request_interface.emplace_back(ipv4_address_t(), ///< default
-		                               interface_id,
-		                               3, ///< @todo: DEFINE
-		                               interface_name,
-		                               0,
-		                               0,
-		                               1,
-		                               ipv4_address_t()); ///< default
-	}
-	else if (const auto virtual_port_id = std::get_if<uint32_t>(&destination))
-	{
-		controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
-			tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
-			                                                      "repeat",
-			                                                      3, ///< @todo: DEFINE
-			                                                      0,
-			                                                      0,
-			                                                      1.00);
-
-			globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
-			                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
-			                                                                                          socket_id,
-			                                                                                          common::globalBase::eNexthopType::repeat,
-			                                                                                          {})); ///< @todo: VIRTUAL_PORT
-		});
-
 		return;
 	}
-	else if (std::get_if<route::tunnel_destination_default_t>(&destination))
-	{
-		if (fallback.is_ipv4())
-		{
-			for (const auto& default_nexthop : tunnel_defaults_v4)
-			{
-				auto interface = generation.get_interface_by_neighbor(default_nexthop);
-				if (interface)
-				{
-					const auto& [interface_id, interface_name] = **interface;
-
-					request_interface.emplace_back(default_nexthop,
-					                               interface_id,
-					                               3, ///< @todo: DEFINE
-					                               interface_name,
-					                               0,
-					                               0,
-					                               1,
-					                               default_nexthop);
-				}
-			}
-		}
-		else
-		{
-			for (const auto& default_nexthop : tunnel_defaults_v6)
-			{
-				auto interface = generation.get_interface_by_neighbor(default_nexthop);
-				if (interface)
-				{
-					const auto& [interface_id, interface_name] = **interface;
-
-					request_interface.emplace_back(default_nexthop,
-					                               interface_id,
-					                               3, ///< @todo: DEFINE
-					                               interface_name,
-					                               0,
-					                               0,
-					                               1,
-					                               default_nexthop);
-				}
-			}
-		}
-	}
-
-	if (request_interface.size() > YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE)
-	{
-		/// @todo: stats
-
-		request_interface.resize(YANET_CONFIG_ROUTE_TUNNEL_ECMP_SIZE);
-	}
+	std::vector<route::tunnel_value_interface_t> request_interface =
+	        MakeTunnelValueRequestInterface(globalbase, generation, value_id, value_key);
 
 	if (request_interface.empty())
 	{
-		controlPlane->forEachSocket([this, &value_id, &globalbase](const tSocketId& socket_id) {
-			tunnel_value_lookup[value_id][socket_id].emplace_back(ip_address_t(),
-			                                                      "linux",
-			                                                      3, ///< @todo: DEFINE
-			                                                      0,
-			                                                      0,
-			                                                      1.00);
-
-			globalbase.emplace_back(common::idp::updateGlobalBase::requestType::route_tunnel_value_update,
-			                        common::idp::updateGlobalBase::route_tunnel_value_update::request(value_id,
-			                                                                                          socket_id,
-			                                                                                          common::globalBase::eNexthopType::controlPlane,
-			                                                                                          {}));
-		});
-
+		AddRequestForEachSocket(globalbase, value_id, common::globalBase::eNexthopType::controlPlane);
 		return;
 	}
 
-	generation.for_each_socket([this, &value_id, &request_interface, &fallback = fallback, &globalbase](const tSocketId& socket_id, const std::set<tInterfaceId>& interfaces) {
+	tunnel_value_lookup[value_id].clear();
+
+	generation.for_each_socket([this,
+	                            &value_id,
+	                            &request_interface,
+	                            &fallback = std::get<common::ip_prefix_t>(value_key),
+	                            &globalbase](
+	                                   const tSocketId& socket_id,
+	                                   const std::set<tInterfaceId>& interfaces) {
 		common::idp::updateGlobalBase::route_tunnel_value_update::interface update_interface;
 		auto& [update_weight_start, update_weight_size, update_nexthops] = update_interface;
 
 		std::vector<uint32_t> weights;
 		uint64_t weight_total = 0;
 
-		/// same numa
-		for (const auto& item : request_interface)
-		{
-			const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
-			GCC_BUG_UNUSED(egress_interface_name);
-
-			if (exist(interfaces, egress_interface_id))
+		auto collect = [&](auto filter) {
+			for (const auto& item : request_interface)
 			{
-				const auto counter_id = tunnel_counter.get_id({fallback.is_ipv4(), peer_id, nexthop, origin_as});
+				const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
 
-				uint16_t flags = 0;
-				if (neighbor_address.is_default())
+				if (filter(item))
 				{
-					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
+					const auto counter_id = tunnel_counter.get_id({fallback.is_ipv4(), peer_id, nexthop, origin_as});
+
+					uint16_t flags = 0;
+					if (neighbor_address.is_default())
+					{
+						flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
+					}
+
+					update_nexthops.emplace_back(egress_interface_id, counter_id, label, nexthop, neighbor_address, flags);
+					weights.emplace_back(weight);
+
+					tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
+					                                                      egress_interface_name,
+					                                                      label,
+					                                                      peer_id,
+					                                                      origin_as,
+					                                                      weight);
+
+					weight_total += weight;
 				}
-
-				update_nexthops.emplace_back(egress_interface_id, counter_id, label, nexthop, neighbor_address, flags);
-				weights.emplace_back(weight);
-
-				tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
-				                                                      egress_interface_name,
-				                                                      label,
-				                                                      peer_id,
-				                                                      origin_as,
-				                                                      weight);
-
-				weight_total += weight;
 			}
-		}
+		};
+
+		// same numa
+		collect([&](const route::tunnel_value_interface_t& e) {
+			return exist(interfaces, std::get<1>(e));
+		});
 
 		/// all numa
 		if (update_nexthops.empty())
 		{
-			for (const auto& item : request_interface)
-			{
-				const auto& [nexthop, egress_interface_id, label, egress_interface_name, peer_id, origin_as, weight, neighbor_address] = item;
-				GCC_BUG_UNUSED(egress_interface_name);
-
-				const auto counter_id = tunnel_counter.get_id({fallback.is_ipv4(), peer_id, nexthop, origin_as});
-
-				uint16_t flags = 0;
-				if (neighbor_address.is_default())
-				{
-					flags |= YANET_NEXTHOP_FLAG_DIRECTLY;
-				}
-
-				update_nexthops.emplace_back(egress_interface_id, counter_id, label, nexthop, neighbor_address, flags);
-				weights.emplace_back(weight);
-
-				tunnel_value_lookup[value_id][socket_id].emplace_back(nexthop,
-				                                                      egress_interface_name,
-				                                                      label,
-				                                                      peer_id,
-				                                                      origin_as,
-				                                                      weight);
-
-				weight_total += weight;
-			}
+			collect([](const route::tunnel_value_interface_t&) {
+				return true;
+			});
 		}
 
-		const auto& [weight_start, weight_size, weight_is_fallback] = tunnel_weights.insert(weights);
-		update_weight_start = weight_start;
-		update_weight_size = weight_size;
+		const auto& [weight, weight_is_fallback] = tunnel_weights.insert(weights);
+		update_weight_start = weight.start;
+		update_weight_size = weight.size;
 
 		if (weight_is_fallback)
 		{
-			tunnel_value_lookup[value_id][socket_id].resize(weight_size);
-			weight_total = weight_size;
+			tunnel_value_lookup[value_id][socket_id].resize(weight.size);
+			weight_total = weight.size;
 		}
 
 		for (auto& [nexthop, egress_interface_name, label, peer_id, origin_as, weight_percent] : tunnel_value_lookup[value_id][socket_id])
 		{
-			GCC_BUG_UNUSED(socket_id);
 			GCC_BUG_UNUSED(nexthop);
 			GCC_BUG_UNUSED(egress_interface_name);
 			GCC_BUG_UNUSED(label);
