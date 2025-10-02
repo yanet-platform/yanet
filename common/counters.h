@@ -102,6 +102,7 @@ enum class service_counter : tCounterId
 	connection_limiter_remove,
 	connection_limiter_overflow,
 	rate_limiter_overflow,
+	reuse_old_rst_connection,
 	size
 };
 
@@ -187,6 +188,8 @@ inline const char* service_counter_toString(service_counter counter)
 			return "connection_limiter_overflow";
 		case service_counter::rate_limiter_overflow:
 			return "rate_limiter_overflow";
+		case service_counter::reuse_old_rst_connection:
+			return "reuse_old_rst_connection";
 		case service_counter::size:
 			return "unknown";
 	}

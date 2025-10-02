@@ -216,6 +216,12 @@ struct ConnectionData {
         memset(connection, 0, sizeof(ConnectionInfo));
         bucket->num_allocated++;
     }
+
+    void Reuse(uint64_t time)
+    {
+        bucket->last_times[idx] = time;
+        memset(connection, 0, sizeof(ConnectionInfo));
+    }
     
     void Unlock()
     {

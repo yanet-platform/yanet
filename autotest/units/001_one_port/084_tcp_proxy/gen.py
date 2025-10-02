@@ -342,7 +342,6 @@ data_type10_1 = [
 	),
     (
 		test_001.FromServer((1 + len(data_server1), 1 + len(data_client1) + len(data_client2)), 'R'),
-		test_001.ToClient((1 + len(data_server1), 1 + len(data_client1) + len(data_client2)), 'R')
 	),
 ]
 

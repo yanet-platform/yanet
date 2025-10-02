@@ -1220,6 +1220,105 @@ uint32_t CheckSynCookie(const proxy_service_t& service, rte_ipv4_hdr* ipv4_heade
     return cookie_data;
 }
 
+bool CheckSynCookie(rte_mbuf* mbuf,
+                    dataplane::proxy::WorkerInfo& worker_info,
+                    dataplane::proxy::proxy_service_t& service,
+                    dataplane::metadata* metadata,
+                    rte_ipv4_hdr*& ipv4_header,
+                    rte_tcp_hdr*& tcp_header,
+                    ServiceConnectionData& service_connection_data,
+                    uint32_t flags,
+                    bool reuse_connection)
+{
+	// try check cookie
+	// todo - check time overflow
+	uint32_t cookie_data = CheckSynCookie(service, ipv4_header, tcp_header);
+	if (cookie_data == 0)
+	{
+		DebugPacket("!CheckSynCookie", service_id, ipv4_header, tcp_header);
+
+		worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
+		return false;
+	}
+	else if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
+	{
+		worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::success_check_syn_cookie]++;
+		worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
+        if (service.rate_limit_table.Mode() == common::proxy::limit_mode::on)
+        {
+		    return false;
+        }
+	}
+
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::success_check_syn_cookie]++;
+
+    uint64_t local;
+    if (reuse_connection)
+    {
+        local = service_connection_data.connection->local;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::reuse_old_rst_connection]++;
+        service_connection_data.Reuse(worker_info.current_time_ms);
+    }
+    else
+    {
+        // get from local
+        local = service.tables.local_pool.Allocate(worker_info.worker_id, ipv4_header->src_addr, tcp_header->src_port);
+        if (local == 0)
+        {
+            DebugPacket("!local_pool.Allocate", service_id, ipv4_header, tcp_header);
+
+            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
+            return false;
+        }
+        service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, worker_info.current_time_ms);
+    }
+
+    TcpOptions tcp_options;
+    memset(&tcp_options, 0, sizeof(tcp_options));
+    if (!tcp_options.Read(tcp_header))
+    {
+	    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
+	    // DebugFullHeader(mbuf, "ActionClientOnAck 3");
+    }
+
+    // Add to connections
+    LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
+    service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
+    service_connection_data.connection->proxy_start_seq = rte_be_to_cpu_32(tcp_header->recv_ack) - 1;
+    service_connection_data.connection->client_start_seq = sub_cpu_32(tcp_header->sent_seq, 1);
+    service_connection_data.connection->timestamp_proxy_first = tcp_options.timestamp_echo;
+    service_connection_data.connection->timestamp_client_last = tcp_options.timestamp_value;
+    service_connection_data.connection->cookie_data = cookie_data;
+
+    tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, 1 + (service.config.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
+
+    TcpOptions cookie_options = SynCookies::UnpackData(cookie_data);
+    if (tcp_options.timestamp_value != 0 && service.config.tcp_options.timestamps)
+    {
+	    cookie_options.timestamp_value = tcp_options.timestamp_value;
+    }
+    else
+    {
+	    cookie_options.timestamp_value = 0;
+	    flags |= Connection::flag_no_timestamps;
+    }
+    service_connection_data.connection->flags = Connection::flag_from_synkookie | flags;
+    service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
+    if (metadata->flow.data.proxy_service.whitelist)
+    {
+	    service_connection_data.connection->SetFlag(Connection::flag_whitelist);
+    }
+
+    cookie_options.Write(mbuf, &ipv4_header, &tcp_header);
+    ipv4_header->time_to_live = 64;
+    tcp_header->recv_ack = 0;
+    tcp_header->tcp_flags = TCP_SYN_FLAG;
+
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
+
+	return true;
+}
+
 bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
@@ -1258,92 +1357,99 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
             DebugPacket("\tservice.FindAndLock=Found", service_id, ipv4_header, tcp_header);
             RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::AckFound, tcp_header->src_port, service_connection_data.connection->local));
 
-            // check non-empty tcp-data packet
-            if (NonEmptyTcpData(ipv4_header, tcp_header))
+            if ((service_connection_data.connection->service_flags & TCP_RST_FLAG) != 0)
             {
-                service_connection_data.connection->flags |= Connection::flag_nonempty_ack_from_client;
-            }
-            service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
-
-            if (tcp_header->sent_seq == service_connection_data.connection->client_start_seq)
-            {
-                // todo - add check + only syn-cookie
-                if (service.config.EnabledFlag(dataplane::proxy::proxy_service_config_t::flag_ignore_size_update_detections))
-                {
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::ignored_size_update_detections]++;
-                    action = false;
-                }
-                else
-                {
-                    TcpOptions tcp_options;
-                    memset(&tcp_options, 0, sizeof(tcp_options));
-                    if (!tcp_options.Read(tcp_header)) {
-                        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
-                        // DebugFullHeader(mbuf, "ActionClientOnAck 1");
-                    }
-
-                    LocalPool::UnpackTupleSrc(service_connection_data.connection->local, ipv4_header, tcp_header);
-                    tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, (service.config.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
-
-                    // todo - need save options in ServiceConnections !!!
-                    tcp_options.mss = 1300;
-                    tcp_options.sack_permitted = true;
-                    tcp_options.window_scaling = 5;
-                    tcp_options.timestamp_echo = 0;
-
-                    tcp_options.Write(mbuf, &ipv4_header, &tcp_header);
-                    ipv4_header->time_to_live = 64;
-                    tcp_header->recv_ack = 0;
-                    tcp_header->tcp_flags = TCP_SYN_FLAG;
-		        }
+                action = CheckSynCookie(mbuf, worker_info, service, metadata, ipv4_header, tcp_header, service_connection_data, 0, true);
             }
             else
             {
-                uint32_t src_addr = ipv4_header->src_addr;
-                uint16_t src_port = tcp_header->src_port;
-                LocalPool::UnpackTupleSrc(service_connection_data.connection->local, ipv4_header, tcp_header);
+                // check non-empty tcp-data packet
+                if (NonEmptyTcpData(ipv4_header, tcp_header))
+                {
+                    service_connection_data.connection->flags |= Connection::flag_nonempty_ack_from_client;
+                }
+                service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
 
-                bool is_first_ack = (tcp_header->sent_seq == add_cpu_32(service_connection_data.connection->client_start_seq, 1)); // todo - check time
-                
-                TcpOptions tcp_options;
-                memset(&tcp_options, 0, sizeof(tcp_options));
-                if (!tcp_options.ReadOnlyTimestampsAndSack(tcp_header)) {
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
-                    // DebugFullHeader(mbuf, "ActionClientOnAck 2");
-                }
-                // YANET_LOG_WARNING("\t\t!!!! ReadOnlyTimestampsAndSack, timestamp=(%u, %u), sack_count=%d\n", tcp_options.timestamp_value, tcp_options.timestamp_echo, tcp_options.sack_count);
-                
-                // work with SACK
-                if ((service_connection_data.connection->flags & Connection::flag_clear_sack) != 0)
+                if (tcp_header->sent_seq == service_connection_data.connection->client_start_seq)
                 {
-                    tcp_options.sack_count = 0;
-                }
-                for (uint32_t index = 0; index < tcp_options.sack_count; index++)
-                {
-                    tcp_options.sack_start[index] -= service_connection_data.connection->shift_server;
-                    tcp_options.sack_finish[index] -= service_connection_data.connection->shift_server;
-                }
+                    // todo - add check + only syn-cookie
+                    if (service.config.EnabledFlag(dataplane::proxy::proxy_service_config_t::flag_ignore_size_update_detections))
+                    {
+                        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::ignored_size_update_detections]++;
+                        action = false;
+                    }
+                    else
+                    {
+                        TcpOptions tcp_options;
+                        memset(&tcp_options, 0, sizeof(tcp_options));
+                        if (!tcp_options.Read(tcp_header)) {
+                            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
+                            // DebugFullHeader(mbuf, "ActionClientOnAck 1");
+                        }
 
-                // work with timestamps
-                service_connection_data.connection->timestamp_client_last = tcp_options.timestamp_value;
-                if ((tcp_options.timestamp_value == 0) || 
-                    ((service_connection_data.connection->flags & (Connection::flag_no_timestamps | Connection::flag_timestamp_fail)) != 0))
-                {
-                    tcp_options.timestamp_value = 0;
-                    tcp_options.timestamp_echo = 0;
+                        LocalPool::UnpackTupleSrc(service_connection_data.connection->local, ipv4_header, tcp_header);
+                        tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, (service.config.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
+
+                        // todo - need save options in ServiceConnections !!!
+                        tcp_options.mss = 1300;
+                        tcp_options.sack_permitted = true;
+                        tcp_options.window_scaling = 5;
+                        tcp_options.timestamp_echo = 0;
+
+                        tcp_options.Write(mbuf, &ipv4_header, &tcp_header);
+                        ipv4_header->time_to_live = 64;
+                        tcp_header->recv_ack = 0;
+                        tcp_header->tcp_flags = TCP_SYN_FLAG;
+                    }
                 }
                 else
                 {
-                    tcp_options.timestamp_echo -= service_connection_data.connection->timestamp_shift;
-                }                    
-                tcp_options.Write(mbuf, &ipv4_header, &tcp_header);
-                
+                    uint32_t src_addr = ipv4_header->src_addr;
+                    uint16_t src_port = tcp_header->src_port;
+                    LocalPool::UnpackTupleSrc(service_connection_data.connection->local, ipv4_header, tcp_header);
 
-                tcp_header->recv_ack = sub_cpu_32(tcp_header->recv_ack, service_connection_data.connection->shift_server);
-                if (is_first_ack && service.config.send_proxy_header)
-                {
-                    tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, sizeof(proxy_v2_ipv4_hdr));
-                    size_proxy_header = AddProxyHeader(service, mbuf, metadata, &ipv4_header, &tcp_header, src_addr, src_port);
+                    bool is_first_ack = (tcp_header->sent_seq == add_cpu_32(service_connection_data.connection->client_start_seq, 1)); // todo - check time
+                    
+                    TcpOptions tcp_options;
+                    memset(&tcp_options, 0, sizeof(tcp_options));
+                    if (!tcp_options.ReadOnlyTimestampsAndSack(tcp_header)) {
+                        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
+                        // DebugFullHeader(mbuf, "ActionClientOnAck 2");
+                    }
+                    // YANET_LOG_WARNING("\t\t!!!! ReadOnlyTimestampsAndSack, timestamp=(%u, %u), sack_count=%d\n", tcp_options.timestamp_value, tcp_options.timestamp_echo, tcp_options.sack_count);
+                    
+                    // work with SACK
+                    if ((service_connection_data.connection->flags & Connection::flag_clear_sack) != 0)
+                    {
+                        tcp_options.sack_count = 0;
+                    }
+                    for (uint32_t index = 0; index < tcp_options.sack_count; index++)
+                    {
+                        tcp_options.sack_start[index] -= service_connection_data.connection->shift_server;
+                        tcp_options.sack_finish[index] -= service_connection_data.connection->shift_server;
+                    }
+
+                    // work with timestamps
+                    service_connection_data.connection->timestamp_client_last = tcp_options.timestamp_value;
+                    if ((tcp_options.timestamp_value == 0) || 
+                        ((service_connection_data.connection->flags & (Connection::flag_no_timestamps | Connection::flag_timestamp_fail)) != 0))
+                    {
+                        tcp_options.timestamp_value = 0;
+                        tcp_options.timestamp_echo = 0;
+                    }
+                    else
+                    {
+                        tcp_options.timestamp_echo -= service_connection_data.connection->timestamp_shift;
+                    }                    
+                    tcp_options.Write(mbuf, &ipv4_header, &tcp_header);
+                    
+
+                    tcp_header->recv_ack = sub_cpu_32(tcp_header->recv_ack, service_connection_data.connection->shift_server);
+                    if (is_first_ack && service.config.send_proxy_header)
+                    {
+                        tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, sizeof(proxy_v2_ipv4_hdr));
+                        size_proxy_header = AddProxyHeader(service, mbuf, metadata, &ipv4_header, &tcp_header, src_addr, src_port);
+                    }
                 }
             }
 
@@ -1418,86 +1524,7 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
             else
             {
                 syn_connection_data.Unlock();
-
-                // try check cookie
-                // todo - check time overflow
-                uint32_t cookie_data = CheckSynCookie(service, ipv4_header, tcp_header);
-                if (cookie_data == 0)
-                {
-                    DebugPacket("!CheckSynCookie", service_id, ipv4_header, tcp_header);
-                    RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::AckBadCookie, tcp_header->src_port, 0));
-
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
-                    action = false;
-                }
-                else if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
-                {
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::success_check_syn_cookie]++;
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
-                    if (service.rate_limit_table.Mode() == common::proxy::limit_mode::on) action = false;
-                }
-                else
-                {
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::success_check_syn_cookie]++;
-
-                    // get from local
-                    uint64_t local = service.tables.local_pool.Allocate(worker_info.worker_id, ipv4_header->src_addr, tcp_header->src_port);
-                    if (local == 0)
-                    {
-                        DebugPacket("!local_pool.Allocate", service_id, ipv4_header, tcp_header);
-                        RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::AckErrLocal, tcp_header->src_port, 0));
-
-                        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
-                        action = false;
-                    }
-                    else
-                    {
-                        RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::AckFromCookie, tcp_header->src_port, local));
-                        TcpOptions tcp_options;
-                        memset(&tcp_options, 0, sizeof(tcp_options));
-                        if (!tcp_options.Read(tcp_header))
-                        {
-                            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
-                            // DebugFullHeader(mbuf, "ActionClientOnAck 3");
-                        }
-
-                        // Add to connections
-                        service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, worker_info.current_time_ms);
-                        LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
-                        service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
-                        service_connection_data.connection->proxy_start_seq = rte_be_to_cpu_32(tcp_header->recv_ack) - 1;
-                        service_connection_data.connection->client_start_seq = sub_cpu_32(tcp_header->sent_seq, 1);
-                        service_connection_data.connection->timestamp_proxy_first = tcp_options.timestamp_echo;
-                        service_connection_data.connection->timestamp_client_last = tcp_options.timestamp_value;
-                        service_connection_data.connection->cookie_data = cookie_data;
-                        
-                        tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, 1 + (service.config.send_proxy_header ? sizeof(proxy_v2_ipv4_hdr) : 0));
-
-                        TcpOptions cookie_options = SynCookies::UnpackData(cookie_data);
-                        if (tcp_options.timestamp_value != 0 && service.config.tcp_options.timestamps)
-                        {
-                            cookie_options.timestamp_value = tcp_options.timestamp_value;
-                        }
-                        else
-                        {
-                            cookie_options.timestamp_value = 0;
-                            flags |= Connection::flag_no_timestamps;
-                        }
-                        service_connection_data.connection->flags = Connection::flag_from_synkookie | flags;
-                        service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
-                        if (metadata->flow.data.proxy_service.whitelist)
-                        {
-                            service_connection_data.connection->SetFlag(Connection::flag_whitelist);
-                        }
-
-                        cookie_options.Write(mbuf, &ipv4_header, &tcp_header);
-                        ipv4_header->time_to_live = 64;
-                        tcp_header->recv_ack = 0;
-                        tcp_header->tcp_flags = TCP_SYN_FLAG;
-
-                        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
-                    }
-                }
+                action = CheckSynCookie(mbuf, worker_info, service, metadata, ipv4_header, tcp_header, service_connection_data, flags, false);
             }
             
             break;
@@ -1534,11 +1561,6 @@ bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_
     DebugPacket("proxy_server_syn_ack", service_id, ipv4_header, tcp_header);
     RINGLOG_CONDITION(worker_info.globalBase->ringlog_enabled);
     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::service_syn_ack_count]++;
-
-    if (tcp_header->tcp_flags & TCP_RST_FLAG)
-    {
-        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rst_service]++;
-    }
 
     uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
@@ -1699,11 +1721,6 @@ bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_inf
     DebugPacket("proxy_server_ack", service_id, ipv4_header, tcp_header);
     RINGLOG_CONDITION(worker_info.globalBase->ringlog_enabled);
 
-    if (tcp_header->tcp_flags & TCP_RST_FLAG)
-    {
-        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rst_service]++;
-    }
-
     uint64_t client_info = service.tables.local_pool.FindClientByLocal(ipv4_header->dst_addr, tcp_header->dst_port);
     if (client_info == 0)
     {
@@ -1732,6 +1749,15 @@ bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_inf
     }
 
     service_connection_data.connection->service_flags |= tcp_header->tcp_flags;
+
+    if (tcp_header->tcp_flags & TCP_RST_FLAG)
+    {
+        service_connection_data.Unlock();
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rst_service]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_packets]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_service_bytes] += mbuf->pkt_len;
+        return false;
+    }
 
     RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SrvAckOk, client_port, tcp_header->dst_port));
     if (service_connection_data.connection->CreatedFromSynCookie())
