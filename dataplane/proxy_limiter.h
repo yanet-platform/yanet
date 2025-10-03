@@ -12,6 +12,13 @@
 namespace dataplane::proxy
 {
 
+enum class RateLimitResult : uint32_t
+{
+    Drop,
+    Pass,
+    Overflow
+};
+
 struct RateLimitBucket
 {
     static constexpr uint32_t bucket_size = 16;
@@ -21,15 +28,15 @@ struct RateLimitBucket
         rte_spinlock_init(&spinlock);
     }
 
-    bool Check(uint32_t i, uint64_t current_time_ms, uint32_t rate, uint32_t cost, uint32_t capacity)
+    RateLimitResult Check(uint32_t i, uint64_t current_time_ms, uint32_t rate, uint32_t cost, uint32_t capacity)
     {
         uint32_t elapsed = current_time_ms - last_times[i];
         tokens[i] = std::min(capacity, tokens[i] + (elapsed * rate));
         last_times[i] = current_time_ms;
-        return tokens[i] >= cost;
+        return tokens[i] >= cost ? RateLimitResult::Pass : RateLimitResult::Drop;
     }
 
-    bool Consume(uint32_t i, uint64_t current_time_ms, uint32_t rate, uint32_t cost, uint32_t capacity)
+    RateLimitResult Consume(uint32_t i, uint64_t current_time_ms, uint32_t rate, uint32_t cost, uint32_t capacity)
     {
         uint32_t elapsed = current_time_ms - last_times[i];
         tokens[i] = std::min(capacity, tokens[i] + (elapsed * rate));
@@ -38,9 +45,9 @@ struct RateLimitBucket
         if (tokens[i] >= cost)
         {
             tokens[i] -= cost;
-            return true;
+            return RateLimitResult::Pass;
         }
-        return false;
+        return RateLimitResult::Drop;
     }
 
     void Clear(uint32_t idx)
@@ -170,9 +177,9 @@ public:
         capacity_ = std::max(burst_capacity * cost_, cost_);
     }
 
-    bool Check(uint32_t addr, uint64_t current_time_ms)
+    RateLimitResult Check(uint32_t addr, uint64_t current_time_ms)
     {
-        if (mode_ == common::proxy::limit_mode::off) return true;
+        if (mode_ == common::proxy::limit_mode::off) return RateLimitResult::Pass;
 
         uint64_t key = Hash(addr);
         RateLimitBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
@@ -184,12 +191,12 @@ public:
             }
         }
 
-        return true;
+        return RateLimitResult::Pass;
     }
 
-    bool CheckAndConsume(uint32_t addr, uint64_t current_time_ms)
+    RateLimitResult CheckAndConsume(uint32_t addr, uint64_t current_time_ms)
     {
-        if (mode_ == common::proxy::limit_mode::off) return true;
+        if (mode_ == common::proxy::limit_mode::off) return RateLimitResult::Pass;
 
         uint64_t key = Hash(addr);
         RateLimitBucket* bucket = &buckets_[key & (number_buckets_ - 1)];
@@ -199,7 +206,7 @@ public:
         {
             if (bucket->addresses[i] == addr)
             {
-                bool result = bucket->Consume(i, current_time_ms, rate_, cost_, capacity_);
+                RateLimitResult result = bucket->Consume(i, current_time_ms, rate_, cost_, capacity_);
                 bucket->Unlock();
                 return result;
             }
@@ -215,10 +222,10 @@ public:
             bucket->tokens[free_idx] = capacity_ - (cost_ * rate_);
             bucket->last_times[free_idx] = current_time_ms;
             bucket->Unlock();
-            return true;
+            return RateLimitResult::Pass;
         }
         bucket->Unlock();
-        return false;
+        return RateLimitResult::Overflow;
     }
 
     inline uint32_t Hash(uint32_t addr)

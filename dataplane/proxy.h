@@ -177,6 +177,15 @@ struct ConnectionStoreOnSocket
     rte_ring* ring_retransmit_send;
 };
 
+struct WorkerGCInfo
+{
+    dataplane::memory_manager* memory_manager;
+    tSocketId socket_id;
+    uint64_t* counters;
+    proxy_service_id_t start_proxy_retransmit_service;
+    uint64_t current_time_ms;
+};
+
 class TcpConnectionStore
 {
 public:
@@ -184,7 +193,7 @@ public:
     eResult ServiceUpdateOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager);
     void ServiceRemoveOnSocket(dataplane::proxy::proxy_service_t& service, bool first_state_update_global_base, dataplane::memory_manager* memory_manager);
     void ClearAllServices(dataplane::memory_manager* memory_manager);
-    void CollectGarbage(tSocketId socket_id, uint64_t current_time_ms, dataplane::memory_manager* memory_manager, proxy_service_id_t& start_proxy_retransmit_service);
+    void CollectGarbage(dataplane::proxy::WorkerGCInfo& worker_gc_info);
     utils::StaticVector<std::pair<rte_ring*, rte_ring*>, 8> GetRetransmitRings();
 
     // Info

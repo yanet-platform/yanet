@@ -1213,5 +1213,12 @@ void worker_gc_t::balancer_state_clear()
 void worker_gc_t::handle_proxy_gc()
 {
 	const auto& base = bases[local_base_id & 1];
-	tcp_connection_store_->CollectGarbage(socket_id, current_time_ms, &base.globalBase->dataPlane->memory_manager, start_proxy_retransmit_service_);
+	dataplane::proxy::WorkerGCInfo worker_gc_info{
+		.memory_manager = &base.globalBase->dataPlane->memory_manager,
+		.socket_id = socket_id,
+		.counters = counters,
+		.start_proxy_retransmit_service = start_proxy_retransmit_service_,
+		.current_time_ms = current_time_ms
+	};
+	tcp_connection_store_->CollectGarbage(worker_gc_info);
 }

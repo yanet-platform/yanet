@@ -573,13 +573,13 @@ void TcpConnectionStore::ClearAllServices(dataplane::memory_manager* memory_mana
     }
 }
 
-void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_time_ms, dataplane::memory_manager* memory_manager, proxy_service_id_t& start_proxy_retransmit_service)
+void TcpConnectionStore::CollectGarbage(dataplane::proxy::WorkerGCInfo& worker_gc_info)
 {
     // YANET_LOG_WARNING("TcpConnectionStore::CollectGarbage: current_time=%d\n", current_time);
-    auto iter_data_on_socket = data_on_sockets_.find(socket_id);
+    auto iter_data_on_socket = data_on_sockets_.find(worker_gc_info.socket_id);
 	if (iter_data_on_socket == data_on_sockets_.end())
 	{
-		YADECAP_LOG_ERROR("not found proxy service config for socketId: '%u' in CollectGarbage\n", socket_id);
+		YADECAP_LOG_ERROR("not found proxy service config for socketId: '%u' in CollectGarbage\n", worker_gc_info.socket_id);
 		return;
 	}
     ConnectionStoreOnSocket& data_on_socket = iter_data_on_socket->second;
@@ -593,7 +593,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
         {
             {
                 // Clear in table Connections
-                uint64_t time_to_clear = current_time_ms - service.config.timeouts.established;
+                uint64_t time_to_clear = worker_gc_info.current_time_ms - service.config.timeouts.established;
                 auto condition = [time_to_clear] (uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
                     return (last_time < time_to_clear) || ((connection.service_flags & TCP_RST_FLAG) != 0);
                 };
@@ -608,7 +608,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
 
             {
                 // Clear in table SynConnections
-                uint64_t time_to_clear = current_time_ms - service.config.timeouts.syn_recv;
+                uint64_t time_to_clear = worker_gc_info.current_time_ms - service.config.timeouts.syn_recv;
                 auto condition = [time_to_clear] (uint32_t address, tPortId port, uint64_t last_time, const SynConnection& connection) {
                     return last_time < time_to_clear;
                 };
@@ -624,7 +624,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
             if (service.tables_work.rate_limit.Mode() != common::proxy::limit_mode::off)
             {
                 // Work RateLimit
-                uint64_t time_to_clear = current_time_ms - RateLimitTable::timeout_ms;
+                uint64_t time_to_clear = worker_gc_info.current_time_ms - RateLimitTable::timeout_ms;
                 auto condition = [time_to_clear] (uint32_t address, uint64_t last_time) {
                     return last_time < time_to_clear;
                 };
@@ -648,8 +648,11 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                         continue;
                     }
     
-                    if (*iter.value() < current_time_ms)
+                    if (*iter.value() < worker_gc_info.current_time_ms)
+                    {
                         iter.unset_valid();
+                        worker_gc_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::connection_limiter_remove]++;
+                    }
     
                     iter.unlock();
                 }
@@ -657,7 +660,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
 
             constexpr static uint32_t whitelist_bit = 1u << 31;
             std::string name = "tcp_proxy.gc.count_connections." + std::to_string(service.config.service_id) + ".socket." + std::to_string(service.config.socket_id);
-            if(service.connection_counter.Init(memory_manager, name, socket_id, service.config.size_connections_table))
+            if(service.connection_counter.Init(worker_gc_info.memory_manager, name, worker_gc_info.socket_id, service.config.size_connections_table))
             {
                 auto count_connections = [&service](uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
                     uint32_t init_value = whitelist_bit * connection.FlagEnabled(Connection::flag_whitelist) + 1;
@@ -667,13 +670,16 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
     
                 std::array<uint32_t, common::proxy::conn_count_tresholds.size() + 1> counts{};
                 uint32_t max_count{};
-                service.connection_counter.ForEach([&service, &max_count, &counts, current_time_ms](uint32_t address, uint32_t count) {
+                service.connection_counter.ForEach([&service, &max_count, &counts, &worker_gc_info](uint32_t address, uint32_t count) {
                     if (count & whitelist_bit) return;
                     count = count & ~whitelist_bit;
                     if (service.tables_work.connection_limit.Mode() != common::proxy::limit_mode::off
                         && count >= service.config.connection_limit.limit)
                     {
-                        service.tables_work.connection_limit.Add(address, current_time_ms);
+                        if(service.tables_work.connection_limit.Add(address, worker_gc_info.current_time_ms))
+                            worker_gc_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::connection_limiter_new]++;
+                        else
+                            worker_gc_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::connection_limiter_overflow]++;
                     }
     
                     if (max_count < count) max_count = count;
@@ -688,14 +694,14 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                     if (count >= common::proxy::conn_count_tresholds[common::proxy::conn_count_tresholds.size()-1])
                         counts[common::proxy::conn_count_tresholds.size()]++;
                 });
-                service.tables_work.connection_limit.AddConnCountStats(counts, max_count, current_time_ms);
+                service.tables_work.connection_limit.AddConnCountStats(counts, max_count, worker_gc_info.current_time_ms);
                 service.connection_counter.Clear();
             }
 
-            if (!was_overflow_ring_retransmit && index >= start_proxy_retransmit_service)
+            if (!was_overflow_ring_retransmit && index >= worker_gc_info.start_proxy_retransmit_service)
             {
                 // Check retransmits
-                uint64_t time_to_retransmit = current_time_ms - service.config.timeouts.syn_rto;
+                uint64_t time_to_retransmit = worker_gc_info.current_time_ms - service.config.timeouts.syn_rto;
                 auto condition = [time_to_retransmit, was_overflow_ring_retransmit] (uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
                     return !was_overflow_ring_retransmit && (last_time < time_to_retransmit) && connection.NeedRetransmit();
                 };
@@ -742,7 +748,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
                 service.tables_work.service_connections.ProcessAllConnectionsWithLocking(condition, action);
                 if (was_overflow_ring_retransmit)
                 {
-                    start_proxy_retransmit_service = index;
+                    worker_gc_info.start_proxy_retransmit_service = index;
                 }
             }
 
@@ -752,7 +758,7 @@ void TcpConnectionStore::CollectGarbage(tSocketId socket_id, uint64_t current_ti
 
     if (!was_overflow_ring_retransmit)
     {
-        start_proxy_retransmit_service = 0;
+        worker_gc_info.start_proxy_retransmit_service = 0;
     }
 }
 
@@ -1086,7 +1092,8 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_bytes] += mbuf->pkt_len;
         if (service.connection_limit_table.Mode() == common::proxy::limit_mode::on) return false;
     }
-    if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.Check(ipv4_header->src_addr, worker_info.current_time_ms))
+    if (!metadata->flow.data.proxy_service.whitelist
+        && service.rate_limit_table.Check(ipv4_header->src_addr, worker_info.current_time_ms) != RateLimitResult::Pass)
     {
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
         worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_client_packets]++;
@@ -1240,17 +1247,20 @@ bool CheckSynCookie(rte_mbuf* mbuf,
 		worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
 		return false;
 	}
-	else if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
-	{
-		worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::success_check_syn_cookie]++;
-		worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
-        if (service.rate_limit_table.Mode() == common::proxy::limit_mode::on)
-        {
-		    return false;
-        }
-	}
 
     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::success_check_syn_cookie]++;
+
+    RateLimitResult result = RateLimitResult::Pass;
+    if (!metadata->flow.data.proxy_service.whitelist)
+        result = service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms);
+    if (result != RateLimitResult::Pass)
+    {
+        if (result == RateLimitResult::Overflow)
+            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rate_limiter_overflow]++;
+        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
+        if (service.rate_limit_table.Mode() == common::proxy::limit_mode::on)
+            return false;
+    }
 
     uint64_t local;
     if (reuse_connection)
@@ -1486,39 +1496,50 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
                     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::ack_invalid_ack_number]++;
                     action = false;
                 }
-                else if (!metadata->flow.data.proxy_service.whitelist && !service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms))
-                {
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
-                    if (service.rate_limit_table.Mode() == common::proxy::limit_mode::on) action = false;
-                }
                 else
                 {
-                    DebugPacket("\tadd to service", service_id, ipv4_header, tcp_header);
-                    RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::AckNew, tcp_header->src_port, syn_connection_data.connection->local));
-
-                    uint32_t src_addr = ipv4_header->src_addr;
-                    uint16_t src_port = tcp_header->src_port;
-                    service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, worker_info.current_time_ms);
-                    LocalPool::UnpackTupleSrc(syn_connection_data.connection->local, ipv4_header, tcp_header);
-                    service_connection_data.connection->client_start_seq = syn_connection_data.connection->client_start_seq;
-                    syn_connection_data.bucket->Clear(syn_connection_data.idx);
-                    syn_connection_data.Unlock();
-                    
-                    service_connection_data.connection->flags = flags;
-                    service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
-                    service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
-                    if (metadata->flow.data.proxy_service.whitelist)
+                    RateLimitResult result = RateLimitResult::Pass;
+                    if (!metadata->flow.data.proxy_service.whitelist)
+                        result = service.rate_limit_table.CheckAndConsume(ipv4_header->src_addr, worker_info.current_time_ms);
+                    if (result != RateLimitResult::Pass)
                     {
-                        service_connection_data.connection->SetFlag(Connection::flag_whitelist);
+                        if (result == RateLimitResult::Overflow)
+                            worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::rate_limiter_overflow]++;
+                        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::drop_rate_limit]++;
                     }
-                    
-                    if (service.config.send_proxy_header)
+                    if (result == RateLimitResult::Pass || service.rate_limit_table.Mode() != common::proxy::limit_mode::on)
                     {
-                            tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, sizeof(proxy_v2_ipv4_hdr));
-                            size_proxy_header = AddProxyHeader(service, mbuf, metadata, &ipv4_header, &tcp_header, src_addr, src_port);
+                        DebugPacket("\tadd to service", service_id, ipv4_header, tcp_header);
+                        RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::AckNew, tcp_header->src_port, syn_connection_data.connection->local));
+    
+                        uint32_t src_addr = ipv4_header->src_addr;
+                        uint16_t src_port = tcp_header->src_port;
+                        service_connection_data.Init(ipv4_header->src_addr, tcp_header->src_port, worker_info.current_time_ms);
+                        LocalPool::UnpackTupleSrc(syn_connection_data.connection->local, ipv4_header, tcp_header);
+                        service_connection_data.connection->client_start_seq = syn_connection_data.connection->client_start_seq;
+                        syn_connection_data.bucket->Clear(syn_connection_data.idx);
+                        syn_connection_data.Unlock();
+                        
+                        service_connection_data.connection->flags = flags;
+                        service_connection_data.connection->client_flags |= tcp_header->tcp_flags;
+                        service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
+                        if (metadata->flow.data.proxy_service.whitelist)
+                        {
+                            service_connection_data.connection->SetFlag(Connection::flag_whitelist);
+                        }
+                        
+                        if (service.config.send_proxy_header)
+                        {
+                                tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, sizeof(proxy_v2_ipv4_hdr));
+                                size_proxy_header = AddProxyHeader(service, mbuf, metadata, &ipv4_header, &tcp_header, src_addr, src_port);
+                        }
+    
+                        worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
                     }
-
-                    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::new_connections]++;
+                    else
+                    {
+                        action = false;
+                    }
                 }
             }
             else
