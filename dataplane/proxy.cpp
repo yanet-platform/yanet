@@ -328,7 +328,7 @@ eResult TcpConnectionStore::ActivateSocket(tSocketId socket_id, dataplane::memor
     // check YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS is power of 2
     assert((YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS & (YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS - 1)) == 0);
 
-	store_on_socket.ring_retransmit_free = rte_ring_create("tcp_proxy.retransmits_free",
+	store_on_socket.ring_retransmit_free = rte_ring_create(("tcp_proxy.retransmits_free." + std::to_string(socket_id)).c_str(),
 	                                                       YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS,
 	                                                       socket_id,
 	                                                       RING_F_SP_ENQ | RING_F_SC_DEQ);
@@ -344,6 +344,7 @@ eResult TcpConnectionStore::ActivateSocket(tSocketId socket_id, dataplane::memor
 	        socket_id);
 	if (!data_for_retransmits)
 	{
+        YANET_LOG_ERROR("Error create tcp_proxy.data_for_retransmits\n");
 		return eResult::errorAllocatingMemory;
 	}
 	for (uint32_t index = 0; index < YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS - 1; index++)
@@ -351,7 +352,7 @@ eResult TcpConnectionStore::ActivateSocket(tSocketId socket_id, dataplane::memor
 		rte_ring_sp_enqueue(store_on_socket.ring_retransmit_free, (void*)&data_for_retransmits[index]);
 	}
 
-	store_on_socket.ring_retransmit_send = rte_ring_create("tcp_proxy.retransmits_send",
+	store_on_socket.ring_retransmit_send = rte_ring_create(("tcp_proxy.retransmits_send." + std::to_string(socket_id)).c_str(),
 	                                                       YANET_PROXY_SIZE_RTE_PROXY_RETRANSMITS,
 	                                                       socket_id,
 	                                                       RING_F_SP_ENQ | RING_F_SC_DEQ);
