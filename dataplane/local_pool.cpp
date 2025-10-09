@@ -5,27 +5,38 @@ namespace dataplane::proxy
 
 constexpr uint32_t NULL_CHUNK = 0xffffffff;
 
-bool LocalPool::Init(proxy_service_id_t service_id, const ipv4_prefix_t& prefix,
+bool LocalPool::Init(proxy_service_id_t service_id, const PrefixConfig& config,
                      dataplane::memory_manager* memory_manager, tSocketId socket_id,
-                     bool include_edge_addresses, bool rotate_addresses_first)
+                     bool rotate_addresses_first)
 {
-    if (initialized_)
+    if (initialized_) return true;
+    if (config.prefixes.size() == 0)
     {
-        return true;
-    }
-    if (prefix.mask == 0)
-    {
+        YANET_LOG_ERROR("Empty prefixes array\n");
         return false;
     }
-    prefix_ = prefix;
-    rotate_addr_first_ = rotate_addresses_first;
-
-    num_addrs_ = 1u << (32u - prefix_.mask);
-    if (!include_edge_addresses && num_addrs_ > 2) 
+    if (config.index_to_prefix == nullptr)
     {
-        num_addrs_ -= 2;
-        addr_offset_ = 1;
+        YANET_LOG_ERROR("Empty index_to_prefix array\n");
+        return false;
     }
+    if (config.prefix_first_index.size() != config.prefixes.size())
+    {
+        YANET_LOG_ERROR("Invalid prefix_first_index array\n");
+        return false;
+    }
+
+    prefixes_ = &config.prefixes;
+    index_to_prefix_ = config.index_to_prefix;
+    prefix_first_index_ = &config.prefix_first_index;
+    rotate_addr_first_ = rotate_addresses_first;
+    num_addrs_ = config.num_addresses;
+
+    // if (!include_edge_addresses && num_addrs_ > 2) 
+    // {
+    //     num_addrs_ -= 2;
+    //     addr_offset_ = 1;
+    // }
     uint32_t num_connections = num_addrs_ * num_ports;
     uint32_t num_free_chunks = max_workers * 2;
     uint32_t num_chunks = num_connections / chunk_size;
@@ -196,8 +207,8 @@ uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) c
         return 0;
     }
     uint32_t idx = tuple_to_index(PackTuple(local_addr, local_port));
-    local_addr = rte_be_to_cpu_32(local_addr);
-    local_port = rte_be_to_cpu_16(local_port);
+    // local_addr = rte_be_to_cpu_32(local_addr);
+    // local_port = rte_be_to_cpu_16(local_port);
     if (unlikely(idx > local_info_->num_chunks * chunk_size - 1))
     {
         // YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: out of range, local_addr=%s local_port=%d idx=%d num_connections_=%lu\n",
@@ -223,38 +234,73 @@ LocalPoolStat LocalPool::GetStat() const {
         return stat;
     }
 
-    stat.prefix = common::ipv4_prefix_t{prefix_.address.address, prefix_.mask};
+    for (const ipv4_prefix_t& prefix : *prefixes_)
+    {
+        stat.prefixes.emplace_back(prefix.address.address, prefix.mask);
+    }
     stat.total_addresses = local_info_->num_chunks * chunk_size;
     stat.free_addresses = local_info_->free_addresses;
     stat.used_addresses = local_info_->used_addresses;
     return stat;
 }
 
+inline uint32_t LocalPool::index_to_prefix(uint32_t index) const
+{
+    index = rotate_addr_first_ ? index % num_addrs_ : index / num_ports;
+    return index_to_prefix_[index];
+}
+
+inline uint32_t LocalPool::tuple_to_prefix(uint64_t tuple) const
+{
+    common::ipv4_address_t addr(rte_be_to_cpu_32(tuple >> 16));
+    uint32_t index = 0;
+    for (const auto& prefix : *prefixes_)
+    {
+        if (common::ipv4_prefix_t(prefix.address.address, prefix.mask).subnetFor(addr))
+            return index;
+        index++;
+    }
+    return 0;
+}
+
 inline uint64_t LocalPool::index_to_tuple(uint32_t index) const
 {
+    uint32_t prefix_idx = index_to_prefix(index);
+    ipv4_prefix_t prefix = prefixes_->at(prefix_idx);
+    uint32_t start_idx = prefix_first_index_->at(prefix_idx);
     if (rotate_addr_first_)
     {
-        return PackTuple(rte_cpu_to_be_32(prefix_.address.address + addr_offset_ + index % num_addrs_),
+        return PackTuple(rte_cpu_to_be_32(prefix.address.address + addr_offset_ + (index - start_idx) % num_addrs_),
                     rte_cpu_to_be_16(min_port + index / num_addrs_));
     }
-    return PackTuple(rte_cpu_to_be_32(prefix_.address.address + addr_offset_ + index / num_ports),
+    return PackTuple(rte_cpu_to_be_32(prefix.address.address + addr_offset_ + index / num_ports - start_idx),
                       rte_cpu_to_be_16(min_port + index % num_ports));
 }
 
 inline uint32_t LocalPool::tuple_to_index(uint64_t tuple) const
 {
+    uint32_t prefix_idx = tuple_to_prefix(tuple);
+    ipv4_prefix_t prefix = prefixes_->at(prefix_idx);
+    uint32_t start_idx = prefix_first_index_->at(prefix_idx);
     if (rotate_addr_first_)
     {
         return (rte_be_to_cpu_16((uint16_t)(tuple & 0xffff)) - min_port) * num_addrs_ + 
-               (rte_be_to_cpu_32((uint32_t)(tuple >> 16)) - prefix_.address.address - addr_offset_);
+               (rte_be_to_cpu_32((uint32_t)(tuple >> 16)) - prefix.address.address - addr_offset_ + start_idx);
     }
     return (rte_be_to_cpu_16((uint16_t)(tuple & 0xffff)) - min_port) + 
-           (rte_be_to_cpu_32((uint32_t)(tuple >> 16)) - prefix_.address.address - addr_offset_) * num_ports;
+           (rte_be_to_cpu_32((uint32_t)(tuple >> 16)) - prefix.address.address - addr_offset_ + start_idx) * num_ports;
 }
 
-bool LocalPool::NeedUpdate(const ipv4_prefix_t& prefix)
+bool LocalPool::NeedUpdate(const PrefixConfig& config)
 {
-    return (prefix_.address != prefix.address) || (prefix_.mask != prefix.mask) || !initialized_;
+    if (!initialized_ || prefixes_ == nullptr || prefixes_->size() != config.prefixes.size()) return true;
+    for (uint32_t i = 0; i < prefixes_->size(); i++)
+    {
+        ipv4_prefix_t prefix = prefixes_->at(i);
+        if (prefix.address != config.prefixes[i].address || prefix.mask != config.prefixes[i].mask)
+            return true;
+    }
+    return false;
 }
 
 void LocalPool::ClearIfNotEqual(const LocalPool& other, dataplane::memory_manager* memory_manager)
@@ -264,8 +310,6 @@ void LocalPool::ClearIfNotEqual(const LocalPool& other, dataplane::memory_manage
         Clear(memory_manager);
         ClearLinks();
     }
-
-    initialized_ = false;
 }
 
 void LocalPool::Clear(dataplane::memory_manager* memory_manager)
@@ -293,7 +337,9 @@ void LocalPool::Clear(dataplane::memory_manager* memory_manager)
 
 void LocalPool::CopyFrom(const LocalPool& other)
 {
-    prefix_ = other.prefix_;
+    prefixes_ = other.prefixes_;
+    index_to_prefix_ = other.index_to_prefix_;
+    prefix_first_index_ = other.prefix_first_index_;
     addr_offset_ = other.addr_offset_;
     rotate_addr_first_ = other.rotate_addr_first_;
     num_addrs_ = other.num_addrs_;
@@ -305,6 +351,9 @@ void LocalPool::CopyFrom(const LocalPool& other)
 
 void LocalPool::ClearLinks()
 {
+    prefixes_ = nullptr;
+    prefix_first_index_ = nullptr;
+    index_to_prefix_ = nullptr;
     chunk_queue_ = nullptr;
     local_to_client_ = nullptr;
     local_info_ = nullptr;

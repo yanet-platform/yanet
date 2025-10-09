@@ -40,7 +40,7 @@ struct proxy_service_config_t
 	uint32_t size_connections_table;
 	uint32_t size_syn_table;
 
-	ipv4_prefix_t pool_prefix;
+    LocalPool::PrefixConfig pool_config{};
 	bool send_proxy_header;
     
     controlplane::proxy::tcp_options_t tcp_options;
@@ -51,7 +51,7 @@ struct proxy_service_config_t
     controlplane::proxy::connection_limit_t connection_limit;
 
     bool EnabledFlag(uint8_t flag) const;
-    bool ReadConfig(const controlplane::proxy::service_t& service_info, tCounterId service_counter_id);
+    bool ReadConfig(const controlplane::proxy::service_t& service_info, tCounterId service_counter_id, memory_manager* memory_manager);
 
     static constexpr uint64_t flag_dont_use_bucket_optimization = (1ul << 0);
     static constexpr uint64_t flag_ignore_size_update_detections = (1ul << 1);

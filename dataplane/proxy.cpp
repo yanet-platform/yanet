@@ -383,7 +383,7 @@ utils::StaticVector<std::pair<rte_ring*, rte_ring*>, 8> TcpConnectionStore::GetR
     return rings;
 }
 
-bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& service_info, tCounterId service_counter_id)
+bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& service_info, tCounterId service_counter_id, memory_manager* memory_manager)
 {
 	service_id = service_info.service_id;
     socket_id = service_info.socket_id;
@@ -402,9 +402,8 @@ bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& se
 		YADECAP_LOG_ERROR("upstream_nets empty'\n");
 		return false;
 	}
-	pool_prefix.address = ipv4_address_t::convert(service_info.upstream_nets[0].address());
-    pool_prefix.address.address = rte_be_to_cpu_32(pool_prefix.address.address);
-    pool_prefix.mask = service_info.upstream_nets[0].mask();
+
+    pool_config.Init(service_info.upstream_nets, memory_manager, service_info.socket_id, service_info.service_id);
 
 	// sizes of tables
 	size_connections_table = service_info.size_connections_table;
@@ -1243,7 +1242,7 @@ bool CheckSynCookie(rte_mbuf* mbuf,
 	uint32_t cookie_data = CheckSynCookie(service, ipv4_header, tcp_header);
 	if (cookie_data == 0)
 	{
-		DebugPacket("!CheckSynCookie", service_id, ipv4_header, tcp_header);
+		DebugPacket("!CheckSynCookie", service.config.service_id, ipv4_header, tcp_header);
 
 		worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_check_syn_cookie]++;
 		return false;
@@ -1276,7 +1275,7 @@ bool CheckSynCookie(rte_mbuf* mbuf,
         local = service.tables.local_pool.Allocate(worker_info.worker_id, ipv4_header->src_addr, tcp_header->src_port);
         if (local == 0)
         {
-            DebugPacket("!local_pool.Allocate", service_id, ipv4_header, tcp_header);
+            DebugPacket("!local_pool.Allocate", service.config.service_id, ipv4_header, tcp_header);
 
             worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::failed_local_pool_allocation]++;
             return false;
@@ -1827,10 +1826,10 @@ bool ProxyTables::NeedUpdate(const proxy_service_config_t& service_config)
 {
     // YANET_LOG_WARNING("NeedUpdate %d check: con=(%d, %ld), syn=(%d, %ld) need=(%d, %d, %d)\n", service_config.service_id,
     //     service_config.size_connections_table, service_connections.Capacity(), service_config.size_syn_table, syn_connections.Capacity(),
-    //     service_connections.NeedUpdate(service_config.size_connections_table), syn_connections.NeedUpdate(service_config.size_syn_table), local_pool.NeedUpdate(service_config.pool_prefix));
+    //     service_connections.NeedUpdate(service_config.size_connections_table), syn_connections.NeedUpdate(service_config.size_syn_table), local_pool.NeedUpdate(service_config.pool_config));
     return service_connections.NeedUpdate(service_config.size_connections_table)
             || syn_connections.NeedUpdate(service_config.size_syn_table)
-            || local_pool.NeedUpdate(service_config.pool_prefix);
+            || local_pool.NeedUpdate(service_config.pool_config);
 }
 
 void ProxyTables::ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager)
@@ -1855,7 +1854,7 @@ eResult ProxyTables::Allocate(dataplane::memory_manager* memory_manager, const p
     }
 
     bool rotate_addresses_first = (service_config.debug_flags & proxy_service_config_t::flag_local_pool_rotate_addresses_second) == 0;
-    if (!local_pool.Init(service_config.service_id, service_config.pool_prefix, memory_manager, service_config.socket_id, false, rotate_addresses_first))
+    if (!local_pool.Init(service_config.service_id, service_config.pool_config, memory_manager, service_config.socket_id, rotate_addresses_first))
     {
         YANET_LOG_ERROR("Error initialization TcpProxy.LocalPool, service: %d\n", service_config.service_id);
         return eResult::errorAllocatingMemory;
@@ -1888,10 +1887,16 @@ void ProxyTables::Clear(dataplane::memory_manager* memory_manager)
 void proxy_service_t::Debug() const
 {
     YANET_LOG_WARNING("service_id=%d, counter_id=%d, size_con=%d, size_syn=%d, proxy_header=%d, debug_flags=%ld\n", config.service_id, config.counter_id, config.size_connections_table, config.size_syn_table, config.send_proxy_header, config.debug_flags);
-    YANET_LOG_WARNING("\tproxy=%s:%d, service=%s:%d, pool=%s\n",
+    std::stringstream ss;
+    for (uint32_t i = 0; i < config.pool_config.prefixes.size(); i++)
+    {
+        ss << common::ipv4_prefix_t(config.pool_config.prefixes[i].address.address, config.pool_config.prefixes[i].mask).toString().c_str();
+        if (i < config.pool_config.prefixes.size() - 1) ss << ", ";
+    }
+    YANET_LOG_WARNING("\tproxy=%s:%d, service=%s:%d, pool=[%s]\n",
         common::ipv4_address_t(rte_cpu_to_be_32(config.proxy_addr)).toString().c_str(), rte_cpu_to_be_16(config.proxy_port),
         common::ipv4_address_t(rte_cpu_to_be_32(config.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(config.upstream_port),
-        common::ipv4_prefix_t(config.pool_prefix.address.address, config.pool_prefix.mask).toString().c_str());
+        ss.str().c_str());
     config.tcp_options.Debug();
     config.timeouts.Debug();
 	YANET_LOG_WARNING("\tservice=[%s], syn=[%s], local=[%s]\n", tables.service_connections.Debug().c_str(), tables.syn_connections.Debug().c_str(), tables.local_pool.Debug().c_str());

@@ -33,11 +33,9 @@ class ProxyTest:
     MAC_CLIENT = "00:00:00:00:00:01"
     MAC_SERVER = "00:00:00:00:00:0A"
     
-    IP_PROXY_INT = "10.0.0.0"
-    IP_PROXY_INT2 = "10.0.0.1"
-    IP_PROXY_INT3 = "10.0.0.2"
-    IP_PROXY_INT4 = "10.0.0.3"
-    IP_PROXY_INT5 = "10.0.0.4"
+    IP_PROXY_INT = "10.0.0.1"
+    IP_PROXY_INT2 = "11.0.0.1"
+    IP_PROXY_INT3 = "12.0.0.1"
 
     START_CLIENT_SEQ = 1000
     START_SERVER_SEQ = 2000

@@ -1,0 +1,36 @@
+steps:
+- cli:
+  - rib static insert default 10.0.1.0/24 10.0.1.1
+  - rib static insert default 10.0.2.0/24 10.0.2.1
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 001-send.pcap
+    expect: 001-expect.pcap
+
+- sendPackets:
+  - port: kni0
+    send: 002-send.pcap
+    expect: 002-expect.pcap
+
+- sendPackets:
+  - port: kni0
+    send: 003-send.pcap
+    expect: 003-expect.pcap
+
+- cli:
+  - proxy counters
+  - proxy tables
+  - proxy buckets 10.0.1.1
+  - proxy connections 10.0.1.1 tcp 80
+  - proxy syn 10.0.1.1 tcp 80
+
+- sleep: 5
+
+- cli:
+  - proxy connections 10.0.1.1 tcp 80
+  - proxy syn 10.0.1.1 tcp 80
+  - rib static remove default 10.0.1.0/24 10.0.1.1
+  - rib static remove default 10.0.2.0/24 10.0.2.1
+  - rib prefixes

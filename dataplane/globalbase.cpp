@@ -2651,7 +2651,7 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 	proxy_enabled = 1;
 	proxy_flow = service_info.flow;
 
-	if (!service.config.ReadConfig(service_info, counter_id))
+	if (!service.config.ReadConfig(service_info, counter_id, &dataPlane->memory_manager))
 	{
 		return eResult::invalidId;
 	}
