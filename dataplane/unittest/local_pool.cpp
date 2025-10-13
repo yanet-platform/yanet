@@ -17,11 +17,8 @@ TEST(LocalPoolTest, Allocate)
         {"192.168.1.2/31"},
         {"192.168.2.2/31"}
     };
-    LocalPool::PrefixConfig prefix_config{};
-    prefix_config.Init(prefixes, nullptr, 0, 0);
-    
     LocalPool pool;
-    pool.Init(0, prefix_config, nullptr, 0);
+    pool.Init(0, prefixes, nullptr, 0);
 
     uint32_t client_addr = ipv4_address_t::convert(common::ipv4_address_t("10.0.0.1")).address;
     tPortId client_port = 12345;
@@ -99,11 +96,8 @@ TEST(LocalPoolTest, RotateAddressesFirst)
         {"192.168.1.2/31"},
         {"192.168.2.2/31"}
     };
-    LocalPool::PrefixConfig prefix_config{};
-    prefix_config.Init(prefixes, nullptr, 0, 0);
-    
     LocalPool pool;
-    pool.Init(0, prefix_config, nullptr, 0, true);
+    pool.Init(0, prefixes, nullptr, 0, true);
 
     uint32_t client_addr = ipv4_address_t::convert(common::ipv4_address_t("10.0.0.1")).address;
     tPortId client_port = 12345;
@@ -155,8 +149,6 @@ TEST(LocalPoolTest, RotateAddressesFirst)
 TEST(LocalPoolTest, Benchmark)
 {
     std::vector<common::ipv4_prefix_t> prefixes{{"192.168.0.0/24"}};
-    LocalPool::PrefixConfig prefix_config{};
-    prefix_config.Init(prefixes, nullptr, 0, 0);
 
     unsigned int concurrency = std::thread::hardware_concurrency();
     if (concurrency == 0)
@@ -179,7 +171,7 @@ TEST(LocalPoolTest, Benchmark)
                                                                             std::chrono::duration<double>,
                                                                             std::chrono::duration<double>> {
                 LocalPool pool;
-                pool.Init(0, prefix_config, nullptr, 0, false);
+                pool.Init(0, prefixes, nullptr, 0, false);
             
                 std::vector<uint64_t> addresses(iterations);
                 
@@ -243,8 +235,6 @@ TEST(LocalPoolTest, Benchmark)
 TEST(LocalPoolTest, BenchmarkConcurrent)
 {
     std::vector<common::ipv4_prefix_t> prefixes{{"192.168.0.0/24"}};
-    LocalPool::PrefixConfig prefix_config{};
-    prefix_config.Init(prefixes, nullptr, 0, 0);
 
     unsigned int concurrency = std::thread::hardware_concurrency();
     if (concurrency == 0)
@@ -273,7 +263,7 @@ TEST(LocalPoolTest, BenchmarkConcurrent)
                                                                             std::chrono::duration<double>,
                                                                             std::chrono::duration<double>> {
                 LocalPool pool;
-                pool.Init(0, prefix_config, nullptr, 0, false);
+                pool.Init(0, prefixes, nullptr, 0, false);
             
                 std::vector<uint64_t> addresses(iterations);
                 

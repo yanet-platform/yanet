@@ -40,7 +40,7 @@ struct proxy_service_config_t
 	uint32_t size_connections_table;
 	uint32_t size_syn_table;
 
-    LocalPool::PrefixConfig pool_config{};
+    std::vector<common::ipv4_prefix_t> pool_prefixes;
 	bool send_proxy_header;
     
     controlplane::proxy::tcp_options_t tcp_options;

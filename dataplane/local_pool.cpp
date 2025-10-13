@@ -5,32 +5,48 @@ namespace dataplane::proxy
 
 constexpr uint32_t NULL_CHUNK = 0xffffffff;
 
-bool LocalPool::Init(proxy_service_id_t service_id, const PrefixConfig& config,
+bool LocalPool::Init(proxy_service_id_t service_id, const std::vector<common::ipv4_prefix_t>& prefixes,
                      dataplane::memory_manager* memory_manager, tSocketId socket_id,
                      bool rotate_addresses_first)
 {
     if (initialized_) return true;
-    if (config.prefixes.size() == 0)
+    if (prefixes.size() == 0)
     {
         YANET_LOG_ERROR("Empty prefixes array\n");
         return false;
     }
-    if (config.index_to_prefix == nullptr)
+
+    for (auto upstream_net : prefixes)
     {
-        YANET_LOG_ERROR("Empty index_to_prefix array\n");
-        return false;
+        ipv4_prefix_t prefix;
+        prefix.address.address = upstream_net.address();
+        prefix.mask = upstream_net.mask();
+        prefixes_.push_back(prefix);
     }
-    if (config.prefix_first_index.size() != config.prefixes.size())
+    prefix_first_index_.resize(prefixes_.size());
+
+    for (const auto& prefix : prefixes)
+        num_addrs_ += 1u << (32u - prefix.mask());
+    
+    #ifdef CONFIG_YADECAP_UNITTEST
+    index_to_prefix_ = new uint32_t[num_addrs_];
+    #else
+    std::string name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".index_to_prefix";
+    index_to_prefix_ = memory_manager->create_static_array<uint32_t>(name.c_str(), num_addrs_, socket_id);
+    #endif
+
+    uint32_t prefix_idx = 0, idx = 0;
+    for (const auto& prefix : prefixes_)
     {
-        YANET_LOG_ERROR("Invalid prefix_first_index array\n");
-        return false;
+        prefix_first_index_[prefix_idx] = idx;
+        for (uint32_t i = 0; i < (1u << (32u - prefix.mask)); i++, idx++)
+        {
+            index_to_prefix_[idx] = prefix_idx;
+        }
+        prefix_idx++;
     }
 
-    prefixes_ = &config.prefixes;
-    index_to_prefix_ = config.index_to_prefix;
-    prefix_first_index_ = &config.prefix_first_index;
     rotate_addr_first_ = rotate_addresses_first;
-    num_addrs_ = config.num_addresses;
 
     // if (!include_edge_addresses && num_addrs_ > 2) 
     // {
@@ -46,7 +62,7 @@ bool LocalPool::Init(proxy_service_id_t service_id, const PrefixConfig& config,
     chunk_queue_ = new ConnectionsChunk[num_free_chunks + num_chunks];
     local_to_client_ = new uint64_t[num_chunks * chunk_size];
 #else
-    std::string name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".local_info";
+    name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".local_info";
     local_info_ = (LocalInfo*)memory_manager->alloc(name.data(), socket_id, sizeof(LocalInfo));
     name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".chunk_queue";
     chunk_queue_ = memory_manager->create_static_array<ConnectionsChunk>(name.data(), num_free_chunks + num_chunks, socket_id);
@@ -234,7 +250,7 @@ LocalPoolStat LocalPool::GetStat() const {
         return stat;
     }
 
-    for (const ipv4_prefix_t& prefix : *prefixes_)
+    for (const ipv4_prefix_t& prefix : prefixes_)
     {
         stat.prefixes.emplace_back(prefix.address.address, prefix.mask);
     }
@@ -254,7 +270,7 @@ inline uint32_t LocalPool::tuple_to_prefix(uint64_t tuple) const
 {
     common::ipv4_address_t addr(rte_be_to_cpu_32(tuple >> 16));
     uint32_t index = 0;
-    for (const auto& prefix : *prefixes_)
+    for (const auto& prefix : prefixes_)
     {
         if (common::ipv4_prefix_t(prefix.address.address, prefix.mask).subnetFor(addr))
             return index;
@@ -266,8 +282,8 @@ inline uint32_t LocalPool::tuple_to_prefix(uint64_t tuple) const
 inline uint64_t LocalPool::index_to_tuple(uint32_t index) const
 {
     uint32_t prefix_idx = index_to_prefix(index);
-    ipv4_prefix_t prefix = prefixes_->at(prefix_idx);
-    uint32_t start_idx = prefix_first_index_->at(prefix_idx);
+    ipv4_prefix_t prefix = prefixes_[prefix_idx];
+    uint32_t start_idx = prefix_first_index_[prefix_idx];
     if (rotate_addr_first_)
     {
         return PackTuple(rte_cpu_to_be_32(prefix.address.address + addr_offset_ + (index - start_idx) % num_addrs_),
@@ -280,8 +296,8 @@ inline uint64_t LocalPool::index_to_tuple(uint32_t index) const
 inline uint32_t LocalPool::tuple_to_index(uint64_t tuple) const
 {
     uint32_t prefix_idx = tuple_to_prefix(tuple);
-    ipv4_prefix_t prefix = prefixes_->at(prefix_idx);
-    uint32_t start_idx = prefix_first_index_->at(prefix_idx);
+    ipv4_prefix_t prefix = prefixes_[prefix_idx];
+    uint32_t start_idx = prefix_first_index_[prefix_idx];
     if (rotate_addr_first_)
     {
         return (rte_be_to_cpu_16((uint16_t)(tuple & 0xffff)) - min_port) * num_addrs_ + 
@@ -291,14 +307,18 @@ inline uint32_t LocalPool::tuple_to_index(uint64_t tuple) const
            (rte_be_to_cpu_32((uint32_t)(tuple >> 16)) - prefix.address.address - addr_offset_ + start_idx) * num_ports;
 }
 
-bool LocalPool::NeedUpdate(const PrefixConfig& config)
+bool LocalPool::NeedUpdate(const std::vector<common::ipv4_prefix_t>& prefixes)
 {
-    if (!initialized_ || prefixes_ == nullptr || prefixes_->size() != config.prefixes.size()) return true;
-    for (uint32_t i = 0; i < prefixes_->size(); i++)
+    if (!initialized_  || prefixes_.size() != prefixes.size())
     {
-        ipv4_prefix_t prefix = prefixes_->at(i);
-        if (prefix.address != config.prefixes[i].address || prefix.mask != config.prefixes[i].mask)
+        return true;
+    }
+    for (uint32_t i = 0; i < prefixes_.size(); i++)
+    {
+        if (prefixes_[i].address.address != prefixes[i].address() || prefixes_[i].mask != prefixes[i].mask())
+        {
             return true;
+        }
     }
     return false;
 }
@@ -318,6 +338,7 @@ void LocalPool::Clear(dataplane::memory_manager* memory_manager)
         delete chunk_queue_;
         delete local_to_client_;
         delete local_info_;
+        delete index_to_prefix_;
 #else
     if (chunk_queue_ != nullptr)
     {
@@ -331,7 +352,13 @@ void LocalPool::Clear(dataplane::memory_manager* memory_manager)
     {
         memory_manager->destroy(local_info_);
     }
+    if (index_to_prefix_ != nullptr)
+    {
+        memory_manager->destroy(index_to_prefix_);
+    }
 #endif
+    prefixes_.clear();
+    prefix_first_index_.clear();
     ClearLinks();
 }
 
@@ -351,8 +378,6 @@ void LocalPool::CopyFrom(const LocalPool& other)
 
 void LocalPool::ClearLinks()
 {
-    prefixes_ = nullptr;
-    prefix_first_index_ = nullptr;
     index_to_prefix_ = nullptr;
     chunk_queue_ = nullptr;
     local_to_client_ = nullptr;
