@@ -6312,8 +6312,10 @@ inline void cWorker::proxy_client_icmp_handle()
 	{
 		rte_mbuf* mbuf = proxy_client_icmp_stack.mbufs[mbuf_i];
 		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-
 		const dataplane::proxy::proxy_service_t& service = base.globalBase->proxy_services[metadata->flow.data.proxy_service.id];
+
+		counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_packets]++;
+    	counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_bytes] += mbuf->pkt_len;
 
 		icmpv4_header_t* icmpHeader = rte_pktmbuf_mtod_offset(mbuf, icmpv4_header_t*, metadata->transport_headerOffset);
 

@@ -63,6 +63,8 @@ namespace proxy
 
 enum class service_counter : tCounterId
 {
+	client_packets,
+	client_bytes,
 	forward_client_packets,
 	forward_client_bytes,
 	forward_service_packets,
@@ -110,6 +112,10 @@ inline const char* service_counter_toString(service_counter counter)
 {
 	switch (counter)
 	{
+		case service_counter::client_packets:
+			return "client_packets";
+		case service_counter::client_bytes:
+			return "client_bytes";
 		case service_counter::forward_client_packets:
 			return "forward_client_packets";
 		case service_counter::forward_client_bytes:

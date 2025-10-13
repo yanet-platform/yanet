@@ -1073,9 +1073,11 @@ void PrepareSynToService(const proxy_service_t& service, rte_ipv4_hdr* ipv4_head
 bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info)
 {
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-	
     proxy_service_id_t service_id = metadata->flow.data.proxy_service.id;
     dataplane::proxy::proxy_service_t& service = worker_info.globalBase->proxy_services[service_id];
+
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_packets]++;
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_bytes] += mbuf->pkt_len;
 
     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::syn_count]++;
 
@@ -1238,7 +1240,7 @@ bool CheckSynCookie(rte_mbuf* mbuf,
                     bool reuse_connection)
 {
 	// try check cookie
-	// todo - check time overflow
+    // todo - check time overflow
 	uint32_t cookie_data = CheckSynCookie(service, ipv4_header, tcp_header);
 	if (cookie_data == 0)
 	{
@@ -1334,6 +1336,9 @@ bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
     dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
     proxy_service_id_t service_id = metadata->flow.data.proxy_service.id;
     dataplane::proxy::proxy_service_t& service = worker_info.globalBase->proxy_services[service_id];
+
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_packets]++;
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_bytes] += mbuf->pkt_len;
 
     rte_ipv4_hdr* ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
     rte_tcp_hdr* tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
