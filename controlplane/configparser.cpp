@@ -1252,15 +1252,32 @@ void config_parser_t::loadConfig_proxy(controlplane::base_t& baseNext,
 
 	if (moduleJson["upstreamNet"].is_string())
 	{
-		proxy.upstream_nets = { moduleJson["upstreamNet"].get<std::string>() };
+		common::ip_prefix_t prefix = moduleJson["upstreamNet"].get<std::string>();
+		if (prefix.is_ipv4())
+			proxy.ipv4_upstream_nets = { prefix.get_ipv4() };
+		else
+			proxy.ipv6_upstream_nets = { prefix.get_ipv6() };
 	}
 	else
 	{
+		common::ipv6_prefix_t prefix_subnet_check{};
 		for (const auto& upstream_net : moduleJson["upstreamNet"])
 		{
-			proxy.upstream_nets.push_back(common::ipv4_prefix_t(upstream_net));
+			common::ip_prefix_t prefix(upstream_net);
+			if (prefix.is_ipv4())
+			{
+				proxy.ipv4_upstream_nets.push_back(prefix.get_ipv4());
+			}
+			else
+			{
+				if (prefix_subnet_check.mask() == 0)
+					prefix_subnet_check = common::ipv6_prefix_t(prefix.get_ipv6().address(), 96);
+				else if (!prefix.get_ipv6().subnetOf(prefix_subnet_check))
+					throw error_result_t(eResult::invalidConfigurationFile, "All IPv6 upstream nets should belong to the same /96 subnet");
+				proxy.ipv6_upstream_nets.push_back(prefix.get_ipv6());
+			}
 		}
-		if (proxy.upstream_nets.empty())
+		if (proxy.ipv4_upstream_nets.empty() && proxy.ipv6_upstream_nets.empty())
 		{
 			throw error_result_t(eResult::invalidConfigurationFile, "empty list of upstream nets for proxy module");
 		}
@@ -1344,6 +1361,10 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 
 		// key: proxy address, port and protocol
 		service.proxy_addr = common::ip_address_t(service_json["proxyAddress"]);
+		if (service.proxy_addr.is_ipv4() && proxy.ipv4_upstream_nets.empty())
+			throw error_result_t(eResult::invalidConfigurationFile, "IPv4 proxy address with no IPv4 upstream nets");
+		else if (service.proxy_addr.is_ipv6() && proxy.ipv6_upstream_nets.empty())
+			throw error_result_t(eResult::invalidConfigurationFile, "IPv6 proxy address with no IPv6 upstream nets");
 		service.proxy_port = service_json["proxyPort"];
 		std::string str_proto = service_json["proto"];
 		service.proto = controlplane::balancer::to_proto(str_proto);
@@ -1354,6 +1375,8 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 
 		// service address, port
 		service.upstream_addr = common::ip_address_t(service_json["upstreamAddress"]);
+		if (service.upstream_addr.is_ipv4() != service.proxy_addr.is_ipv4())
+			throw error_result_t(eResult::invalidConfigurationFile, service.service + " proxy address and upstream address IP version mismatch");
 		service.upstream_port = service_json["upstreamPort"];
 
 		// sizes of tables
@@ -1368,7 +1391,8 @@ void config_parser_t::loadConfig_proxy_services(controlplane::base_t& baseNext,
 			throw error_result_t(eResult::invalidConfigurationFile, "sizeSYNTable must be 0 or power of 2");
 		}
 
-		service.upstream_nets = proxy.upstream_nets;
+		service.ipv4_upstream_nets = proxy.ipv4_upstream_nets;
+		service.ipv6_upstream_nets = proxy.ipv6_upstream_nets;
 		service.blacklist = proxy.blacklist;
 		service.whitelist = proxy.whitelist;
 		LoadSubnetList(service_json, rootFilePath, "blacklist", service.blacklist);

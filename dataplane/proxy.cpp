@@ -3,6 +3,7 @@
 #include "common/counters.h"
 
 #include "common.h"
+#include "checksum.h"
 #include "globalbase.h"
 #include "metadata.h"
 #include "proxy.h"
@@ -390,20 +391,52 @@ bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& se
 	counter_id = service_counter_id;
     proxy_flow = service_info.flow;
 
+    using_ipv6 = service_info.proxy_addr.is_ipv6();
+
 	// proxy and service address, port
-	proxy_addr = ipv4_address_t::convert(service_info.proxy_addr.get_ipv4()).address;
+    if (using_ipv6)
+    {
+        ipv6_address_t addr = ipv6_address_t::convert(service_info.proxy_addr.get_ipv6());
+        for (size_t i = 0, shift = 0; i < sizeof(proxy_addr); i++, shift += 8)
+            proxy_addr += (common::uint128_t)addr.bytes[i] << shift;
+        addr = ipv6_address_t::convert(service_info.upstream_addr.get_ipv6());
+        for (size_t i = 0, shift = 0; i < sizeof(proxy_addr); i++, shift += 8)
+            upstream_addr += (common::uint128_t)addr.bytes[i] << shift;
+    }
+    else
+    {
+        proxy_addr = ipv4_address_t::convert(service_info.proxy_addr.get_ipv4()).address;
+        upstream_addr = ipv4_address_t::convert(service_info.upstream_addr.get_ipv4()).address;
+    }
 	proxy_port = rte_cpu_to_be_16(service_info.proxy_port);
-	upstream_addr = ipv4_address_t::convert(service_info.upstream_addr.get_ipv4()).address;
 	upstream_port = rte_cpu_to_be_16(service_info.upstream_port);
 
 	// pool_prefix
-	if (service_info.upstream_nets.empty())
+	if (service_info.proxy_addr.is_ipv4() && service_info.ipv4_upstream_nets.empty())
 	{
-		YADECAP_LOG_ERROR("upstream_nets empty'\n");
+		YADECAP_LOG_ERROR("ipv4_upstream_nets empty'\n");
+		return false;
+	}
+    else if (service_info.proxy_addr.is_ipv6() && service_info.ipv6_upstream_nets.empty())
+	{
+		YADECAP_LOG_ERROR("ipv6_upstream_nets empty'\n");
 		return false;
 	}
 
-    pool_prefixes = service_info.upstream_nets;
+    ipv4_pool_prefixes = service_info.ipv4_upstream_nets;
+    ipv6_pool_prefixes = service_info.ipv6_upstream_nets;
+    if (using_ipv6)
+    {
+        // All subnets are supposed to be in the same /96 subnet
+        // Making offset from base 96 bits
+        pool_prefixes.clear();
+        for (const auto& prefix : ipv6_pool_prefixes)
+            pool_prefixes.emplace_back(0, prefix.mask() - 96);
+    }
+    else
+    {
+        pool_prefixes = ipv4_pool_prefixes;
+    }
 
 	// sizes of tables
 	size_connections_table = service_info.size_connections_table;
@@ -1824,6 +1857,80 @@ bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_inf
     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_service_packets]++;
     worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::forward_service_bytes] += mbuf->pkt_len;			
 
+    return true;
+}
+
+bool ActionClientOnICMP(rte_mbuf* mbuf, WorkerInfo& worker_info)
+{
+    dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+    const dataplane::proxy::proxy_service_t& service = worker_info.globalBase->proxy_services[metadata->flow.data.proxy_service.id];
+
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_packets]++;
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_bytes] += mbuf->pkt_len;
+
+    icmpv4_header_t* icmpHeader = rte_pktmbuf_mtod_offset(mbuf, icmpv4_header_t*, metadata->transport_headerOffset);
+
+    icmpHeader->type = ICMP_ECHOREPLY;
+    icmpHeader->code = 0;
+
+    rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
+    // YANET_LOG_WARNING("ping %s -> %s\n",
+    // 		common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(),
+    // 		common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str());
+
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::ping_count]++;
+
+    uint32_t tmp_for_swap = ipv4Header->src_addr;
+    ipv4Header->src_addr = ipv4Header->dst_addr;
+    ipv4Header->dst_addr = tmp_for_swap;
+
+    // it is a reply, ttl starts anew, route_handle() will decrease it and modify checksum accordingly
+    ipv4Header->time_to_live = 65;
+
+    yanet_ipv4_checksum(ipv4Header);
+
+    uint16_t icmp_checksum = ~icmpHeader->checksum;
+    icmp_checksum = csum_minus(icmp_checksum, ICMP_ECHO);
+    icmp_checksum = csum_plus(icmp_checksum, ICMP_ECHOREPLY);
+    icmpHeader->checksum = ~icmp_checksum;
+
+    // todo:
+    // counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_generated_echo_reply_ipv4]++;
+    return true;
+}
+
+bool ActionClientOnICMPv6(rte_mbuf* mbuf, WorkerInfo& worker_info)
+{
+    dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+    const dataplane::proxy::proxy_service_t& service = worker_info.globalBase->proxy_services[metadata->flow.data.proxy_service.id];
+
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_packets]++;
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_bytes] += mbuf->pkt_len;
+
+    icmpv6_header_t* icmpHeader = rte_pktmbuf_mtod_offset(mbuf, icmpv6_header_t*, metadata->transport_headerOffset);
+
+    icmpHeader->type = ICMP_ECHOREPLY;
+    icmpHeader->code = 0;
+
+    rte_ipv6_hdr* ipv6Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv6_hdr*, metadata->network_headerOffset);
+
+    worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::ping_count]++;
+
+    uint8_t tmp_for_swap[sizeof(ipv6Header->src_addr)];
+    rte_memcpy(tmp_for_swap, ipv6Header->src_addr, sizeof(tmp_for_swap));
+    rte_memcpy(ipv6Header->src_addr, ipv6Header->dst_addr, sizeof(ipv6Header->src_addr));
+    rte_memcpy(ipv6Header->dst_addr, tmp_for_swap, sizeof(ipv6Header->dst_addr));
+
+    // it is a reply, ttl starts anew, route_handle() will decrease it and modify checksum accordingly
+    ipv6Header->hop_limits = 65;
+
+    uint16_t icmp_checksum = ~icmpHeader->checksum;
+    icmp_checksum = csum_minus(icmp_checksum, ICMP_ECHO);
+    icmp_checksum = csum_plus(icmp_checksum, ICMP_ECHOREPLY);
+    icmpHeader->checksum = ~icmp_checksum;
+
+    // todo:
+    // counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_generated_echo_reply_ipv6]++;
     return true;
 }
 

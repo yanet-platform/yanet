@@ -2049,6 +2049,7 @@ enum class eFlowType : uint8_t
 	proxy_server_syn_ack,
 	proxy_server_ack,
 	proxy_client_icmp,
+	proxy_client_icmp_v6
 };
 
 inline const char* eFlowType_toString(eFlowType t)
@@ -2147,6 +2148,8 @@ inline const char* eFlowType_toString(eFlowType t)
 			return "proxy_server_ack";
 		case eFlowType::proxy_client_icmp:
 			return "proxy_client_icmp";
+		case eFlowType::proxy_client_icmp_v6:
+			return "proxy_client_icmp_v6";
 	}
 
 	return "unknown";

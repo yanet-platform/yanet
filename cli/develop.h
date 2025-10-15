@@ -281,6 +281,7 @@ private:
 							obj.proxy_server_syn_ack_handle,
 							obj.proxy_server_ack_handle,
 							obj.proxy_client_icmp_handle,
+							obj.proxy_client_icmp_v6_handle,
 			                obj.route_tunnel_handle4,
 			                obj.route_tunnel_handle6,
 			                obj.acl_egress_handle4,
@@ -315,6 +316,7 @@ private:
 		CountersArray proxy_server_syn_ack_handle{};
 		CountersArray proxy_server_ack_handle{};
 		CountersArray proxy_client_icmp_handle{};
+		CountersArray proxy_client_icmp_v6_handle{};
 		CountersArray route_tunnel_handle4{};
 		CountersArray route_tunnel_handle6{};
 		CountersArray acl_egress_handle4{};
@@ -375,6 +377,7 @@ private:
 						 "proxy_s_syn_ack",
 						 "proxy_s_ack",
 						 "proxy_icmp",
+						 "proxy_icmp_v6",
 		                 "route_tunnel4",
 		                 "route_tunnel6",
 		                 "acl_egress4",

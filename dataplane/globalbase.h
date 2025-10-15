@@ -263,6 +263,7 @@ public: ///< @todo
 	uint8_t tun64_enabled;
 	uint8_t early_decap_enabled;
 	uint8_t proxy_enabled;
+	uint8_t proxy_v6_enabled;
 	common::globalBase::tFlow proxy_flow;
 
 	uint32_t serial;

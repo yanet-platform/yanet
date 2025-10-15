@@ -950,6 +950,12 @@ inline void cWorker::handlePackets()
 		proxy_client_icmp_handle();
 		tsc_deltas->write(tsc_start, stack_size, tsc_deltas->proxy_client_icmp_handle, base_values.proxy_client_icmp_handle);
 	}
+	if (globalbase.proxy_v6_enabled)
+	{
+		stack_size = proxy_client_icmp_v6_stack.mbufsCount;
+		proxy_client_icmp_v6_handle();
+		tsc_deltas->write(tsc_start, stack_size, tsc_deltas->proxy_client_icmp_v6_handle, base_values.proxy_client_icmp_v6_handle);
+	}
 
 	stack_size = route_stack4.mbufsCount + vrf_route_stack4.mbufsCount;
 	route_handle4();
@@ -1826,6 +1832,10 @@ inline void cWorker::acl_ingress_flow(rte_mbuf* mbuf,
 	else if (flow.type == common::globalBase::eFlowType::proxy_client_icmp)
 	{
 		proxy_client_icmp_entry(mbuf);
+	}
+	else if (flow.type == common::globalBase::eFlowType::proxy_client_icmp_v6)
+	{
+		proxy_client_icmp_v6_entry(mbuf);
 	}
 	else
 	{
@@ -6306,50 +6316,72 @@ inline void cWorker::proxy_client_icmp_handle()
 		return;
 	}
 
+	dataplane::proxy::WorkerInfo worker_info{
+	        .globalBase = base.globalBase,
+	        .counters = counters,
+	        .worker_id = proxy_worker_id,
+	        .ringlog = &ringLog,
+	        .current_time_sec = CurrentTime(),
+	        .current_time_ms = CurrentTimeMs(),
+	};
+
 	for (unsigned int mbuf_i = 0;
 	     mbuf_i < proxy_client_icmp_stack.mbufsCount;
 	     mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_client_icmp_stack.mbufs[mbuf_i];
-		dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-		const dataplane::proxy::proxy_service_t& service = base.globalBase->proxy_services[metadata->flow.data.proxy_service.id];
-
-		counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_packets]++;
-    	counters[service.config.counter_id + (tCounterId)::proxy::service_counter::client_bytes] += mbuf->pkt_len;
-
-		icmpv4_header_t* icmpHeader = rte_pktmbuf_mtod_offset(mbuf, icmpv4_header_t*, metadata->transport_headerOffset);
-
-		icmpHeader->type = ICMP_ECHOREPLY;
-		icmpHeader->code = 0;
-
-		rte_ipv4_hdr* ipv4Header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-		// YANET_LOG_WARNING("ping %s -> %s\n",
-		// 		common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->src_addr)).toString().c_str(),
-		// 		common::ipv4_address_t(rte_cpu_to_be_32(ipv4Header->dst_addr)).toString().c_str());
-
-		counters[service.config.counter_id + (tCounterId)proxy::service_counter::ping_count]++;
-
-		uint32_t tmp_for_swap = ipv4Header->src_addr;
-		ipv4Header->src_addr = ipv4Header->dst_addr;
-		ipv4Header->dst_addr = tmp_for_swap;
-
-		// it is a reply, ttl starts anew, route_handle() will decrease it and modify checksum accordingly
-		ipv4Header->time_to_live = 65;
-
-		yanet_ipv4_checksum(ipv4Header);
-
-		uint16_t icmp_checksum = ~icmpHeader->checksum;
-		icmp_checksum = csum_minus(icmp_checksum, ICMP_ECHO);
-		icmp_checksum = csum_plus(icmp_checksum, ICMP_ECHOREPLY);
-		icmpHeader->checksum = ~icmp_checksum;
-
-		// todo:
-		// counters[(uint32_t)common::globalBase::static_counter_type::balancer_icmp_generated_echo_reply_ipv4]++;
-
-		proxy_flow(mbuf, base.globalBase->proxy_flow);
+		if (dataplane::proxy::ActionClientOnICMP(mbuf, worker_info))
+		{
+			proxy_flow(mbuf, base.globalBase->proxy_flow);
+		}
+		else
+		{
+			drop(mbuf);
+		}
 	}
 
 	proxy_client_icmp_stack.clear();
+}
+
+inline void cWorker::proxy_client_icmp_v6_entry(rte_mbuf* mbuf)
+{
+	proxy_client_icmp_v6_stack.insert(mbuf);
+}
+
+inline void cWorker::proxy_client_icmp_v6_handle()
+{
+	const auto& base = bases[localBaseId & 1];
+
+	if (unlikely(proxy_client_icmp_v6_stack.mbufsCount == 0))
+	{
+		return;
+	}
+
+	dataplane::proxy::WorkerInfo worker_info{
+	        .globalBase = base.globalBase,
+	        .counters = counters,
+	        .worker_id = proxy_worker_id,
+	        .ringlog = &ringLog,
+	        .current_time_sec = CurrentTime(),
+	        .current_time_ms = CurrentTimeMs(),
+	};
+
+	for (unsigned int mbuf_i = 0;
+	     mbuf_i < proxy_client_icmp_v6_stack.mbufsCount;
+	     mbuf_i++)
+	{
+		rte_mbuf* mbuf = proxy_client_icmp_v6_stack.mbufs[mbuf_i];
+		if (dataplane::proxy::ActionClientOnICMPv6(mbuf, worker_info))
+		{
+			proxy_flow(mbuf, base.globalBase->proxy_flow);
+		}
+		else
+		{
+			drop(mbuf);
+		}
+	}
+
+	proxy_client_icmp_v6_stack.clear();
 }
 
 inline void cWorker::proxy_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow)

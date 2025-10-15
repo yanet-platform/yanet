@@ -392,7 +392,7 @@ public:
 	service_t() = default;
 
 	SERIALIZABLE(service_id, socket_id, service, proxy_addr, proxy_port, proto, upstream_addr, upstream_port, size_connections_table, 
-		size_syn_table, flow, upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts, rate_limit, connection_limit);
+		size_syn_table, flow, ipv4_upstream_nets, ipv6_upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts, rate_limit, connection_limit);
 
 	using key_t = std::tuple<common::ip_address_t, tPortId, uint8_t>;
 
@@ -415,7 +415,8 @@ public:
 	uint32_t size_syn_table;
 
 	common::globalBase::tFlow flow;
-	std::vector<common::ipv4_prefix_t> upstream_nets;
+	std::vector<common::ipv4_prefix_t> ipv4_upstream_nets;
+	std::vector<common::ipv6_prefix_t> ipv6_upstream_nets;
 	std::set<common::ip_prefix_t> blacklist;
 	std::set<common::ip_prefix_t> whitelist;
 	bool send_proxy_header;
@@ -435,7 +436,11 @@ public:
 	void Debug() const
 	{
 		std::string prefixes;
-		for (const auto& net : upstream_nets)
+		for (const auto& net : ipv4_upstream_nets)
+		{
+			prefixes += (prefixes.empty() ? "" : ", ") + net.toString();
+		}
+		for (const auto& net : ipv6_upstream_nets)
 		{
 			prefixes += (prefixes.empty() ? "" : ", ") + net.toString();
 		}
@@ -486,7 +491,8 @@ class config_t
 public:
 	config_t() = default;
 
-	SERIALIZABLE(services, socket_id, size_connections_table, size_syn_table, nextModule, flow, upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts);
+	SERIALIZABLE(services, socket_id, size_connections_table, size_syn_table, nextModule, flow,
+				ipv4_upstream_nets, ipv6_upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts);
 
 public:
 	proxy_services services;
@@ -498,7 +504,8 @@ public:
 
 	std::string nextModule;
 	common::globalBase::tFlow flow;
-	std::vector<common::ipv4_prefix_t> upstream_nets;
+	std::vector<common::ipv4_prefix_t> ipv4_upstream_nets;
+	std::vector<common::ipv6_prefix_t> ipv6_upstream_nets;
 	std::set<common::ip_prefix_t> blacklist;
 	std::set<common::ip_prefix_t> whitelist;
 	bool send_proxy_header;

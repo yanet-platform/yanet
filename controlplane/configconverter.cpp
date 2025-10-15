@@ -342,6 +342,10 @@ void config_converter_t::convertToFlow(const std::string& nextModule,
 		{
 			flow.type = common::globalBase::eFlowType::proxy_client_icmp;
 		}
+		else if (entry == "client_icmp_v6")
+		{
+			flow.type = common::globalBase::eFlowType::proxy_client_icmp_v6;
+		}
 		else
 		{
 			throw error_result_t(eResult::invalidFlow, "invalid entry: " + entry);
@@ -740,7 +744,8 @@ void config_converter_t::processProxy()
 	}
 
 	controlplane_ptr->proxy_services_ids.ClearUsedKeys();
-	std::vector<common::ipv4_prefix_t> all_upstream_nets;
+	std::vector<common::ipv4_prefix_t> all_ipv4_upstream_nets;
+	std::vector<common::ipv6_prefix_t> all_ipv6_upstream_nets;
 
 	for (auto& [moduleName, proxy] : baseNext.proxies)
 	{
@@ -759,15 +764,23 @@ void config_converter_t::processProxy()
 
 		if (!proxy.services.empty())
 		{
-			all_upstream_nets.insert(all_upstream_nets.end(), proxy.upstream_nets.begin(), proxy.upstream_nets.end());
+			all_ipv4_upstream_nets.insert(all_ipv4_upstream_nets.end(), proxy.ipv4_upstream_nets.begin(), proxy.ipv4_upstream_nets.end());
+			all_ipv6_upstream_nets.insert(all_ipv6_upstream_nets.end(), proxy.ipv6_upstream_nets.begin(), proxy.ipv6_upstream_nets.end());
 			// check upstrem nets
-			for (const auto& net : proxy.upstream_nets)
+			for (const auto& net : proxy.ipv4_upstream_nets)
 			{
 				if (net.mask() == 0)
 				{
-					throw error_result_t(eResult::invalidFlow, "empty local pool for proxy in upstream_nets");
+					throw error_result_t(eResult::invalidFlow, "empty local pool for proxy in ipv4_upstream_nets");
 				}
-			}			
+			}	
+			for (const auto& net : proxy.ipv6_upstream_nets)
+			{
+				if (net.mask() == 0)
+				{
+					throw error_result_t(eResult::invalidFlow, "empty local pool for proxy in ipv6_upstream_nets");
+				}
+			}		
 		}
 
 		for (auto& [service_key, service] : proxy.services)
@@ -786,15 +799,27 @@ void config_converter_t::processProxy()
 	}
 
 	// check that all prefixes disjoints
-	for (size_t first = 0; first < all_upstream_nets.size(); first++)
+	for (size_t first = 0; first < all_ipv4_upstream_nets.size(); first++)
 	{
-		for (size_t second = first + 1; second < all_upstream_nets.size(); second++)
+		for (size_t second = first + 1; second < all_ipv4_upstream_nets.size(); second++)
 		{
-			const auto& net_first = all_upstream_nets[first];
-			const auto& net_second = all_upstream_nets[second];
+			const auto& net_first = all_ipv4_upstream_nets[first];
+			const auto& net_second = all_ipv4_upstream_nets[second];
 			if (net_first.subnetOf(net_second) || net_second.subnetOf(net_first))
 			{
-				throw error_result_t(eResult::invalidFlow, "disjoint prefixes in upstream_nets: " + net_first.toString() + " and " + net_second.toString());
+				throw error_result_t(eResult::invalidFlow, "disjoint prefixes in ipv4_upstream_nets: " + net_first.toString() + " and " + net_second.toString());
+			}
+		}
+	}
+	for (size_t first = 0; first < all_ipv6_upstream_nets.size(); first++)
+	{
+		for (size_t second = first + 1; second < all_ipv6_upstream_nets.size(); second++)
+		{
+			const auto& net_first = all_ipv6_upstream_nets[first];
+			const auto& net_second = all_ipv6_upstream_nets[second];
+			if (net_first.subnetOf(net_second) || net_second.subnetOf(net_first))
+			{
+				throw error_result_t(eResult::invalidFlow, "disjoint prefixes in ipv6_upstream_nets: " + net_first.toString() + " and " + net_second.toString());
 			}
 		}
 	}
@@ -1950,7 +1975,6 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		const controlplane::proxy::service_t& service = iter_service.second;
 		// YANET_LOG_WARNING("acl_rules_proxy\n");
 		// service.Debug();
-		controlplane::base::acl_rule_network_ipv4_t client_rule_network({common::ipv4_prefix_default}, {common::ipv4_prefix_t(service.proxy_addr)});
 		controlplane::base::acl_rule_transport_tcp_t client_rule_transport{range_t{0x0000, 0xFFFF}, range_t{service.proxy_port}};
 		
 		for (const auto& prefix : service.whitelist)
@@ -1980,53 +2004,90 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		{
 			// blacklist
 			common::globalBase::tFlow flow = convertToFlow("drop");
-			controlplane::base::acl_rule_network_ipv4_t blacklist_rule_network({common::ipv4_prefix_t(prefix)}, {common::ipv4_prefix_t(service.proxy_addr)});
-			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(blacklist_rule_network, client_rule_transport, flow));
+			if (service.proxy_addr.is_ipv4() && prefix.is_ipv4())
+			{
+				controlplane::base::acl_rule_network_ipv4_t blacklist_rule_network({common::ipv4_prefix_t(prefix)}, {common::ipv4_prefix_t(service.proxy_addr)});
+				acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(blacklist_rule_network, client_rule_transport, flow));
+			}
+			else if (service.proxy_addr.is_ipv6() && prefix.is_ipv6())
+			{
+				controlplane::base::acl_rule_network_ipv6_t blacklist_rule_network({common::ipv6_prefix_t(prefix)}, {common::ipv6_prefix_t(service.proxy_addr)});
+				acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(blacklist_rule_network, client_rule_transport, flow));
+			}
 		}
 
+		if (service.proxy_addr.is_ipv4())
 		{
-			// client_syn
-			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_syn");	
-			flow.data.proxy_service.id = service.service_id;
-			client_rule_transport.flags = {TCP_SYN_FLAG, TCP_ACK_FLAG};
-			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
+			controlplane::base::acl_rule_network_ipv4_t client_rule_network({common::ipv4_prefix_default}, {common::ipv4_prefix_t(service.proxy_addr)});
+			{
+				// client_syn
+				common::globalBase::tFlow flow = convertToFlow(nextModule, "client_syn");	
+				flow.data.proxy_service.id = service.service_id;
+				client_rule_transport.flags = {TCP_SYN_FLAG, TCP_ACK_FLAG};
+				acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
+			}
+			{
+				// client_ack
+				common::globalBase::tFlow flow = convertToFlow(nextModule, "client_ack");	
+				flow.data.proxy_service.id = service.service_id;
+				client_rule_transport.flags = {0, TCP_SYN_FLAG};
+				acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
+			}
+			{
+				// client_icmp
+				common::globalBase::tFlow flow = convertToFlow(nextModule, "client_icmp");	
+				flow.data.proxy_service.id = service.service_id;
+				ranges_t ping_types(values_t({ICMP_ECHO}));
+				ranges_t ping_codes(values_t({ICMP_ECHOREPLY}));
+				controlplane::base::acl_rule_transport_icmpv4_t rule_ping(ping_types, ping_codes);
+				acl.nextModuleRules.emplace_back(client_rule_network, rule_ping, flow);
+			}
+
+			controlplane::base::acl_rule_network_ipv4_t server_rule_network({common::ipv4_prefix_t(service.upstream_addr)}, {common::ipv4_prefix_default});
+			controlplane::base::acl_rule_transport_tcp_t server_rule_transport{range_t{service.upstream_port}, range_t{0x0000, 0xFFFF}};
+
+			{
+				// server_syn_ack
+				common::globalBase::tFlow flow = convertToFlow(nextModule, "server_syn_ack");	
+				flow.data.proxy_service.id = service.service_id;
+				server_rule_transport.flags = {TCP_SYN_FLAG | TCP_ACK_FLAG , 0};
+				acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
+			}
+
+			{
+				// server_ack
+				common::globalBase::tFlow flow = convertToFlow(nextModule, "server_ack");	
+				flow.data.proxy_service.id = service.service_id;
+				server_rule_transport.flags = {0, TCP_SYN_FLAG};
+				acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
+			}
 		}
-
+		else
 		{
-			// client_ack
-			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_ack");	
-			flow.data.proxy_service.id = service.service_id;
-			client_rule_transport.flags = {0, TCP_SYN_FLAG};
-			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
-		}
-
-		{
-			// client_icmp
-			common::globalBase::tFlow flow = convertToFlow(nextModule, "client_icmp");	
-			flow.data.proxy_service.id = service.service_id;
-			ranges_t ping_types(values_t({ICMP_ECHO}));
-			ranges_t ping_codes(values_t({ICMP_ECHOREPLY}));
-			controlplane::base::acl_rule_transport_icmpv4_t rule_ping(ping_types, ping_codes);
-			acl.nextModuleRules.emplace_back(client_rule_network, rule_ping, flow);
-		}
-
-		controlplane::base::acl_rule_network_ipv4_t server_rule_network({common::ipv4_prefix_t(service.upstream_addr)}, {common::ipv4_prefix_default});
-		controlplane::base::acl_rule_transport_tcp_t server_rule_transport{range_t{service.upstream_port}, range_t{0x0000, 0xFFFF}};
-
-		{
-			// server_syn_ack
-			common::globalBase::tFlow flow = convertToFlow(nextModule, "server_syn_ack");	
-			flow.data.proxy_service.id = service.service_id;
-			server_rule_transport.flags = {TCP_SYN_FLAG | TCP_ACK_FLAG , 0};
-			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
-		}
-
-		{
-			// server_ack
-			common::globalBase::tFlow flow = convertToFlow(nextModule, "server_ack");	
-			flow.data.proxy_service.id = service.service_id;
-			server_rule_transport.flags = {0, TCP_SYN_FLAG};
-			acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(server_rule_network, server_rule_transport, flow));
+			controlplane::base::acl_rule_network_ipv6_t client_rule_network({common::ipv6_prefix_default}, {common::ipv6_prefix_t(service.proxy_addr)});
+			// {
+			// 	// client_syn
+			// 	common::globalBase::tFlow flow = convertToFlow(nextModule, "client_syn_v6");	
+			// 	flow.data.proxy_service.id = service.service_id;
+			// 	client_rule_transport.flags = {TCP_SYN_FLAG, TCP_ACK_FLAG};
+			// 	acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
+			// }
+			// {
+			// 	// client_ack
+			// 	common::globalBase::tFlow flow = convertToFlow(nextModule, "client_ack_v6");	
+			// 	flow.data.proxy_service.id = service.service_id;
+			// 	client_rule_transport.flags = {0, TCP_SYN_FLAG};
+			// 	acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
+			// }
+			{
+				// client_icmp
+				common::globalBase::tFlow flow = convertToFlow(nextModule, "client_icmp_v6");	
+				flow.data.proxy_service.id = service.service_id;
+				ranges_t ping_types(values_t({ICMP_ECHO}));
+				ranges_t ping_codes(values_t({ICMP_ECHOREPLY}));
+				controlplane::base::acl_rule_transport_icmpv6_t rule_ping(ping_types, ping_codes);
+				acl.nextModuleRules.emplace_back(client_rule_network, rule_ping, flow);
+			}
 		}
 	}
 }

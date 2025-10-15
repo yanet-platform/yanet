@@ -1,0 +1,26 @@
+steps:
+- cli:
+  - rib static insert default fc00::1:0/120 fc00::1:1
+  - rib static insert default fc00::2:0/120 fc00::2:1
+  - rib prefixes
+
+- sendPackets:
+  - port: kni0
+    send: 005-send.pcap
+    expect: 005-expect.pcap
+
+- cli:
+  - proxy counters
+  - proxy tables
+  - proxy buckets fc00::1:1
+  - proxy connections fc00::1:1 tcp 80
+  - proxy syn fc00::1:1 tcp 80
+
+- sleep: 5
+
+- cli:
+  - proxy connections fc00::1:1 tcp 80
+  - proxy syn fc00::1:1 tcp 80
+  - rib static remove default fc00::1:0/120 fc00::1:1
+  - rib static remove default fc00::2:0/120 fc00::2:1
+  - rib prefixes

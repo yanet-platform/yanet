@@ -205,6 +205,8 @@ protected:
 	inline void proxy_server_ack_handle();
 	inline void proxy_client_icmp_entry(rte_mbuf* mbuf);
 	inline void proxy_client_icmp_handle();
+	inline void proxy_client_icmp_v6_entry(rte_mbuf* mbuf);
+	inline void proxy_client_icmp_v6_handle();
 	inline void proxy_flow(rte_mbuf* mbuf, const common::globalBase::tFlow& flow);
 
 	/// fw state
@@ -370,6 +372,7 @@ protected:
 	worker::tStack<> proxy_server_syn_ack_stack;
 	worker::tStack<> proxy_server_ack_stack;
 	worker::tStack<> proxy_client_icmp_stack;
+	worker::tStack<> proxy_client_icmp_v6_stack;
 	worker::tStack<128> controlPlane_stack; ///< to_linux + ingress_state + egress_state + nap
 
 	worker::tStack<> after_early_decap_stack4;

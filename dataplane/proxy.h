@@ -30,16 +30,19 @@ struct proxy_service_config_t
 	tCounterId counter_id;
     common::globalBase::tFlow proxy_flow;
 
+    bool using_ipv6;
 	// proxy and service address, port
-	uint32_t proxy_addr;
+	common::uint128_t proxy_addr;
 	tPortId proxy_port;
-	uint32_t upstream_addr;
+	common::uint128_t upstream_addr;
 	tPortId upstream_port;
 
 	// sizes of tables
 	uint32_t size_connections_table;
 	uint32_t size_syn_table;
 
+    std::vector<common::ipv4_prefix_t> ipv4_pool_prefixes;
+    std::vector<common::ipv6_prefix_t> ipv6_pool_prefixes;
     std::vector<common::ipv4_prefix_t> pool_prefixes;
 	bool send_proxy_header;
     
@@ -169,6 +172,9 @@ bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info
 bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
 bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
 bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
+
+bool ActionClientOnICMP(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
+bool ActionClientOnICMPv6(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
 
 struct ConnectionStoreOnSocket
 {

@@ -916,6 +916,7 @@ static const std::map<std::string, uint32_t> counter_name_to_offset = {
 		{"proxy_server_syn_ack_handle", offsetof(tsc_base_values, proxy_server_syn_ack_handle)},
 		{"proxy_server_ack_handle", offsetof(tsc_base_values, proxy_server_ack_handle)},
 		{"proxy_client_icmp_handle", offsetof(tsc_base_values, proxy_client_icmp_handle)},
+		{"proxy_client_icmp_v6_handle", offsetof(tsc_base_values, proxy_client_icmp_v6_handle)},
         {"route_tunnel_handle4", offsetof(tsc_base_values, route_tunnel_handle4)},
         {"route_tunnel_handle6", offsetof(tsc_base_values, route_tunnel_handle6)},
         {"acl_egress_handle4", offsetof(tsc_base_values, acl_egress_handle4)},

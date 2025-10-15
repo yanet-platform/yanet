@@ -666,6 +666,7 @@ eResult generation::clear()
 	nat46clat_enabled = 0;
 	balancer_enabled = 0;
 	proxy_enabled = 0;
+	proxy_v6_enabled = 0;
 	acl_egress_enabled = 0;
 	sampler_enabled = 0;
 	serial = 0;
@@ -854,7 +855,8 @@ static bool checkFlow(const common::globalBase::tFlow& flow)
 	         flow.type == common::globalBase::eFlowType::proxy_client_ack ||
 			 flow.type == common::globalBase::eFlowType::proxy_server_syn_ack ||
 			 flow.type == common::globalBase::eFlowType::proxy_server_ack ||
-			 flow.type == common::globalBase::eFlowType::proxy_client_icmp)
+			 flow.type == common::globalBase::eFlowType::proxy_client_icmp ||
+			 flow.type == common::globalBase::eFlowType::proxy_client_icmp_v6)
 	{
 		if (flow.data.proxy_service.id > YANET_CONFIG_PROXY_SERVICES_SIZE)
 		{
@@ -2648,7 +2650,10 @@ eResult generation::proxy_service_update(const common::idp::updateGlobalBase::pr
 
 	dataplane::proxy::proxy_service_t& service = proxy_services[service_info.service_id];
 
-	proxy_enabled = 1;
+	if (service_info.proxy_addr.is_ipv4())
+		proxy_enabled = 1;
+	else
+		proxy_v6_enabled = 1;
 	proxy_flow = service_info.flow;
 
 	if (!service.config.ReadConfig(service_info, counter_id, &dataPlane->memory_manager))
