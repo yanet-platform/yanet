@@ -23,6 +23,43 @@
 namespace dataplane::proxy
 {
 
+struct TcpOptions
+{
+    uint32_t timestamp_value;
+    uint32_t timestamp_echo;
+    uint16_t mss;
+    uint8_t sack_permitted;
+    uint8_t window_scaling;
+
+    uint32_t sack_count;
+    uint32_t sack_start[TCP_OPTIONS_MAX_SACK_COUNT];
+    uint32_t sack_finish[TCP_OPTIONS_MAX_SACK_COUNT];
+
+    bool Read(rte_tcp_hdr* tcp_header);
+    bool ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header);
+    uint32_t WriteSYN(rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) const;
+    uint32_t Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const;
+    uint32_t WriteBuffer(uint8_t* data) const;
+    uint32_t Size() const;
+
+    void Clear();
+
+    std::string DebugInfo() const;
+
+    constexpr bool operator==(const TcpOptions& other) const {
+        return timestamp_value == other.timestamp_value && timestamp_echo == other.timestamp_echo
+                && mss == other.mss && sack_permitted == other.sack_permitted
+                && window_scaling == other.window_scaling;
+    }
+
+    constexpr bool operator!=(const TcpOptions& other) const {
+        return !(*this == other);
+    }
+
+private:
+    bool CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected);
+};
+
 struct proxy_service_config_t
 {
 	proxy_service_id_t service_id;
@@ -79,7 +116,6 @@ struct ProxyTables
     void Clear(dataplane::memory_manager* memory_manager);
 };
 
-
 struct proxy_service_t
 {
     proxy_service_config_t config;
@@ -106,43 +142,6 @@ struct proxy_service_on_socket_t
     void UpdateSecondStage(dataplane::proxy::proxy_service_t& service, dataplane::memory_manager* memory_manager);
 } __rte_cache_aligned;
 
-struct TcpOptions
-{
-    uint32_t timestamp_value;
-    uint32_t timestamp_echo;
-    uint16_t mss;
-    uint8_t sack_permitted;
-    uint8_t window_scaling;
-
-    uint32_t sack_count;
-    uint32_t sack_start[TCP_OPTIONS_MAX_SACK_COUNT];
-    uint32_t sack_finish[TCP_OPTIONS_MAX_SACK_COUNT];
-
-    bool Read(rte_tcp_hdr* tcp_header);
-    bool ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header);
-    uint32_t WriteSYN(rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) const;
-    uint32_t Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const;
-    uint32_t WriteBuffer(uint8_t* data) const;
-    uint32_t Size() const;
-
-    void Clear();
-
-    std::string DebugInfo() const;
-
-    constexpr bool operator==(const TcpOptions& other) const {
-        return timestamp_value == other.timestamp_value && timestamp_echo == other.timestamp_echo
-                && mss == other.mss && sack_permitted == other.sack_permitted
-                && window_scaling == other.window_scaling;
-    }
-
-    constexpr bool operator!=(const TcpOptions& other) const {
-        return !(*this == other);
-    }
-
-private:
-    bool CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected);
-};
-
 struct DataForRetransmit
 {
     proxy_service_id_t service_id;
@@ -156,25 +155,6 @@ struct DataForRetransmit
     common::globalBase::tFlow flow;
     tCounterId counter_id;
 };
-
-struct WorkerInfo
-{
-    dataplane::globalBase::generation* globalBase;
-    uint64_t* counters;
-    uint32_t worker_id;
-    common::ringlog::LogInfo* ringlog;
-    uint32_t current_time_sec;
-    uint64_t current_time_ms;
-};
-
-// Actions from worker
-bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
-bool ActionClientOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
-bool ActionServiceOnSynAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
-bool ActionServiceOnAck(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
-
-bool ActionClientOnICMP(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
-bool ActionClientOnICMPv6(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& worker_info);
 
 struct ConnectionStoreOnSocket
 {

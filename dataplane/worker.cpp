@@ -30,6 +30,7 @@
 #include "icmp.h"
 #include "metadata.h"
 #include "prepare.h"
+#include "proxy_actions.h"
 #include "worker.h"
 
 //
