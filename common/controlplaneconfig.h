@@ -392,7 +392,7 @@ public:
 	service_t() = default;
 
 	SERIALIZABLE(service_id, socket_id, service, proxy_addr, proxy_port, proto, upstream_addr, upstream_port, size_connections_table, 
-		size_syn_table, flow, ipv4_upstream_nets, ipv6_upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts, rate_limit, connection_limit);
+		size_syn_table, flow, ipv4_upstream_nets, ipv6_upstream_net, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts, rate_limit, connection_limit);
 
 	using key_t = std::tuple<common::ip_address_t, tPortId, uint8_t>;
 
@@ -416,7 +416,7 @@ public:
 
 	common::globalBase::tFlow flow;
 	std::vector<common::ipv4_prefix_t> ipv4_upstream_nets;
-	std::vector<common::ipv6_prefix_t> ipv6_upstream_nets;
+	common::ipv6_prefix_t ipv6_upstream_net;
 	std::set<common::ip_prefix_t> blacklist;
 	std::set<common::ip_prefix_t> whitelist;
 	bool send_proxy_header;
@@ -440,10 +440,8 @@ public:
 		{
 			prefixes += (prefixes.empty() ? "" : ", ") + net.toString();
 		}
-		for (const auto& net : ipv6_upstream_nets)
-		{
-			prefixes += (prefixes.empty() ? "" : ", ") + net.toString();
-		}
+		if (ipv6_upstream_net.isValid())
+			prefixes += (prefixes.empty() ? "" : ", ") + ipv6_upstream_net.toString();
 
 	    YANET_LOG_WARNING("service_id=%d, service=%s, size_con=%d, size_syn=%d, proxy_header=%d\n", service_id, service.c_str(), size_connections_table, size_syn_table, send_proxy_header);
     	YANET_LOG_WARNING("\tproxy=%s:%d, service=%s:%d, pool=[%s]\n", proxy_addr.toString().c_str(), proxy_port, upstream_addr.toString().c_str(), upstream_port, prefixes.c_str());
@@ -492,7 +490,7 @@ public:
 	config_t() = default;
 
 	SERIALIZABLE(services, socket_id, size_connections_table, size_syn_table, nextModule, flow,
-				ipv4_upstream_nets, ipv6_upstream_nets, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts);
+				ipv4_upstream_nets, ipv6_upstream_net, blacklist, send_proxy_header, tcp_options, debug_flags, timeouts);
 
 public:
 	proxy_services services;
@@ -505,7 +503,7 @@ public:
 	std::string nextModule;
 	common::globalBase::tFlow flow;
 	std::vector<common::ipv4_prefix_t> ipv4_upstream_nets;
-	std::vector<common::ipv6_prefix_t> ipv6_upstream_nets;
+	common::ipv6_prefix_t ipv6_upstream_net;
 	std::set<common::ip_prefix_t> blacklist;
 	std::set<common::ip_prefix_t> whitelist;
 	bool send_proxy_header;

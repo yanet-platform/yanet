@@ -3,97 +3,6 @@
 namespace dataplane::proxy
 {
 
-uint32_t CheckSumBeforeUpdate(rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
-{
-    uint32_t chksum_work = tcp_header->cksum + rte_ipv4_phdr_cksum(ipv4_header, 0);
-    tcp_header->cksum = 0;
-    chksum_work += rte_raw_cksum(tcp_header, (tcp_header->data_off >> 4) << 2);
-    return chksum_work;
-}
-
-void CheckSumAfterUpdate(const dataplane::proxy::proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint32_t chksum_work, uint32_t size_data)
-{
-    if ((service.config.debug_flags & proxy_service_config_t::flag_ignore_optimize_checksum) != 0)
-    {
-        UpdateCheckSums(ipv4_header, tcp_header);
-        return;
-    }
-
-    ipv4_header->hdr_checksum = 0;
-    ipv4_header->hdr_checksum = rte_ipv4_cksum(ipv4_header);
-
-    uint32_t chksum_plus = rte_ipv4_phdr_cksum(ipv4_header, 0) + rte_raw_cksum(tcp_header, ((tcp_header->data_off >> 4) << 2) + size_data);
-
-    chksum_work = __rte_raw_cksum_reduce(chksum_work);
-    chksum_plus = __rte_raw_cksum_reduce(chksum_plus);
-    uint16_t chksum = chksum_work - chksum_plus;
-    if (chksum_work < chksum_plus)
-    {
-        chksum--;
-    }
-
-    tcp_header->cksum = chksum;
-}
-
-void PrepareSynAckToClient(const proxy_service_t& service, rte_mbuf* mbuf,
-                           rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header,
-                           uint64_t* counters, uint32_t current_time_sec)
-{
-    TcpOptions tcp_options;
-    memset(&tcp_options, 0, sizeof(tcp_options));
-    if (!tcp_options.Read(tcp_header)) {
-        counters[service.config.counter_id + (tCounterId)::proxy::service_counter::pkts_with_corrupted_tcp_opts_client]++;
-        // DebugFullHeader(mbuf, "PrepareSynAckToClient");
-    }
-    tcp_options.sack_permitted &= service.config.tcp_options.use_sack;
-    tcp_options.mss = std::min(tcp_options.mss, (uint16_t)service.config.tcp_options.mss);
-
-    uint32_t cookie_data = SynCookies::PackData(tcp_options);
-    uint32_t cookie = service.syn_cookie.GetCookie(ipv4_header->src_addr, tcp_header->src_port, tcp_header->sent_seq, cookie_data);
-    // YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, rte_be_to_cpu_32(tcp_header->sent_seq));
-
-    tcp_options.window_scaling = service.config.tcp_options.winscale;
-    if (tcp_options.timestamp_value != 0 && service.config.tcp_options.timestamps)
-    {
-        tcp_options.timestamp_echo = tcp_options.timestamp_value;
-        tcp_options.timestamp_value = current_time_sec;
-#ifdef CONFIG_YADECAP_AUTOTEST
-        tcp_options.timestamp_value = 1;
-#endif
-    }
-    else
-    {
-        tcp_options.timestamp_echo = 0;
-        tcp_options.timestamp_value = 0;
-    }
-    if (service.config.send_proxy_header)
-    {
-        tcp_options.mss -= int(sizeof(proxy_v2_ipv4_hdr));
-    }
-    tcp_options.WriteSYN(mbuf, ipv4_header, tcp_header);
-
-    SwapAddresses(ipv4_header);
-    ipv4_header->time_to_live = 64;
-    tcp_header->recv_ack = add_cpu_32(tcp_header->sent_seq, 1);
-    tcp_header->sent_seq = rte_cpu_to_be_32(cookie);
-    tcp_header->tcp_flags = TCP_SYN_FLAG | TCP_ACK_FLAG;
-    tcp_header->rx_win = 0;
-    SwapPorts(tcp_header);
-}
-
-void PrepareSynToService(const proxy_service_t& service, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header, uint64_t local)
-{
-    LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
-    if (service.config.send_proxy_header)
-    {
-        // При использовании ProxyHeader уменьшаем значение SEQ полученное от клиента
-        tcp_header->sent_seq = sub_cpu_32(tcp_header->sent_seq, sizeof(proxy_v2_ipv4_hdr));
-    }
-
-    ipv4_header->dst_addr = service.config.upstream_addr;
-    tcp_header->dst_port = service.config.upstream_port;
-}
-
 uint32_t AddProxyHeader(const proxy_service_t& service, rte_mbuf* mbuf, dataplane::metadata* metadata,
                         rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header, uint32_t src_addr, uint16_t src_port)
 {
@@ -149,7 +58,7 @@ bool CheckSynCookie(rte_mbuf* mbuf,
                     dataplane::metadata* metadata,
                     rte_ipv4_hdr*& ipv4_header,
                     rte_tcp_hdr*& tcp_header,
-                    ServiceConnectionData& service_connection_data,
+                    ServiceConnectionData4& service_connection_data,
                     uint32_t flags,
                     bool reuse_connection)
 {
@@ -209,7 +118,7 @@ bool CheckSynCookie(rte_mbuf* mbuf,
 
     // Add to connections
     LocalPool::UnpackTupleSrc(local, ipv4_header, tcp_header);
-    service_connection_data.connection->local = ServiceSynConnections::Pack(ipv4_header->src_addr, tcp_header->src_port);
+    service_connection_data.connection->local = LocalPool::PackTuple(ipv4_header->src_addr, tcp_header->src_port);
     service_connection_data.connection->proxy_start_seq = rte_be_to_cpu_32(tcp_header->recv_ack) - 1;
     service_connection_data.connection->client_start_seq = sub_cpu_32(tcp_header->sent_seq, 1);
     service_connection_data.connection->timestamp_proxy_first = tcp_options.timestamp_echo;

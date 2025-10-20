@@ -196,58 +196,6 @@ uint32_t TcpOptions::Size() const {
     return size;
 }
 
-uint32_t TcpOptions::WriteSYN(rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) const
-{
-    uint32_t len = WriteBuffer((uint8_t*)(tcp_header) + sizeof(rte_tcp_hdr));
-
-    tcp_header->data_off = ((sizeof(rte_tcp_hdr) + len) >> 2) << 4;
-    
-    uint16_t total_length = rte_ipv4_hdr_len(ipv4_header) + sizeof(rte_tcp_hdr) + len;
-    ipv4_header->total_length = rte_cpu_to_be_16(total_length);
-
-    mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + total_length;
-    mbuf->pkt_len = mbuf->data_len;
-
-    return len;
-}
-
-uint32_t TcpOptions::Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const
-{
-    dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-    size_t tcp_header_len_old = std::max(sizeof(rte_tcp_hdr), (size_t)((*tcp_header)->data_off >> 4) << 2);
-    uint16_t tcp_data_len = rte_be_to_cpu_16((*ipv4_header)->total_length) - rte_ipv4_hdr_len(*ipv4_header) - tcp_header_len_old;
-
-    uint32_t old_opts_size = tcp_header_len_old - sizeof(rte_tcp_hdr);
-    int diff = old_opts_size - Size();
-    if (diff < 0) // Options size increased
-    {
-        rte_pktmbuf_prepend(mbuf, -diff);
-        memmove(rte_pktmbuf_mtod(mbuf, char*),
-                rte_pktmbuf_mtod_offset(mbuf, char*, -diff),
-                metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
-    }
-    else if (diff > 0) // Options size decreased
-    {
-        memmove(rte_pktmbuf_mtod_offset(mbuf, char*, diff),
-                rte_pktmbuf_mtod(mbuf, char*),
-                metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
-        rte_pktmbuf_adj(mbuf, diff);
-    }
-    *ipv4_header = rte_pktmbuf_mtod_offset(mbuf, rte_ipv4_hdr*, metadata->network_headerOffset);
-    *tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
-    uint32_t len = WriteBuffer((uint8_t*)(*tcp_header) + sizeof(rte_tcp_hdr));
-
-    (*tcp_header)->data_off = ((sizeof(rte_tcp_hdr) + len) >> 2) << 4;
-    
-    uint16_t total_length = rte_ipv4_hdr_len(*ipv4_header) + sizeof(rte_tcp_hdr) + len + tcp_data_len;
-    (*ipv4_header)->total_length = rte_cpu_to_be_16(total_length);
-
-    mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + total_length;
-    mbuf->pkt_len = mbuf->data_len;
-
-    return len;
-}
-
 bool TcpOptions::CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected)
 {
     return (index + expected <= len) && (data[index + 1] == expected);
@@ -370,22 +318,25 @@ bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& se
 	counter_id = service_counter_id;
     proxy_flow = service_info.flow;
 
-    using_ipv6 = service_info.proxy_addr.is_ipv6();
+    if (service_info.proxy_addr.is_ipv4())
+        ip_ver = ProxyServiceIPVer::IPv4;
+    else if (service_info.proxy_addr.is_ipv6())
+        ip_ver = ProxyServiceIPVer::IPv6; 
 
 	// proxy and service address, port
-    if (using_ipv6)
+    if (ip_ver == ProxyServiceIPVer::IPv6)
     {
         ipv6_address_t addr = ipv6_address_t::convert(service_info.proxy_addr.get_ipv6());
-        for (size_t i = 0, shift = 0; i < sizeof(proxy_addr); i++, shift += 8)
-            proxy_addr += (common::uint128_t)addr.bytes[i] << shift;
+        for (size_t i = 0, shift = 0; i < sizeof(proxy_addr6); i++, shift += 8)
+            proxy_addr6 += (common::uint128_t)addr.bytes[i] << shift;
         addr = ipv6_address_t::convert(service_info.upstream_addr.get_ipv6());
-        for (size_t i = 0, shift = 0; i < sizeof(proxy_addr); i++, shift += 8)
-            upstream_addr += (common::uint128_t)addr.bytes[i] << shift;
+        for (size_t i = 0, shift = 0; i < sizeof(proxy_addr6); i++, shift += 8)
+            upstream_addr6 += (common::uint128_t)addr.bytes[i] << shift;
     }
     else
     {
-        proxy_addr = ipv4_address_t::convert(service_info.proxy_addr.get_ipv4()).address;
-        upstream_addr = ipv4_address_t::convert(service_info.upstream_addr.get_ipv4()).address;
+        proxy_addr4 = ipv4_address_t::convert(service_info.proxy_addr.get_ipv4()).address;
+        upstream_addr4 = ipv4_address_t::convert(service_info.upstream_addr.get_ipv4()).address;
     }
 	proxy_port = rte_cpu_to_be_16(service_info.proxy_port);
 	upstream_port = rte_cpu_to_be_16(service_info.upstream_port);
@@ -393,24 +344,22 @@ bool proxy_service_config_t::ReadConfig(const controlplane::proxy::service_t& se
 	// pool_prefix
 	if (service_info.proxy_addr.is_ipv4() && service_info.ipv4_upstream_nets.empty())
 	{
-		YADECAP_LOG_ERROR("ipv4_upstream_nets empty'\n");
+		YADECAP_LOG_ERROR("ipv4_upstream_nets empty\n");
 		return false;
 	}
-    else if (service_info.proxy_addr.is_ipv6() && service_info.ipv6_upstream_nets.empty())
+    else if (service_info.proxy_addr.is_ipv6() && !service_info.ipv6_upstream_net.isValid())
 	{
-		YADECAP_LOG_ERROR("ipv6_upstream_nets empty'\n");
+		YADECAP_LOG_ERROR("No IPv6 upstream net\n");
 		return false;
 	}
 
     ipv4_pool_prefixes = service_info.ipv4_upstream_nets;
-    ipv6_pool_prefixes = service_info.ipv6_upstream_nets;
-    if (using_ipv6)
+    ipv6_pool_prefix = service_info.ipv6_upstream_net;
+    if (ip_ver == ProxyServiceIPVer::IPv6)
     {
-        // All subnets are supposed to be in the same /96 subnet
         // Making offset from base 96 bits
         pool_prefixes.clear();
-        for (const auto& prefix : ipv6_pool_prefixes)
-            pool_prefixes.emplace_back(0, prefix.mask() - 96);
+        pool_prefixes.emplace_back(0, ipv6_pool_prefix.mask() - 96);
     }
     else
     {
@@ -615,7 +564,7 @@ void TcpConnectionStore::CollectGarbage(dataplane::proxy::WorkerGCInfo& worker_g
                     bucket.Clear(conn_idx);
                 };
 
-                service.tables_work.service_connections.ProcessAllConnectionsWithLocking(condition, action);
+                service.tables_work.service_connections4.ProcessAllConnectionsWithLocking(condition, action);
             }
 
             {
@@ -630,7 +579,7 @@ void TcpConnectionStore::CollectGarbage(dataplane::proxy::WorkerGCInfo& worker_g
                     bucket.Clear(conn_idx);
                 };
 
-                service.tables_work.syn_connections.ProcessAllConnectionsWithLocking(condition, action);
+                service.tables_work.syn_connections4.ProcessAllConnectionsWithLocking(condition, action);
             }
 
             if (service.tables_work.rate_limit.Mode() != common::proxy::limit_mode::off)
@@ -678,7 +627,7 @@ void TcpConnectionStore::CollectGarbage(dataplane::proxy::WorkerGCInfo& worker_g
                     uint32_t init_value = whitelist_bit * connection.FlagEnabled(Connection::flag_whitelist) + 1;
                     service.connection_counter.Add(address, init_value);
                 };
-                service.tables_work.service_connections.ProcessAllConnectionsWithoutLocking(count_connections);
+                service.tables_work.service_connections4.ProcessAllConnectionsWithoutLocking(count_connections);
     
                 std::array<uint32_t, common::proxy::conn_count_tresholds.size() + 1> counts{};
                 uint32_t max_count{};
@@ -740,8 +689,8 @@ void TcpConnectionStore::CollectGarbage(dataplane::proxy::WorkerGCInfo& worker_g
                     #endif
 
                     data->service_id = service.config.service_id;
-                    ServiceConnections::Unpack(connection.local, data->src, data->sport);
-                    data->dst = service.config.upstream_addr;
+                    LocalPool::UnpackTuple(connection.local, data->src, data->sport);
+                    data->dst = service.config.upstream_addr4;
                     data->dport = service.config.upstream_port;
                     data->client_start_seq = connection.client_start_seq;
                     data->flow = service.config.proxy_flow;
@@ -757,7 +706,7 @@ void TcpConnectionStore::CollectGarbage(dataplane::proxy::WorkerGCInfo& worker_g
                     bucket.connections[conn_idx].SetSentRetransmit();
                 };
 
-                service.tables_work.service_connections.ProcessAllConnectionsWithLocking(condition, action);
+                service.tables_work.service_connections4.ProcessAllConnectionsWithLocking(condition, action);
                 if (was_overflow_ring_retransmit)
                 {
                     worker_gc_info.start_proxy_retransmit_service = index;
@@ -789,14 +738,14 @@ common::idp::proxy_connections::response TcpConnectionStore::GetConnections(prox
             auto get_connections = [&response, socket_id, &client_prefix] (uint32_t address, tPortId port, uint64_t last_time, const Connection& connection) {
                 uint32_t local_addr;
                 uint16_t local_port;
-                ServiceConnections::Unpack(connection.local, local_addr, local_port);
+                LocalPool::UnpackTuple(connection.local, local_addr, local_port);
                 if (!client_prefix.has_value() || client_prefix->subnetFor(rte_cpu_to_be_32(address)))
                 {
                     response.emplace_back(address, port, local_addr, local_port, socket_id);
                 }
             };
 
-            service.tables_work.service_connections.ProcessAllConnectionsWithoutLocking(get_connections);
+            service.tables_work.service_connections4.ProcessAllConnectionsWithoutLocking(get_connections);
         }
     }
     return response;
@@ -815,14 +764,14 @@ common::idp::proxy_syn::response TcpConnectionStore::GetSyn(proxy_service_id_t s
             auto get_connections = [&response, socket_id, &client_prefix] (uint32_t address, tPortId port, uint64_t last_time, const SynConnection& connection) {
                 uint32_t local_addr;
                 uint16_t local_port;
-                ServiceConnections::Unpack(connection.local, local_addr, local_port);
+                LocalPool::UnpackTuple(connection.local, local_addr, local_port);
                 if (!client_prefix.has_value() || client_prefix->subnetFor(rte_cpu_to_be_32(address)))
                 {
                     response.emplace_back(address, port, local_addr, local_port, socket_id);
                 }
             };
 
-            service.tables_work.syn_connections.ProcessAllConnectionsWithoutLocking(get_connections);
+            service.tables_work.syn_connections4.ProcessAllConnectionsWithoutLocking(get_connections);
         }
     }
     return response;
@@ -847,8 +796,8 @@ common::idp::proxy_tables::response TcpConnectionStore::GetTables(const common::
                     common::proxy::AllTablesInfo info;
                     info.header = service_info;
 
-                    current.service_connections.FillStat(info.connections);
-                    current.syn_connections.FillStat(info.syn_connections);
+                    current.service_connections4.FillStat(info.connections);
+                    current.syn_connections4.FillStat(info.syn_connections);
 
                     LocalPoolStat stat = current.local_pool.GetStat();
                     info.local_pool.size = stat.total_addresses;
@@ -882,8 +831,8 @@ common::idp::proxy_buckets::response TcpConnectionStore::GetBuckets(const common
                     std::shared_lock lock(service.mutex);
                     const ProxyTables& current = service.tables_work;
 
-                    response.push_back({service_info, "connections", current.service_connections.BucketsStat()});
-                    response.push_back({service_info, "syn_connections", current.syn_connections.BucketsStat()});
+                    response.push_back({service_info, "connections", current.service_connections4.BucketsStat()});
+                    response.push_back({service_info, "syn_connections", current.syn_connections4.BucketsStat()});
                     response.push_back({service_info, "rate_limit", current.rate_limit.BucketsStat()});
                     response.push_back({service_info, "connection_limit", current.connection_limit.BucketsStat()});
                 }
@@ -968,30 +917,56 @@ bool ProxyTables::NeedUpdate(const proxy_service_config_t& service_config)
     // YANET_LOG_WARNING("NeedUpdate %d check: con=(%d, %ld), syn=(%d, %ld) need=(%d, %d, %d)\n", service_config.service_id,
     //     service_config.size_connections_table, service_connections.Capacity(), service_config.size_syn_table, syn_connections.Capacity(),
     //     service_connections.NeedUpdate(service_config.size_connections_table), syn_connections.NeedUpdate(service_config.size_syn_table), local_pool.NeedUpdate(service_config.pool_prefixes));
-    return service_connections.NeedUpdate(service_config.size_connections_table)
-            || syn_connections.NeedUpdate(service_config.size_syn_table)
-            || local_pool.NeedUpdate(service_config.pool_prefixes);
+    switch (service_config.ip_ver)
+    {
+    case ProxyServiceIPVer::IPv4:
+        return service_connections4.NeedUpdate(service_config.size_connections_table)
+                || syn_connections4.NeedUpdate(service_config.size_syn_table)
+                || local_pool.NeedUpdate(service_config.pool_prefixes);
+    case ProxyServiceIPVer::IPv6:
+        return service_connections6.NeedUpdate(service_config.size_connections_table)
+                || syn_connections6.NeedUpdate(service_config.size_syn_table)
+                || local_pool.NeedUpdate(service_config.pool_prefixes);
+    }
+    return false;
 }
 
 void ProxyTables::ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager)
 {
-    service_connections.ClearIfNotEqual(other.service_connections, memory_manager);
-    syn_connections.ClearIfNotEqual(other.syn_connections, memory_manager);
+    service_connections4.ClearIfNotEqual(other.service_connections4, memory_manager);
+    service_connections6.ClearIfNotEqual(other.service_connections6, memory_manager);
+    syn_connections4.ClearIfNotEqual(other.syn_connections4, memory_manager);
+    syn_connections6.ClearIfNotEqual(other.syn_connections6, memory_manager);
     local_pool.ClearIfNotEqual(other.local_pool, memory_manager);
 }
 
 eResult ProxyTables::Allocate(dataplane::memory_manager* memory_manager, const proxy_service_config_t& service_config)
 {
-    if (!service_connections.Init(service_config.service_id, service_config.size_connections_table, memory_manager, service_config.socket_id, "tcp_proxy.connections." + std::to_string(service_config.service_id) + ".socket." + std::to_string(service_config.socket_id)))
+    if (service_config.ip_ver == ProxyServiceIPVer::IPv4)
     {
-        YANET_LOG_ERROR("Error initialization TcpProxy.ServiceConnections, service: %d\n", service_config.service_id);
-        return eResult::errorAllocatingMemory;
+        if (!service_connections4.Init(service_config.service_id, service_config.size_connections_table, memory_manager, service_config.socket_id, "tcp_proxy.connections." + std::to_string(service_config.service_id) + ".socket." + std::to_string(service_config.socket_id)))
+        {
+            YANET_LOG_ERROR("Error initialization TcpProxy.ServiceConnections, service: %d\n", service_config.service_id);
+            return eResult::errorAllocatingMemory;
+        }
+        if (!syn_connections4.Init(service_config.service_id, service_config.size_syn_table, memory_manager, service_config.socket_id, "tcp_proxy.syn_connections." + std::to_string(service_config.service_id) + ".socket." + std::to_string(service_config.socket_id)))
+        {
+            YANET_LOG_ERROR("Error initialization TcpProxy.SynConnections, service: %d\n", service_config.service_id);
+            return eResult::errorAllocatingMemory;
+        }
     }
-
-    if (!syn_connections.Init(service_config.service_id, service_config.size_syn_table, memory_manager, service_config.socket_id, "tcp_proxy.syn_connections." + std::to_string(service_config.service_id) + ".socket." + std::to_string(service_config.socket_id)))
+    else if (service_config.ip_ver == ProxyServiceIPVer::IPv6)
     {
-        YANET_LOG_ERROR("Error initialization TcpProxy.SynConnections, service: %d\n", service_config.service_id);
-        return eResult::errorAllocatingMemory;
+        if (!service_connections6.Init(service_config.service_id, service_config.size_connections_table, memory_manager, service_config.socket_id, "tcp_proxy.connections6." + std::to_string(service_config.service_id) + ".socket." + std::to_string(service_config.socket_id)))
+        {
+            YANET_LOG_ERROR("Error initialization TcpProxy.ServiceConnections6, service: %d\n", service_config.service_id);
+            return eResult::errorAllocatingMemory;
+        }
+        if (!syn_connections6.Init(service_config.service_id, service_config.size_syn_table, memory_manager, service_config.socket_id, "tcp_proxy.syn_connections6." + std::to_string(service_config.service_id) + ".socket." + std::to_string(service_config.socket_id)))
+        {
+            YANET_LOG_ERROR("Error initialization TcpProxy.SynConnections6, service: %d\n", service_config.service_id);
+            return eResult::errorAllocatingMemory;
+        }
     }
 
     bool rotate_addresses_first = (service_config.debug_flags & proxy_service_config_t::flag_local_pool_rotate_addresses_second) == 0;
@@ -1006,22 +981,28 @@ eResult ProxyTables::Allocate(dataplane::memory_manager* memory_manager, const p
 
 void ProxyTables::CopyFrom(const ProxyTables& other)
 {
-    service_connections.CopyFrom(other.service_connections);
-    syn_connections.CopyFrom(other.syn_connections);
+    service_connections4.CopyFrom(other.service_connections4);
+    service_connections6.CopyFrom(other.service_connections6);
+    syn_connections4.CopyFrom(other.syn_connections4);
+    syn_connections6.CopyFrom(other.syn_connections6);
     local_pool.CopyFrom(other.local_pool);
 }
 
 void ProxyTables::ClearLinks()
 {
-    service_connections.ClearLinks();
-    syn_connections.ClearLinks();
+    service_connections4.ClearLinks();
+    service_connections6.ClearLinks();
+    syn_connections4.ClearLinks();
+    syn_connections6.ClearLinks();
     local_pool.ClearLinks();
 }
 
 void ProxyTables::Clear(dataplane::memory_manager* memory_manager)
 {
-    service_connections.Clear(memory_manager);
-    syn_connections.Clear(memory_manager);
+    service_connections4.Clear(memory_manager);
+    service_connections6.Clear(memory_manager);
+    syn_connections4.Clear(memory_manager);
+    syn_connections6.Clear(memory_manager);
     local_pool.Clear(memory_manager);
 }
 
@@ -1034,13 +1015,15 @@ void proxy_service_t::Debug() const
         ss << config.pool_prefixes[i].toString().c_str();
         if (i < config.pool_prefixes.size() - 1) ss << ", ";
     }
-    YANET_LOG_WARNING("\tproxy=%s:%d, service=%s:%d, pool=[%s]\n",
-        common::ipv4_address_t(rte_cpu_to_be_32(config.proxy_addr)).toString().c_str(), rte_cpu_to_be_16(config.proxy_port),
-        common::ipv4_address_t(rte_cpu_to_be_32(config.upstream_addr)).toString().c_str(), rte_cpu_to_be_16(config.upstream_port),
+    YANET_LOG_WARNING("\tproxy4=%s:%u, proxy6=%s:%u, service4=%s:%u, service6=%s:%u, pool=[%s]\n",
+        common::ipv4_address_t(rte_cpu_to_be_32(config.proxy_addr4)).toString().c_str(), rte_cpu_to_be_16(config.proxy_port),
+        common::ipv6_address_t(config.proxy_addr6).toString().c_str(), rte_cpu_to_be_16(config.proxy_port),
+        common::ipv4_address_t(rte_cpu_to_be_32(config.upstream_addr4)).toString().c_str(), rte_cpu_to_be_16(config.upstream_port),
+        common::ipv6_address_t(config.upstream_addr6).toString().c_str(), rte_cpu_to_be_16(config.upstream_port),
         ss.str().c_str());
     config.tcp_options.Debug();
     config.timeouts.Debug();
-	YANET_LOG_WARNING("\tservice=[%s], syn=[%s], local=[%s]\n", tables.service_connections.Debug().c_str(), tables.syn_connections.Debug().c_str(), tables.local_pool.Debug().c_str());
+	YANET_LOG_WARNING("\tservice=[%s], syn=[%s], local=[%s]\n", tables.service_connections4.Debug().c_str(), tables.syn_connections4.Debug().c_str(), tables.local_pool.Debug().c_str());
 }
 
 bool proxy_service_config_t::EnabledFlag(uint8_t flag) const
@@ -1056,7 +1039,7 @@ void proxy_service_t::UpdateProxyHeader()
 	proxy_header_tmp.version_cmd = (dataplane::proxy::PROXY_VERSION_V2 << 4) + dataplane::proxy::PROXY_CMD_LOCAL;
 	proxy_header_tmp.af_proto = (dataplane::proxy::PROXY_AF_INET << 4) + dataplane::proxy::PROXY_PROTO_STREAM;
 	proxy_header_tmp.addr_len = rte_cpu_to_be_16(4 + 4 + 4);
-	proxy_header_tmp.dst_addr = config.proxy_addr;
+	proxy_header_tmp.dst_addr = config.proxy_addr4;
 	proxy_header_tmp.dst_port = config.proxy_port;
 
     rte_memcpy(proxy_header.signature, proxy_header_tmp.signature, sizeof(proxy::proxy_v2_ipv4_hdr));

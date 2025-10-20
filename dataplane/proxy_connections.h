@@ -11,6 +11,16 @@ namespace dataplane::proxy
 
 #define TIMEOUT_BUCKET_OVERFLOW 1000
 
+using addr_type_ipv4 = uint32_t;
+using addr_type_ipv6 = common::uint128_t;
+
+template<typename ip_header_t>
+using addr_type = std::conditional_t<
+                    std::is_same_v<ip_header_t, rte_ipv6_hdr>,
+                    addr_type_ipv6,
+                    addr_type_ipv4
+                  >;
+
 enum class TableSearchResult : uint32_t
 {
     Overflow = 0,
@@ -106,7 +116,7 @@ struct SynConnection
     }
 } __rte_aligned(32);
 
-template<typename ConnectionInfo>
+template<typename ConnectionInfo, typename ip_address_t>
 struct ConnectionBucket
 {
     static constexpr uint32_t bucket_size = 16;
@@ -122,11 +132,9 @@ struct ConnectionBucket
         num_allocated = 0;
     }
 
-    // 128 bytes = 2 cache lines
     uint64_t last_times[bucket_size];
 
-    // 108 bytes = 2 cache lines
-    uint32_t addresses[bucket_size];
+    ip_address_t addresses[bucket_size];
     tPortId ports[bucket_size];
     uint32_t time_overflow;
     uint32_t num_allocated;
@@ -156,7 +164,7 @@ struct ConnectionBucket
     class Iterator
     {
     public:
-        Iterator(const ConnectionBucket<ConnectionInfo>* bucket, uint32_t conn_idx) 
+        Iterator(const ConnectionBucket<ConnectionInfo, ip_address_t>* bucket, uint32_t conn_idx) 
             : bucket_(bucket), conn_idx_(conn_idx) 
         {
             while (conn_idx_ < bucket_size && bucket_->addresses[conn_idx_] == 0) conn_idx_++;
@@ -190,7 +198,7 @@ struct ConnectionBucket
         }
 
     private:
-        const ConnectionBucket<ConnectionInfo>* bucket_;
+        const ConnectionBucket<ConnectionInfo, ip_address_t>* bucket_;
         uint32_t conn_idx_;
     };
 
@@ -202,15 +210,15 @@ struct ConnectionBucket
     iterator_type end() const { return Iterator(this, bucket_size); }
 } __rte_cache_aligned;
 
-template<typename ConnectionInfo>
+template<typename ConnectionInfo, typename ip_address_t>
 struct ConnectionData {
-    ConnectionBucket<ConnectionInfo>* bucket;
+    ConnectionBucket<ConnectionInfo, ip_address_t>* bucket;
     ConnectionInfo* connection;
     uint32_t idx;
     
-    void Init(uint32_t ip, tPortId port, uint64_t time)
+    void Init(ip_address_t addr, tPortId port, uint64_t time)
     {
-        bucket->addresses[idx] = ip;
+        bucket->addresses[idx] = addr;
         bucket->ports[idx] = port;
         bucket->last_times[idx] = time;
         memset(connection, 0, sizeof(ConnectionInfo));
@@ -240,14 +248,30 @@ struct ConnectionData {
     }
 };
 
-using ServiceConnectionData = ConnectionData<Connection>;
-using SynConnectionData = ConnectionData<SynConnection>;
+using ServiceConnectionData4 = ConnectionData<Connection, addr_type_ipv4>;
+using ServiceConnectionData6 = ConnectionData<Connection, addr_type_ipv6>;
+using SynConnectionData4 = ConnectionData<SynConnection, addr_type_ipv4>;
+using SynConnectionData6 = ConnectionData<SynConnection, addr_type_ipv6>;
 
-template<typename ConnectionInfo>
+template<typename ip_header_t>
+using ServiceConnectionData = std::conditional_t<
+                                std::is_same_v<ip_header_t, rte_ipv6_hdr>,
+                                ServiceConnectionData6,
+                                ServiceConnectionData4
+                              >;
+
+template<typename ip_header_t>
+using SynConnectionData = std::conditional_t<
+                            std::is_same_v<ip_header_t, rte_ipv6_hdr>,
+                            SynConnectionData6,
+                            SynConnectionData4
+                          >;
+
+template<typename ConnectionInfo, typename ip_address_t>
 class ConnectionsTable
 {
 public:
-    using Bucket = ConnectionBucket<ConnectionInfo>;
+    using Bucket = ConnectionBucket<ConnectionInfo, ip_address_t>;
 
     bool Init(proxy_service_id_t service_id, uint32_t number_connections, dataplane::memory_manager* memory_manager, tSocketId socket_id, const std::string& name)
     {
@@ -290,7 +314,7 @@ public:
     class Iterator
     {
     public:
-        Iterator(const ConnectionsTable<ConnectionInfo>* table, uint32_t bucket_idx) 
+        Iterator(const ConnectionsTable<ConnectionInfo, ip_address_t>* table, uint32_t bucket_idx) 
             : table_(table), bucket_idx_(bucket_idx)
         {
             if (unlikely(!table_->initialized_)) {
@@ -340,7 +364,7 @@ public:
         }
 
     private:
-        const ConnectionsTable<ConnectionInfo>* table_;
+        const ConnectionsTable<ConnectionInfo, ip_address_t>* table_;
         uint32_t bucket_idx_;
         T* bucket_;
     };
@@ -409,7 +433,8 @@ public:
         return number_buckets_ * Bucket::bucket_size;
     }
 
-    TableSearchResult FindAndLock(uint32_t addr, tPortId port, uint64_t current_time, ConnectionData<ConnectionInfo>& data, bool first_overflow_check)
+    TableSearchResult FindAndLock(ip_address_t addr, tPortId port, uint64_t current_time,
+                                  ConnectionData<ConnectionInfo, ip_address_t>& data, bool first_overflow_check)
     {
         data.bucket = nullptr;
         data.connection = nullptr;
@@ -418,7 +443,11 @@ public:
             return TableSearchResult::Overflow;
         }
         
-        uint64_t key = Hash(addr, port);
+        uint64_t key;
+        if constexpr (std::is_same_v<ip_address_t, addr_type_ipv4>)
+            key = Hash(addr, port);
+        else if constexpr (std::is_same_v<ip_address_t, addr_type_ipv6>)
+            key = Hash6(addr, port);
         Bucket* bucket = &buckets_[key & (number_buckets_ - 1)];
 
         if (first_overflow_check)
@@ -552,13 +581,41 @@ private:
     uint32_t init_value_hash_ = 0;
     bool initialized_ = false;
 
-    inline uint64_t Hash(uint32_t addr, tPortId port)
+    inline uint64_t Hash(addr_type_ipv4 addr, tPortId port)
     {
         return rte_hash_crc_8byte(Pack(addr, port), init_value_hash_);
     }
+
+    inline uint64_t Hash6(addr_type_ipv6 addr, tPortId port)
+    {
+        uint64_t result = rte_hash_crc_2byte(port, init_value_hash_);
+        unsigned int offset = 0;
+        for (unsigned int i = 0; i < sizeof(addr_type_ipv6) / 8; i++)
+        {
+            result = rte_hash_crc_8byte(*(((const uint64_t*)&addr) + offset / 8), result);
+            offset += 8;
+        }
+        return result;
+    }
 };
 
-using ServiceConnections = ConnectionsTable<Connection>;
-using ServiceSynConnections = ConnectionsTable<SynConnection>;
+using ServiceConnections4 = ConnectionsTable<Connection, addr_type_ipv4>;
+using ServiceConnections6 = ConnectionsTable<Connection, addr_type_ipv6>;
+using ServiceSynConnections4 = ConnectionsTable<SynConnection, addr_type_ipv4>;
+using ServiceSynConnections6 = ConnectionsTable<SynConnection, addr_type_ipv6>;
+
+template<typename ip_header_t>
+using ServiceConnections = std::conditional_t<
+                                std::is_same_v<ip_header_t, rte_ipv6_hdr>,
+                                ServiceConnections6,
+                                ServiceConnections4
+                              >;
+
+template<typename ip_header_t>
+using ServiceSynConnections = std::conditional_t<
+                                std::is_same_v<ip_header_t, rte_ipv6_hdr>,
+                                ServiceSynConnections6,
+                                ServiceSynConnections4
+                              >;
 
 }

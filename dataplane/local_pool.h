@@ -38,9 +38,15 @@ public:
               dataplane::memory_manager* memory_manager, tSocketId socket_id,
               bool rotate_addresses_first = false);
 
-    uint64_t Allocate(uint32_t worker_id, uint32_t client_addr, tPortId client_port);
-    uint64_t FindClientByLocal(uint32_t local_addr, tPortId local_port) const;
+    uint64_t Allocate(uint32_t worker_id, common::uint128_t client_addr, tPortId client_port);
     void Free(uint32_t worker_id, uint64_t tuple);
+
+    struct Client
+    {
+        common::uint128_t address;
+        uint16_t port;
+    };
+    Client FindClientByLocal(uint32_t local_addr, tPortId local_port) const;
 
     LocalPoolStat GetStat() const;
 
@@ -58,6 +64,12 @@ public:
     std::string Debug() const;
 
 private:
+    struct ClientInfo
+    {
+        common::uint128_t* addresses;
+        uint16_t* ports;
+    };
+
     struct LocalInfo
     {
         mutable rte_spinlock_t spinlock;
@@ -82,7 +94,7 @@ private:
     bool rotate_addr_first_{false};
     uint32_t num_addrs_{0};
     ConnectionsChunk* chunk_queue_{nullptr};
-    uint64_t* local_to_client_{nullptr};
+    ClientInfo local_to_client_{};
     LocalInfo* local_info_{nullptr};
 
     inline uint32_t index_to_prefix(uint32_t index) const;
@@ -91,21 +103,31 @@ private:
     inline uint32_t tuple_to_index(uint64_t tuple) const;
 
 public:
-    inline static uint64_t PackTuple(uint32_t addr, uint16_t port) {
+    inline static uint64_t PackTuple(uint32_t addr, uint16_t port)
+    {
         return ((uint64_t)addr << 16) | (uint64_t)port;
     }
 
-    inline static void UnpackTuple(uint64_t tuple, uint32_t& addr, tPortId& port) {
+    inline static void UnpackTuple(uint64_t tuple, uint32_t& addr, tPortId& port)
+    {
         addr = tuple >> 16;
         port = tuple & 0xffff;
     }
 
-    inline static void UnpackTupleSrc(uint64_t tuple, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) {
+    inline static void UnpackTupleSrc(uint64_t tuple, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
+    {
         ipv4_header->src_addr = tuple >> 16;
         tcp_header->src_port = tuple & 0xffff;
     }
 
-    inline static void UnpackTupleDst(uint64_t tuple, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) {
+    inline static void UnpackTupleSrc(uint64_t tuple, rte_ipv6_hdr* ipv6_header, rte_tcp_hdr* tcp_header)
+    {
+        *(common::uint128_t*)&ipv6_header->src_addr += (tuple >> 16);
+        tcp_header->src_port = tuple & 0xffff;
+    }
+
+    inline static void UnpackTupleDst(uint64_t tuple, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header)
+    {
         ipv4_header->dst_addr = tuple >> 16;
         tcp_header->dst_port = tuple & 0xffff;
     }

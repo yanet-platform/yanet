@@ -66,10 +66,12 @@ bool LocalPool::Init(proxy_service_id_t service_id, const std::vector<common::ip
     local_info_ = (LocalInfo*)memory_manager->alloc(name.data(), socket_id, sizeof(LocalInfo));
     name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".chunk_queue";
     chunk_queue_ = memory_manager->create_static_array<ConnectionsChunk>(name.data(), num_free_chunks + num_chunks, socket_id);
-    name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".local_to_client";
-    local_to_client_ = memory_manager->create_static_array<uint64_t>(name.data(), num_chunks * chunk_size, socket_id);
+    name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".local_to_client.addresses";
+    local_to_client_.addresses = memory_manager->create_static_array<common::uint128_t>(name.data(), num_chunks * chunk_size, socket_id);
+    name = "tcp_proxy.local_pools." + std::to_string(service_id) + ".local_to_client.ports";
+    local_to_client_.ports = memory_manager->create_static_array<uint16_t>(name.data(), num_chunks * chunk_size, socket_id);
 #endif
-    if (local_info_ == nullptr || chunk_queue_ == nullptr || local_to_client_ == nullptr)
+    if (local_info_ == nullptr || chunk_queue_ == nullptr || local_to_client_.addresses == nullptr || local_to_client_.ports == nullptr)
     {
         return false;
     }
@@ -119,7 +121,7 @@ bool LocalPool::Init(proxy_service_id_t service_id, const std::vector<common::ip
     return true;
 }
 
-uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId client_port)
+uint64_t LocalPool::Allocate(uint32_t worker_id, common::uint128_t client_addr, tPortId client_port)
 {
     if (unlikely(!initialized_)) return 0;
 
@@ -158,7 +160,8 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, uint32_t client_addr, tPortId c
         local_info_->worker_chunks[worker_id] = NULL_CHUNK;
         rte_spinlock_unlock(&local_info_->spinlock);
     }
-    local_to_client_[local] = PackTuple(client_addr, client_port); 
+    local_to_client_.addresses[local] = client_addr;
+    local_to_client_.addresses[local] = client_port; 
 
     return res;
 }
@@ -169,7 +172,7 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
     
     uint32_t idx = tuple_to_index(tuple);
     if (unlikely(idx > local_info_->num_chunks * chunk_size - 1)) return;
-    if (unlikely(local_to_client_[idx] == 0))
+    if (unlikely(local_to_client_.addresses[idx] == 0))
     {
         YANET_LOG_ERROR("Trying to free tuple %s:%d which is not in use\n",
             common::ip_address_t(rte_be_to_cpu_32(uint32_t(tuple >> 16))).toString().c_str(), rte_be_to_cpu_16(uint16_t(tuple & 0xffff)));
@@ -213,14 +216,16 @@ void LocalPool::Free(uint32_t worker_id, uint64_t tuple)
         rte_spinlock_unlock(&local_info_->spinlock);
     }
 
-    local_to_client_[idx] = 0;
+    local_to_client_.addresses[idx] = 0;
+    local_to_client_.ports[idx] = 0;
 }
 
-uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) const
+LocalPool::Client LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) const
 {
+    Client result{};
     if (unlikely(!initialized_))
     {
-        return 0;
+        return result;
     }
     uint32_t idx = tuple_to_index(PackTuple(local_addr, local_port));
     // local_addr = rte_be_to_cpu_32(local_addr);
@@ -229,18 +234,19 @@ uint64_t LocalPool::FindClientByLocal(uint32_t local_addr, tPortId local_port) c
     {
         // YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: out of range, local_addr=%s local_port=%d idx=%d num_connections_=%lu\n",
         //     common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx, local_info_->num_chunks * chunk_size);
-        return 0;
+        return result;
     }
     
-    uint64_t client = local_to_client_[idx];
-    if (client == 0)
+    if (local_to_client_.addresses[idx] == 0)
     {
         // YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: not used, local_addr=%s local_port=%d idx=%d\n", common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx);
-        return 0;
+        return result;
     }
+    result.address = local_to_client_.addresses[idx];
+    result.port = local_to_client_.ports[idx];
     
     // YANET_LOG_WARNING("\tLocalPool.FindClientByLocal: found, local_addr=%s local_port=%d idx=%d\n", common::ipv4_address_t(local_addr).toString().c_str(), local_port, idx);
-    return client;
+    return result;
 }
 
 LocalPoolStat LocalPool::GetStat() const {
@@ -344,9 +350,13 @@ void LocalPool::Clear(dataplane::memory_manager* memory_manager)
     {
         memory_manager->destroy(chunk_queue_);
     }
-    if (local_to_client_ != nullptr)
+    if (local_to_client_.addresses != nullptr)
     {
-        memory_manager->destroy(local_to_client_);
+        memory_manager->destroy(local_to_client_.addresses);
+    }
+    if (local_to_client_.ports != nullptr)
+    {
+        memory_manager->destroy(local_to_client_.ports);
     }
     if (local_info_ != nullptr)
     {
@@ -380,7 +390,8 @@ void LocalPool::ClearLinks()
 {
     index_to_prefix_ = nullptr;
     chunk_queue_ = nullptr;
-    local_to_client_ = nullptr;
+    local_to_client_.addresses = nullptr;
+    local_to_client_.ports = nullptr;
     local_info_ = nullptr;
     initialized_ = false;
 }
@@ -393,7 +404,8 @@ std::string LocalPool::Debug() const
     }
 
     char loc_buf[256];
-    snprintf(loc_buf, sizeof(loc_buf), "chunk_queue=%p, local_to_client=%p, local_info=%p", chunk_queue_, local_to_client_, local_info_);
+    snprintf(loc_buf, sizeof(loc_buf), "chunk_queue=%p, local_to_client.addresses=%p, local_to_client.ports=%p, local_info=%p",
+             chunk_queue_, local_to_client_.addresses, local_to_client_.ports, local_info_);
     return std::string(loc_buf);
 }
 

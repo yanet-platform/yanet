@@ -6173,7 +6173,7 @@ inline void cWorker::proxy_client_syn_handle()
 	for (unsigned int mbuf_i = 0; mbuf_i < proxy_client_syn_stack.mbufsCount; mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_client_syn_stack.mbufs[mbuf_i];
-		if (dataplane::proxy::ActionClientOnSyn(mbuf, worker_info))
+		if (dataplane::proxy::ActionClientOnSyn4(mbuf, worker_info))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6331,7 +6331,7 @@ inline void cWorker::proxy_client_icmp_handle()
 	     mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_client_icmp_stack.mbufs[mbuf_i];
-		if (dataplane::proxy::ActionClientOnICMP(mbuf, worker_info))
+		if (dataplane::proxy::ActionClientOnICMP<rte_ipv4_hdr, icmpv4_header_t>(mbuf, worker_info))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}
@@ -6372,7 +6372,7 @@ inline void cWorker::proxy_client_icmp_v6_handle()
 	     mbuf_i++)
 	{
 		rte_mbuf* mbuf = proxy_client_icmp_v6_stack.mbufs[mbuf_i];
-		if (dataplane::proxy::ActionClientOnICMPv6(mbuf, worker_info))
+		if (dataplane::proxy::ActionClientOnICMP<rte_ipv6_hdr, icmpv6_header_t>(mbuf, worker_info))
 		{
 			proxy_flow(mbuf, base.globalBase->proxy_flow);
 		}

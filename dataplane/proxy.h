@@ -37,8 +37,85 @@ struct TcpOptions
 
     bool Read(rte_tcp_hdr* tcp_header);
     bool ReadOnlyTimestampsAndSack(rte_tcp_hdr* tcp_header);
-    uint32_t WriteSYN(rte_mbuf* mbuf, rte_ipv4_hdr* ipv4_header, rte_tcp_hdr* tcp_header) const;
-    uint32_t Write(rte_mbuf* mbuf, rte_ipv4_hdr** ipv4_header, rte_tcp_hdr** tcp_header) const;
+
+    template<typename ip_header_t>
+    uint32_t WriteSYN(rte_mbuf* mbuf, ip_header_t* ip_header, rte_tcp_hdr* tcp_header) const
+    {
+        uint32_t len = WriteBuffer((uint8_t*)(tcp_header) + sizeof(rte_tcp_hdr));
+
+        tcp_header->data_off = ((sizeof(rte_tcp_hdr) + len) >> 2) << 4;
+        
+        if constexpr (std::is_same_v<ip_header_t, rte_ipv6_hdr>)
+        {
+            ip_header->payload_len = rte_cpu_to_be_16(sizeof(rte_tcp_hdr) + len);
+            mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + sizeof(rte_ipv6_hdr) + ip_header->payload_len;
+        }
+        else
+        {
+            uint16_t total_length = rte_ipv4_hdr_len(ip_header) + sizeof(rte_tcp_hdr) + len;
+            ip_header->total_length = rte_cpu_to_be_16(total_length);
+            mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + total_length;
+        }
+
+        mbuf->pkt_len = mbuf->data_len;
+
+        return len;
+    }
+
+    template<typename ip_header_t>
+    uint32_t Write(rte_mbuf* mbuf, ip_header_t** ip_header, rte_tcp_hdr** tcp_header) const
+    {
+        dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
+        size_t tcp_header_len_old = std::max(sizeof(rte_tcp_hdr), (size_t)((*tcp_header)->data_off >> 4) << 2);
+        uint16_t tcp_data_len = 0;
+        if constexpr (std::is_same_v<ip_header_t, rte_ipv6_hdr>)
+        {
+            tcp_data_len = rte_be_to_cpu_16((*ip_header)->payload_len) - tcp_header_len_old;
+        }
+        else
+        {
+            tcp_data_len = rte_be_to_cpu_16((*ip_header)->total_length) - rte_ipv4_hdr_len(*ip_header) - tcp_header_len_old;
+        }
+
+        uint32_t old_opts_size = tcp_header_len_old - sizeof(rte_tcp_hdr);
+        int diff = old_opts_size - Size();
+        if (diff < 0) // Options size increased
+        {
+            rte_pktmbuf_prepend(mbuf, -diff);
+            memmove(rte_pktmbuf_mtod(mbuf, char*),
+                    rte_pktmbuf_mtod_offset(mbuf, char*, -diff),
+                    metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
+        }
+        else if (diff > 0) // Options size decreased
+        {
+            memmove(rte_pktmbuf_mtod_offset(mbuf, char*, diff),
+                    rte_pktmbuf_mtod(mbuf, char*),
+                    metadata->transport_headerOffset + sizeof(rte_tcp_hdr));
+            rte_pktmbuf_adj(mbuf, diff);
+        }
+        *ip_header = rte_pktmbuf_mtod_offset(mbuf, ip_header_t*, metadata->network_headerOffset);
+        *tcp_header = rte_pktmbuf_mtod_offset(mbuf, rte_tcp_hdr*, metadata->transport_headerOffset);
+        uint32_t len = WriteBuffer((uint8_t*)(*tcp_header) + sizeof(rte_tcp_hdr));
+
+        (*tcp_header)->data_off = ((sizeof(rte_tcp_hdr) + len) >> 2) << 4;
+        
+        if constexpr (std::is_same_v<ip_header_t, rte_ipv6_hdr>)
+        {
+            (*ip_header)->payload_len = rte_cpu_to_be_16(sizeof(rte_tcp_hdr) + len + tcp_data_len);
+            mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + sizeof(rte_ipv6_hdr) + (*ip_header)->payload_len;
+        }
+        else
+        {
+            uint16_t total_length = rte_ipv4_hdr_len(*ip_header) + sizeof(rte_tcp_hdr) + len + tcp_data_len;
+            (*ip_header)->total_length = rte_cpu_to_be_16(total_length);
+            mbuf->data_len = sizeof(rte_ether_hdr) + sizeof(rte_vlan_hdr) + total_length;
+        }
+
+        mbuf->pkt_len = mbuf->data_len;
+
+        return len;
+    }
+
     uint32_t WriteBuffer(uint8_t* data) const;
     uint32_t Size() const;
 
@@ -60,6 +137,12 @@ private:
     bool CheckSize(uint32_t index, uint32_t len, uint8_t* data, uint8_t expected);
 };
 
+enum class ProxyServiceIPVer
+{
+    IPv4,
+    IPv6
+};
+
 struct proxy_service_config_t
 {
 	proxy_service_id_t service_id;
@@ -67,11 +150,13 @@ struct proxy_service_config_t
 	tCounterId counter_id;
     common::globalBase::tFlow proxy_flow;
 
-    bool using_ipv6;
+    ProxyServiceIPVer ip_ver;
 	// proxy and service address, port
-	common::uint128_t proxy_addr;
+    uint32_t proxy_addr4;
+	common::uint128_t proxy_addr6;
 	tPortId proxy_port;
-	common::uint128_t upstream_addr;
+    uint32_t upstream_addr4;
+	common::uint128_t upstream_addr6;
 	tPortId upstream_port;
 
 	// sizes of tables
@@ -79,7 +164,7 @@ struct proxy_service_config_t
 	uint32_t size_syn_table;
 
     std::vector<common::ipv4_prefix_t> ipv4_pool_prefixes;
-    std::vector<common::ipv6_prefix_t> ipv6_pool_prefixes;
+    common::ipv6_prefix_t ipv6_pool_prefix;
     std::vector<common::ipv4_prefix_t> pool_prefixes;
 	bool send_proxy_header;
     
@@ -102,11 +187,29 @@ struct proxy_service_config_t
 
 struct ProxyTables
 {
-    dataplane::proxy::LocalPool local_pool;
-    dataplane::proxy::ServiceConnections service_connections;
-    dataplane::proxy::ServiceSynConnections syn_connections;
-    dataplane::proxy::RateLimitTable rate_limit;
-    dataplane::proxy::ConnectionLimitTable connection_limit;
+    LocalPool local_pool;
+    ServiceConnections4 service_connections4;
+    ServiceConnections6 service_connections6;
+    ServiceSynConnections4 syn_connections4;
+    ServiceSynConnections6 syn_connections6;
+    RateLimitTable rate_limit;
+    ConnectionLimitTable connection_limit;
+
+    template<typename ip_header_t>
+    constexpr auto& service_connections() {
+        if constexpr (std::is_same_v<ip_header_t, rte_ipv6_hdr>)
+            return service_connections6;
+        else
+            return service_connections4;
+    };
+
+    template<typename ip_header_t>
+    constexpr auto& syn_connections() {
+        if constexpr (std::is_same_v<ip_header_t, rte_ipv6_hdr>)
+            return syn_connections6;
+        else
+            return syn_connections4;
+    };
 
     bool NeedUpdate(const proxy_service_config_t& service_config);
     void ClearIfNotEqual(const ProxyTables& other, dataplane::memory_manager* memory_manager);

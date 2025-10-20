@@ -4,7 +4,7 @@
 
 #include "common/type.h"
 
-#define RINGLOG_ENABLED 1
+#define RINGLOG_ENABLED 0
 
 #define RINGLOG_SIZE_PER_WORKER 1024 * 256
 static_assert((RINGLOG_SIZE_PER_WORKER & (RINGLOG_SIZE_PER_WORKER - 1)) == 0, "size is not power 2");
