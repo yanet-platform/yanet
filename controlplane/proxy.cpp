@@ -35,7 +35,6 @@ eResult proxy_t::init()
     controlPlane->register_command(common::icp::requestType::proxy_blacklist_add, [this](const common::icp::request& request) {
         return proxy_blacklist_add(std::get<common::icp::proxy_blacklist_add::request>(std::get<1>(request)));
     });
-    controlPlane->register_service(this);
 
     funcThreads.emplace_back([this]() {
 		counters_gc_thread();
