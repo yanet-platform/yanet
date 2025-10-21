@@ -912,6 +912,7 @@ static const std::map<std::string, uint32_t> counter_name_to_offset = {
         {"balancer_icmp_reply_handle", offsetof(tsc_base_values, balancer_icmp_reply_handle)},
         {"balancer_icmp_forward_handle", offsetof(tsc_base_values, balancer_icmp_forward_handle)},
 		{"proxy_client_syn_handle", offsetof(tsc_base_values, proxy_client_syn_handle)},
+		{"proxy_client_syn_v6_handle", offsetof(tsc_base_values, proxy_client_syn_v6_handle)},
 		{"proxy_client_ack_handle", offsetof(tsc_base_values, proxy_client_ack_handle)},
 		{"proxy_server_syn_ack_handle", offsetof(tsc_base_values, proxy_server_syn_ack_handle)},
 		{"proxy_server_ack_handle", offsetof(tsc_base_values, proxy_server_ack_handle)},

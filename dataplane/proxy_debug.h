@@ -20,9 +20,9 @@ void PrintDebugPacket(const char* msg, proxy_service_id_t service_id, ip_header_
     }
     else if constexpr (std::is_same_v<ip_header_t, rte_ipv6_hdr>)
     {
-        YANET_LOG_WARNING("%s service_id=%d, %s:%d -> %s:%d, seq=%u, ack=%u\n", msg, service_id,
-            common::ipv6_address_t(*(common::uint128_t*)&ip_header->src_addr).toString().c_str(), rte_cpu_to_be_16(tcp_header->src_port),
-            common::ipv6_address_t(*(common::uint128_t*)&ip_header->dst_addr).toString().c_str(), rte_cpu_to_be_16(tcp_header->dst_port),
+        YANET_LOG_WARNING("%s service_id=%d, [%s]:%d -> %s:%d, seq=%u, ack=%u\n", msg, service_id,
+            common::ipv6_address_t((uint8_t*)&ip_header->src_addr).toString().c_str(), rte_cpu_to_be_16(tcp_header->src_port),
+            common::ipv6_address_t((uint8_t*)&ip_header->dst_addr).toString().c_str(), rte_cpu_to_be_16(tcp_header->dst_port),
             rte_cpu_to_be_32(tcp_header->sent_seq), rte_cpu_to_be_32(tcp_header->recv_ack));
     }
 }

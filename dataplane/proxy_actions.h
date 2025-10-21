@@ -290,7 +290,7 @@ inline bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& work
                 syn_connection_data.Init(addr_t(ip_header->src_addr), tcp_header->src_port, worker_info.current_time_ms);
                 syn_connection_data.connection->local = local;
                 syn_connection_data.connection->client_start_seq = tcp_header->sent_seq;
-
+                
                 PrepareSynToService(service, ip_header, tcp_header, local);
                 worker_info.counters[service.config.counter_id + (tCounterId)::proxy::service_counter::new_syn_connections]++;
             }

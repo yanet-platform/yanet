@@ -2045,6 +2045,7 @@ enum class eFlowType : uint8_t
 	nat46clat_lan,
 	nat46clat_wan,
 	proxy_client_syn,
+	proxy_client_syn_v6,
 	proxy_client_ack,
 	proxy_server_syn_ack,
 	proxy_server_ack,
@@ -2140,6 +2141,8 @@ inline const char* eFlowType_toString(eFlowType t)
 			return "nat46clat_wan";
 		case eFlowType::proxy_client_syn:
 			return "proxy_client_syn";
+		case eFlowType::proxy_client_syn_v6:
+			return "proxy_client_syn_v6";
 		case eFlowType::proxy_client_ack:
 			return "proxy_client_ack";
 		case eFlowType::proxy_server_syn_ack:

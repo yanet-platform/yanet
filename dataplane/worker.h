@@ -197,6 +197,8 @@ protected:
 	/// proxy
 	inline void proxy_client_syn_entry(rte_mbuf* mbuf);
 	inline void proxy_client_syn_handle();
+	inline void proxy_client_syn_v6_entry(rte_mbuf* mbuf);
+	inline void proxy_client_syn_v6_handle();
 	inline void proxy_client_ack_entry(rte_mbuf* mbuf);
 	inline void proxy_client_ack_handle();
 	inline void proxy_server_syn_ack_entry(rte_mbuf* mbuf);
@@ -368,6 +370,7 @@ protected:
 	worker::tStack<> acl_egress_stack4;
 	worker::tStack<> acl_egress_stack6;
 	worker::tStack<> proxy_client_syn_stack;
+	worker::tStack<> proxy_client_syn_v6_stack;
 	worker::tStack<> proxy_client_ack_stack;
 	worker::tStack<> proxy_server_syn_ack_stack;
 	worker::tStack<> proxy_server_ack_stack;

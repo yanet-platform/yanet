@@ -277,6 +277,7 @@ private:
 			                obj.balancer_icmp_reply_handle,
 			                obj.balancer_icmp_forward_handle,
 							obj.proxy_client_syn_handle,
+							obj.proxy_client_syn_v6_handle,
 							obj.proxy_client_ack_handle,
 							obj.proxy_server_syn_ack_handle,
 							obj.proxy_server_ack_handle,
@@ -312,6 +313,7 @@ private:
 		CountersArray balancer_icmp_reply_handle{};
 		CountersArray balancer_icmp_forward_handle{};
 		CountersArray proxy_client_syn_handle{};
+		CountersArray proxy_client_syn_v6_handle{};
 		CountersArray proxy_client_ack_handle{};
 		CountersArray proxy_server_syn_ack_handle{};
 		CountersArray proxy_server_ack_handle{};

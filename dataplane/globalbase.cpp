@@ -852,6 +852,7 @@ static bool checkFlow(const common::globalBase::tFlow& flow)
 	{
 	}
 	else if (flow.type == common::globalBase::eFlowType::proxy_client_syn ||
+			 flow.type == common::globalBase::eFlowType::proxy_client_syn_v6 ||
 	         flow.type == common::globalBase::eFlowType::proxy_client_ack ||
 			 flow.type == common::globalBase::eFlowType::proxy_server_syn_ack ||
 			 flow.type == common::globalBase::eFlowType::proxy_server_ack ||

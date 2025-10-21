@@ -953,6 +953,10 @@ inline void cWorker::handlePackets()
 	}
 	if (globalbase.proxy_v6_enabled)
 	{
+		stack_size = proxy_client_syn_v6_stack.mbufsCount;
+		proxy_client_syn_v6_handle();
+		tsc_deltas->write(tsc_start, stack_size, tsc_deltas->proxy_client_syn_v6_handle, base_values.proxy_client_syn_v6_handle);
+
 		stack_size = proxy_client_icmp_v6_stack.mbufsCount;
 		proxy_client_icmp_v6_handle();
 		tsc_deltas->write(tsc_start, stack_size, tsc_deltas->proxy_client_icmp_v6_handle, base_values.proxy_client_icmp_v6_handle);
@@ -1817,6 +1821,10 @@ inline void cWorker::acl_ingress_flow(rte_mbuf* mbuf,
 	else if (flow.type == common::globalBase::eFlowType::proxy_client_syn)
 	{
 		proxy_client_syn_entry(mbuf);
+	}
+	else if (flow.type == common::globalBase::eFlowType::proxy_client_syn_v6)
+	{
+		proxy_client_syn_v6_entry(mbuf);
 	}
 	else if (flow.type == common::globalBase::eFlowType::proxy_client_ack)
 	{
@@ -6184,6 +6192,45 @@ inline void cWorker::proxy_client_syn_handle()
 	}
 
 	proxy_client_syn_stack.clear();
+}
+
+inline void cWorker::proxy_client_syn_v6_entry(rte_mbuf* mbuf)
+{
+	proxy_client_syn_v6_stack.insert(mbuf);
+}
+
+inline void cWorker::proxy_client_syn_v6_handle()
+{
+	const auto& base = bases[localBaseId & 1];
+
+	if (unlikely(proxy_client_syn_v6_stack.mbufsCount == 0))
+	{
+		return;
+	}
+
+	dataplane::proxy::WorkerInfo worker_info{
+	        .globalBase = base.globalBase,
+	        .counters = counters,
+	        .worker_id = proxy_worker_id,
+	        .ringlog = &ringLog,
+	        .current_time_sec = CurrentTime(),
+	        .current_time_ms = CurrentTimeMs(),
+	};
+
+	for (unsigned int mbuf_i = 0; mbuf_i < proxy_client_syn_v6_stack.mbufsCount; mbuf_i++)
+	{
+		rte_mbuf* mbuf = proxy_client_syn_v6_stack.mbufs[mbuf_i];
+		if (dataplane::proxy::ActionClientOnSyn6(mbuf, worker_info))
+		{
+			proxy_flow(mbuf, base.globalBase->proxy_flow);
+		}
+		else
+		{
+			drop(mbuf);
+		}
+	}
+
+	proxy_client_syn_v6_stack.clear();
 }
 
 inline void cWorker::proxy_client_ack_entry(rte_mbuf* mbuf)

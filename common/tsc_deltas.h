@@ -42,6 +42,7 @@ struct alignas(2 * RTE_CACHE_LINE_SIZE) tsc_base_values
 
 	uint32_t balancer_icmp_forward_handle = 0;
 	uint32_t proxy_client_syn_handle = 0;
+	uint32_t proxy_client_syn_v6_handle = 0;
 	uint32_t proxy_client_ack_handle = 0;
 	uint32_t proxy_server_syn_ack_handle = 0;
 	uint32_t proxy_server_ack_handle = 0;
@@ -79,6 +80,7 @@ struct alignas(2 * RTE_CACHE_LINE_SIZE) tsc_deltas
 	CountersArray balancer_icmp_reply_handle{};
 	CountersArray balancer_icmp_forward_handle{};
 	CountersArray proxy_client_syn_handle{};
+	CountersArray proxy_client_syn_v6_handle{};
 	CountersArray proxy_client_ack_handle{};
 	CountersArray proxy_server_syn_ack_handle{};
 	CountersArray proxy_server_ack_handle{};
@@ -136,6 +138,7 @@ struct alignas(2 * RTE_CACHE_LINE_SIZE) tsc_deltas
 		                balancer_icmp_reply_handle,
 		                balancer_icmp_forward_handle,
 						proxy_client_syn_handle,
+						proxy_client_syn_v6_handle,
 						proxy_client_ack_handle,
 						proxy_server_syn_ack_handle,
 						proxy_server_ack_handle,

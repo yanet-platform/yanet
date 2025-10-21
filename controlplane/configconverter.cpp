@@ -326,6 +326,10 @@ void config_converter_t::convertToFlow(const std::string& nextModule,
 		{
 			flow.type = common::globalBase::eFlowType::proxy_client_syn;
 		}
+		else if (entry == "client_syn_v6")
+		{
+			flow.type = common::globalBase::eFlowType::proxy_client_syn_v6;
+		}
 		else if (entry == "client_ack")
 		{
 			flow.type = common::globalBase::eFlowType::proxy_client_ack;
@@ -2062,13 +2066,13 @@ void config_converter_t::acl_rules_proxy(controlplane::base::acl_t& acl,
 		else
 		{
 			controlplane::base::acl_rule_network_ipv6_t client_rule_network({common::ipv6_prefix_default}, {common::ipv6_prefix_t(service.proxy_addr)});
-			// {
-			// 	// client_syn
-			// 	common::globalBase::tFlow flow = convertToFlow(nextModule, "client_syn_v6");	
-			// 	flow.data.proxy_service.id = service.service_id;
-			// 	client_rule_transport.flags = {TCP_SYN_FLAG, TCP_ACK_FLAG};
-			// 	acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
-			// }
+			{
+				// client_syn
+				common::globalBase::tFlow flow = convertToFlow(nextModule, "client_syn_v6");	
+				flow.data.proxy_service.id = service.service_id;
+				client_rule_transport.flags = {TCP_SYN_FLAG, TCP_ACK_FLAG};
+				acl.nextModuleRules.emplace_back(controlplane::base::acl_rule_t(client_rule_network, client_rule_transport, flow));
+			}
 			// {
 			// 	// client_ack
 			// 	common::globalBase::tFlow flow = convertToFlow(nextModule, "client_ack_v6");	
