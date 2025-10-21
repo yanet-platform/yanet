@@ -127,6 +127,8 @@ void CheckSumAfterUpdate(const dataplane::proxy::proxy_service_t& service, ip_he
     tcp_header->cksum = chksum;
 }
 
+#define addr_t(addr) (*(addr_type<ip_header_t>*)&addr)
+
 template<typename ip_header_t>
 void PrepareSynAckToClient(const proxy_service_t& service, rte_mbuf* mbuf,
                            ip_header_t* ip_header, rte_tcp_hdr* tcp_header,
@@ -148,7 +150,8 @@ void PrepareSynAckToClient(const proxy_service_t& service, rte_mbuf* mbuf,
         memcpy(&addr, (uint8_t*)(&ip_header->src_addr) + 12, sizeof(addr));
     else
         addr = ip_header->src_addr;
-    uint32_t cookie = service.syn_cookie.GetCookie(ip_header->src_addr, tcp_header->src_port, tcp_header->sent_seq, cookie_data);
+    uint32_t cookie = service.syn_cookie.GetCookie(addr_t(ip_header->src_addr), tcp_header->src_port,
+                                                   tcp_header->sent_seq, cookie_data);
     // YANET_LOG_WARNING("\tcookie_data=%d, cookie=%u, seq=%u\n", cookie_data, cookie, rte_be_to_cpu_32(tcp_header->sent_seq));
 
     tcp_options.window_scaling = service.config.tcp_options.winscale;
@@ -243,7 +246,7 @@ inline bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& work
     uint32_t chksum_work = CheckSumBeforeUpdate(ip_header, tcp_header);
     SynConnectionData<ip_header_t> syn_connection_data;
     auto& syn_connections = service.tables.syn_connections<ip_header_t>();
-    switch (syn_connections.FindAndLock(*(addr_type<ip_header_t>*)&ip_header->src_addr, tcp_header->src_port,
+    switch (syn_connections.FindAndLock(addr_t(ip_header->src_addr), tcp_header->src_port,
                                         worker_info.current_time_ms, syn_connection_data, !service.config.EnabledFlag(dataplane::proxy::proxy_service_config_t::flag_dont_use_bucket_optimization)))
     {
         case TableSearchResult::Overflow:
@@ -251,7 +254,7 @@ inline bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& work
             DebugPacket("\tsyn.FindAndLock=Overflow", service_id, ip_header, tcp_header);
 		    RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SynOverflow, tcp_header->src_port, 0));
 
-            // PrepareSynAckToClient(service, mbuf, ip_header, tcp_header, worker_info.counters, worker_info.current_time_sec);
+            PrepareSynAckToClient(service, mbuf, ip_header, tcp_header, worker_info.counters, worker_info.current_time_sec);
             is_syn_ack = true;
             break;
         }
@@ -261,7 +264,7 @@ inline bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& work
             RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SynFound, tcp_header->src_port, syn_connection_data.connection->local));
             if (++syn_connection_data.connection->retransmits_from_client > 3)
             {
-                // PrepareSynAckToClient(service, mbuf, ip_header, tcp_header, worker_info.counters, worker_info.current_time_sec);
+                PrepareSynAckToClient(service, mbuf, ip_header, tcp_header, worker_info.counters, worker_info.current_time_sec);
                 is_syn_ack = true;
             }
             else
@@ -273,7 +276,7 @@ inline bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& work
         case TableSearchResult::NotFound:
         {
             DebugPacket("\tsyn.FindAndLock=NotFound", service_id, ip_header, tcp_header);
-            uint64_t local = service.tables.local_pool.Allocate(worker_info.worker_id, *(addr_type<ip_header_t>*)&ip_header->src_addr, tcp_header->src_port);
+            uint64_t local = service.tables.local_pool.Allocate(worker_info.worker_id, addr_t(ip_header->src_addr), tcp_header->src_port);
             if (local == 0)
             {
                 DebugPacket("failed to allocate local address", service_id, ip_header, tcp_header);
@@ -284,7 +287,7 @@ inline bool ActionClientOnSyn(rte_mbuf* mbuf, dataplane::proxy::WorkerInfo& work
             else
             {
                 RINGLOG_ADD(*worker_info.ringlog, worker_info.current_time_ms, PackLog(common::ringlog::DebugEvent::SynAdd, tcp_header->src_port, local));
-                syn_connection_data.Init(*(addr_type<ip_header_t>*)&ip_header->src_addr, tcp_header->src_port, worker_info.current_time_ms);
+                syn_connection_data.Init(addr_t(ip_header->src_addr), tcp_header->src_port, worker_info.current_time_ms);
                 syn_connection_data.connection->local = local;
                 syn_connection_data.connection->client_start_seq = tcp_header->sent_seq;
 

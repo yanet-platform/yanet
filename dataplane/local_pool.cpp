@@ -161,7 +161,7 @@ uint64_t LocalPool::Allocate(uint32_t worker_id, common::uint128_t client_addr, 
         rte_spinlock_unlock(&local_info_->spinlock);
     }
     local_to_client_.addresses[local] = client_addr;
-    local_to_client_.addresses[local] = client_port; 
+    local_to_client_.ports[local] = client_port; 
 
     return res;
 }

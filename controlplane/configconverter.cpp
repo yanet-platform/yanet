@@ -765,7 +765,6 @@ void config_converter_t::processProxy()
 		if (!proxy.services.empty())
 		{
 			all_ipv4_upstream_nets.insert(all_ipv4_upstream_nets.end(), proxy.ipv4_upstream_nets.begin(), proxy.ipv4_upstream_nets.end());
-			all_ipv6_upstream_nets.insert(all_ipv6_upstream_nets.end(), proxy.ipv6_upstream_net);
 			// check upstrem nets
 			for (const auto& net : proxy.ipv4_upstream_nets)
 			{
@@ -774,9 +773,10 @@ void config_converter_t::processProxy()
 					throw error_result_t(eResult::invalidFlow, "empty local pool for proxy in ipv4_upstream_nets");
 				}
 			}	
-			if (proxy.ipv6_upstream_net.mask() == 0)
+
+			if (proxy.ipv6_upstream_net.isValid())
 			{
-				throw error_result_t(eResult::invalidFlow, "empty local pool for proxy in ipv6_upstream_net");
+				all_ipv6_upstream_nets.insert(all_ipv6_upstream_nets.end(), proxy.ipv6_upstream_net);
 			}
 		}
 

@@ -14,8 +14,34 @@ class SynCookies
 public:
     SynCookies();
 
-    uint32_t GetCookie(uint32_t saddr, uint16_t sport,  uint32_t sseq, uint32_t data) const;
-    uint32_t CheckCookie(uint32_t cookie, uint32_t saddr, uint16_t sport, uint32_t sseq) const;
+    template<typename addr_type>
+    uint32_t GetCookie(addr_type saddr, uint16_t sport,  uint32_t sseq, uint32_t data) const
+    {
+        uint32_t cookie = ((cookie_hash(saddr, sport, 0) + sseq) << 1)
+                    + ((current_key_ - 1) << COOKIE_BITS)
+                    + ((cookie_hash(saddr, sport, current_key_) + data) << 1 & COOKIE_MASK);
+        cookie |= (rte_be_to_cpu_32(sseq) & 1);
+
+        return cookie;
+    }
+
+    template<typename addr_type>
+    uint32_t CheckCookie(uint32_t cookie, addr_type saddr, uint16_t sport, uint32_t sseq) const
+    {
+        cookie -= (cookie_hash(saddr, sport, 0) + sseq) << 1;
+        uint32_t keyidx = (cookie >> COOKIE_BITS) + 1;
+        if (1 > keyidx || keyidx > 2) {
+            return 0;
+        }
+        cookie = ((cookie & COOKIE_MASK) - (cookie_hash(saddr, sport, keyidx) << 1 & COOKIE_MASK)) & COOKIE_MASK;
+        
+        uint32_t data = cookie >> 1;
+        if (data & ~DATA_MASK) {
+            return 0;
+        }
+
+        return data;
+    }
 
     void UpdateKeys();
     void CopyKeysFrom(const SynCookies& other);
@@ -48,6 +74,7 @@ private:
     static constexpr uint32_t DATA_MASK = WSCALE_MASK | SACK_MASK | MSS_MASK;
 
     uint32_t cookie_hash(uint32_t saddr, uint16_t sport, uint32_t keyidx) const;
+    uint32_t cookie_hash(common::uint128_t saddr, uint16_t sport, uint32_t keyidx) const;
 } __rte_cache_aligned;
 
 }
