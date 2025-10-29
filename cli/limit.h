@@ -14,6 +14,11 @@ void summary()
 	const auto response = controlPlane.limit_summary();
 
 	TablePrinter table;
+	table.insert_row("name",
+	                 "socket_id",
+	                 "current",
+	                 "maximum",
+	                 "percent");
 
 	table.insert_row("name",
 	                 "socket_id",
