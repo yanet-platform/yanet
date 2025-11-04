@@ -1854,7 +1854,11 @@ generation::ServiceSize generation::rebuild_service_ring_one_wrr(
         const balancer_service_t& service)
 {
 	balancer_real_id_t* end = start;
-	balancer_real_id_t* reserve = start + YANET_BALANCER_WRR_SERVICE_SIZE;
+	balancer_real_id_t* reserve = start + YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX * service.real_size;
+	if (reserve > do_not_exceed)
+	{
+		reserve = (balancer_real_id_t*)do_not_exceed;
+	}
 	for (uint32_t real_idx = service.real_start;
 	     real_idx < service.real_start + service.real_size;
 	     ++real_idx)
@@ -1867,6 +1871,8 @@ generation::ServiceSize generation::rebuild_service_ring_one_wrr(
 		if (end + weight > reserve)
 		{
 			YANET_LOG_ERROR("Balancer service exceeded ring chunk bounds. Some reals skipped.\n");
+			std::fill_n(end, reserve - end, real_id);
+			end = reserve;
 			break;
 		}
 
