@@ -161,10 +161,10 @@ struct DumpAction final
 	tCounterId counter_id;
 
 	DumpAction(const acl::dump_t& dump_action) :
-	        dump_id(dump_action.dump_id), counter_id(dump_action.counter_id){};
+	        dump_id(dump_action.dump_id), counter_id(dump_action.counter_id) {};
 
 	DumpAction() :
-	        dump_id(0), counter_id(0){};
+	        dump_id(0), counter_id(0) {};
 
 	[[nodiscard]] bool terminating() const { return false; }
 
@@ -193,7 +193,7 @@ struct FlowAction final
 	std::optional<uint32_t> timeout;
 
 	FlowAction(const globalBase::tFlow& flow) :
-	        flow(flow){};
+	        flow(flow) {};
 
 	FlowAction(globalBase::tFlow&& flow) :
 	        flow(std::move(flow)) {}
@@ -228,7 +228,7 @@ struct CheckStateAction final
 	tCounterId counter_id{0};
 
 	CheckStateAction(const acl::check_state_t& check_state_action) :
-	        counter_id(check_state_action.counter_id){};
+	        counter_id(check_state_action.counter_id) {};
 	CheckStateAction() = default;
 
 	[[nodiscard]] bool terminating() const { return false; }
@@ -255,10 +255,10 @@ struct StateTimeoutAction final
 	uint32_t timeout;
 
 	StateTimeoutAction(const acl::state_timeout_t& timeout_action) :
-	        timeout(timeout_action.timeout){};
+	        timeout(timeout_action.timeout) {};
 
 	StateTimeoutAction() :
-	        timeout(0){};
+	        timeout(0) {};
 
 	[[nodiscard]] bool terminating() const { return false; }
 
@@ -287,11 +287,11 @@ struct HitCountAction final
 
 	HitCountAction(const acl::hit_count_t& hitcount_action) :
 	        id(std::move(hitcount_action.id)),
-	        counter_id(hitcount_action.counter_id){};
+	        counter_id(hitcount_action.counter_id) {};
 
 	HitCountAction() :
 	        id(""),
-	        counter_id(0){};
+	        counter_id(0) {};
 
 	[[nodiscard]] bool terminating() const { return false; }
 
