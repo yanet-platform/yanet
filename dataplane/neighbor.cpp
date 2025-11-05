@@ -261,7 +261,11 @@ void module::StartNetlinkMonitor()
 	        },
 	        [this](auto... args) { return Upsert(args...); },
 	        [this](auto... args) { return Remove(args...); },
-	        [this](auto... args) { return UpdateTimestamp(args...); });
+	        [this](auto... args) { return UpdateTimestamp(args...); },
+	        [this](auto... args) {
+		        YANET_LOG_INFO("Netlink monitor exited\n");
+		        restart_nei_.store(true, std::memory_order_relaxed);
+	        });
 	YANET_LOG_INFO("Netlink monitor started\n");
 }
 
@@ -401,6 +405,14 @@ void module::StartResolveJob()
 		}
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(PAUSE));
+
+		if (restart_nei_.load(std::memory_order_acquire))
+		{
+			StopNetlinkMonitor();
+			DumpOSNeighbors();
+			StartNetlinkMonitor();
+		}
+
 		return true;
 	});
 	YANET_LOG_INFO("Neighbor resolve job started\n");

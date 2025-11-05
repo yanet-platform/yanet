@@ -148,7 +148,8 @@ std::vector<Entry> Provider::GetHostDump(
 void Provider::StartMonitor(std::function<std::optional<tInterfaceId>(const char*)> get_id,
                             std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
                             std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
-                            std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp)
+                            std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp,
+                            std::function<void()> on_error)
 {
 	auto deleter = [](nl_sock* sk) { nl_socket_free(sk); };
 	std::unique_ptr<nl_sock, decltype(deleter)> usk{nl_socket_alloc(), deleter};
@@ -226,7 +227,7 @@ void Provider::StartMonitor(std::function<std::optional<tInterfaceId>(const char
 		YANET_LOG_ERROR("Failed to set socket timeout (%s)\n", strerror(errno));
 	}
 	sk_ = usk.release();
-	monitor_.Run([this]() {
+	monitor_.Run([this, &on_error]() {
 		int err;
 		if ((err = nl_recvmsgs_default(sk_)) < 0)
 		{
@@ -234,12 +235,14 @@ void Provider::StartMonitor(std::function<std::optional<tInterfaceId>(const char
 			{
 				case ENOBUFS:
 					YANET_LOG_ERROR("Lost events because of ENOBUFS\n");
-					break;
+					on_error();
+					return false;
 				case EAGAIN:
 				case EINTR:
 					break;
 				default:
 					YANET_LOG_ERROR("Failed to receive: %s", nl_geterror(err));
+					on_error();
 					return false;
 			}
 		}

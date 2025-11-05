@@ -119,6 +119,7 @@ protected:
 	void TransformHashtables(UpdaterFunc&& updater);
 
 	utils::Job resolve_;
+	std::atomic<bool> restart_nei_;
 };
 
 template<typename UpdaterFunc>

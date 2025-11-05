@@ -29,7 +29,8 @@ public:
 	virtual void StartMonitor(std::function<std::optional<tInterfaceId>(const char*)> get_id,
 	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
 	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
-	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp) = 0;
+	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp,
+	                          std::function<void()> on_error) = 0;
 	virtual void StopMonitor() = 0;
 	virtual ~Interface() = default;
 };
@@ -52,7 +53,8 @@ public:
 	void StartMonitor(std::function<std::optional<tInterfaceId>(const char*)> get_id,
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
-	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp) final;
+	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp,
+	                  std::function<void()> on_error) final;
 	void StopMonitor() final;
 	~Provider() final;
 };
