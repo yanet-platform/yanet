@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
+#include <vector>
 
+#include "common/type.h"
 #include "controlplane/segment_allocator.h"
 
 static constexpr uint32_t error_result = 0;
@@ -223,6 +225,215 @@ TEST(SegmentAllocator, OnlyErrors)
 	EXPECT_FALSE(allocator.Free(16, 23)); // segments starts at (15, 15+23, ...)
 	EXPECT_FALSE(allocator.Free(38, 23)); // segment free
 	EXPECT_EQ(allocator.GetErrors(), Errors(9, 0));
+}
+
+bool TestBlockSegmentAllocator(uint16_t segment_size, uint16_t groups, uint16_t count_group)
+{
+	static constexpr uint32_t counter_index_begin = (((uint32_t)common::globalBase::static_counter_type::size + 63) / 64) * 64;
+	static constexpr uint32_t max_buffer_size = 64;
+	using SegmentAllocatorType = SegmentAllocator<counter_index_begin, YANET_CONFIG_COUNTERS_SIZE, 64 * 64, max_buffer_size, 0>;
+	SegmentAllocatorType::OneBlock block;
+
+	block.Initialize(0, 0);
+	block.SetSize(segment_size);
+	int free_segments = block.free_segments;
+
+	for (uint32_t retries = 0; retries < groups; retries++)
+	{
+		std::vector<uint16_t> data;
+		// Try allocate "count_group" segments
+		for (uint16_t index = 0; index < count_group && free_segments > 0; index++)
+		{
+			uint16_t value = block.Allocate();
+			if (value == SegmentAllocatorType::error_in_block_)
+			{
+				std::cerr << "Error allocate segment in block\n";
+				return false;
+			}
+			free_segments--;
+			data.push_back(value);
+
+			if (!block.CheckInvariants())
+			{
+				return false;
+			}
+		}
+
+		for (uint16_t index = 0; index < data.size(); index += 2)
+		{
+			if (block.Free(data[index]) == SegmentAllocatorType::error_in_block_)
+			{
+				std::cout << "Error free segment in block\n";
+				return false;
+			}
+			free_segments++;
+
+			if (!block.CheckInvariants())
+			{
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+TEST(SegmentAllocator, Block)
+{
+	EXPECT_TRUE(TestBlockSegmentAllocator(2, 10, 1000));
+	EXPECT_TRUE(TestBlockSegmentAllocator(4, 10, 500));
+	EXPECT_TRUE(TestBlockSegmentAllocator(6, 10, 500));
+	EXPECT_TRUE(TestBlockSegmentAllocator(37, 10, 100));
+}
+
+struct TestOneSizeInfo
+{
+	uint32_t size;
+	uint32_t accumulated_weight;
+	uint32_t elements_in_block;
+	uint32_t used_blocks = 0;
+	std::vector<uint32_t> segments;
+	std::set<uint32_t> segments_map;
+};
+
+bool TestSegmentAllocatorDifferentSizes(std::vector<std::pair<uint32_t, uint32_t>> test_data)
+{
+	static constexpr uint32_t counter_index_begin = (((uint32_t)common::globalBase::static_counter_type::size + 63) / 64) * 64;
+	static constexpr uint32_t max_buffer_size = 64;
+	static constexpr uint32_t block_size = 64 * 64;
+	static constexpr uint32_t counters_size = YANET_CONFIG_COUNTERS_SIZE / 8;
+	static constexpr uint32_t total_full_blocks = (counters_size - counter_index_begin) / block_size;
+	SegmentAllocator<counter_index_begin, counters_size, block_size, max_buffer_size, 0> allocator;
+
+	uint32_t sizes = test_data.size();
+	uint32_t total_weight = 0;
+	std::vector<TestOneSizeInfo> tests_info(sizes);
+	for (uint32_t index = 0; index < sizes; index++)
+	{
+		total_weight += test_data[index].second;
+		TestOneSizeInfo& test_info = tests_info[index];
+		test_info.size = test_data[index].first;
+		test_info.accumulated_weight = total_weight;
+		test_info.elements_in_block = block_size / test_info.size;
+	}
+
+	std::srand(17);
+	uint32_t used_blocks = 0;
+	while (used_blocks + sizes <= total_full_blocks)
+	{
+		// Select size
+		uint32_t weight = std::rand() % total_weight;
+		uint32_t cur_index = 0;
+		for (uint32_t index = 1; index < sizes; index++)
+		{
+			if (weight >= tests_info[index - 1].accumulated_weight)
+			{
+				cur_index = index;
+			}
+		}
+
+		// Select action
+		TestOneSizeInfo& test_info = tests_info[cur_index];
+		static constexpr int32_t probability_free = 30;
+		bool action_free = ((std::rand() % 100) < probability_free);
+		if (action_free)
+		{
+			// Free
+			uint32_t current_size = test_info.segments.size();
+			if (current_size != 0)
+			{
+				uint32_t index = std::rand() % current_size;
+				uint32_t value = test_info.segments[index];
+				test_info.segments_map.erase(value);
+				test_info.segments[index] = test_info.segments.back();
+				test_info.segments.pop_back();
+
+				if (allocator.Free(value, test_info.size) == 0)
+				{
+					std::cout << "Error free segment in allocator\n";
+					return false;
+				}
+			}
+		}
+		else
+		{
+			// Allocate
+			uint32_t value = allocator.Allocate(test_info.size);
+			if (value == 0)
+			{
+				std::cout << "can't allocate\n";
+				return false;
+			}
+			else if (test_info.segments_map.find(value) != test_info.segments_map.end())
+			{
+				std::cout << "Allocated segment exists\n";
+				return false;
+			}
+			test_info.segments_map.insert(value);
+			test_info.segments.push_back(value);
+			if (test_info.segments.size() % test_info.elements_in_block == 1)
+			{
+				used_blocks = 0;
+				for (const TestOneSizeInfo& info : tests_info)
+				{
+					used_blocks += (info.segments.size() + info.elements_in_block - 1) / info.elements_in_block;
+				}
+			}
+		}
+	}
+
+	EXPECT_EQ(allocator.GetErrors(), Errors(0, 0));
+
+	uint32_t used_counters = 0;
+	for (const TestOneSizeInfo& info : tests_info)
+	{
+		used_counters += info.size * info.segments.size();
+	}
+	uint32_t total_counters = counters_size - counter_index_begin;
+	EXPECT_GE(used_counters, 0.95 * total_counters);
+
+	return true;
+}
+
+TEST(SegmentAllocator, DifferentSizes)
+{
+	EXPECT_TRUE(TestSegmentAllocatorDifferentSizes({{2, 10}, {4, 5}, {6, 1}}));
+	EXPECT_TRUE(TestSegmentAllocatorDifferentSizes({{8, 1}, {17, 1}, {37, 1}}));
+}
+
+TEST(SegmentAllocator, AddAndHalfDelete)
+{
+	static constexpr uint32_t counter_index_begin = (((uint32_t)common::globalBase::static_counter_type::size + 63) / 64) * 64;
+	static constexpr uint32_t max_buffer_size = 64;
+	SegmentAllocator<counter_index_begin, YANET_CONFIG_COUNTERS_SIZE, 64 * 64, max_buffer_size, 0> allocator;
+
+	uint16_t size = 2;
+	uint32_t count = 100000;
+	bool errors = false;
+	for (uint32_t retries = 0; retries < 10 && !errors; retries++)
+	{
+		std::vector<uint32_t> data;
+
+		for (uint32_t index = 0; index < count && !errors; index++)
+		{
+			uint32_t value = allocator.Allocate(size);
+			EXPECT_NE(value, 0);
+			if (value == 0)
+			{
+				errors = true;
+				break;
+			}
+			data.push_back(value);
+		}
+
+		for (uint32_t index = 0; index < count && !errors; index += 2)
+		{
+			EXPECT_TRUE(allocator.Free(data[index], size));
+		}
+
+		EXPECT_EQ(allocator.GetErrors(), Errors(0, 0));
+	}
+	EXPECT_EQ(allocator.GetErrors(), Errors(0, 0));
 }
 
 int main(int argc, char** argv)

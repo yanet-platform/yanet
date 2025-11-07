@@ -164,7 +164,6 @@ public:
 		return {errors_external_, errors_internal_};
 	}
 
-private:
 	struct OneBlock
 	{
 		// indexes of previous and next blocks in list
@@ -248,21 +247,57 @@ private:
 
 			// set bits usage
 			DISABLE_BIT(masks[group], index);
-			if (masks[group] == 0)
-			{
-				DISABLE_BIT(group_mask, group);
-			}
+			DISABLE_BIT(group_mask, group);
 
 			// change number of free segments
 			free_segments++;
 
 			return 0;
 		}
+
+		bool CheckInvariants()
+		{
+			uint16_t total_free = 0;
+			for (uint16_t index = 0; index < total_segments; index++)
+			{
+				uint16_t group = index / 64;
+				if (GET_BIT(masks[group], index % 64) == 0)
+				{
+					total_free++;
+				}
+			}
+
+			if (total_free != free_segments)
+			{
+				std::cout << "total_free != free_segments: " << total_free << ", " << free_segments << "\n";
+				return false;
+			}
+
+			uint16_t groups = sizeof(masks) / sizeof(masks[0]);
+			for (uint16_t group = 0; group < 64; group++)
+			{
+				uint16_t bit_expected = 0;
+				if ((group < groups) && (~masks[group] == 0))
+				{
+					bit_expected = 1;
+				}
+				uint16_t bit_value = GET_BIT(group_mask, group);
+				if (bit_expected != bit_value)
+				{
+					std::cout << "bad bit in group mask " << group << ", expected=" << bit_expected << ", value=" << bit_value << "\n";
+					return false;
+				}
+			}
+
+			return true;
+		}
 	};
 
+	static constexpr uint16_t error_in_block_ = static_cast<uint16_t>(-1);
+
+private:
 	static constexpr uint32_t total_blocks_ = (IndexEnd - IndexBegin + BlockSize - 1) / BlockSize;
 	static constexpr uint32_t null_block_ = static_cast<uint32_t>(-1);
-	static constexpr uint16_t error_in_block_ = static_cast<uint16_t>(-1);
 
 	OneBlock all_blocks_[total_blocks_];
 	OneSizeBlockInfo sizes_info_[MaxBufferSize + 1];
