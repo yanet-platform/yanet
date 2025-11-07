@@ -53,6 +53,7 @@ public:
 					str++;
 				}
 				char* endptr = nullptr;
+				errno = 0;
 				unsigned long long size = strtoull(str, &endptr, 0);
 				// The string still contains kB (or mB, gB), but it only matters to us
 				// whether the value is 0 or not
