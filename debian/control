@@ -47,3 +47,8 @@ Package: yanet-utils
 Architecture: amd64
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Various YANET utilities
+
+Package: yanet-logger-systemd
+Architecture: amd64
+Depends: yanet-utils
+Description: Systemd unit file for yanet-logger
