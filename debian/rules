@@ -24,6 +24,7 @@ override_dh_auto_install:
 	install -pD -m0755 build/logger/yanet-logger -t debian/tmp/usr/bin
 	install -pD -m0755 misc/yanet-dataplane.service -t debian/tmp/lib/systemd/system
 	install -pD -m0755 misc/yanet-controlplane.service -t debian/tmp/lib/systemd/system
+	install -pD -m0755 misc/yanet-logger.service -t debian/tmp/lib/systemd/system
 	install -pD -m0775 libprotobuf/meta.proto -t debian/tmp/usr/include/yanet/
 	install -pD -m0775 libprotobuf/controlplane.proto -t debian/tmp/usr/include/yanet/
 	install -pD -m0775 build/librib/libyanet-rib.so -t debian/tmp/usr/lib

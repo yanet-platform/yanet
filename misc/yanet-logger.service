@@ -1,0 +1,18 @@
+[Unit]
+Description = yanet logger
+
+After = yanet-dataplane.service yanet-controlplane.service
+Requires = yanet-controlplane.service
+
+[Service]
+User = root
+Group = yanet
+
+Environment = "RUNTIME_DIRECTORY=/run/yanet"
+ExecStart = /usr/bin/yanet-logger -c /etc/yanet/logger.conf
+
+Restart = always
+RestartSec = 5
+
+[Install]
+WantedBy=multi-user.target
