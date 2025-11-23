@@ -1854,7 +1854,13 @@ generation::ServiceSize generation::rebuild_service_ring_one_wrr(
         const balancer_service_t& service)
 {
 	balancer_real_id_t* end = start;
-	balancer_real_id_t* reserve = start + YANET_BALANCER_WRR_SERVICE_SIZE;
+	const auto service_size = service.real_size * YANET_CONFIG_BALANCER_REAL_WEIGHT_MAX;
+	balancer_real_id_t* reserve = start + service_size;
+	if (reserve > do_not_exceed)
+	{
+		reserve = do_not_exceed;
+		YANET_LOG_ERROR("Balancer exceeded service ring size. Service ring chunck clamped to limit.\n");
+	}
 	for (uint32_t real_idx = service.real_start;
 	     real_idx < service.real_start + service.real_size;
 	     ++real_idx)
