@@ -153,7 +153,7 @@ steps:
       peer: 0.0.0.0
       med: 0
       large_communities:
-      - 13238:1:4000000
+      - 13238:1:8000000
       prefixes:
       - nexthop: 88.88.88.1
         prefix: 1.0.0.251/32
@@ -169,7 +169,7 @@ steps:
       peer: 0.0.0.0
       med: 0
       large_communities:
-      - 13238:1:4000000
+      - 13238:1:8000000
       prefixes:
       - nexthop: 88.88.88.1
         prefix: 1.0.0.250/32
@@ -201,7 +201,7 @@ steps:
       peer: 0.0.0.0
       med: 0
       large_communities:
-      - 13238:1:4000000
+      - 13238:1:8000000
       prefixes:
       - nexthop: 8888::1
         prefix: 7e57::fffb/128
@@ -217,7 +217,7 @@ steps:
       peer: 0.0.0.0
       med: 0
       large_communities:
-      - 13238:1:4000000
+      - 13238:1:8000000
       prefixes:
       - nexthop: 8888::1
         prefix: 7e57::fffa/128
