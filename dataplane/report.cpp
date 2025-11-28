@@ -147,6 +147,7 @@ nlohmann::json cReport::convertWorker(const cWorker* worker)
 	json["stats"]["interface_lookupMisses"] = worker->stats->interface_lookupMisses;
 	json["stats"]["interface_hopLimits"] = worker->stats->interface_hopLimits;
 	json["stats"]["interface_neighbor_invalid"] = worker->stats->interface_neighbor_invalid;
+	json["stats"]["interface_neighbor_requests"] = worker->stats->interface_neighbor_requests;
 	json["stats"]["nat64stateless_ingressPackets"] = worker->stats->nat64stateless_ingressPackets;
 	json["stats"]["nat64stateless_ingressFragments"] = worker->stats->nat64stateless_ingressFragments;
 	json["stats"]["nat64stateless_ingressUnknownICMP"] = worker->stats->nat64stateless_ingressUnknownICMP;
