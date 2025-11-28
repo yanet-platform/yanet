@@ -226,6 +226,10 @@ eResult cDataPlane::init(const std::string& binaryPath,
 
 					        gc_keys.emplace_back(key);
 				        }
+						if (!gc_keys.empty())
+						{
+							worker->stats->interface_neighbor_requests += gc_keys.size();
+						}
 				        std::lock_guard<std::mutex> lock(mx);
 				        if (keys.empty())
 				        {

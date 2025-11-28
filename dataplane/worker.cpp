@@ -316,6 +316,7 @@ void cWorker::fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_
 	table["interface_lookupMisses"] = &stats.interface_lookupMisses;
 	table["interface_hopLimits"] = &stats.interface_hopLimits;
 	table["interface_neighbor_invalid"] = &stats.interface_neighbor_invalid;
+	table["interface_neighbor_requests"] = &stats.interface_neighbor_requests;
 	table["nat64stateless_ingressPackets"] = &stats.nat64stateless_ingressPackets;
 	table["nat64stateless_ingressFragments"] = &stats.nat64stateless_ingressFragments;
 	table["nat64stateless_ingressUnknownICMP"] = &stats.nat64stateless_ingressUnknownICMP;
