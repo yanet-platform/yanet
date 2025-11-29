@@ -130,7 +130,7 @@ void module::TransformHashtables(UpdaterFunc&& updater)
 		}
 		return eResult::success;
 	});
-	neighbor_flush();
+	// Changes will be propagated to other generation by ResolveJob
 }
 
 }
