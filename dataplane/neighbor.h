@@ -146,7 +146,6 @@ void module::TransformHashtables(UpdaterFunc&& updater)
 		}
 		return eResult::success;
 	});
-	neighbor_flush();
 }
 
 }
