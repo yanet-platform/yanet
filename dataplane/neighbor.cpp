@@ -163,12 +163,7 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 		return result;
 	});
 
-	if (response != eResult::success)
-	{
-		return response;
-	}
-
-	return neighbor_flush();
+	return response;
 }
 
 eResult module::neighbor_remove(const common::idp::neighbor_remove::request& request)
@@ -223,12 +218,7 @@ eResult module::neighbor_remove(const common::idp::neighbor_remove::request& req
 		return result;
 	});
 
-	if (response != eResult::success)
-	{
-		return response;
-	}
-
-	return neighbor_flush();
+	return response;
 }
 
 eResult module::neighbor_clear()
@@ -399,6 +389,8 @@ void module::StartResolveJob()
 		{
 			resolve(key);
 		}
+
+		neighbor_flush();
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(PAUSE));
 		return true;
