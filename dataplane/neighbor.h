@@ -30,6 +30,22 @@ struct key
 	tInterfaceId interface_id : 16;
 	uint16_t flags;
 	ipv6_address_t address;
+
+	bool operator<(const key& second) const
+	{
+		if (interface_id != second.interface_id)
+		{
+			return interface_id < second.interface_id;
+		}
+		else if (flags != second.flags)
+		{
+			return flags < second.flags;
+		}
+		else
+		{
+			return address < second.address;
+		}
+	}
 };
 
 static_assert(CONFIG_YADECAP_INTERFACES_SIZE <= 0xFFFF, "invalid size");
