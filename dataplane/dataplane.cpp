@@ -301,7 +301,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		        switch_worker_base();
 	        },
 	        [this]() {
-		        std::vector<dataplane::neighbor::key> keys;
+				std::set<dataplane::neighbor::key> keys;
 		        std::mutex mx;
 
 		        for (auto* worker : get_workers())
@@ -329,18 +329,14 @@ eResult cDataPlane::init(const std::string& binaryPath,
 							worker->stats->interface_neighbor_requests += gc_keys.size();
 						}
 				        std::lock_guard<std::mutex> lock(mx);
-				        if (keys.empty())
+				        for (const dataplane::neighbor::key& key : gc_keys)
 				        {
-					        std::swap(keys, gc_keys);
-				        }
-				        else
-				        {
-					        keys.insert(keys.end(), gc_keys.begin(), gc_keys.end());
+					        keys.insert(key);
 				        }
 				        return true;
 			        });
 		        }
-		        return keys;
+		        return std::vector<dataplane::neighbor::key>(keys.begin(), keys.end());
 	        });
 	if (result != eResult::success)
 	{
