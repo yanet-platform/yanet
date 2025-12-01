@@ -289,6 +289,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	result = neighbor.init(
 	        get_socket_ids(),
 	        getConfigValues().neighbor_ht_size,
+	        getConfigValues().neighbor_rcvbuf_size,
 	        [this](tSocketId socket_id) {
 		        return memory_manager.create<dataplane::neighbor::hashtable>(
 		                "neighbor.ht",
@@ -301,7 +302,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		        switch_worker_base();
 	        },
 	        [this]() {
-				std::set<dataplane::neighbor::key> keys;
+		        std::set<dataplane::neighbor::key> keys;
 		        std::mutex mx;
 
 		        for (auto* worker : get_workers())

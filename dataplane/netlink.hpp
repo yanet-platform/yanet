@@ -24,9 +24,10 @@ struct Entry
 class Interface
 {
 public:
-	virtual std::vector<Entry> GetHostDump(
-	        const std::unordered_map<std::string, tInterfaceId>& ids) = 0;
-	virtual void StartMonitor(std::function<std::optional<tInterfaceId>(const char*)> get_id,
+	virtual std::vector<Entry> GetHostDump(unsigned rcvbuf_size,
+	                                       const std::unordered_map<std::string, tInterfaceId>& ids) = 0;
+	virtual void StartMonitor(unsigned rcvbuf_size,
+	                          std::function<std::optional<tInterfaceId>(const char*)> get_id,
 	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
 	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
 	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp) = 0;
@@ -47,9 +48,10 @@ class Provider : public Interface
 	utils::Job monitor_;
 
 public:
-	std::vector<Entry> GetHostDump(
-	        const std::unordered_map<std::string, tInterfaceId>& ids) final;
-	void StartMonitor(std::function<std::optional<tInterfaceId>(const char*)> get_id,
+	std::vector<Entry> GetHostDump(unsigned rcvbuf_size,
+	                               const std::unordered_map<std::string, tInterfaceId>& ids) final;
+	void StartMonitor(unsigned rcvbuf_size,
+	                  std::function<std::optional<tInterfaceId>(const char*)> get_id,
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp) final;

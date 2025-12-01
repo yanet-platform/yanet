@@ -23,6 +23,7 @@ module::module(netlink::Interface* neigh_prov) :neighbor_provider{neigh_prov}
 eResult module::init(
         const std::set<tSocketId>& socket_ids,
         uint64_t ht_size,
+        uint64_t rcvbuf_size,
         std::function<dataplane::neighbor::hashtable*(tSocketId)> ht_allocator,
         std::function<std::uint32_t()> current_time,
         std::function<void()> on_neighbor_flush,
@@ -32,6 +33,7 @@ eResult module::init(
 	current_time_provider_ = std::move(current_time);
 	on_neighbor_flush_handle_ = std::move(on_neighbor_flush);
 	keys_to_resolve_provider_ = std::move(keys_to_resolve);
+	rcvbuf_size_ = rcvbuf_size;
 
 	generation_hashtable.fill([&](neighbor::generation_hashtable& hashtable) {
 		for (const auto socket_id : socket_ids)
@@ -238,6 +240,7 @@ eResult module::neighbor_flush()
 void module::StartNetlinkMonitor()
 {
 	neighbor_provider->StartMonitor(
+	        rcvbuf_size_,
 	        [this](const char* ifname) -> std::optional<tInterfaceId> {
 		        auto interfaces_guard = generation_interface.current_lock_guard();
 		        auto& ids = generation_interface.current().interface_name_to_id;
@@ -270,7 +273,7 @@ eResult module::DumpOSNeighbors()
 		auto interfaces_guard = generation_interface.current_lock_guard();
 		auto& new_interfaces = generation_interface.current();
 		auto& old_interfaces = generation_interface.next();
-		dump = neighbor_provider->GetHostDump(new_interfaces.interface_name_to_id);
+		dump = neighbor_provider->GetHostDump(rcvbuf_size_, new_interfaces.interface_name_to_id);
 
 		{
 			auto lock = generation_hashtable.current_lock_guard();

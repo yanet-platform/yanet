@@ -68,8 +68,8 @@ std::variant<Entry, int> ParseNeighbor(
 	return entry;
 }
 
-std::vector<Entry> Provider::GetHostDump(
-        const std::unordered_map<std::string, tInterfaceId>& ids)
+std::vector<Entry> Provider::GetHostDump(unsigned rcvbuf_size,
+                                         const std::unordered_map<std::string, tInterfaceId>& ids)
 {
 	auto deleter = [](nl_sock* sk) { nl_socket_free(sk); };
 	std::unique_ptr<nl_sock, decltype(deleter)> usk{nl_socket_alloc(), deleter};
@@ -127,6 +127,14 @@ std::vector<Entry> Provider::GetHostDump(
 		YANET_LOG_ERROR("Failed to connect to netlink socket '%s'\n", nl_geterror(err));
 		return dump;
 	}
+	if (rcvbuf_size != 0)
+	{
+		YANET_LOG_INFO("Netlink set recieve buffer size: %d\n", rcvbuf_size);
+		if (auto err = nl_socket_set_buffer_size(sk, rcvbuf_size, 0); err < 0)
+		{
+			YANET_LOG_ERROR("Failed set size in nl_socket_set_buffer_size '%s'\n", nl_geterror(err));
+		}
+	}
 	if (nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM, &WrapAsCallback<decltype(cb)>, &cb))
 	{
 		YANET_LOG_ERROR("Failed to set netlink callback\n");
@@ -145,7 +153,8 @@ std::vector<Entry> Provider::GetHostDump(
 	return dump;
 }
 
-void Provider::StartMonitor(std::function<std::optional<tInterfaceId>(const char*)> get_id,
+void Provider::StartMonitor(unsigned rcvbuf_size,
+                            std::function<std::optional<tInterfaceId>(const char*)> get_id,
                             std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
                             std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
                             std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp)
@@ -163,6 +172,15 @@ void Provider::StartMonitor(std::function<std::optional<tInterfaceId>(const char
 		YANET_LOG_ERROR("Failed to connect to netlink socket '%s'\n", nl_geterror(err));
 		return;
 	}
+	if (rcvbuf_size != 0)
+	{
+		YANET_LOG_INFO("Netlink set recieve buffer size: %d\n", rcvbuf_size);
+		if (auto err = nl_socket_set_buffer_size(sk, rcvbuf_size, 0); err < 0)
+		{
+			YANET_LOG_ERROR("Failed set size in nl_socket_set_buffer_size '%s'\n", nl_geterror(err));
+		}
+	}
+
 	monitor_callback_ = [get_id, upsert, remove, timestamp](nl_msg* msg) -> int {
 		nlmsghdr* msghdr = nlmsg_hdr(msg);
 		if (msghdr->nlmsg_type != RTM_NEWNEIGH && msghdr->nlmsg_type != RTM_DELNEIGH)
