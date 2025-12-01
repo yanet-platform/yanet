@@ -162,7 +162,7 @@ void unsafe()
 		       stats.interface_lookupMisses,
 		       stats.interface_hopLimits,
 		       stats.interface_neighbor_invalid,
-			   stats.interface_neighbor_requests,
+		       stats.interface_neighbor_requests,
 		       stats.nat64stateless_ingressPackets,
 		       stats.nat64stateless_ingressFragments,
 		       stats.nat64stateless_ingressUnknownICMP,
