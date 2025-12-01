@@ -142,7 +142,7 @@ protected:
 template<typename UpdaterFunc>
 void module::TransformHashtables(UpdaterFunc&& updater)
 {
-	generation_hashtable.update([&](neighbor::generation_hashtable& hashtable) {
+	generation_hashtable.update([updater](neighbor::generation_hashtable& hashtable) {
 		for (auto& [_, hashtable_updater] : hashtable.hashtable_updater)
 		{
 			(void)_;
