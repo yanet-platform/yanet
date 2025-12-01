@@ -10,12 +10,13 @@ namespace
 class MockProvider final : public netlink::Interface
 {
 public:
-	std::vector<netlink::Entry> GetHostDump(
-	        const std::unordered_map<std::string, tInterfaceId>& ids)
+	std::vector<netlink::Entry> GetHostDump(unsigned rcvbuf_size,
+	                                        const std::unordered_map<std::string, tInterfaceId>& ids)
 	{
 		return dump_;
 	}
-	void StartMonitor(std::function<std::optional<tInterfaceId>(const char*)> get_id,
+	void StartMonitor(unsigned rcvbuf_size,
+	                  std::function<std::optional<tInterfaceId>(const char*)> get_id,
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp)
@@ -128,6 +129,7 @@ TEST(NeighborTest, Basic)
 	dut.init(
 	        {1},
 	        64 * 1024,
+	        0,
 	        [](tSocketId) {
 		        auto size = dataplane::neighbor::hashtable::calculate_sizeof(64 * 1024);
 		        void* ptr = new char[size];
@@ -142,6 +144,7 @@ TEST(NeighborTest, Basic)
 	common::idp::neighbor_show::response expected = {
 	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, {1}}};
 	dut.Upsert(1, Ip6FromString("192.168.1.1"), false, EthFromString("DE:AD:BE:EF:01:02"));
+	dut.neighbor_flush();
 
 	now = 2;
 	EXPECT_EQ(dut.neighbor_show(), expected);
@@ -152,6 +155,7 @@ TEST(NeighborTest, Basic)
 
 	now = 3;
 	dut.Upsert(1, Ip6FromString("100.200.1.2"), false, EthFromString("DE:AD:BE:EF:08:08"));
+	dut.neighbor_flush();
 	expected = {
 	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, {2}},
 	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {0}}};
@@ -160,6 +164,7 @@ TEST(NeighborTest, Basic)
 
 	now = 4;
 	dut.UpdateTimestamp(1, Ip6FromString("100.200.1.2"), false);
+	dut.neighbor_flush();
 	expected = {
 	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, {3}},
 	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {0}}};
@@ -167,6 +172,7 @@ TEST(NeighborTest, Basic)
 
 	now = 5;
 	dut.Remove(1, Ip6FromString("192.168.1.1"), false);
+	dut.neighbor_flush();
 	expected = {
 	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {1}}};
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
@@ -186,6 +192,7 @@ TEST(NeighborTest, Provider)
 	dut.init(
 	        {1},
 	        64 * 1024,
+	        0,
 	        [](tSocketId) {
 		        auto size = dataplane::neighbor::hashtable::calculate_sizeof(64 * 1024);
 		        void* ptr = new char[size];

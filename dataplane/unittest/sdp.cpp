@@ -94,6 +94,7 @@ public:
 		counters_stats["interface_lookupMisses"] = offsetof(common::worker::stats::common, interface_lookupMisses);
 		counters_stats["interface_hopLimits"] = offsetof(common::worker::stats::common, interface_hopLimits);
 		counters_stats["interface_neighbor_invalid"] = offsetof(common::worker::stats::common, interface_neighbor_invalid);
+		counters_stats["interface_neighbor_requests"] = offsetof(common::worker::stats::common, interface_neighbor_requests);
 		counters_stats["nat64stateless_ingressPackets"] = offsetof(common::worker::stats::common, nat64stateless_ingressPackets);
 		counters_stats["nat64stateless_ingressFragments"] = offsetof(common::worker::stats::common, nat64stateless_ingressFragments);
 		counters_stats["nat64stateless_ingressUnknownICMP"] = offsetof(common::worker::stats::common, nat64stateless_ingressUnknownICMP);

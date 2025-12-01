@@ -289,6 +289,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	result = neighbor.init(
 	        get_socket_ids(),
 	        getConfigValues().neighbor_ht_size,
+	        getConfigValues().neighbor_rcvbuf_size,
 	        [this](tSocketId socket_id) {
 		        return memory_manager.create<dataplane::neighbor::hashtable>(
 		                "neighbor.ht",
@@ -301,7 +302,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		        switch_worker_base();
 	        },
 	        [this]() {
-		        std::vector<dataplane::neighbor::key> keys;
+		        std::set<dataplane::neighbor::key> keys;
 		        std::mutex mx;
 
 		        for (auto* worker : get_workers())
@@ -324,19 +325,19 @@ eResult cDataPlane::init(const std::string& binaryPath,
 
 					        gc_keys.emplace_back(key);
 				        }
-				        std::lock_guard<std::mutex> lock(mx);
-				        if (keys.empty())
+				        if (!gc_keys.empty())
 				        {
-					        std::swap(keys, gc_keys);
+					        worker->stats->interface_neighbor_requests += gc_keys.size();
 				        }
-				        else
+				        std::lock_guard<std::mutex> lock(mx);
+				        for (const dataplane::neighbor::key& key : gc_keys)
 				        {
-					        keys.insert(keys.end(), gc_keys.begin(), gc_keys.end());
+					        keys.insert(key);
 				        }
 				        return true;
 			        });
 		        }
-		        return keys;
+		        return std::vector<dataplane::neighbor::key>(keys.begin(), keys.end());
 	        });
 	if (result != eResult::success)
 	{

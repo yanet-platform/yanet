@@ -30,6 +30,22 @@ struct key
 	tInterfaceId interface_id : 16;
 	uint16_t flags;
 	ipv6_address_t address;
+
+	bool operator<(const key& second) const
+	{
+		if (interface_id != second.interface_id)
+		{
+			return interface_id < second.interface_id;
+		}
+		else if (flags != second.flags)
+		{
+			return flags < second.flags;
+		}
+		else
+		{
+			return address < second.address;
+		}
+	}
 };
 
 static_assert(CONFIG_YADECAP_INTERFACES_SIZE <= 0xFFFF, "invalid size");
@@ -68,6 +84,7 @@ class module
 {
 	static constexpr auto PAUSE = 10ms;
 	netlink::Interface* neighbor_provider;
+	uint64_t rcvbuf_size_ = 0;
 
 public:
 	module();
@@ -75,6 +92,7 @@ public:
 	eResult init(
 	        const std::set<tSocketId>& socket_ids,
 	        uint64_t ht_size,
+	        uint64_t rcvbuf_size,
 	        std::function<dataplane::neighbor::hashtable*(tSocketId)> ht_allocator,
 	        std::function<std::uint32_t()> current_time,
 	        std::function<void()> on_update,
@@ -123,14 +141,13 @@ protected:
 template<typename UpdaterFunc>
 void module::TransformHashtables(UpdaterFunc&& updater)
 {
-	generation_hashtable.update([&](neighbor::generation_hashtable& hashtable) {
+	generation_hashtable.update([updater](neighbor::generation_hashtable& hashtable) {
 		for (auto& [_, hashtable_updater] : hashtable.hashtable_updater)
 		{
 			updater(*hashtable_updater.get_pointer());
 		}
 		return eResult::success;
 	});
-	neighbor_flush();
 }
 
 }

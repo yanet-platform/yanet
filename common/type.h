@@ -1904,6 +1904,7 @@ struct common
 	uint64_t interface_lookupMisses;
 	uint64_t interface_hopLimits;
 	uint64_t interface_neighbor_invalid;
+	uint64_t interface_neighbor_requests;
 	uint64_t nat64stateless_ingressPackets;
 	uint64_t nat64stateless_ingressFragments;
 	uint64_t nat64stateless_ingressUnknownICMP;
