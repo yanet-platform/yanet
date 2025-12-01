@@ -84,6 +84,7 @@ class module
 {
 	static constexpr auto PAUSE = 10ms;
 	netlink::Interface* neighbor_provider;
+	uint64_t rcvbuf_size_ = 0;
 
 public:
 	module();
@@ -91,6 +92,7 @@ public:
 	eResult init(
 	        const std::set<tSocketId>& socket_ids,
 	        uint64_t ht_size,
+	        uint64_t rcvbuf_size,
 	        std::function<dataplane::neighbor::hashtable*(tSocketId)> ht_allocator,
 	        std::function<std::uint32_t()> current_time,
 	        std::function<void()> on_update,
