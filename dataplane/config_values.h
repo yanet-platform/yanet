@@ -40,6 +40,7 @@ struct ConfigValues
 	uint64_t balancer_udp_timeout = YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT;
 	uint64_t balancer_other_protocols_timeout = YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT;
 	uint64_t neighbor_ht_size = 64 * 1024;
+	uint64_t neighbor_rcvbuf_size = 0;
 };
 
 inline void from_json(const nlohmann::json& j, ConfigValues& cfg)
@@ -99,4 +100,5 @@ inline void from_json(const nlohmann::json& j, ConfigValues& cfg)
 	cfg.balancer_udp_timeout = j.value("balancer_udp_timeout", cfg.balancer_udp_timeout);
 	cfg.balancer_other_protocols_timeout = j.value("balancer_other_protocols_timeout", cfg.balancer_other_protocols_timeout);
 	cfg.neighbor_ht_size = j.value("neighbor_ht_size", cfg.neighbor_ht_size);
+	cfg.neighbor_rcvbuf_size = j.value("neighbor_rcvbuf_size", cfg.neighbor_rcvbuf_size);
 }
