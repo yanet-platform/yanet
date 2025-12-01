@@ -351,6 +351,8 @@ eResult module::neighbor_update_interfaces(const common::idp::neighbor_update_in
 {
 	generation_interface.next_lock();
 	auto& generation = generation_interface.next();
+	generation.interface_name_to_id.clear();
+	generation.interface_id_to_name.clear();
 	for (const auto& [interface_id,
 	                  route_name,
 	                  interface_name] : request)
