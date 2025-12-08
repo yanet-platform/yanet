@@ -142,6 +142,7 @@ TEST(NeighborTest, Basic)
 	        0,
 	        YANET_CONFIG_NEIGHBOR_CHECK_INTERVAL,
 	        2, // remove_timeout
+	        YANET_CONFIG_RESOLVE_REMOVED,
 	        [](tSocketId) {
 		        auto size = dataplane::neighbor::hashtable::calculate_sizeof(64 * 1024);
 		        void* ptr = new char[size];
@@ -224,6 +225,7 @@ TEST(NeighborTest, Provider)
 	        0,
 	        YANET_CONFIG_NEIGHBOR_CHECK_INTERVAL,
 	        YANET_CONFIG_NEIGHBOR_REMOVE_TIMEOUT,
+	        YANET_CONFIG_RESOLVE_REMOVED,
 	        [](tSocketId) {
 		        auto size = dataplane::neighbor::hashtable::calculate_sizeof(64 * 1024);
 		        void* ptr = new char[size];

@@ -58,6 +58,7 @@ struct value
 	uint32_t last_update_timestamp;
 	uint32_t last_remove_timestamp;
 	uint32_t last_resolve_timestamp;
+	uint32_t number_resolve_after_remove;
 };
 
 //
@@ -90,6 +91,7 @@ class module
 	uint64_t rcvbuf_size_ = 0;
 	uint64_t checks_interval_ = YANET_CONFIG_NEIGHBOR_CHECK_INTERVAL;
 	uint64_t remove_timeout_ = YANET_CONFIG_NEIGHBOR_REMOVE_TIMEOUT;
+	uint64_t resolve_removed_ = YANET_CONFIG_RESOLVE_REMOVED;
 	std::mutex mutex_restart_monitor_;
 
 public:
@@ -101,6 +103,7 @@ public:
 	        uint64_t rcvbuf_size,
 	        uint64_t checks_interval,
 	        uint64_t remove_timeout,
+	        uint64_t resolve_removed,
 	        std::function<dataplane::neighbor::hashtable*(tSocketId)> ht_allocator,
 	        std::function<std::uint32_t()> current_time,
 	        std::function<void()> on_update,
@@ -129,7 +132,7 @@ protected:
 	void StopNetlinkMonitor();
 	eResult DumpOSNeighbors();
 
-	void resolve(const dataplane::neighbor::key& key);
+	bool resolve(const dataplane::neighbor::key& key);
 
 protected:
 	generation_manager<dataplane::neighbor::generation_interface> generation_interface;

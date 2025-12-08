@@ -194,6 +194,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	        getConfigValues().neighbor_rcvbuf_size,
 	        getConfigValues().neighbor_checks_interval,
 	        getConfigValues().neighbor_remove_timeout,
+	        getConfigValues().neighbor_resolve_removed,
 	        [this](tSocketId socket_id) {
 		        return memory_manager.create<dataplane::neighbor::hashtable>(
 		                "neighbor.ht",
