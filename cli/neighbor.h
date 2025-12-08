@@ -15,7 +15,8 @@ void show()
 	                   "interface_name",
 	                   "ip_address",
 	                   "mac_address",
-	                   "last_update"},
+	                   "last_update",
+	                   "last_remove"},
 	                  response,
 	                  {.optional_null = "static"});
 }
