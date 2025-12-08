@@ -196,7 +196,7 @@ TEST(NeighborTest, Basic)
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 	dut.neighbor_flush();
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
-	
+
 	now = 9;
 	dut.NeighborThreadAction(now);
 	dut.neighbor_flush();
