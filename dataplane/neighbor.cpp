@@ -100,11 +100,17 @@ common::idp::neighbor_show::response module::neighbor_show() const
 					last_update_timestamp = current_time_provider_() - value.last_update_timestamp;
 				}
 
+				std::string last_remove_timestamp;
+				if (value.last_remove_timestamp != 0) {
+					last_remove_timestamp = std::to_string(current_time_provider_() - value.last_remove_timestamp);
+				}
+
 				response.emplace_back(route_name,
 				                      interface_name,
 				                      common::ip_address_t(key.flags & flag_is_ipv6 ? 6 : 4, key.address.bytes),
 				                      common::mac_address_t(value.ether_address.addr_bytes),
-				                      last_update_timestamp);
+				                      last_update_timestamp,
+				                      last_remove_timestamp);
 			}
 		}
 	}
@@ -388,6 +394,8 @@ void module::report(nlohmann::json& json)
 	json["neighbor"]["hashtable_remove_error"] = stats.hashtable_remove_error;
 	json["neighbor"]["netlink_neighbor_update"] = stats.netlink_neighbor_update;
 	json["neighbor"]["resolve"] = stats.resolve;
+	json["neighbor"]["resolve_removed"] = stats.resolve_removed;
+	json["neighbor"]["remove_final"] = stats.remove_final;
 }
 
 void module::StartResolveJob()
@@ -631,7 +639,7 @@ void module::NeighborThreadAction(uint32_t current_time)
 		TransformHashtables([cur_key, this](dataplane::neighbor::hashtable& hashtable) {
 			if (hashtable.remove(cur_key))
 			{
-				stats.hashtable_remove_success++;
+				stats.remove_final++;
 			}
 			else
 			{
@@ -650,7 +658,7 @@ void module::NeighborThreadAction(uint32_t current_time)
 			if (value)
 			{
 				value->last_resolve_timestamp = current_time;
-				stats.resolve++;
+				stats.resolve_removed++;
 			}
 			else
 			{
