@@ -387,7 +387,9 @@ void unsafe()
 	                        {"hashtable_remove_success", neighbor_stats.hashtable_remove_success},
 	                        {"hashtable_remove_error", neighbor_stats.hashtable_remove_error},
 	                        {"netlink_neighbor_update", neighbor_stats.netlink_neighbor_update},
-	                        {"resolve", neighbor_stats.resolve}});
+	                        {"resolve", neighbor_stats.resolve},
+	                        {"resolve_removed", neighbor_stats.resolve_removed},
+	                        {"remove_final", neighbor_stats.remove_final}});
 
 	/// memory
 	{

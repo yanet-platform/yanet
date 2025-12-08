@@ -17,19 +17,22 @@ void show()
 	             "interface_name",
 	             "ip_address",
 	             "mac_address",
-	             "last_update");
+	             "last_update",
+	             "last_remove");
 
 	for (const auto& [route_name,
 	                  interface_name,
 	                  ip_address,
 	                  mac_address,
-	                  last_update] : response)
+	                  last_update,
+	                  last_remove] : response)
 	{
 		table.insert(route_name,
 		             interface_name,
 		             ip_address,
 		             mac_address,
-		             last_update);
+		             last_update,
+		             last_remove);
 	}
 
 	table.print();

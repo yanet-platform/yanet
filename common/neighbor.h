@@ -13,6 +13,8 @@ struct stats
 	uint64_t hashtable_remove_error;
 	uint64_t netlink_neighbor_update;
 	uint64_t resolve;
+	uint64_t resolve_removed;
+	uint64_t remove_final;
 };
 
 }
