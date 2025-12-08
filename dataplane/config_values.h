@@ -48,6 +48,7 @@ struct ConfigValues
 	uint64_t neighbor_rcvbuf_size = 0;
 	uint64_t neighbor_checks_interval = YANET_CONFIG_NEIGHBOR_CHECK_INTERVAL;
 	uint64_t neighbor_remove_timeout = YANET_CONFIG_NEIGHBOR_REMOVE_TIMEOUT;
+	uint64_t neighbor_resolve_removed = YANET_CONFIG_RESOLVE_REMOVED;
 };
 
 inline uint64_t ReadNeighStaleTime()
@@ -131,4 +132,5 @@ inline void from_json(const nlohmann::json& j, ConfigValues& cfg)
 	}
 	cfg.neighbor_checks_interval = j.value("neighbor_checks_interval", cfg.neighbor_checks_interval);
 	cfg.neighbor_remove_timeout = j.value("neighbor_remove_timeout", cfg.neighbor_remove_timeout);
+	cfg.neighbor_resolve_removed = j.value("neighbor_resolve_removed", cfg.neighbor_resolve_removed);
 }
