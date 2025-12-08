@@ -290,6 +290,8 @@ eResult cDataPlane::init(const std::string& binaryPath,
 	        get_socket_ids(),
 	        getConfigValues().neighbor_ht_size,
 	        getConfigValues().neighbor_rcvbuf_size,
+	        getConfigValues().neighbor_checks_interval,
+	        getConfigValues().neighbor_remove_timeout,
 	        [this](tSocketId socket_id) {
 		        return memory_manager.create<dataplane::neighbor::hashtable>(
 		                "neighbor.ht",
@@ -1491,6 +1493,15 @@ void cDataPlane::timestamp_thread()
 	}
 }
 
+void cDataPlane::neighbor_thread()
+{
+	for (;;)
+	{
+		neighbor.NeighborThreadAction(current_time);
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}
+}
+
 void cDataPlane::SWRateLimiterTimeTracker()
 {
 	for (;;)
@@ -1541,6 +1552,10 @@ void cDataPlane::start()
 {
 	threads.emplace_back([this]() {
 		timestamp_thread();
+	});
+
+	threads.emplace_back([this]() {
+		neighbor_thread();
 	});
 
 	threads.emplace_back([this]() {

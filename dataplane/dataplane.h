@@ -140,6 +140,7 @@ protected:
 	const common::idp::hitcount_dump::response& getHitcountMap();
 
 	void timestamp_thread();
+	void neighbor_thread();
 	void SWRateLimiterTimeTracker();
 	std::chrono::high_resolution_clock::time_point prevTimePointForSWRateLimiter;
 
