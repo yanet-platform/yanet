@@ -245,6 +245,7 @@ void Provider::StartMonitor(unsigned rcvbuf_size,
 	}
 	sk_ = usk.release();
 	monitor_.Run([this]() {
+		failed_work_monitor_.store(false);
 		int err;
 		if ((err = nl_recvmsgs_default(sk_)) < 0)
 		{
@@ -252,12 +253,14 @@ void Provider::StartMonitor(unsigned rcvbuf_size,
 			{
 				case ENOBUFS:
 					YANET_LOG_ERROR("Lost events because of ENOBUFS\n");
-					break;
+					failed_work_monitor_.store(true);
+					return false;
 				case EAGAIN:
 				case EINTR:
 					break;
 				default:
 					YANET_LOG_ERROR("Failed to receive: %s", nl_geterror(err));
+					failed_work_monitor_.store(true);
 					return false;
 			}
 		}
@@ -275,6 +278,11 @@ void Provider::StopMonitor()
 Provider::~Provider()
 {
 	StopMonitor();
+}
+
+bool Provider::IsFailedWorkMonitor()
+{
+	return failed_work_monitor_;
 }
 
 } // namespace netlink

@@ -29,6 +29,10 @@ public:
 	{
 	}
 	~MockProvider() final = default;
+	bool IsFailedWorkMonitor() final
+	{
+		return false;
+	}
 	std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert_;
 	std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp_;
 	std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove_;

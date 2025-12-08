@@ -90,6 +90,7 @@ class module
 	uint64_t rcvbuf_size_ = 0;
 	uint64_t checks_interval_ = YANET_CONFIG_NEIGHBOR_CHECK_INTERVAL;
 	uint64_t remove_timeout_ = YANET_CONFIG_NEIGHBOR_REMOVE_TIMEOUT;
+	std::mutex mutex_restart_monitor_;
 
 public:
 	module();

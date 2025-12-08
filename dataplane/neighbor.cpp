@@ -376,7 +376,7 @@ eResult module::neighbor_update_interfaces(const common::idp::neighbor_update_in
 
 	generation_interface.switch_generation();
 	generation_interface.next_unlock();
-
+	std::lock_guard<std::mutex> guard(mutex_restart_monitor_);
 	StopNetlinkMonitor();
 	DumpOSNeighbors();
 	StartNetlinkMonitor();
@@ -608,6 +608,15 @@ void module::resolve(const dataplane::neighbor::key& key)
 
 void module::NeighborThreadAction(uint32_t current_time)
 {
+	// Check monitor status
+	if (neighbor_provider->IsFailedWorkMonitor())
+	{
+		std::lock_guard<std::mutex> guard(mutex_restart_monitor_);
+		StopNetlinkMonitor();
+		DumpOSNeighbors();
+		StartNetlinkMonitor();
+	}
+
 	// find records to remove or resolve
 	std::vector<key> keys_to_remove;
 	std::vector<key> keys_to_resolve;
