@@ -133,6 +133,7 @@ protected:
 
 	static int lcoreThread(void* args);
 	void timestamp_thread();
+	void neighbor_thread();
 
 protected:
 	friend class cWorker;

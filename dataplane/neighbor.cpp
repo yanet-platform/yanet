@@ -23,6 +23,8 @@ eResult module::init(
         const std::set<tSocketId>& socket_ids,
         uint64_t ht_size,
         uint64_t rcvbuf_size,
+        uint64_t checks_interval,
+        uint64_t remove_timeout,
         std::function<dataplane::neighbor::hashtable*(tSocketId)> ht_allocator,
         std::function<std::uint32_t()> current_time,
         std::function<void()> on_neighbor_flush,
@@ -33,6 +35,8 @@ eResult module::init(
 	on_neighbor_flush_handle_ = std::move(on_neighbor_flush);
 	keys_to_resolve_provider_ = std::move(keys_to_resolve);
 	rcvbuf_size_ = rcvbuf_size;
+	checks_interval_ = checks_interval;
+	remove_timeout_ = remove_timeout;
 
 	generation_hashtable.fill([&](neighbor::generation_hashtable& hashtable) {
 		for (const auto socket_id : socket_ids)
@@ -146,6 +150,8 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 	value.flags = 0;
 	value.flags |= flag_is_static;
 	value.last_update_timestamp = current_time_provider_();
+	value.last_remove_timestamp = 0;
+	value.last_resolve_timestamp = 0;
 
 	auto response = generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 		eResult result = eResult::success;
@@ -332,7 +338,7 @@ eResult module::DumpOSNeighbors()
 				        hashtable_updater.get_pointer()
 				                ->insert_or_update(
 				                        dataplane::neighbor::key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
-				                        dataplane::neighbor::value{mac.value(), 0, now});
+				                        dataplane::neighbor::value{mac.value(), 0, now, 0, 0});
 				        stats.netlink_neighbor_update++;
 			        }
 		        }
@@ -406,7 +412,7 @@ void module::StartResolveJob()
 void module::Upsert(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac)
 {
 	TransformHashtables([k = key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
-	                     v = value{mac, 0, current_time_provider_()},
+	                     v = value{mac, 0, current_time_provider_(), 0, 0},
 	                     this](dataplane::neighbor::hashtable& hashtable) {
 		if (!hashtable.insert_or_update(k, v))
 		{
@@ -428,6 +434,8 @@ void module::UpdateTimestamp(tInterfaceId iface, const ipv6_address_t& dst, bool
 		if (value)
 		{
 			value->last_update_timestamp = current_time_provider_();
+			value->last_remove_timestamp = 0;
+			value->last_resolve_timestamp = 0;
 			stats.hashtable_insert_success++;
 		}
 		else
@@ -441,9 +449,16 @@ void module::Remove(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6)
 {
 	TransformHashtables([k = key{iface, is_v6 ? flag_is_ipv6 : uint16_t{}, dst},
 	                     this](dataplane::neighbor::hashtable& hashtable) {
-		if (hashtable.remove(k))
+		dataplane::neighbor::value* value;
+		hashtable.lookup(k, value);
+		if (value)
 		{
+			value->last_remove_timestamp = current_time_provider_();
 			stats.hashtable_remove_success++;
+		}
+		else
+		{
+			stats.hashtable_remove_error++;
 		}
 	});
 }
@@ -581,6 +596,71 @@ void module::resolve(const dataplane::neighbor::key& key)
 
 	close(icmp_socket);
 #endif // CONFIG_YADECAP_AUTOTEST
+}
+
+void module::NeighborThreadAction(uint32_t current_time)
+{
+	// find records to remove or resolve
+	std::vector<key> keys_to_remove;
+	std::vector<key> keys_to_resolve;
+	auto lock = generation_hashtable.current_lock_guard();
+	const auto& hashtable_updater = generation_hashtable.current().hashtable_updater.begin()->second;
+	for (auto iter : hashtable_updater.range())
+	{
+		if (!iter.is_valid())
+		{
+			continue;
+		}
+		auto& key = *iter.key();
+		auto& value = *iter.value();
+		if ((value.last_remove_timestamp == 0) || (value.flags & flag_is_static))
+		{
+			continue;
+		}
+		else if (value.last_remove_timestamp + remove_timeout_ < current_time)
+		{
+			keys_to_remove.push_back(key);
+		}
+		else if (value.last_resolve_timestamp + checks_interval_ <= current_time)
+		{
+			keys_to_resolve.push_back(key);
+		}
+	}
+
+	// remove records
+	for (const key& cur_key : keys_to_remove)
+	{
+		TransformHashtables([cur_key, this](dataplane::neighbor::hashtable& hashtable) {
+			if (hashtable.remove(cur_key))
+			{
+				stats.hashtable_remove_success++;
+			}
+			else
+			{
+				stats.hashtable_remove_error++;
+			}
+		});
+	}
+
+	// resolve
+	for (const key& cur_key : keys_to_resolve)
+	{
+		TransformHashtables([cur_key, current_time, this](dataplane::neighbor::hashtable& hashtable) {
+			YANET_LOG_INFO("resolve\n");
+			dataplane::neighbor::value* value;
+			hashtable.lookup(cur_key, value);
+			if (value)
+			{
+				value->last_resolve_timestamp = current_time;
+				stats.resolve++;
+			}
+			else
+			{
+				stats.hashtable_insert_error++;
+			}
+		});
+		resolve(cur_key);
+	}
 }
 
 } // namespace dataplane::neighbor
