@@ -33,6 +33,7 @@ public:
 	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp) = 0;
 	virtual void StopMonitor() = 0;
 	virtual ~Interface() = default;
+	virtual bool IsFailedWorkMonitor() = 0;
 };
 
 class Provider : public Interface
@@ -46,6 +47,7 @@ class Provider : public Interface
 	std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp_;
 
 	utils::Job monitor_;
+	std::atomic<bool> failed_work_monitor_{false};
 
 public:
 	std::vector<Entry> GetHostDump(unsigned rcvbuf_size,
@@ -57,6 +59,7 @@ public:
 	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp) final;
 	void StopMonitor() final;
 	~Provider() final;
+	bool IsFailedWorkMonitor() final;
 };
 
 template<typename F>
