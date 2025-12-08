@@ -101,7 +101,8 @@ common::idp::neighbor_show::response module::neighbor_show() const
 				}
 
 				std::string last_remove_timestamp;
-				if (value.last_remove_timestamp != 0) {
+				if (value.last_remove_timestamp != 0)
+				{
 					last_remove_timestamp = std::to_string(current_time_provider_() - value.last_remove_timestamp);
 				}
 
