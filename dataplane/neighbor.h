@@ -55,6 +55,8 @@ struct value
 	rte_ether_addr ether_address;
 	uint16_t flags;
 	uint32_t last_update_timestamp;
+	uint32_t last_remove_timestamp;
+	uint32_t last_resolve_timestamp;
 };
 
 //
@@ -85,6 +87,8 @@ class module
 	static constexpr auto PAUSE = 10ms;
 	netlink::Interface* neighbor_provider;
 	uint64_t rcvbuf_size_ = 0;
+	uint64_t checks_interval_ = YANET_CONFIG_NEIGHBOR_CHECK_INTERVAL;
+	uint64_t remove_timeout_ = YANET_CONFIG_NEIGHBOR_REMOVE_TIMEOUT;
 
 public:
 	module();
@@ -93,6 +97,8 @@ public:
 	        const std::set<tSocketId>& socket_ids,
 	        uint64_t ht_size,
 	        uint64_t rcvbuf_size,
+	        uint64_t checks_interval,
+	        uint64_t remove_timeout,
 	        std::function<dataplane::neighbor::hashtable*(tSocketId)> ht_allocator,
 	        std::function<std::uint32_t()> current_time,
 	        std::function<void()> on_update,
@@ -113,6 +119,7 @@ public:
 	void Upsert(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac);
 	void UpdateTimestamp(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6);
 	void Remove(tInterfaceId iface, const ipv6_address_t& dst, bool is_v6);
+	void NeighborThreadAction(uint32_t current_time);
 
 protected:
 	void StartResolveJob();

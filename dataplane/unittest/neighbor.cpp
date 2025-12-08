@@ -130,6 +130,8 @@ TEST(NeighborTest, Basic)
 	        {1},
 	        64 * 1024,
 	        0,
+	        YANET_CONFIG_NEIGHBOR_CHECK_INTERVAL,
+	        2, // remove_timeout
 	        [](tSocketId) {
 		        auto size = dataplane::neighbor::hashtable::calculate_sizeof(64 * 1024);
 		        void* ptr = new char[size];
@@ -161,6 +163,8 @@ TEST(NeighborTest, Basic)
 	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {0}}};
 
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
+	dut.neighbor_flush();
+	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 
 	now = 4;
 	dut.UpdateTimestamp(1, Ip6FromString("100.200.1.2"), false);
@@ -169,17 +173,31 @@ TEST(NeighborTest, Basic)
 	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, {3}},
 	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {0}}};
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
+	dut.neighbor_flush();
+	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 
 	now = 5;
 	dut.Remove(1, Ip6FromString("192.168.1.1"), false);
 	dut.neighbor_flush();
 	expected = {
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, {4}},
 	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {1}}};
+	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
+	dut.neighbor_flush();
+	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
+	
+	now = 9;
+	dut.NeighborThreadAction(now);
+	dut.neighbor_flush();
+	expected = {
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {5}}};
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 
 	dut.neighbor_flush();
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 
+	dut.neighbor_clear();
+	EXPECT_TRUE(equal(dut.neighbor_show(), {}));
 	dut.neighbor_clear();
 	EXPECT_TRUE(equal(dut.neighbor_show(), {}));
 }
@@ -193,6 +211,8 @@ TEST(NeighborTest, Provider)
 	        {1},
 	        64 * 1024,
 	        0,
+	        YANET_CONFIG_NEIGHBOR_CHECK_INTERVAL,
+	        YANET_CONFIG_NEIGHBOR_REMOVE_TIMEOUT,
 	        [](tSocketId) {
 		        auto size = dataplane::neighbor::hashtable::calculate_sizeof(64 * 1024);
 		        void* ptr = new char[size];

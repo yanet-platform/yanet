@@ -2,6 +2,7 @@
 
 #include "common/config.release.h"
 #include <cstdint>
+#include <fstream>
 #include <nlohmann/json.hpp>
 
 struct FragmentationConfig
@@ -45,7 +46,24 @@ struct ConfigValues
 	uint64_t balancer_other_protocols_timeout = YANET_CONFIG_BALANCER_STATE_TIMEOUT_DEFAULT;
 	uint64_t neighbor_ht_size = 64 * 1024;
 	uint64_t neighbor_rcvbuf_size = 0;
+	uint64_t neighbor_checks_interval = YANET_CONFIG_NEIGHBOR_CHECK_INTERVAL;
+	uint64_t neighbor_remove_timeout = YANET_CONFIG_NEIGHBOR_REMOVE_TIMEOUT;
 };
+
+inline uint64_t ReadNeighStaleTime()
+{
+	std::string filename{"/proc/sys/net/ipv6/neigh/default/gc_stale_time"};
+	std::ifstream input_file(filename);
+	if (!input_file)
+	{
+		YANET_LOG_ERROR("error read neighbor stale timeout from '%s': %d, %s\n", filename.c_str(), errno, strerror(errno));
+		return 0;
+	}
+	uint64_t result;
+	input_file >> result;
+	input_file.close();
+	return result;
+}
 
 inline void from_json(const nlohmann::json& j, ConfigValues& cfg)
 {
@@ -105,4 +123,12 @@ inline void from_json(const nlohmann::json& j, ConfigValues& cfg)
 	cfg.balancer_other_protocols_timeout = j.value("balancer_other_protocols_timeout", cfg.balancer_other_protocols_timeout);
 	cfg.neighbor_ht_size = j.value("neighbor_ht_size", cfg.neighbor_ht_size);
 	cfg.neighbor_rcvbuf_size = j.value("neighbor_rcvbuf_size", cfg.neighbor_rcvbuf_size);
+
+	uint64_t neighbor_remove_timeout = ReadNeighStaleTime();
+	if (neighbor_remove_timeout != 0)
+	{
+		cfg.neighbor_remove_timeout = neighbor_remove_timeout;
+	}
+	cfg.neighbor_checks_interval = j.value("neighbor_checks_interval", cfg.neighbor_checks_interval);
+	cfg.neighbor_remove_timeout = j.value("neighbor_remove_timeout", cfg.neighbor_remove_timeout);
 }
