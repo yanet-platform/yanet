@@ -214,6 +214,11 @@ struct ipv6_address_t
 		memset(bytes, 0, std::size(bytes));
 	}
 
+	bool operator<(ipv6_address_t other) const
+	{
+		return std::memcmp(bytes, other.bytes, 16) < 0;
+	}
+
 	union
 	{
 		uint8_t bytes[LENGTH]; ///< @todo: rename to address
