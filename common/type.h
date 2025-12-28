@@ -1999,6 +1999,23 @@ enum class eNexthopType : unsigned int
 	repeat,
 };
 
+inline std::string InterfaceName(eNexthopType nh)
+{
+	switch (nh)
+	{
+		case eNexthopType::controlPlane:
+			return "linux";
+		case eNexthopType::repeat:
+			return "repeat";
+		default:
+#if __cpp_exceptions
+			throw std::invalid_argument{"No valid conversion from eNexthopType to interface name string"};
+#else
+			std::exit(EXIT_FAILURE);
+#endif
+	}
+}
+
 enum class eFlowType : uint8_t
 {
 	drop,
