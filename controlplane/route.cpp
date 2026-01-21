@@ -1034,6 +1034,7 @@ void route_t::reload_after()
 	generations.switch_generation();
 	generations_neighbors.next_unlock();
 	generations.next_unlock();
+	dataplane.neighbor_interfaces_switch();
 }
 
 void route_t::prefix_flush_prefixes(common::idp::updateGlobalBase::request& globalbase)

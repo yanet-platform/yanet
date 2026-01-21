@@ -12,30 +12,26 @@ void show()
 	interface::dataPlane dataplane;
 	const auto response = dataplane.neighbor_show();
 
-	table_t table({.optional_null = "static"});
-	table.insert("route_name",
-	             "interface_name",
-	             "ip_address",
-	             "mac_address",
-	             "last_update",
-	             "last_remove");
+	FillAndPrintTable({"route_name",
+	                   "interface_name",
+	                   "ip_address",
+	                   "mac_address"},
+	                  response,
+	                  {.optional_null = "static"});
+}
 
-	for (const auto& [route_name,
-	                  interface_name,
-	                  ip_address,
-	                  mac_address,
-	                  last_update,
-	                  last_remove] : response)
-	{
-		table.insert(route_name,
-		             interface_name,
-		             ip_address,
-		             mac_address,
-		             last_update,
-		             last_remove);
-	}
+void show_cache()
+{
+	interface::dataPlane dataplane;
+	const auto response = dataplane.neighbor_show_cache();
 
-	table.print();
+	FillAndPrintTable({"interface_name",
+	                   "ip_address",
+	                   "mac_address",
+	                   "last_update",
+	                   "last_remove"},
+	                  response,
+	                  {.optional_null = "static"});
 }
 
 void insert(const std::string& route_name,

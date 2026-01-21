@@ -10,16 +10,14 @@ namespace
 class MockProvider final : public netlink::Interface
 {
 public:
-	std::vector<netlink::Entry> GetHostDump(unsigned rcvbuf_size,
-	                                        const std::unordered_map<std::string, tInterfaceId>& ids)
+	std::vector<netlink::Entry> GetHostDump(unsigned rcvbuf_size)
 	{
 		return dump_;
 	}
 	void StartMonitor(unsigned rcvbuf_size,
-	                  std::function<std::optional<tInterfaceId>(const char*)> get_id,
-	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
-	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
-	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp)
+	                  std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
+	                  std::function<void(std::string, const ipv6_address_t&, bool)> remove,
+	                  std::function<void(std::string, const ipv6_address_t&, bool)> timestamp)
 	{
 		upsert_ = std::move(upsert);
 		timestamp_ = std::move(timestamp);
@@ -33,9 +31,9 @@ public:
 	{
 		return false;
 	}
-	std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert_;
-	std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp_;
-	std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove_;
+	std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert_;
+	std::function<void(std::string, const ipv6_address_t&, bool)> timestamp_;
+	std::function<void(std::string, const ipv6_address_t&, bool)> remove_;
 	std::vector<netlink::Entry> dump_;
 };
 
@@ -80,15 +78,6 @@ std::ostream& operator<<(std::ostream& os, entry_t e)
 	   << std::get<1>(e) << ' '
 	   << std::get<common::ip_address_t>(e).toString() << ' '
 	   << std::get<common::mac_address_t>(e).toString();
-	if (auto& ts = std::get<4>(e))
-	{
-		os << ' ' << ts.value();
-	}
-	else
-	{
-		os << " {}";
-	}
-	os << ' ' << std::get<5>(e);
 	return os;
 }
 
@@ -97,9 +86,7 @@ bool equal(entry_t a, entry_t b)
 	return std::get<0>(a) == std::get<0>(b) &&
 	       std::get<1>(a) == std::get<1>(b) &&
 	       std::get<2>(a) == std::get<2>(b) &&
-	       std::get<3>(a) == std::get<3>(b) &&
-	       std::get<4>(a) == std::get<4>(b) &&
-	       std::get<5>(a) == std::get<5>(b);
+	       std::get<3>(a) == std::get<3>(b);
 }
 
 bool equal(response_t a, response_t b)
@@ -155,8 +142,9 @@ TEST(NeighborTest, Basic)
 
 	dut.neighbor_update_interfaces({{1, "route0", "kni1"}});
 	common::idp::neighbor_show::response expected = {
-	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, {1}, {}}};
-	dut.Upsert(1, Ip6FromString("192.168.1.1"), false, EthFromString("DE:AD:BE:EF:01:02"));
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}}};
+	dut.neighbor_interfaces_switch();
+	dut.Upsert("kni1", Ip6FromString("192.168.1.1"), false, EthFromString("DE:AD:BE:EF:01:02"));
 	dut.neighbor_flush();
 
 	now = 2;
@@ -167,42 +155,42 @@ TEST(NeighborTest, Basic)
 	EXPECT_EQ(dut.neighbor_show(), expected);
 
 	now = 3;
-	dut.Upsert(1, Ip6FromString("100.200.1.2"), false, EthFromString("DE:AD:BE:EF:08:08"));
+	dut.Upsert("kni1", Ip6FromString("100.200.1.2"), false, EthFromString("DE:AD:BE:EF:08:08"));
 	dut.neighbor_flush();
 	expected = {
-	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, {2}, {}},
-	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {0}, {}}};
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}},
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}}};
 
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 	dut.neighbor_flush();
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 
 	now = 4;
-	dut.UpdateTimestamp(1, Ip6FromString("100.200.1.2"), false);
+	dut.UpdateTimestamp("kni1", Ip6FromString("100.200.1.2"), false);
 	dut.neighbor_flush();
 	expected = {
-	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, {3}, {}},
-	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {0}, {}}};
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}},
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}}};
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 	dut.neighbor_flush();
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 
 	now = 5;
-	dut.Remove(1, Ip6FromString("192.168.1.1"), false);
+	dut.Remove("kni1", Ip6FromString("192.168.1.1"), false);
 	dut.neighbor_flush();
 	now = 7;
 	expected = {
-	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, 6, "2"},
-	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {3}, {}}};
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}},
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}}};
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 	dut.neighbor_flush();
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 
-	now = 9;
+	now = 1000;
 	dut.NeighborThreadAction(now);
 	dut.neighbor_flush();
 	expected = {
-	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {5}, {}}};
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}}};
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 
 	dut.neighbor_flush();
@@ -241,14 +229,14 @@ TEST(NeighborTest, Provider)
 	EXPECT_TRUE(equal(dut.neighbor_show(), {}));
 
 	mock->dump_ = {
-	        {1, Ip6FromString("192.168.1.1"), EthFromString("DE:AD:BE:EF:01:02"), false},
-	        {1, Ip6FromString("100.200.1.2"), EthFromString("DE:AD:BE:EF:08:08"), false}};
+	        {"kni1", Ip6FromString("192.168.1.1"), EthFromString("DE:AD:BE:EF:01:02"), false},
+	        {"kni1", Ip6FromString("100.200.1.2"), EthFromString("DE:AD:BE:EF:08:08"), false}};
 
 	dut.neighbor_clear();
 
 	common::idp::neighbor_show::response expected = {
-	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, {0}, {}},
-	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, {0}, {}}};
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}},
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}}};
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 }
 

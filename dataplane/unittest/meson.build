@@ -11,7 +11,7 @@ sources = files('unittest.cpp',
                 'hashtable.cpp')
 
 arch = 'corei7'
-cpp_args_append = ['-march=' + arch]
+cpp_args_append = ['-march=' + arch, '-DCONFIG_YADECAP_UNITTEST']
 
 unittest = executable('yanet-dataplane-unittest',
                       sources,
