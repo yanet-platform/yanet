@@ -14,6 +14,18 @@ void show()
 	FillAndPrintTable({"route_name",
 	                   "interface_name",
 	                   "ip_address",
+	                   "mac_address"},
+	                  response,
+	                  {.optional_null = "static"});
+}
+
+void show_cache()
+{
+	interface::dataPlane dataplane;
+	const auto response = dataplane.neighbor_show_cache();
+
+	FillAndPrintTable({"interface_name",
+	                   "ip_address",
 	                   "mac_address",
 	                   "last_update",
 	                   "last_remove"},

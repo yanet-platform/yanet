@@ -210,6 +210,11 @@ public:
 		return get<common::idp::requestType::neighbor_show, common::idp::neighbor_show::response>();
 	}
 
+	auto neighbor_show_cache() const
+	{
+		return get<common::idp::requestType::neighbor_show_cache, common::idp::neighbor_show_cache::response>();
+	}
+
 	auto neighbor_insert(const common::idp::neighbor_insert::request& request) const
 	{
 		return get<common::idp::requestType::neighbor_insert, eResult>(request);
@@ -248,6 +253,11 @@ public:
 	auto memory_manager_stats() const
 	{
 		return get<common::idp::requestType::memory_manager_stats, common::idp::memory_manager_stats::response>();
+	}
+
+	auto neighbor_interfaces_switch() const
+	{
+		return get<common::idp::requestType::neighbor_interfaces_switch, eResult>();
 	}
 
 protected:

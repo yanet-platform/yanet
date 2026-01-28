@@ -318,6 +318,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = dataPlane->neighbor.neighbor_show();
 		}
+		else if (type == common::idp::requestType::neighbor_show_cache)
+		{
+			response = dataPlane->neighbor.neighbor_show_cache();
+		}
 		else if (type == common::idp::requestType::neighbor_insert)
 		{
 			response = dataPlane->neighbor.neighbor_insert(std::get<common::idp::neighbor_insert::request>(std::get<1>(request)));
@@ -349,6 +353,10 @@ void cBus::clientThread(int clientSocket)
 		else if (type == common::idp::requestType::memory_manager_stats)
 		{
 			response = dataPlane->memory_manager.memory_manager_stats();
+		}
+		else if (type == common::idp::requestType::neighbor_interfaces_switch)
+		{
+			response = dataPlane->neighbor.neighbor_interfaces_switch();
 		}
 		else
 		{

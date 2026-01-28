@@ -53,6 +53,7 @@ inline std::vector<bus_request_info> get_bus_requests(common::sdp::DataPlaneInSh
 	        {common::idp::requestType::dump_physical_port, "dump_physical_port"},
 	        {common::idp::requestType::balancer_state_clear, "balancer_state_clear"},
 	        {common::idp::requestType::neighbor_show, "neighbor_show"},
+	        {common::idp::requestType::neighbor_show_cache, "neighbor_show_cache"},
 	        {common::idp::requestType::neighbor_insert, "neighbor_insert"},
 	        {common::idp::requestType::neighbor_remove, "neighbor_remove"},
 	        {common::idp::requestType::neighbor_clear, "neighbor_clear"},
