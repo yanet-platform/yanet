@@ -192,7 +192,7 @@ protected:
 	void StopNetlinkMonitor();
 	eResult DumpOSNeighbors();
 
-	bool resolve(const std::string& interface_name, const common::ip_address_t& ip_address);
+	bool resolve(const std::string& interface_name, const ipv6_address_t& ip_address, bool is_v6);
 	std::optional<tInterfaceId> GetInterfaceId(const std::string& iface_name);
 	std::optional<std::string> GetInterfaceName(tInterfaceId iface_id);
 
