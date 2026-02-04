@@ -282,6 +282,7 @@ eResult module::DumpOSNeighbors()
 	                neighbor::generation_hashtable& hashtable) {
 		        for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
 		        {
+			        (void)socket_id;
 			        for (const auto& entry : dump)
 			        {
 				        const auto& [iface_name, dst, mac, is_v6] = entry;
@@ -579,7 +580,7 @@ bool module::resolve(const std::string& interface_name, const ipv6_address_t& ip
 		generation_hashtable.update([this, key, value](neighbor::generation_hashtable& hashtable) {
 			for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
 			{
-				GCC_BUG_UNUSED(socket_id);
+				(void)socket_id;
 				if (!hashtable_updater.get_pointer()->insert_or_update(key, value))
 				{
 					stats.hashtable_insert_error++;
@@ -757,7 +758,7 @@ std::optional<std::string> module::GetInterfaceName(tInterfaceId iface_id)
 	}
 
 	const auto& [it_route_name, it_interface_name] = it->second;
-	GCC_BUG_UNUSED(it_route_name);
+	(void)it_route_name;
 
 	return it_interface_name;
 }
