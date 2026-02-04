@@ -424,7 +424,7 @@ eResult module::neighbor_interfaces_switch()
 
 	if (changed)
 	{
-		NEIGHBOR_INFO("neighbor_interfaces_switch changed");
+		NEIGHBOR_INFO("neighbor_interfaces_switch changed\n");
 #ifdef CONFIG_YADECAP_AUTOTEST
 		UpdateFromCache(true);
 #else // CONFIG_YADECAP_AUTOTEST
@@ -463,8 +463,7 @@ void module::StartResolveJob()
 			std::optional<std::string> interface_name = GetInterfaceName(key.interface_id);
 			if (interface_name.has_value() && neighbor_cache_.NeedResolve(*interface_name, key.address, key.flags & flag_is_ipv6, timestamp))
 			{
-				common::ip_address_t ip_address(key.flags & flag_is_ipv6 ? 6 : 4, key.address.bytes);
-				resolve(*interface_name, ip_address);
+				resolve(*interface_name, key.address, key.flags & flag_is_ipv6);
 			}
 		}
 
@@ -537,24 +536,26 @@ void module::Remove(std::string iface_name, const ipv6_address_t& dst, bool is_v
 	}
 }
 
-bool module::resolve(const std::string& interface_name, const common::ip_address_t& ip_address)
+bool module::resolve(const std::string& interface_name, const ipv6_address_t& ip_address, bool is_v6)
 {
 	stats.resolve++;
 
-	NEIGHBOR_DEBUG("neighbor resolve: %s, %s\n", interface_name.c_str(), ip_address.toString().c_str());
+	NEIGHBOR_DEBUG("neighbor resolve: %s, %s\n",
+	               interface_name.c_str(),
+	               common::ip_address_t(is_v6 ? 6 : 4, ip_address.bytes).toString().c_str());
 	YANET_LOG_DEBUG("resolve: %s, %s\n",
 	                interface_name.data(),
-	                ip_address.toString().data());
+	                common::ip_address_t(is_v6 ? 6 : 4, ip_address.bytes).toString().data());
 
 	bool result = true;
 #ifdef CONFIG_YADECAP_AUTOTEST
 	NEIGHBOR_INFO("Mocking resolve: %s, %s\n",
 	              interface_name.data(),
-	              ip_address.toString().data());
+	              common::ip_address_t(is_v6 ? 6 : 4, ip_address.bytes).toString().data());
 	value value;
 	value.ether_address.addr_bytes[0] = 44;
 	value.ether_address.addr_bytes[1] = 44;
-	if (ip_address.is_ipv6())
+	if (is_v6)
 	{
 		value.ether_address.addr_bytes[0] = 66;
 		value.ether_address.addr_bytes[1] = 66;
@@ -562,18 +563,15 @@ bool module::resolve(const std::string& interface_name, const common::ip_address
 
 	dataplane::neighbor::key key;
 	memset(&key, 0, sizeof(key));
-	if (ip_address.is_ipv4())
+	key.address = ip_address;
+	if (is_v6)
 	{
-		key.address.mapped_ipv4_address = ipv4_address_t::convert(ip_address.get_ipv4());
-	}
-	else
-	{
-		key.address = ipv6_address_t::convert(ip_address.get_ipv6());
+
 		key.flags |= flag_is_ipv6;
 	}
 	*((uint32_t*)&value.ether_address.addr_bytes[2]) = rte_hash_crc(key.address.bytes, 16, 0);
 
-	neighbor_cache_.Insert(interface_name, key.address, ip_address.is_ipv6(), value.ether_address, current_time_provider_(), false);
+	neighbor_cache_.Insert(interface_name, key.address, is_v6, value.ether_address, current_time_provider_(), false);
 
 	std::optional<tInterfaceId> interface_id = GetInterfaceId(interface_name);
 	if (interface_id.has_value())
@@ -603,7 +601,7 @@ bool module::resolve(const std::string& interface_name, const common::ip_address
 
 	int family = AF_INET;
 	int protocol = IPPROTO_ICMP;
-	if (ip_address.is_ipv6())
+	if (is_v6)
 	{
 		family = AF_INET6;
 		protocol = IPPROTO_ICMPV6;
@@ -640,11 +638,11 @@ bool module::resolve(const std::string& interface_name, const common::ip_address
 
 	socklen_t address_length = sizeof(address_v4);
 
-	if (ip_address.is_ipv6())
+	if (is_v6)
 	{
 		address_v6.sin6_family = AF_INET6;
 		address_v6.sin6_port = 0;
-		memcpy(address_v6.sin6_addr.__in6_u.__u6_addr8, ip_address.get_ipv6().data(), 16);
+		memcpy(address_v6.sin6_addr.__in6_u.__u6_addr8, ip_address.bytes, 16);
 
 		address_length = sizeof(address_v6);
 	}
@@ -652,7 +650,7 @@ bool module::resolve(const std::string& interface_name, const common::ip_address
 	{
 		address_v4.sin_family = AF_INET;
 		address_v4.sin_port = 0;
-		address_v4.sin_addr.s_addr = ip_address.get_ipv6().get_mapped_ipv4_address();
+		address_v4.sin_addr.s_addr = ip_address.mapped_ipv4_address.address;
 	}
 
 	icmphdr header;
@@ -722,8 +720,7 @@ void module::NeighborThreadAction(uint32_t current_time)
 	// resolve
 	for (const key_cache& cur_key : keys_to_resolve)
 	{
-		common::ip_address_t ip_address(cur_key.is_v6 ? 6 : 4, cur_key.address.bytes);
-		if (resolve(cur_key.iface_name, ip_address))
+		if (resolve(cur_key.iface_name, cur_key.address, cur_key.is_v6))
 		{
 			neighbor_cache_.SetSentResolve(cur_key, current_time_provider_());
 		}
