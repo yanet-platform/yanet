@@ -185,6 +185,7 @@ public:
 	void UpdateTimestamp(std::string iface_name, const ipv6_address_t& dst, bool is_v6);
 	void Remove(std::string iface_name, const ipv6_address_t& dst, bool is_v6);
 	void NeighborThreadAction(uint32_t current_time);
+	void UpdateFromCache(bool remove_old, bool use_next_generation);
 
 protected:
 	void StartResolveJob();
@@ -194,9 +195,8 @@ protected:
 
 	bool resolve(const std::string& interface_name, const ipv6_address_t& ip_address, bool is_v6);
 	std::optional<tInterfaceId> GetInterfaceId(const std::string& iface_name);
+	std::optional<tInterfaceId> GetInterfaceIdNext(const std::string& iface_name);
 	std::optional<std::string> GetInterfaceName(tInterfaceId iface_id);
-
-	void UpdateFromCache(bool remove_old);
 
 protected:
 	generation_manager<dataplane::neighbor::generation_interface> generation_interface;

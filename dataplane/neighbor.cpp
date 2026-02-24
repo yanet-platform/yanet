@@ -237,7 +237,7 @@ eResult module::neighbor_clear()
 	{
 		return result;
 	}
-	UpdateFromCache(true);
+	UpdateFromCache(true, false);
 
 	return eResult::success;
 }
@@ -426,10 +426,10 @@ eResult module::neighbor_interfaces_switch()
 	{
 		NEIGHBOR_INFO("neighbor_interfaces_switch changed\n");
 #ifdef CONFIG_YADECAP_AUTOTEST
-		UpdateFromCache(true);
+		UpdateFromCache(true, false);
 #else // CONFIG_YADECAP_AUTOTEST
 		time_del_unused_ = current_time_provider_() + 30;
-		UpdateFromCache(false);
+		UpdateFromCache(false, false);
 #endif // CONFIG_YADECAP_AUTOTEST
 	}
 
@@ -610,7 +610,9 @@ bool module::resolve(const std::string& interface_name, const ipv6_address_t& ip
 	int icmp_socket = socket(family, SOCK_RAW, protocol);
 	if (icmp_socket == -1)
 	{
-		YANET_LOG_WARNING("neighbor_resolve: socket(): %s\n",
+		YANET_LOG_WARNING("neighbor_resolve %s on %s: socket(): %s\n",
+		                  common::ip_address_t(is_v6 ? 6 : 4, ip_address.bytes).toString().data(),
+		                  interface_name.data(),
 		                  strerror(errno));
 		return false;
 	}
@@ -622,7 +624,8 @@ bool module::resolve(const std::string& interface_name, const ipv6_address_t& ip
 	                    strlen(interface_name.data()) + 1);
 	if (rc == -1)
 	{
-		YANET_LOG_WARNING("neighbor_resolve: setsockopt(%s): %s\n",
+		YANET_LOG_WARNING("neighbor_resolve %s: setsockopt(%s): %s\n",
+		                  common::ip_address_t(is_v6 ? 6 : 4, ip_address.bytes).toString().data(),
 		                  interface_name.data(),
 		                  strerror(errno));
 		close(icmp_socket);
@@ -662,7 +665,9 @@ bool module::resolve(const std::string& interface_name, const ipv6_address_t& ip
 	           &address,
 	           address_length) == -1)
 	{
-		YANET_LOG_WARNING("neighbor_resolve: sendto(): %s\n",
+		YANET_LOG_WARNING("neighbor_resolve %s on %s: sendto(): %s\n",
+		                  common::ip_address_t(is_v6 ? 6 : 4, ip_address.bytes).toString().data(),
+		                  interface_name.data(),
 		                  strerror(errno));
 		result = false;
 	}
@@ -730,7 +735,7 @@ void module::NeighborThreadAction(uint32_t current_time)
 	if (time_del_unused_ != 0 && current_time >= time_del_unused_)
 	{
 		time_del_unused_ = 0;
-		UpdateFromCache(true);
+		UpdateFromCache(true, false);
 	}
 }
 
@@ -745,6 +750,22 @@ std::optional<tInterfaceId> module::GetInterfaceId(const std::string& iface_name
 	}
 
 	return std::get<1>(it->second);
+}
+
+std::optional<tInterfaceId> module::GetInterfaceIdNext(const std::string& iface_name)
+{
+	generation_interface.next_lock();
+	const auto& interface_name_to_id = generation_interface.next().interface_name_to_id;
+	auto it = interface_name_to_id.find(iface_name);
+	if (it == interface_name_to_id.end())
+	{
+		generation_interface.next_unlock();
+		return std::nullopt;
+	}
+
+	tInterfaceId id = std::get<1>(it->second);
+	generation_interface.next_unlock();
+	return id;
 }
 
 std::optional<std::string> module::GetInterfaceName(tInterfaceId iface_id)
@@ -763,7 +784,7 @@ std::optional<std::string> module::GetInterfaceName(tInterfaceId iface_id)
 	return it_interface_name;
 }
 
-void module::UpdateFromCache(bool remove_old)
+void module::UpdateFromCache(bool remove_old, bool use_next_generation)
 {
 	std::lock_guard<std::mutex> lock_cache = neighbor_cache_.LockGuard();
 	std::map<key_cache, value_cache> data = neighbor_cache_.GetData();
@@ -771,7 +792,7 @@ void module::UpdateFromCache(bool remove_old)
 	// insert or update all values
 	for (const auto& [cur_key, cur_value] : data)
 	{
-		std::optional<tInterfaceId> iface_id = GetInterfaceId(cur_key.iface_name);
+		std::optional<tInterfaceId> iface_id = (use_next_generation ? GetInterfaceIdNext(cur_key.iface_name) : GetInterfaceId(cur_key.iface_name));
 		if (iface_id.has_value())
 		{
 			NEIGHBOR_DEBUG("UpdateFromCache %s iface_id=%d\n", netlink::Entry{cur_key.iface_name, cur_key.address, cur_value.ether_address, cur_key.is_v6}.toString().c_str(), *iface_id);

@@ -168,6 +168,7 @@ common::idp::updateGlobalBase::response cControlPlane::updateGlobalBase(const co
 	{
 		return result;
 	}
+	dataPlane->neighbor.UpdateFromCache(false, true);
 
 	DEBUG_LATCH_WAIT(common::idp::debug_latch_update::id::global_base_switch);
 
