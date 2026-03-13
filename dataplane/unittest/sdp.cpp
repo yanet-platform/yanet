@@ -77,6 +77,8 @@ public:
 		metadata.start_bursts = common::sdp::SdrSever::GetStartData((CONFIG_YADECAP_MBUFS_BURST_SIZE + 1) * sizeof(uint64_t), metadata.size);
 		metadata.start_stats = common::sdp::SdrSever::GetStartData(sizeof(common::worker::stats::common), metadata.size);
 		metadata.start_stats_ports = common::sdp::SdrSever::GetStartData(sizeof(common::worker::stats::port[CONFIG_YADECAP_PORTS_SIZE]), metadata.size);
+		metadata.start_stats_logical_ports =
+		        common::sdp::SdrSever::GetStartData(sizeof(common::worker::stats::logicalPort[CONFIG_YADECAP_LOGICALPORTS_SIZE]), metadata.size);
 
 		// stats
 		std::map<std::string, uint64_t> counters_stats;
@@ -166,6 +168,7 @@ public:
 		bursts = utils::ShiftBuffer<uint64_t*>(buffer, metadata.start_bursts);
 		stats = utils::ShiftBuffer<common::worker::stats::common*>(buffer, metadata.start_stats);
 		statsPorts = utils::ShiftBuffer<common::worker::stats::port*>(buffer, metadata.start_stats_ports);
+		statsLogicalPorts = utils::ShiftBuffer<common::worker::stats::logicalPort*>(buffer, metadata.start_stats_logical_ports);
 	}
 
 	void SetTestValues(tCoreId coreId)
@@ -180,22 +183,31 @@ public:
 			statsPorts[index].physicalPort_egress_drops = 4 * (index + coreId);
 		}
 
+		// statsLogicalPorts
+		for (uint32_t index = 0; index < CONFIG_YADECAP_LOGICALPORTS_SIZE; index++)
+		{
+			statsLogicalPorts[index].rx_packets = 5 * (index + coreId);
+			statsLogicalPorts[index].rx_bytes = 6 * (index + coreId);
+			statsLogicalPorts[index].tx_packets = 7 * (index + coreId);
+			statsLogicalPorts[index].tx_bytes = 8 * (index + coreId);
+		}
+
 		// bursts
 		for (uint32_t index = 0; index < CONFIG_YADECAP_MBUFS_BURST_SIZE + 1; index++)
 		{
-			bursts[index] = 5 * (index + coreId);
+			bursts[index] = 9 * (index + coreId);
 		}
 
 		// counters
 		for (uint32_t index = YANET_CONFIG_COUNTER_FALLBACK_SIZE; index < YANET_CONFIG_COUNTERS_SIZE; index++)
 		{
-			counters[index] = (index + coreId) * (index + coreId);
+			counters[index] = 10 * (index + coreId) * (index + coreId);
 		}
 
 		// aclCounters
 		for (uint32_t index = 0; index < YANET_CONFIG_ACL_COUNTERS_SIZE; index++)
 		{
-			aclCounters[index] = index + coreId;
+			aclCounters[index] = 11 * (index + coreId);
 		}
 	}
 
@@ -214,6 +226,17 @@ public:
 		{
 			ASSERT_EQ(statsPorts[index].controlPlane_drops, bufStatsPorts[index].controlPlane_drops);
 			ASSERT_EQ(statsPorts[index].physicalPort_egress_drops, bufStatsPorts[index].physicalPort_egress_drops);
+		}
+
+		// statsLogicalPorts
+		auto* bufStatsLogicalPorts =
+		        utils::ShiftBuffer<common::worker::stats::logicalPort*>(buffer, sdp_data_client.metadata_worker.start_stats_logical_ports);
+		for (uint32_t index = 0; index < CONFIG_YADECAP_LOGICALPORTS_SIZE; index++)
+		{
+			ASSERT_EQ(statsLogicalPorts[index].rx_packets, bufStatsLogicalPorts[index].rx_packets);
+			ASSERT_EQ(statsLogicalPorts[index].rx_bytes, bufStatsLogicalPorts[index].rx_bytes);
+			ASSERT_EQ(statsLogicalPorts[index].tx_packets, bufStatsLogicalPorts[index].tx_packets);
+			ASSERT_EQ(statsLogicalPorts[index].tx_bytes, bufStatsLogicalPorts[index].tx_bytes);
 		}
 
 		// bursts
@@ -241,6 +264,7 @@ public:
 protected:
 	common::worker::stats::common* stats;
 	common::worker::stats::port* statsPorts; // CONFIG_YADECAP_PORTS_SIZE
+	common::worker::stats::logicalPort* statsLogicalPorts; // CONFIG_YADECAP_LOGICALPORTS_SIZE
 	uint64_t* bursts; // CONFIG_YADECAP_MBUFS_BURST_SIZE + 1
 	uint64_t* counters; // YANET_CONFIG_COUNTERS_SIZE
 	uint64_t* aclCounters; // YANET_CONFIG_ACL_COUNTERS_SIZE
