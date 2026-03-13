@@ -373,6 +373,64 @@ common::idp::get_ports_stats_extended::response cControlPlane::get_ports_stats_e
 	return response;
 }
 
+std::set<tLogicalPortId> cControlPlane::getActiveLogicalPorts()
+{
+	std::lock_guard<std::mutex> guard(mutex);
+
+    std::set<tLogicalPortId> result;
+
+	if (dataPlane->globalBases.empty())
+	{
+		return result;
+	}
+
+	const auto* globalBase = dataPlane->globalBases.begin()->second[dataPlane->currentGlobalBaseId];
+	if (globalBase == nullptr)
+	{
+		return result;
+	}
+
+	for (uint32_t logicalPortId = 0;
+	     logicalPortId < CONFIG_YADECAP_LOGICALPORTS_SIZE;
+	     ++logicalPortId)
+	{
+		const auto& logicalPort = globalBase->logicalPorts[logicalPortId];
+		if (logicalPort.flow.type == common::globalBase::eFlowType::controlPlane)
+		{
+			continue;
+		}
+
+		result.emplace(logicalPortId);
+	}
+
+	return result;
+}
+
+common::idp::get_logical_ports_stats::response cControlPlane::get_logical_ports_stats()
+{
+	common::idp::get_logical_ports_stats::response response;
+	std::set<tLogicalPortId> activeLogicalPorts = getActiveLogicalPorts();
+
+	for (const auto& logicalPortId : activeLogicalPorts)
+	{
+		common::idp::logical_port_stats_t stats = std::accumulate(
+		        workers_vector().begin(),
+		        workers_vector().end(),
+                common::idp::logical_port_stats_t{},
+		        [logicalPortId](common::idp::logical_port_stats_t total, cWorker* worker) {
+			        std::get<0>(total) += worker->statsLogicalPorts[logicalPortId].rx_packets;
+			        std::get<1>(total) += worker->statsLogicalPorts[logicalPortId].rx_bytes;
+			        std::get<2>(total) += worker->statsLogicalPorts[logicalPortId].tx_packets;
+			        std::get<3>(total) += worker->statsLogicalPorts[logicalPortId].tx_bytes;
+			        return total;
+		        });
+
+		response[logicalPortId] = stats;
+	}
+
+	return response;
+}
+
 common::idp::getControlPlanePortStats::response cControlPlane::getControlPlanePortStats(const common::idp::getControlPlanePortStats::request& request)
 {
 	/// unsafe

@@ -1932,6 +1932,14 @@ struct port
 	uint64_t physicalPort_egress_drops = 0;
 	uint64_t controlPlane_drops = 0; ///< @todo: DELETE
 };
+
+struct logicalPort
+{
+	uint64_t rx_packets = 0;
+	uint64_t rx_bytes = 0;
+	uint64_t tx_packets = 0;
+	uint64_t tx_bytes = 0;
+};
 }
 
 namespace worker_gc

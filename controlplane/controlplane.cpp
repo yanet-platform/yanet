@@ -308,16 +308,22 @@ common::icp::getPhysicalPorts::response cControlPlane::getPhysicalPorts() const
 common::icp::getLogicalPorts::response cControlPlane::getLogicalPorts() const
 {
 	common::icp::getLogicalPorts::response response;
+	auto logicalPortsStats = dataPlane.get_logical_ports_stats();
 
 	{
 		auto current_guard = generations.current_lock_guard();
 		for (const auto& [logicalPortName, logicalPort] : generations.current().logicalPorts)
 		{
+			auto stats = logicalPortsStats[logicalPort.logicalPortId];
 			response[logicalPortName] = {logicalPort.physicalPort,
 			                             logicalPort.vlanId,
 			                             logicalPort.vrf,
 			                             logicalPort.macAddress,
-			                             logicalPort.promiscuousMode};
+			                             logicalPort.promiscuousMode,
+			                             std::get<0>(stats),
+			                             std::get<1>(stats),
+			                             std::get<2>(stats),
+			                             std::get<3>(stats)};
 		}
 	}
 

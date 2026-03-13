@@ -206,6 +206,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::get_ports_stats_extended, request);
 		}
+		else if (type == common::idp::requestType::get_logical_ports_stats)
+		{
+			response = callWithResponse(&cControlPlane::get_logical_ports_stats, request);
+		}
 		else if (type == common::idp::requestType::getControlPlanePortStats)
 		{
 			response = callWithResponse(&cControlPlane::getControlPlanePortStats, request);

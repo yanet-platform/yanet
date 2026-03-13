@@ -24,6 +24,7 @@ inline std::vector<bus_request_info> get_bus_requests(common::sdp::DataPlaneInSh
 	        {common::idp::requestType::get_dregress_counters, "get_dregress_counters"},
 	        {common::idp::requestType::get_ports_stats, "get_ports_stats"},
 	        {common::idp::requestType::get_ports_stats_extended, "get_ports_stats_extended"},
+	        {common::idp::requestType::get_logical_ports_stats, "get_logical_ports_stats"},
 	        {common::idp::requestType::getControlPlanePortStats, "getControlPlanePortStats"},
 	        {common::idp::requestType::getPortStatsEx, "getPortStatsEx"},
 	        {common::idp::requestType::getFragmentationStats, "getFragmentationStats"},

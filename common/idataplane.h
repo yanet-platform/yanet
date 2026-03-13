@@ -75,6 +75,11 @@ public:
 		return get<common::idp::requestType::get_ports_stats_extended, common::idp::get_ports_stats_extended::response>();
 	}
 
+	common::idp::get_logical_ports_stats::response get_logical_ports_stats() const
+	{
+		return get<common::idp::requestType::get_logical_ports_stats, common::idp::get_logical_ports_stats::response>();
+	}
+
 	common::idp::getControlPlanePortStats::response getControlPlanePortStats(const common::idp::getControlPlanePortStats::request& request) const
 	{
 		return get<common::idp::requestType::getControlPlanePortStats, common::idp::getControlPlanePortStats::response>(request);

@@ -354,6 +354,7 @@ void cWorker::SetBufferForCounters(void* buffer, const common::sdp::MetadataWork
 	bursts = utils::ShiftBuffer<uint64_t*>(buffer, metadata.start_bursts);
 	stats = utils::ShiftBuffer<common::worker::stats::common*>(buffer, metadata.start_stats);
 	statsPorts = utils::ShiftBuffer<common::worker::stats::port*>(buffer, metadata.start_stats_ports);
+	statsLogicalPorts = utils::ShiftBuffer<common::worker::stats::logicalPort*>(buffer, metadata.start_stats_logical_ports);
 }
 
 eResult cWorker::sanityCheck()
@@ -1197,6 +1198,10 @@ inline void cWorker::logicalPort_ingress_flow(rte_mbuf* mbuf,
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
 	metadata->flow = flow;
+	auto logicalPortId = metadata->in_logicalport_id;
+
+	statsLogicalPorts[logicalPortId].rx_packets += 1;
+	statsLogicalPorts[logicalPortId].rx_bytes += mbuf->pkt_len;
 
 	if (flow.type == common::globalBase::eFlowType::acl_ingress)
 	{
@@ -1223,7 +1228,11 @@ inline void cWorker::logicalPort_ingress_flow(rte_mbuf* mbuf,
 inline void cWorker::logicalPort_egress_entry(rte_mbuf* mbuf)
 {
 	dataplane::metadata* metadata = YADECAP_METADATA(mbuf);
-	metadata->out_logicalport_id = metadata->flow.data.logicalPortId;
+	auto logicalPortId = metadata->flow.data.logicalPortId;
+	metadata->out_logicalport_id = logicalPortId;
+
+	statsLogicalPorts[logicalPortId].tx_packets += 1;
+	statsLogicalPorts[logicalPortId].tx_bytes += mbuf->pkt_len;
 
 	logicalPort_egress_stack.insert(mbuf);
 }

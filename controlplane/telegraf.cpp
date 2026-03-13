@@ -311,10 +311,12 @@ common::icp::telegraf_other::response telegraf_t::telegraf_other()
 
 	const auto portsStatsExtended = dataPlane.get_ports_stats_extended();
 
+	const auto logicalPorts = controlPlane->getLogicalPorts();
+
 	//
 
 	common::icp::telegraf_other::response response;
-	auto& [response_flagFirst, response_workers, response_ports] = response;
+	auto& [response_flagFirst, response_workers, response_ports, response_logicalPorts] = response;
 
 	response_flagFirst = flagFirst;
 
@@ -340,6 +342,14 @@ common::icp::telegraf_other::response telegraf_t::telegraf_other()
 		}
 
 		response_ports[physicalPortName] = stats;
+	}
+
+	for (const auto& [logicalPortName, stats] : logicalPorts)
+	{
+		response_logicalPorts[logicalPortName]["rx_packets"] = std::get<5>(stats);
+		response_logicalPorts[logicalPortName]["rx_bytes"] = std::get<6>(stats);
+		response_logicalPorts[logicalPortName]["tx_packets"] = std::get<7>(stats);
+		response_logicalPorts[logicalPortName]["tx_bytes"] = std::get<8>(stats);
 	}
 
 	//

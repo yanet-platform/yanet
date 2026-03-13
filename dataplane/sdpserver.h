@@ -166,21 +166,22 @@ private:
 		{
 			uint64_t index = start_workers_metadata / sizeof(uint64_t);
 
-			// 0-5 - values from MetadataWorker
+			// 0-6 - values from MetadataWorker
 			WriteValue(sdp_data, index, sdp_data.metadata_worker.start_counters);
 			WriteValue(sdp_data, index + 1, sdp_data.metadata_worker.start_acl_counters);
 			WriteValue(sdp_data, index + 2, sdp_data.metadata_worker.start_bursts);
 			WriteValue(sdp_data, index + 3, sdp_data.metadata_worker.start_stats);
 			WriteValue(sdp_data, index + 4, sdp_data.metadata_worker.start_stats_ports);
-			WriteValue(sdp_data, index + 5, sdp_data.metadata_worker.size);
-			// 6 - n1 = size MetadataWorker.counter_positions
-			WriteValue(sdp_data, index + 6, sdp_data.metadata_worker.counter_positions.size());
-			// 7-9 - values from MetadataWorker
-			WriteValue(sdp_data, index + 7, sdp_data.metadata_worker_gc.start_counters);
-			WriteValue(sdp_data, index + 8, sdp_data.metadata_worker_gc.start_stats);
-			WriteValue(sdp_data, index + 9, sdp_data.metadata_worker_gc.size);
-			// 10 - n2 = size MetadataWorker.counter_positions
-			WriteValue(sdp_data, index + 10, sdp_data.metadata_worker_gc.counter_positions.size());
+			WriteValue(sdp_data, index + 5, sdp_data.metadata_worker.start_stats_logical_ports);
+			WriteValue(sdp_data, index + 6, sdp_data.metadata_worker.size);
+			// 7 - n1 = size MetadataWorker.counter_positions
+			WriteValue(sdp_data, index + 7, sdp_data.metadata_worker.counter_positions.size());
+			// 8-10 - values from MetadataWorker
+			WriteValue(sdp_data, index + 8, sdp_data.metadata_worker_gc.start_counters);
+			WriteValue(sdp_data, index + 9, sdp_data.metadata_worker_gc.start_stats);
+			WriteValue(sdp_data, index + 10, sdp_data.metadata_worker_gc.size);
+			// 11 - n2 = size MetadataWorker.counter_positions
+			WriteValue(sdp_data, index + 11, sdp_data.metadata_worker_gc.counter_positions.size());
 
 			WriteMap(sdp_data, start_workers_metadata + 128, sdp_data.metadata_worker.counter_positions);
 			WriteMap(sdp_data, start_workers_metadata + 128 * (1 + sdp_data.metadata_worker.counter_positions.size()), sdp_data.metadata_worker_gc.counter_positions);
