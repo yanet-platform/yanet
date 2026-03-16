@@ -377,7 +377,12 @@ std::set<tLogicalPortId> cControlPlane::getActiveLogicalPorts()
 {
 	std::lock_guard<std::mutex> guard(mutex);
 
-    std::set<tLogicalPortId> result;
+	return _getActiveLogicalPorts();
+}
+
+std::set<tLogicalPortId> cControlPlane::_getActiveLogicalPorts()
+{
+        std::set<tLogicalPortId> result;
 
 	if (dataPlane->globalBases.empty())
 	{

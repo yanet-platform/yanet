@@ -93,6 +93,7 @@ public:
 private:
 	[[nodiscard]] const std::vector<cWorker*>& workers_vector() const;
 	[[nodiscard]] const std::map<tCoreId, dataplane::SlowWorker*>& slow_workers() const;
+	[[nodiscard]] std::set<tLogicalPortId> _getActiveLogicalPorts();
 	[[nodiscard]] std::set<tLogicalPortId> getActiveLogicalPorts();
 
 	template<typename F>
