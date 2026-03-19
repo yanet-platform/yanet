@@ -968,7 +968,8 @@ namespace neighbor_show
 using entry = std::tuple<std::string, ///< route_name
                          std::string, ///< interface_name
                          ip_address_t, ///< ip_address
-                         mac_address_t>; ///< mac_address
+                         mac_address_t, ///< mac_address
+                         std::optional<uint32_t>>; ///< last_update_timestamp
 
 using response = std::vector<entry>;
 }
