@@ -16,17 +16,20 @@ void show()
 	table.insert("route_name",
 	             "interface_name",
 	             "ip_address",
-	             "mac_address");
+	             "mac_address",
+	             "last_update");
 
 	for (const auto& [route_name,
 	                  interface_name,
 	                  ip_address,
-	                  mac_address] : response)
+	                  mac_address,
+	                  last_update] : response)
 	{
 		table.insert(route_name,
 		             interface_name,
 		             ip_address,
-		             mac_address);
+		             mac_address,
+		             last_update);
 	}
 
 	table.print();

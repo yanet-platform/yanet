@@ -110,10 +110,17 @@ common::idp::neighbor_show::response module::neighbor_show() const
 
 				const auto& [route_name, interface_name] = it->second;
 
+				std::optional<uint32_t> last_update_timestamp;
+				// if (!(value.flags & flag_is_static))
+				// {
+				// 	last_update_timestamp = current_time_provider_() - value.last_update_timestamp;
+				// }
+
 				response.emplace_back(route_name,
 				                      interface_name,
 				                      common::ip_address_t(key.flags & flag_is_ipv6 ? 6 : 4, key.address.bytes),
-				                      common::mac_address_t(value.ether_address.addr_bytes));
+				                      common::mac_address_t(value.ether_address.addr_bytes),
+				                      last_update_timestamp);
 			}
 		}
 	}
