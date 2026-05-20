@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <gtest/gtest.h>
+#include <utility>
 #include <vector>
 
 #include "common/type.h"
@@ -434,6 +436,100 @@ TEST(SegmentAllocator, AddAndHalfDelete)
 		EXPECT_EQ(allocator.GetErrors(), Errors(0, 0));
 	}
 	EXPECT_EQ(allocator.GetErrors(), Errors(0, 0));
+}
+
+namespace
+{
+
+template<typename Vec>
+bool any_overlap(const Vec& slots)
+{
+	for (size_t i = 0; i < slots.size(); ++i)
+	{
+		const auto [a_off, a_sz] = slots[i];
+		for (size_t j = i + 1; j < slots.size(); ++j)
+		{
+			const auto [b_off, b_sz] = slots[j];
+			if (a_off + a_sz <= b_off)
+				continue;
+			if (b_off + b_sz <= a_off)
+				continue;
+			return true;
+		}
+	}
+	return false;
+}
+
+} // namespace
+
+// Regression: InsertToList used to leave the old head with previous=null_block_,
+// so RemoveFromList of a non-head block could not unlink it from its predecessor.
+// A block then ended up reachable from two free-lists simultaneously, the
+// allocator handed out overlapping byte ranges, and counter_t::insert silently
+// accepted ErrorResult==0 as a valid counter id — aliasing distinct balancer
+// service counters onto worker->counters[0..size_T-1].
+TEST(SegmentAllocator, ListIntegrityAcrossSizes)
+{
+	// IndexBegin=64 keeps valid offsets >= 64 so they never collide with
+	// the ErrorResult==0 sentinel.
+	using Small = SegmentAllocator<64, 64 + 4 * 64, 64, 16, 0>;
+	Small a;
+
+	std::vector<std::pair<uint32_t, uint16_t>> live;
+	auto take = [&](uint16_t sz) {
+		uint32_t v = a.Allocate(sz);
+		if (v != 0u)
+			live.emplace_back(v, sz);
+		return v;
+	};
+	auto drop = [&](uint32_t off, uint16_t sz) {
+		EXPECT_TRUE(a.Free(off, sz));
+		live.erase(std::remove(live.begin(), live.end(), std::make_pair(off, sz)),
+		           live.end());
+	};
+
+	// Fill block 0 with size=4 → busy, removed from head[4].
+	std::vector<uint32_t> first_block;
+	for (int i = 0; i < 16; ++i)
+	{
+		uint32_t v = take(4);
+		ASSERT_NE(v, 0u);
+		first_block.push_back(v);
+	}
+
+	// Claim block 1 for size=4: it becomes the lone head of size=4.
+	uint32_t first_in_block1 = take(4);
+	ASSERT_NE(first_in_block1, 0u);
+
+	// Insert block 0 in front of block 1 at head[4]. Without the fix,
+	// block 1's previous pointer stays null_block_ instead of pointing
+	// back to block 0.
+	drop(first_block.front(), 4);
+
+	// Fully free block 1. RemoveFromList relies on block1.previous to
+	// disconnect it from block0.next; with the bug that link is broken,
+	// so block 0 keeps pointing at block 1 after this returns.
+	drop(first_in_block1, 4);
+
+	// Refill block 0 to busy. head[4] now advances to block 0's stale next
+	// pointer (== block 1), so block 1 is simultaneously reachable from
+	// head[4] and head[0].
+	ASSERT_NE(take(4), 0u);
+
+	// Allocate alternately as size=2 and size=4. The size=2 path claims
+	// block 1 from head[0] via SetSize(2), but the buggy state also has it
+	// on head[4], so both sizes draw from the same physical block under
+	// conflicting interpretations and produce overlapping byte ranges.
+	for (int i = 0; i < 16; ++i)
+	{
+		uint32_t v2 = take(2);
+		ASSERT_NE(v2, 0u);
+		uint32_t v4 = take(4);
+		ASSERT_NE(v4, 0u);
+	}
+
+	EXPECT_EQ(a.GetErrors(), Errors(0, 0));
+	EXPECT_FALSE(any_overlap(live));
 }
 
 int main(int argc, char** argv)
