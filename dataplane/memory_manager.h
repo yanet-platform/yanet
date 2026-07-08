@@ -151,6 +151,7 @@ public:
 	}
 
 	void destroy(void* pointer);
+	void cleanup();
 	void debug(tSocketId socket_id);
 	bool check_memory_limit(const std::string& name, const uint64_t size);
 	Deleter deleter() { return Deleter{this}; }

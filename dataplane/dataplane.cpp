@@ -70,12 +70,23 @@ cDataPlane::~cDataPlane()
 	if (mempool_log)
 	{
 		rte_mempool_free(mempool_log);
+		mempool_log = nullptr;
 	}
 	for (auto& [socket_id, rte_mempool] : socket_cplane_mempools)
 	{
 		GCC_BUG_UNUSED(socket_id);
 		rte_mempool_free(rte_mempool);
 	}
+	socket_cplane_mempools.clear();
+
+	// Explicitly run all object destructors and rte_free() calls while EAL is
+	// still valid, then shut EAL down cleanly.  This prevents the implicit
+	// destruction of memory_manager (which happens after the destructor body)
+	// from calling rte_free() after EAL has already been torn down, which
+	// would corrupt glibc's internal linked lists and crash with
+	// "corrupted double-linked list".
+	memory_manager.cleanup();
+	rte_eal_cleanup();
 }
 
 eResult cDataPlane::init(const std::string& binaryPath,
@@ -168,12 +179,18 @@ eResult cDataPlane::init(const std::string& binaryPath,
 
 	for (auto socket : slow_sockets)
 	{
+		const uint64_t cp_pool_count = CONFIG_YADECAP_MBUFS_COUNT +
+		                               config_values_.fragmentation.size +
+		                               config_values_.master_mempool_size +
+		                               4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE +
+		                               4 * ports.size() * config_values_.kernel_interface_queue_size;
+		YADECAP_LOG_INFO("rte_mempool_create(cp-%u): count=%lu, elem_size=%u, total_approx=%lu MB\n",
+		                 socket,
+		                 cp_pool_count,
+		                 CONFIG_YADECAP_MBUF_SIZE,
+		                 cp_pool_count * CONFIG_YADECAP_MBUF_SIZE / (1024 * 1024));
 		auto pool = rte_mempool_create(("cp-" + std::to_string(socket)).c_str(),
-		                               CONFIG_YADECAP_MBUFS_COUNT +
-		                                       config_values_.fragmentation.size +
-		                                       config_values_.master_mempool_size +
-		                                       4 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE +
-		                                       4 * ports.size() * config_values_.kernel_interface_queue_size,
+		                               cp_pool_count,
 		                               CONFIG_YADECAP_MBUF_SIZE,
 		                               0,
 		                               sizeof(struct rte_pktmbuf_pool_private),
@@ -186,6 +203,7 @@ eResult cDataPlane::init(const std::string& binaryPath,
 		if (!pool)
 		{
 			YADECAP_LOG_ERROR("rte_mempool_create(): %s [%u]\n", rte_strerror(rte_errno), rte_errno);
+			memory_manager.debug(socket);
 			return eResult::errorAllocatingMemory;
 		}
 		socket_cplane_mempools.emplace(socket, pool);
