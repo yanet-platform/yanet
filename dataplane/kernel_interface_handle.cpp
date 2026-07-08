@@ -1,6 +1,8 @@
 #include <linux/if.h>
+#include <net/if_arp.h>
 #include <sys/ioctl.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include <rte_ethdev.h>
 
@@ -8,6 +10,42 @@
 #include "kernel_interface_handle.h"
 namespace dataplane
 {
+
+bool KernelInterfaceHandle::SyncMac(const common::mac_address_t& addr) const noexcept
+{
+	// Skip zero/invalid MAC (e.g. sock_dev leaves it all-zeros). Setting a
+	// zero MAC via SIOCSIFHWADDR fails with EINVAL on most drivers.
+	if (addr.is_default())
+	{
+		YANET_LOG_WARNING("SyncMac: skipping zero MAC for interface %s\n", name_.data());
+		return true;
+	}
+
+	// NOTE: MAC must be changed while the interface is DOWN. This method is
+	// therefore expected to be called before SetUp() (which raises IFF_UP).
+	int sock = ::socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock < 0)
+	{
+		YANET_LOG_ERROR("SyncMac: failed to open socket for interface %s\n", name_.data());
+		return false;
+	}
+
+	struct ifreq request;
+	memset(&request, 0, sizeof(request));
+	strncpy(request.ifr_name, name_.data(), IFNAMSIZ - 1);
+	request.ifr_hwaddr.sa_family = ARPHRD_ETHER;
+	memcpy(request.ifr_hwaddr.sa_data, addr.data(), RTE_ETHER_ADDR_LEN);
+
+	if (ioctl(sock, SIOCSIFHWADDR, &request) < 0)
+	{
+		YANET_LOG_ERROR("SyncMac: failed to set MAC on interface %s\n", name_.data());
+		::close(sock);
+		return false;
+	}
+
+	::close(sock);
+	return true;
+}
 
 bool KernelInterfaceHandle::SetUp() const noexcept
 {
@@ -20,14 +58,16 @@ bool KernelInterfaceHandle::SetUp() const noexcept
 	struct ifreq request;
 	memset(&request, 0, sizeof request);
 
-	strncpy(request.ifr_name, name_.data(), IFNAMSIZ);
+	strncpy(request.ifr_name, name_.data(), IFNAMSIZ - 1);
 
 	request.ifr_flags |= IFF_UP;
 	if (auto res = ioctl(socket, SIOCSIFFLAGS, &request))
 	{
 		YANET_LOG_ERROR("failed to set interface %s up, ioctl returned (%d)", name_.data(), res);
+		::close(socket);
 		return false;
 	}
+	::close(socket);
 	return true;
 }
 

@@ -39,6 +39,7 @@
 #include "common/utils.h"
 #include "dataplane.h"
 #include "dataplane/sdpserver.h"
+#include "dpdk.h"
 #include "dump_rings.h"
 #include "globalbase.h"
 #include "sock_dev.h"
@@ -707,11 +708,33 @@ void cDataPlane::StartInterfaces()
 	{
 		for (auto& [portid, handles] : kni_interface_handles)
 		{
+			// Read the actual MAC after rte_eth_dev_start(): for some drivers
+			// the MAC only becomes valid (or may change) once the port is started.
+			auto actual_mac = dpdk::GetMacAddress(portid);
+			if (!actual_mac)
+			{
+				YANET_LOG_ERROR("Failed to get MAC for port belonging to %s", std::get<0>(ports.at(portid)).c_str());
+				std::abort();
+			}
+
 			if (!handles.Start())
 			{
 				YANET_LOG_ERROR("Failed to start kni interfaces");
 				std::abort();
 			}
+
+			// Sync the actual MAC to all KNI interfaces, because it may differ
+			// from what was used at vdev creation time (before the port start).
+			// MAC must be changed while the interface is DOWN, hence before SetUp().
+			if (!handles.forward.SyncMac(*actual_mac) ||
+			    !handles.in_dump.SyncMac(*actual_mac) ||
+			    !handles.out_dump.SyncMac(*actual_mac) ||
+			    !handles.drop_dump.SyncMac(*actual_mac))
+			{
+				YANET_LOG_ERROR("Failed to sync MAC on kni interfaces belonging to %s", std::get<0>(ports.at(portid)).c_str());
+				std::abort();
+			}
+
 			if (!handles.forward.SetUp())
 			{
 				YANET_LOG_ERROR("Failed to set kni interface belonging to %s up", std::get<0>(ports.at(portid)).c_str());
