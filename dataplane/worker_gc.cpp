@@ -52,8 +52,15 @@ eResult worker_gc_t::init(const tCoreId& core_id,
 	this->bases[local_base_id] = base;
 	this->bases[local_base_id ^ 1] = base;
 
+	const uint64_t wgc_pool_count = CONFIG_YADECAP_MBUFS_COUNT + 3 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE;
+	YADECAP_LOG_INFO("rte_mempool_create(wgc%u, socketId: %u): count=%lu, elem_size=%u, total_approx=%lu MB\n",
+	                 core_id,
+	                 socket_id,
+	                 wgc_pool_count,
+	                 CONFIG_YADECAP_MBUF_SIZE,
+	                 wgc_pool_count * CONFIG_YADECAP_MBUF_SIZE / (1024 * 1024));
 	mempool = rte_mempool_create(("wgc" + std::to_string(core_id)).data(),
-	                             CONFIG_YADECAP_MBUFS_COUNT + 3 * CONFIG_YADECAP_PORTS_SIZE * CONFIG_YADECAP_MBUFS_BURST_SIZE,
+	                             wgc_pool_count,
 	                             CONFIG_YADECAP_MBUF_SIZE,
 	                             0,
 	                             sizeof(struct rte_pktmbuf_pool_private),

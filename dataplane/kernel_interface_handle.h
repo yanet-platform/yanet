@@ -30,6 +30,7 @@ public:
 	[[nodiscard]] const tPortId& Id() const noexcept { return kni_port_; }
 	[[nodiscard]] bool Start() const noexcept;
 	[[nodiscard]] bool SetUp() const noexcept;
+	[[nodiscard]] bool SyncMac(const common::mac_address_t& addr) const noexcept;
 	bool SetupRxQueue(tQueueId queue, tSocketId socket, rte_mempool* mempool) noexcept;
 	bool SetupTxQueue(tQueueId queue, tSocketId socket) noexcept;
 	bool CloneMTU(const uint16_t) noexcept;

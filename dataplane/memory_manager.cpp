@@ -145,6 +145,17 @@ void memory_manager::destroy(void* pointer)
 	pointers.erase(it);
 }
 
+void memory_manager::cleanup()
+{
+	std::lock_guard<std::mutex> guard(mutex);
+
+	// Explicitly destroy all tracked objects and free hugepage memory in a
+	// controlled order, before rte_eal_cleanup() is called.  Clearing the map
+	// here means the default destructor of memory_manager will find it empty
+	// and will not attempt any rte_free() calls after EAL has been torn down.
+	pointers.clear();
+}
+
 void memory_manager::debug(tSocketId socket_id)
 {
 	rte_malloc_socket_stats stats;

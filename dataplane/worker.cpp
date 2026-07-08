@@ -101,10 +101,6 @@ eResult cWorker::init(const tCoreId& coreId,
                       const dataplane::base::permanently& basePermanently,
                       const dataplane::base::generation& base)
 {
-	YADECAP_LOG_DEBUG("rte_mempool_create(coreId: %u, socketId: %u)\n",
-	                  coreId,
-	                  rte_lcore_to_socket_id(coreId));
-
 	this->coreId = coreId;
 	this->socketId = rte_lcore_to_socket_id(coreId);
 	this->basePermanently = basePermanently;
@@ -113,7 +109,12 @@ eResult cWorker::init(const tCoreId& coreId,
 
 	unsigned int elements_count = MempoolSize();
 
-	YADECAP_LOG_DEBUG("elements_count: %u\n", elements_count);
+	YADECAP_LOG_INFO("rte_mempool_create(fp%u, socketId: %u): count=%u, elem_size=%u, total_approx=%lu MB\n",
+	                 coreId,
+	                 socketId,
+	                 elements_count,
+	                 CONFIG_YADECAP_MBUF_SIZE,
+	                 (uint64_t)elements_count * CONFIG_YADECAP_MBUF_SIZE / (1024 * 1024));
 
 	/// init mempool
 	mempool = rte_mempool_create(("fp" + std::to_string(coreId)).data(),
@@ -130,6 +131,7 @@ eResult cWorker::init(const tCoreId& coreId,
 	if (!mempool)
 	{
 		YADECAP_LOG_ERROR("rte_mempool_create(): %s [%u]\n", rte_strerror(rte_errno), rte_errno);
+		dataPlane->memory_manager.debug(socketId);
 		return eResult::errorInitMempool;
 	}
 
