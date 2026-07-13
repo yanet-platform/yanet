@@ -1,4 +1,5 @@
 #include <linux/if.h>
+#include <linux/if_arp.h>
 #include <sys/ioctl.h>
 #include <sys/un.h>
 
@@ -21,6 +22,17 @@ bool KernelInterfaceHandle::SetUp() const noexcept
 	memset(&request, 0, sizeof request);
 
 	strncpy(request.ifr_name, name_.data(), IFNAMSIZ);
+
+	struct rte_ether_addr ether_addr;
+	rte_eth_macaddr_get(physical_port_, &ether_addr);
+	request.ifr_hwaddr.sa_family = ARPHRD_ETHER;
+	memcpy(request.ifr_hwaddr.sa_data, ether_addr.addr_bytes, RTE_ETHER_ADDR_LEN);
+	if (auto res = ioctl(socket, SIOCSIFHWADDR, &request))
+	{
+		YANET_LOG_ERROR("failed to set MAC address for interface %s, ioctl returned (%d)", name_.data(), res);
+		return false;
+	}
+	memset(&request.ifr_ifru, 0, sizeof request.ifr_ifru);
 
 	request.ifr_flags |= IFF_UP;
 	if (auto res = ioctl(socket, SIOCSIFFLAGS, &request))
@@ -61,6 +73,7 @@ KernelInterfaceHandle& KernelInterfaceHandle::operator=(KernelInterfaceHandle&& 
 	if (this != &other)
 	{
 		std::swap(kni_port_, other.kni_port_);
+		std::swap(physical_port_, other.physical_port_);
 		std::swap(name_, other.name_);
 		std::swap(vdev_name_, other.vdev_name_);
 		std::swap(queue_size_, other.queue_size_);
@@ -77,6 +90,7 @@ KernelInterfaceHandle::MakeKernelInterfaceHandle(
 {
 	KernelInterfaceHandle kni;
 	kni.queue_size_ = queue_size;
+	kni.physical_port_ = port;
 	kni.name_ = name;
 	kni.vdev_name_ = VdevName(name, port);
 	std::string vdev_args = VdevArgs(name, port, queue_count, queue_size);
