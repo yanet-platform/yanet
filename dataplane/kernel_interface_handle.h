@@ -10,6 +10,7 @@ namespace dataplane
 class KernelInterfaceHandle
 {
 	tPortId kni_port_ = INVALID_PORT_ID;
+	tPortId physical_port_ = INVALID_PORT_ID;
 	std::string name_;
 	std::string vdev_name_;
 	uint16_t queue_size_ = 0;
