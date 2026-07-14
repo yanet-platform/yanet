@@ -24,7 +24,11 @@ bool KernelInterfaceHandle::SetUp() const noexcept
 	strncpy(request.ifr_name, name_.data(), IFNAMSIZ);
 
 	struct rte_ether_addr ether_addr;
-	rte_eth_macaddr_get(physical_port_, &ether_addr);
+	if (auto res = rte_eth_macaddr_get(physical_port_, &ether_addr))
+	{
+		YANET_LOG_ERROR("failed to get MAC address for port %u, rte_eth_macaddr_get returned (%d)", physical_port_, res);
+		return false;
+	}
 	request.ifr_hwaddr.sa_family = ARPHRD_ETHER;
 	memcpy(request.ifr_hwaddr.sa_data, ether_addr.addr_bytes, RTE_ETHER_ADDR_LEN);
 	if (auto res = ioctl(socket, SIOCSIFHWADDR, &request))
