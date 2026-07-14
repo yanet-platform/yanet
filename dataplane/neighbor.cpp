@@ -156,7 +156,7 @@ eResult module::neighbor_insert(const common::idp::neighbor_insert::request& req
 	dataplane::neighbor::value value;
 	memcpy(value.ether_address.addr_bytes, mac_address.data(), 6);
 
-	neighbor_cache_.Insert(interface_name, key.address, ip_address.is_ipv6(), value.ether_address, current_time_provider_(), true);
+	neighbor_cache_.Insert(interface_name, key.address, ip_address.is_ipv6(), value.ether_address, current_time_provider_(), true, true);
 
 	std::optional<tInterfaceId> interface_id = GetInterfaceId(interface_name);
 	if (!interface_id.has_value())
@@ -292,10 +292,10 @@ eResult module::DumpOSNeighbors()
 			        (void)socket_id;
 			        for (const auto& entry : dump)
 			        {
-				        const auto& [iface_name, dst, mac, is_v6] = entry;
-				        if (!mac)
+				        const auto& [iface_name, dst, mac, is_v6, state] = entry;
+				        if (!mac || state == NUD_FAILED || state == NUD_INCOMPLETE)
 				        {
-					        NEIGHBOR_INFO("No MAC address for neighbor in dump\n");
+					        NEIGHBOR_INFO("No usable MAC address for neighbor in dump\n");
 					        continue;
 				        }
 
@@ -482,14 +482,15 @@ void module::StartResolveJob()
 	YANET_LOG_INFO("Neighbor resolve job started\n");
 }
 
-void module::Upsert(std::string iface_name, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac)
+void module::Upsert(std::string iface_name, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac, bool renew_state)
 {
+	// renew_state is true only for NUD_REACHABLE/NUD_PERMANENT updates.
 	NEIGHBOR_INFO("Upsert %s\n", netlink::Entry{iface_name, dst, mac, is_v6}.toString().c_str());
 	bool is_static = false;
 #ifdef CONFIG_YADECAP_UNITTEST
 	is_static = true;
 #endif
-	neighbor_cache_.Insert(iface_name, dst, is_v6, mac, current_time_provider_(), is_static);
+	neighbor_cache_.Insert(iface_name, dst, is_v6, mac, current_time_provider_(), is_static, renew_state);
 
 	std::optional<tInterfaceId> iface = GetInterfaceId(iface_name);
 	if (!iface.has_value())
@@ -578,7 +579,7 @@ bool module::resolve(const std::string& interface_name, const ipv6_address_t& ip
 	}
 	*((uint32_t*)&value.ether_address.addr_bytes[2]) = rte_hash_crc(key.address.bytes, 16, 0);
 
-	neighbor_cache_.Insert(interface_name, key.address, is_v6, value.ether_address, current_time_provider_(), false);
+	neighbor_cache_.Insert(interface_name, key.address, is_v6, value.ether_address, current_time_provider_(), false, true);
 
 	std::optional<tInterfaceId> interface_id = GetInterfaceId(interface_name);
 	if (interface_id.has_value())
@@ -897,14 +898,16 @@ bool NeighborCache::UpdateTimestamp(std::string iface_name, const ipv6_address_t
 
 	dataplane::neighbor::value_cache& value = iter->second;
 	value.last_update_timestamp = timestamp;
-	value.last_remove_timestamp = 0;
-	value.last_resolve_timestamp = 0;
-	value.number_resolve_after_remove = 0;
+	if (value.last_remove_timestamp == 0)
+	{
+		value.last_resolve_timestamp = 0;
+		value.number_resolve_after_remove = 0;
+	}
 
 	return true;
 }
 
-void NeighborCache::Insert(const std::string& iface_name, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac, uint32_t timestamp, bool is_static)
+void NeighborCache::Insert(const std::string& iface_name, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac, uint32_t timestamp, bool is_static, bool renew_state)
 {
 	key_cache key;
 	key.iface_name = iface_name;
@@ -912,22 +915,38 @@ void NeighborCache::Insert(const std::string& iface_name, const ipv6_address_t& 
 	key.address = dst;
 
 	std::lock_guard<std::mutex> guard(mutex_);
-	if (!is_static)
+	auto iter = data_.find(key);
+	if (iter != data_.end())
 	{
-		auto iter = data_.find(key);
-		if (iter != data_.end() && iter->second.is_static)
+		dataplane::neighbor::value_cache& value = iter->second;
+		if (!is_static && value.is_static)
 		{
 			return;
 		}
+
+		memcpy(value.ether_address.addr_bytes, mac.addr_bytes, 6);
+		value.is_static = is_static;
+		// Non-renewing MAC updates refresh the MAC only; they must not resurrect
+		// entries already marked for removal.
+		if (renew_state)
+		{
+			value.last_update_timestamp = timestamp;
+			value.last_remove_timestamp = 0;
+			value.last_resolve_timestamp = 0;
+			value.number_resolve_after_remove = 0;
+		}
+		return;
 	}
 
 	dataplane::neighbor::value_cache value;
 	memcpy(value.ether_address.addr_bytes, mac.addr_bytes, 6);
 	value.is_static = is_static;
 	value.last_update_timestamp = timestamp;
-	value.last_remove_timestamp = 0;
-	value.last_resolve_timestamp = 0;
-	value.number_resolve_after_remove = 0;
+	if (!renew_state && !is_static)
+	{
+		// A new non-renewing dynamic entry must not become permanently live.
+		value.last_remove_timestamp = timestamp;
+	}
 
 	data_[key] = value;
 }
@@ -959,8 +978,8 @@ bool NeighborCache::Remove(std::string iface_name, const ipv6_address_t& dst, bo
 		if (value.last_remove_timestamp == 0)
 		{
 			value.last_remove_timestamp = timestamp;
-			value.number_resolve_after_remove = 0;
 		}
+		value.number_resolve_after_remove = 0;
 	}
 #endif // CONFIG_YADECAP_AUTOTEST
 
@@ -1000,9 +1019,12 @@ void NeighborCache::UpdateFromDump(const std::vector<netlink::Entry>& dump, uint
 	std::set<key_cache> all_keys;
 	for (const netlink::Entry& entry : dump)
 	{
-		if (entry.mac.has_value())
+		if (entry.mac.has_value() && entry.state != NUD_FAILED && entry.state != NUD_INCOMPLETE)
 		{
-			Insert(entry.ifname, entry.dst, entry.v6, *entry.mac, timestamp, false);
+			// Keep usable MACs from STALE/DELAY/PROBE states, but renew lifetime
+			// only when the kernel reports REACHABLE/PERMANENT.
+			const bool renew_state = entry.state == NUD_REACHABLE || entry.state == NUD_PERMANENT;
+			Insert(entry.ifname, entry.dst, entry.v6, *entry.mac, timestamp, false, renew_state);
 			all_keys.insert({entry.ifname, entry.v6, entry.dst});
 		}
 	}
@@ -1053,15 +1075,28 @@ std::pair<std::vector<key_cache>, std::vector<key_cache>> NeighborCache::GetKeys
 	std::vector<key_cache> keys_to_resolve;
 
 	std::lock_guard<std::mutex> guard(mutex_);
-	for (const auto& [key, value] : data_)
+	for (auto& [key, value] : data_)
 	{
 		NEIGHBOR_DEBUG("NeighborCache::GetKeysRemoveAndResolve check %s, timestamp=%d, last_remove_timestamp=%d, is_static=%d\n",
 		               netlink::Entry{key.iface_name, key.address, std::nullopt, key.is_v6}.toString().c_str(),
 		               timestamp,
 		               value.last_remove_timestamp,
 		               value.is_static);
-		if ((value.last_remove_timestamp == 0) || value.is_static)
+		if (value.is_static)
 		{
+			continue;
+		}
+		else if (value.last_remove_timestamp == 0)
+		{
+			// Linux kernel is the source of truth for neighbor lifetime. YANET dataplane
+			// may see last_update_timestamp grow while the kernel entry is still
+			// REACHABLE/STALE, so this timer must not start removal by itself. It only
+			// schedules refresh probes; removal starts from kernel/user Remove().
+			if (value.last_update_timestamp + remove_timeout_ < timestamp &&
+			    value.last_resolve_timestamp + checks_interval_ <= timestamp)
+			{
+				keys_to_resolve.push_back(key);
+			}
 			continue;
 		}
 		else if (value.last_remove_timestamp + remove_timeout_ < timestamp)

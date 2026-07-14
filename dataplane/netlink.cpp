@@ -32,6 +32,8 @@ std::variant<Entry, int> ParseNeighbor(rtnl_neigh* neigh)
 {
 	int sysifid = rtnl_neigh_get_ifindex(neigh);
 	Entry entry;
+	// Preserve the kernel NUD state so cache lifetime can be renewed only by confirmed states.
+	entry.state = rtnl_neigh_get_state(neigh);
 	char ifname[IFNAMSIZ];
 	if (if_indextoname(sysifid, ifname) == nullptr)
 	{
@@ -160,7 +162,9 @@ std::vector<Entry> Provider::GetHostDump(unsigned rcvbuf_size)
 }
 
 void Provider::StartMonitor(unsigned rcvbuf_size,
-                            std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
+                            // Last bool in upsert is renew_state: update MAC for usable states,
+                            // but renew cache lifetime only for NUD_REACHABLE/NUD_PERMANENT.
+                            std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&, bool)> upsert,
                             std::function<void(std::string, const ipv6_address_t&, bool)> remove,
                             std::function<void(std::string, const ipv6_address_t&, bool)> timestamp)
 {
@@ -214,13 +218,20 @@ void Provider::StartMonitor(unsigned rcvbuf_size,
 			rtnl_neigh_put(neigh);
 			return std::get<int>(parsed);
 		}
-		auto& [iface, dst, mac, is_v6] = std::get<Entry>(parsed);
+		auto& [iface, dst, mac, is_v6, parsed_state] = std::get<Entry>(parsed);
 		switch (msghdr->nlmsg_type)
 		{
 			case RTM_NEWNEIGH:
-				if (mac.has_value())
+				if (parsed_state == NUD_FAILED)
 				{
-					upsert(iface, dst, is_v6, mac.value());
+					remove(iface, dst, is_v6);
+				}
+				else if (mac.has_value() && parsed_state != NUD_INCOMPLETE)
+				{
+					// STALE/DELAY/PROBE may still have a usable MAC for forwarding,
+					// but only REACHABLE/PERMANENT are allowed to cancel pending removal.
+					const bool renew_state = parsed_state == NUD_REACHABLE || parsed_state == NUD_PERMANENT;
+					upsert(iface, dst, is_v6, mac.value(), renew_state);
 				}
 				else
 				{

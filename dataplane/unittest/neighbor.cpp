@@ -15,7 +15,7 @@ public:
 		return dump_;
 	}
 	void StartMonitor(unsigned rcvbuf_size,
-	                  std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
+	                  std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&, bool)> upsert,
 	                  std::function<void(std::string, const ipv6_address_t&, bool)> remove,
 	                  std::function<void(std::string, const ipv6_address_t&, bool)> timestamp)
 	{
@@ -31,7 +31,7 @@ public:
 	{
 		return false;
 	}
-	std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert_;
+	std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&, bool)> upsert_;
 	std::function<void(std::string, const ipv6_address_t&, bool)> timestamp_;
 	std::function<void(std::string, const ipv6_address_t&, bool)> remove_;
 	std::vector<netlink::Entry> dump_;
@@ -144,7 +144,7 @@ TEST(NeighborTest, Basic)
 	common::idp::neighbor_show::response expected = {
 	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, std::nullopt}};
 	dut.neighbor_interfaces_switch();
-	dut.Upsert("kni1", Ip6FromString("192.168.1.1"), false, EthFromString("DE:AD:BE:EF:01:02"));
+	dut.Upsert("kni1", Ip6FromString("192.168.1.1"), false, EthFromString("DE:AD:BE:EF:01:02"), true);
 	dut.neighbor_flush();
 
 	now = 2;
@@ -155,7 +155,7 @@ TEST(NeighborTest, Basic)
 	EXPECT_EQ(dut.neighbor_show(), expected);
 
 	now = 3;
-	dut.Upsert("kni1", Ip6FromString("100.200.1.2"), false, EthFromString("DE:AD:BE:EF:08:08"));
+	dut.Upsert("kni1", Ip6FromString("100.200.1.2"), false, EthFromString("DE:AD:BE:EF:08:08"), true);
 	dut.neighbor_flush();
 	expected = {
 	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, std::nullopt},

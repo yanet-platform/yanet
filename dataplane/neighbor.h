@@ -93,7 +93,8 @@ class NeighborCache
 {
 public:
 	void Init(uint64_t checks_interval, uint64_t remove_timeout, uint64_t resolve_removed);
-	void Insert(const std::string& iface_name, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac, uint32_t timestamp, bool is_static);
+	// renew_state means that the kernel confirmed the neighbor as NUD_REACHABLE/NUD_PERMANENT.
+	void Insert(const std::string& iface_name, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac, uint32_t timestamp, bool is_static, bool renew_state);
 	bool UpdateTimestamp(std::string iface_name, const ipv6_address_t& dst, bool is_v6, uint32_t timestamp);
 	bool Remove(std::string iface_name, const ipv6_address_t& dst, bool is_v6, uint32_t timestamp, bool is_static);
 	void UpdateFromDump(const std::vector<netlink::Entry>& dump, uint32_t timestamp);
@@ -181,7 +182,8 @@ public:
 
 	void report(nlohmann::json& json);
 
-	void Upsert(std::string iface_name, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac);
+	// renew_state controls whether this MAC update may cancel pending removal.
+	void Upsert(std::string iface_name, const ipv6_address_t& dst, bool is_v6, const rte_ether_addr& mac, bool renew_state);
 	void UpdateTimestamp(std::string iface_name, const ipv6_address_t& dst, bool is_v6);
 	void Remove(std::string iface_name, const ipv6_address_t& dst, bool is_v6);
 	void NeighborThreadAction(uint32_t current_time);
