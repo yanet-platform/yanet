@@ -1018,10 +1018,16 @@ void config_converter_t::acl_rules_nat64stateful(controlplane::base::acl_t& acl,
 {
 	const auto& nat64stateful = baseNext.nat64statefuls.at(next_module);
 
-	std::set<common::ipv6_prefix_t> ipv6_prefixes;
+	std::set<common::ipv6_prefix_t> destination_ipv6_prefixes;
 	for (const auto& ipv6_prefix : nat64stateful.ipv6_prefixes)
 	{
-		ipv6_prefixes.emplace(ipv6_prefix);
+		destination_ipv6_prefixes.emplace(ipv6_prefix);
+	}
+
+	std::set<common::ipv6_prefix_t> source_ipv6_prefixes;
+	for (const auto& ipv6_prefix : nat64stateful.source_ipv6_prefixes)
+	{
+		source_ipv6_prefixes.emplace(ipv6_prefix);
 	}
 
 	std::set<common::ipv4_prefix_t> ipv4_prefixes;
@@ -1038,7 +1044,7 @@ void config_converter_t::acl_rules_nat64stateful(controlplane::base::acl_t& acl,
 
 		/// ipv6
 		{
-			controlplane::base::acl_rule_network_ipv6_t rule_network({common::ipv6_prefix_default}, ipv6_prefixes);
+			controlplane::base::acl_rule_network_ipv6_t rule_network(source_ipv6_prefixes, destination_ipv6_prefixes);
 
 			controlplane::base::acl_rule_t rule(rule_network, flow_drop);
 			rule.fragment = {fragState::firstFragment, fragState::notFirstFragment};
@@ -1061,7 +1067,7 @@ void config_converter_t::acl_rules_nat64stateful(controlplane::base::acl_t& acl,
 	{
 		auto flow = convertToFlow(next_module, "lan");
 
-		controlplane::base::acl_rule_network_ipv6_t rule_network({common::ipv6_prefix_default}, ipv6_prefixes);
+		controlplane::base::acl_rule_network_ipv6_t rule_network(source_ipv6_prefixes, destination_ipv6_prefixes);
 
 		acl.nextModuleRules.emplace_back(rule_network,
 		                                 controlplane::acl_rule_transport_tcp_any,
@@ -1101,7 +1107,7 @@ void config_converter_t::acl_rules_nat64stateful(controlplane::base::acl_t& acl,
 
 		/// ipv6
 		{
-			controlplane::base::acl_rule_network_ipv6_t rule_network({common::ipv6_prefix_default}, ipv6_prefixes);
+			controlplane::base::acl_rule_network_ipv6_t rule_network(source_ipv6_prefixes, destination_ipv6_prefixes);
 			acl.nextModuleRules.emplace_back(rule_network, flow_drop);
 		}
 
