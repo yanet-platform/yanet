@@ -83,7 +83,7 @@ protected:
 	eResult init_kernel_interfaces();
 	std::optional<tPortId> add_kernel_interface(const tPortId port_id, const std::string& interface_name);
 	void remove_kernel_interface(const tPortId port_id, const std::string& interface_name);
-	void set_kernel_interface_up(const std::string& interface_name);
+	void set_kernel_interface_up(const tPortId port_id, const std::string& interface_name);
 
 	void mainThread();
 	unsigned ring_handle(rte_ring* ring_to_free_mbuf, rte_ring* ring);

@@ -1,4 +1,5 @@
 #include <linux/if.h>
+#include <linux/if_arp.h>
 #include <optional>
 #include <sys/ioctl.h>
 #include <sys/un.h>
@@ -133,7 +134,8 @@ void cControlPlane::start()
 	{
 		for (uint16_t i = 0; i < slowWorker->basePermanently.ports.size(); ++i)
 		{
-			set_kernel_interface_up(kernel_interfaces[i].interface_name);
+			set_kernel_interface_up(slowWorker->basePermanently.ports.ToDpdk(i),
+			                        kernel_interfaces[i].interface_name);
 		}
 	}
 
@@ -1477,7 +1479,11 @@ std::optional<tPortId> cControlPlane::add_kernel_interface(const tPortId port_id
                                                            const std::string& interface_name)
 {
 	rte_ether_addr ether_addr;
-	rte_eth_macaddr_get(port_id, &ether_addr);
+	if (auto res = rte_eth_macaddr_get(port_id, &ether_addr))
+	{
+		YADECAP_LOG_ERROR("failed to get MAC address for port %u, rte_eth_macaddr_get returned (%d)\n", port_id, res);
+		return std::nullopt;
+	}
 
 	char vdev_name[RTE_DEV_NAME_MAX_LEN];
 	char vdev_args[256];
@@ -1584,7 +1590,7 @@ void cControlPlane::remove_kernel_interface(const tPortId port_id,
 	rte_eal_hotplug_remove("vdev", vdev_name);
 }
 
-void cControlPlane::set_kernel_interface_up(const std::string& interface_name)
+void cControlPlane::set_kernel_interface_up(const tPortId port_id, const std::string& interface_name)
 {
 	int socket = ::socket(AF_INET, SOCK_DGRAM, 0);
 	if (socket < 0)
@@ -1596,6 +1602,20 @@ void cControlPlane::set_kernel_interface_up(const std::string& interface_name)
 	memset(&request, 0, sizeof request);
 
 	strncpy(request.ifr_name, interface_name.data(), IFNAMSIZ);
+
+	rte_ether_addr ether_addr;
+	if (auto res = rte_eth_macaddr_get(port_id, &ether_addr))
+	{
+		YADECAP_LOG_ERROR("failed to get MAC address for port %u, rte_eth_macaddr_get returned (%d)\n", port_id, res);
+		return;
+	}
+	request.ifr_hwaddr.sa_family = ARPHRD_ETHER;
+	memcpy(request.ifr_hwaddr.sa_data, ether_addr.addr_bytes, RTE_ETHER_ADDR_LEN);
+	if (ioctl(socket, SIOCSIFHWADDR, &request) != 0)
+	{
+		YADECAP_LOG_ERROR("failed to set MAC address for kernel interface '%s'\n", interface_name.data());
+	}
+	memset(&request.ifr_ifru, 0, sizeof request.ifr_ifru);
 
 	request.ifr_flags |= IFF_UP;
 	ioctl(socket, SIOCSIFFLAGS, &request);

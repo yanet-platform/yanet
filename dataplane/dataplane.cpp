@@ -483,7 +483,12 @@ eResult cDataPlane::initPorts()
 		                 pci.data());
 
 		rte_ether_addr etherAddress;
-		rte_eth_macaddr_get(portId, &etherAddress);
+		if (auto res = rte_eth_macaddr_get(portId, &etherAddress))
+		{
+			YADECAP_LOG_ERROR("failed to get MAC address for port %u, rte_eth_macaddr_get returned (%d)\n", portId, res);
+			remove_keys.emplace_back(interfaceName);
+			continue;
+		}
 
 		rte_eth_dev_info devInfo;
 		rte_eth_dev_info_get(portId, &devInfo);
