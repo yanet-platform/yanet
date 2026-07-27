@@ -106,6 +106,7 @@ std::vector<Entry> Provider::GetHostDump(unsigned rcvbuf_size)
 		const int state = rtnl_neigh_get_state(neigh);
 		if (state == NUD_NOARP)
 		{
+			rtnl_neigh_put(neigh);
 			return NL_OK;
 		}
 
@@ -113,15 +114,18 @@ std::vector<Entry> Provider::GetHostDump(unsigned rcvbuf_size)
 
 		if (!std::holds_alternative<Entry>(var))
 		{
+			rtnl_neigh_put(neigh);
 			return std::get<int>(var);
 		}
 		auto& entry = std::get<Entry>(var);
 		if (!entry.mac.has_value())
 		{
 			YANET_LOG_INFO("Skipping message with no MAC address\n");
+			rtnl_neigh_put(neigh);
 			return NL_OK;
 		}
 		dump.emplace_back(std::move(entry));
+		rtnl_neigh_put(neigh);
 		return NL_OK;
 	};
 	if (auto err = nl_connect(sk, NETLINK_ROUTE); err < 0)
@@ -199,6 +203,7 @@ void Provider::StartMonitor(unsigned rcvbuf_size,
 		if (state == NUD_NOARP)
 		{
 			YANET_LOG_INFO("Skipping message with state NUD_NOARP\n");
+			rtnl_neigh_put(neigh);
 			return NL_OK;
 		}
 
@@ -206,6 +211,7 @@ void Provider::StartMonitor(unsigned rcvbuf_size,
 
 		if (!std::holds_alternative<Entry>(parsed))
 		{
+			rtnl_neigh_put(neigh);
 			return std::get<int>(parsed);
 		}
 		auto& [iface, dst, mac, is_v6] = std::get<Entry>(parsed);
@@ -225,6 +231,7 @@ void Provider::StartMonitor(unsigned rcvbuf_size,
 				remove(iface, dst, is_v6);
 				break;
 		}
+		rtnl_neigh_put(neigh);
 		return NL_OK;
 	};
 	if (nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM, &WrapAsCallback<decltype(monitor_callback_)>, &monitor_callback_))
