@@ -867,6 +867,8 @@ void route_t::compile_interface(common::idp::updateGlobalBase::request& globalba
 			                                                                                interface.flow});
 		}
 	}
+
+	dataplane.neighbor_flush();
 }
 
 void route_t::limit(common::icp::limit_summary::response& limits) const
