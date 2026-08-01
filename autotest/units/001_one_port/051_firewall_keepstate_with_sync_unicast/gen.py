@@ -150,6 +150,14 @@ write_pcap("006-expect.pcap", [
     ipv4_recv("1.1.1.10", "12.0.0.10") / TCP(sport=54321, dport=10000, flags="S"),
 ])
 
+# The reverse packet updates the externally learned state. Once the periodic
+# synchronization interval expires, advertise the updated flags over both
+# configured synchronization paths before starting the next independent flow.
+write_pcap("006-sync-expect.pcap", [
+    Ether(src="00:11:22:33:44:55", dst="33:33:00:00:00:01") / Dot1Q(vlan=2000) / IPv6(src="fe80::f1", dst="ff02::1", hlim=64, fl=0) / UDP(sport=11995, dport=11995) / Raw(make_payload4(socket.IPPROTO_TCP, "12.0.0.10", "1.1.1.10", 10000, 54321, 0x22)),
+    ipv6_recv("3333::4444", "2222::1111") / UDP(sport=21995, dport=21995) / Raw(make_payload4(socket.IPPROTO_TCP, "12.0.0.10", "1.1.1.10", 10000, 54321, 0x22)),
+])
+
 # Sleep for 1s.
 
 write_pcap("007-send.pcap", [
@@ -173,6 +181,5 @@ write_pcap("007-expect-tech.pcap", [
     Ether(src="00:11:22:33:44:55", dst="33:33:00:00:00:01") / Dot1Q(vlan=2000) / IPv6(src="fe80::f1", dst="ff02::1", hlim=64, fl=0) / UDP(sport=11995, dport=11995) / Raw(make_payload6(socket.IPPROTO_TCP, "1111:2222::1", "2220:ddd:ff1c:2030::1", 777, 12345, 2)),
     ipv6_recv("3333::4444", "2222::1111") / UDP(sport=21995, dport=21995) / Raw(make_payload6(socket.IPPROTO_TCP, "1111:2222::1", "2220:ddd:ff1c:2030::1", 777, 12345, 2)),
 ])
-
 
 

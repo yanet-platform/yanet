@@ -106,7 +106,7 @@ jobs:
           name: target_autotest
       - name: bug https://github.com/actions/upload-artifact/issues/38
         run: tar -C /usr -xf target_autotest.tar.gz
-      - run: yanet-autotest-run.py autotest/units/001_one_port
+      - run: run-tests.py autotest-runner autotest/units/001_one_port
 
   deploy:
     needs:
