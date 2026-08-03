@@ -29,7 +29,10 @@ steps:
 - sendPackets:
   - port: kni0
     send: 006-send.pcap
-    expect: 006-expect.pcap
+    expect:
+    - 006-expect.pcap
+    - 006-sync-expect.pcap
+    timelimit: 10
 - sendPackets:
   - port: kni0
     send: 007-send.pcap
@@ -68,7 +71,10 @@ steps:
 - sendPackets:
   - port: kni0
     send: 006-send.pcap
-    expect: 006-expect.pcap
+    expect:
+    - 006-expect.pcap
+    - 006-sync-expect.pcap
+    timelimit: 10
 - sendPackets:
   - port: kni0
     send: 007-send.pcap

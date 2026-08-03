@@ -25,6 +25,21 @@ You can build YANET in [docker](https://www.docker.com/) container and run it in
 
 Or build on bare metal. See [documentation](docs/build.md).
 ## Running Autotests
+
+The repository runner builds and runs both test suites in Docker:
+```
+./run-tests.py
+```
+
+Use `./run-tests.py unit` or `./run-tests.py autotest` to run one suite. The
+autotest runner defaults to two concurrent containers and four fixtures per
+container. Override scheduling directly with `--jobs`, `--batch-size`, and
+`--cores-per-autotest`; use `--pattern` and `--autotest-group` for fixture
+selection. Builder configuration is available through `--builder-image` and
+`--docker-network`. Interactive runs display a live status bar;
+non-interactive CI logs receive progress checkpoints after each completed
+batch.
+
 Pull docker image:
 ```
 docker pull yanetplatform/builder
@@ -48,17 +63,17 @@ yanet-builder meson compile -C build_autotest
 
 Run autotest with all units in `autotest/units/001_one_port`:
 ```
-yanet-builder ./autotest/yanet-autotest-run.py --prefix=build_autotest autotest/units/001_one_port
+yanet-builder ./run-tests.py autotest-runner --prefix=build_autotest autotest/units/001_one_port
 ```
 
 Or run one unit:
 ```
-yanet-builder ./autotest/yanet-autotest-run.py --prefix=build_autotest autotest/units/001_one_port autotest/units/001_one_port/019_acl_decap_route
+yanet-builder ./run-tests.py autotest-runner --prefix=build_autotest autotest/units/001_one_port autotest/units/001_one_port/019_acl_decap_route
 ```
 
 For more information about the autotests run:
 ```
-yanet-builder ./autotest/yanet-autotest-run.py -h
+yanet-builder ./run-tests.py autotest-runner -h
 ```
 
 ## Running Unit Tests

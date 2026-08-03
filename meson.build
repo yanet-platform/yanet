@@ -150,5 +150,10 @@ if target_option.contains('release')
                  rename: 'yanet-rebind',
                  install_dir: bindir_option)
 elif target_option.contains('autotest')
+    install_data(
+        'run-tests.py',
+        install_dir: bindir_option,
+        install_mode: 'rwxr-xr-x',
+    )
     subdir('autotest')
 endif

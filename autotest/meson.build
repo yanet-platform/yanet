@@ -15,5 +15,3 @@ executable('yanet-autotest',
            link_args : ['-lstdc++fs'],
            override_options: 'b_lto=false',
            install: true)
-
-install_data('yanet-autotest-run.py', install_dir: get_option('bindir'))
