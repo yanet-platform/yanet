@@ -293,7 +293,7 @@ class config_t
 public:
 	config_t() = default;
 
-	SERIALIZABLE(nat64stateful_id, dscp_mark_type, dscp, ipv6_prefixes, ipv4_prefixes, announces, next_module, vrf_lan_name, vrf_wan_name, vrf_lan, vrf_wan);
+	SERIALIZABLE(nat64stateful_id, dscp_mark_type, dscp, ipv6_prefixes, ipv4_prefixes, announces, next_module, vrf_lan_name, vrf_wan_name, vrf_lan, vrf_wan, source_ipv6_prefixes);
 
 public:
 	nat64stateful_id_t nat64stateful_id;
@@ -301,6 +301,7 @@ public:
 	uint8_t dscp{};
 	std::vector<common::ipv6_prefix_t> ipv6_prefixes;
 	std::vector<common::ipv4_prefix_t> ipv4_prefixes;
+	std::vector<common::ipv6_prefix_t> source_ipv6_prefixes{common::ipv6_prefix_default};
 	std::set<common::ip_prefix_t> announces;
 	std::string vrf_lan_name;
 	std::string vrf_wan_name;

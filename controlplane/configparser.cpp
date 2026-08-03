@@ -522,6 +522,60 @@ void config_parser_t::loadConfig_nat64stateful(controlplane::base_t& baseNext,
 		nat64stateful.ipv6_prefixes.emplace_back(ipv6_prefix);
 	}
 
+	if (exist(moduleJson, "source_ipv6_prefixes"))
+	{
+		const auto& source_json = moduleJson["source_ipv6_prefixes"];
+
+		if (!source_json.is_array())
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "nat64stateful: source_ipv6_prefixes must be an array");
+		}
+		if (source_json.empty())
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "nat64stateful: source_ipv6_prefixes must not be empty");
+		}
+
+		std::vector<common::ipv6_prefix_t> source_ipv6_prefixes;
+		for (const auto& prefix_json : source_json)
+		{
+			if (!prefix_json.is_string())
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "nat64stateful: source_ipv6_prefixes element must be a string");
+			}
+
+			const std::string prefix_string = prefix_json.get<std::string>();
+
+			const auto slash_pos = prefix_string.find('/');
+			if (slash_pos != std::string::npos)
+			{
+				const std::string mask_string = prefix_string.substr(slash_pos + 1);
+
+				if (mask_string.empty() ||
+				    prefix_string.find('/', slash_pos + 1) != std::string::npos ||
+				    mask_string.find_first_not_of("0123456789") != std::string::npos)
+				{
+					throw error_result_t(eResult::invalidConfigurationFile, "nat64stateful: invalid source_ipv6_prefix mask: " + prefix_string);
+				}
+
+				if (std::stoul(mask_string) > 128)
+				{
+					throw error_result_t(eResult::invalidConfigurationFile, "nat64stateful: source_ipv6_prefix mask out of range [0..128]: " + prefix_string);
+				}
+			}
+
+			common::ipv6_prefix_t source_ipv6_prefix(prefix_string);
+			if (!source_ipv6_prefix.isValid())
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "nat64stateful: source_ipv6_prefix has host bits set: " + prefix_string);
+			}
+
+			source_ipv6_prefixes.emplace_back(source_ipv6_prefix);
+		}
+
+		/// assign only after full validation succeeds; this replaces the default ::/0
+		nat64stateful.source_ipv6_prefixes = std::move(source_ipv6_prefixes);
+	}
+
 	for (const auto& prefix_json : moduleJson["ipv4_prefixes"])
 	{
 		common::ipv4_prefix_t ipv4_prefix(prefix_json.get<std::string>());

@@ -17,7 +17,8 @@ void summary()
 	TablePrinter table;
 	table.insert_row("module",
 	                 "ipv4_pool_size",
-	                 "next_module");
+	                 "next_module",
+	                 "source_ipv6_prefixes");
 
 	for (const auto& [name, nat64stateful] : response)
 	{
@@ -29,7 +30,8 @@ void summary()
 
 		table.insert_row(name,
 		                 ipv4_pool_size,
-		                 nat64stateful.next_module);
+		                 nat64stateful.next_module,
+		                 nat64stateful.source_ipv6_prefixes);
 	}
 
 	table.Print();
