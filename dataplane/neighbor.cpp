@@ -280,17 +280,18 @@ void module::StopNetlinkMonitor()
 	YANET_LOG_INFO("Netlink monitor stopped\n");
 }
 
-eResult module::DumpOSNeighbors(const dataplane::neighbor::generation_interface* previous_interfaces)
+eResult module::DumpOSNeighbors(const dataplane::neighbor::generation_interface* static_entry_interfaces)
 {
 	std::vector<netlink::Entry> dump;
 	std::vector<std::pair<dataplane::neighbor::key, dataplane::neighbor::value>> static_entries;
 	{
 		auto interfaces_guard = generation_interface.current_lock_guard();
 		auto& new_interfaces = generation_interface.current();
-		const auto& old_interfaces = previous_interfaces ? *previous_interfaces : new_interfaces;
 		dump = neighbor_provider->GetHostDump(rcvbuf_size_, new_interfaces.interface_name_to_id);
 
+		if (static_entry_interfaces)
 		{
+			const auto& old_interfaces = *static_entry_interfaces;
 			auto lock = generation_hashtable.current_lock_guard();
 			for (auto it : generation_hashtable.current().hashtable_updater.begin()->second.range())
 			{
@@ -629,7 +630,13 @@ void module::NeighborThreadAction(uint32_t current_time)
 	{
 		std::lock_guard<std::mutex> guard(mutex_restart_monitor_);
 		StopNetlinkMonitor();
-		DumpOSNeighbors(nullptr);
+
+		dataplane::neighbor::generation_interface current_interfaces;
+		{
+			auto interfaces_guard = generation_interface.current_lock_guard();
+			current_interfaces = generation_interface.current();
+		}
+		DumpOSNeighbors(&current_interfaces);
 		StartNetlinkMonitor();
 	}
 

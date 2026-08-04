@@ -284,6 +284,9 @@ TEST(NeighborTest, StaticNeighborSurvivesInterfaceUpdate)
 
 	dut.neighbor_update_interfaces({{2, "route0", "kni1"}});
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
+
+	dut.neighbor_clear();
+	EXPECT_TRUE(equal(dut.neighbor_show(), {}));
 }
 
 } // namespace
