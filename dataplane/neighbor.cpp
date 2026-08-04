@@ -50,7 +50,7 @@ eResult module::init(
 			                                                      ht_size);
 		}
 	});
-	DumpOSNeighbors();
+	DumpOSNeighbors(nullptr);
 	StartNetlinkMonitor();
 	StartResolveJob();
 
@@ -241,7 +241,7 @@ eResult module::neighbor_remove(const common::idp::neighbor_remove::request& req
 
 eResult module::neighbor_clear()
 {
-	return DumpOSNeighbors();
+	return DumpOSNeighbors(nullptr);
 }
 
 eResult module::neighbor_flush()
@@ -280,14 +280,14 @@ void module::StopNetlinkMonitor()
 	YANET_LOG_INFO("Netlink monitor stopped\n");
 }
 
-eResult module::DumpOSNeighbors()
+eResult module::DumpOSNeighbors(const dataplane::neighbor::generation_interface* previous_interfaces)
 {
 	std::vector<netlink::Entry> dump;
 	std::vector<std::pair<dataplane::neighbor::key, dataplane::neighbor::value>> static_entries;
 	{
 		auto interfaces_guard = generation_interface.current_lock_guard();
 		auto& new_interfaces = generation_interface.current();
-		auto& old_interfaces = generation_interface.next();
+		const auto& old_interfaces = previous_interfaces ? *previous_interfaces : new_interfaces;
 		dump = neighbor_provider->GetHostDump(rcvbuf_size_, new_interfaces.interface_name_to_id);
 
 		{
@@ -322,9 +322,9 @@ eResult module::DumpOSNeighbors()
 	}
 
 	eResult res = generation_hashtable.update(
-	        [&dump,
+	        [dump = std::move(dump),
 	         now = current_time_provider_(),
-	         &static_entries,
+	         static_entries = std::move(static_entries),
 	         this](
 	                neighbor::generation_hashtable& hashtable) {
 		        for (auto& [socket_id, hashtable_updater] : hashtable.hashtable_updater)
@@ -365,6 +365,15 @@ eResult module::DumpOSNeighbors()
 eResult module::neighbor_update_interfaces(const common::idp::neighbor_update_interfaces::request& request)
 {
 	generation_interface.next_lock();
+
+	/// static entries stored in the hashtables are keyed with the interface ids of the
+	/// generation being replaced, keep it to remap them onto the new one
+	dataplane::neighbor::generation_interface previous_interfaces;
+	{
+		auto interfaces_guard = generation_interface.current_lock_guard();
+		previous_interfaces = generation_interface.current();
+	}
+
 	auto& generation = generation_interface.next();
 	generation.interface_name_to_id.clear();
 	generation.interface_id_to_name.clear();
@@ -380,9 +389,9 @@ eResult module::neighbor_update_interfaces(const common::idp::neighbor_update_in
 	generation_interface.next_unlock();
 	std::lock_guard<std::mutex> guard(mutex_restart_monitor_);
 	StopNetlinkMonitor();
-	DumpOSNeighbors();
+	auto result = DumpOSNeighbors(&previous_interfaces);
 	StartNetlinkMonitor();
-	return eResult::success;
+	return result;
 }
 
 common::idp::neighbor_stats::response module::neighbor_stats() const
@@ -620,7 +629,7 @@ void module::NeighborThreadAction(uint32_t current_time)
 	{
 		std::lock_guard<std::mutex> guard(mutex_restart_monitor_);
 		StopNetlinkMonitor();
-		DumpOSNeighbors();
+		DumpOSNeighbors(nullptr);
 		StartNetlinkMonitor();
 	}
 

@@ -129,7 +129,11 @@ protected:
 	void StartResolveJob();
 	void StartNetlinkMonitor();
 	void StopNetlinkMonitor();
-	eResult DumpOSNeighbors();
+	/// Rebuilds the neighbor tables from the OS dump, remapping the stored static
+	/// entries onto the current interface generation.
+	/// @param previous_interfaces interface generation the stored static entries are
+	///        keyed with, or nullptr when the interface map has not changed.
+	eResult DumpOSNeighbors(const dataplane::neighbor::generation_interface* previous_interfaces);
 
 	bool resolve(const dataplane::neighbor::key& key);
 
