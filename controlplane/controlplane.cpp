@@ -173,7 +173,7 @@ eResult cControlPlane::init(const std::string& jsonFilePath)
 			result = loadConfig(jsonFilePath, rootJson);
 			if (result != eResult::success)
 			{
-				YANET_LOG_ERROR("failed to load config: eResult %d\n", static_cast<std::uint32_t>(result));
+				YANET_LOG_ERROR("failed to load config: eResult %d, %s\n", static_cast<std::uint32_t>(result), result_to_c_str(result));
 				return result;
 			}
 			loadConfig_done++;

@@ -1338,7 +1338,7 @@ void tAutotest::mainThread()
 				const auto result = controlPlane.loadConfig(request);
 				if (result != eResult::success)
 				{
-					YANET_LOG_ERROR("invalid config: eResult %d\n", static_cast<std::uint32_t>(result));
+					YANET_LOG_ERROR("invalid config: eResult %d, %s\n", static_cast<std::uint32_t>(result), result_to_c_str(result));
 					throw "";
 				}
 				controlPlane.rib_flush();
