@@ -15,22 +15,22 @@ namespace netlink
 
 struct Entry
 {
-	tInterfaceId id;
+	std::string ifname;
 	ipv6_address_t dst;
 	std::optional<rte_ether_addr> mac;
 	bool v6;
+
+	std::string toString() const;
 };
 
 class Interface
 {
 public:
-	virtual std::vector<Entry> GetHostDump(unsigned rcvbuf_size,
-	                                       const std::unordered_map<std::string, tInterfaceId>& ids) = 0;
+	virtual std::vector<Entry> GetHostDump(unsigned rcvbuf_size) = 0;
 	virtual void StartMonitor(unsigned rcvbuf_size,
-	                          std::function<std::optional<tInterfaceId>(const char*)> get_id,
-	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
-	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
-	                          std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp) = 0;
+	                          std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
+	                          std::function<void(std::string, const ipv6_address_t&, bool)> remove,
+	                          std::function<void(std::string, const ipv6_address_t&, bool)> timestamp) = 0;
 	virtual void StopMonitor() = 0;
 	virtual ~Interface() = default;
 	virtual bool IsFailedWorkMonitor() = 0;
@@ -42,21 +42,19 @@ class Provider : public Interface
 
 	nl_sock* sk_;
 	std::function<int(nl_msg*)> monitor_callback_;
-	std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert_;
-	std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove_;
-	std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp_;
+	std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert_;
+	std::function<void(std::string, const ipv6_address_t&, bool)> remove_;
+	std::function<void(std::string, const ipv6_address_t&, bool)> timestamp_;
 
 	utils::Job monitor_;
 	std::atomic<bool> failed_work_monitor_{false};
 
 public:
-	std::vector<Entry> GetHostDump(unsigned rcvbuf_size,
-	                               const std::unordered_map<std::string, tInterfaceId>& ids) final;
+	std::vector<Entry> GetHostDump(unsigned rcvbuf_size) final;
 	void StartMonitor(unsigned rcvbuf_size,
-	                  std::function<std::optional<tInterfaceId>(const char*)> get_id,
-	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
-	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
-	                  std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp) final;
+	                  std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
+	                  std::function<void(std::string, const ipv6_address_t&, bool)> remove,
+	                  std::function<void(std::string, const ipv6_address_t&, bool)> timestamp) final;
 	void StopMonitor() final;
 	~Provider() final;
 	bool IsFailedWorkMonitor() final;

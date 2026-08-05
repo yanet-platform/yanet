@@ -9,9 +9,26 @@
 namespace netlink
 {
 
-std::variant<Entry, int> ParseNeighbor(
-        rtnl_neigh* neigh,
-        std::function<std::optional<tInterfaceId>(const char*)> get_id)
+std::string Entry::toString() const
+{
+	std::stringstream ss;
+	ss << "ifname=" << ifname;
+	if (v6)
+	{
+		ss << ", addr=" << common::ipv6_address_t(dst.bytes).toString();
+	}
+	else
+	{
+		ss << ", addr=" << common::ipv4_address_t(rte_cpu_to_be_32(dst.mapped_ipv4_address.address)).toString();
+	}
+	if (mac.has_value())
+	{
+		ss << ", mac=" << common::mac_address_t(mac->addr_bytes).toString();
+	}
+	return ss.str();
+}
+
+std::variant<Entry, int> ParseNeighbor(rtnl_neigh* neigh)
 {
 	int sysifid = rtnl_neigh_get_ifindex(neigh);
 	Entry entry;
@@ -21,15 +38,7 @@ std::variant<Entry, int> ParseNeighbor(
 		YANET_LOG_INFO("Skipping message for unknown OS interface '%i'\n", sysifid);
 		return NL_OK;
 	}
-	if (auto id = get_id(ifname); id.has_value())
-	{
-		entry.id = id.value();
-	}
-	else
-	{
-		YANET_LOG_INFO("Skipping message for unconfigured interface '%s'\n", ifname);
-		return NL_OK;
-	}
+	entry.ifname = ifname;
 
 	nl_addr* oaddr = rtnl_neigh_get_dst(neigh);
 	if (!oaddr)
@@ -68,8 +77,7 @@ std::variant<Entry, int> ParseNeighbor(
 	return entry;
 }
 
-std::vector<Entry> Provider::GetHostDump(unsigned rcvbuf_size,
-                                         const std::unordered_map<std::string, tInterfaceId>& ids)
+std::vector<Entry> Provider::GetHostDump(unsigned rcvbuf_size)
 {
 	auto deleter = [](nl_sock* sk) { nl_socket_free(sk); };
 	std::unique_ptr<nl_sock, decltype(deleter)> usk{nl_socket_alloc(), deleter};
@@ -98,28 +106,26 @@ std::vector<Entry> Provider::GetHostDump(unsigned rcvbuf_size,
 		const int state = rtnl_neigh_get_state(neigh);
 		if (state == NUD_NOARP)
 		{
+			rtnl_neigh_put(neigh);
 			return NL_OK;
 		}
 
-		auto var = ParseNeighbor(neigh, [&](const char* name) -> std::optional<tInterfaceId> {
-			if (auto it = ids.find(name); it != ids.end())
-			{
-				return it->second;
-			}
-			return std::nullopt;
-		});
+		auto var = ParseNeighbor(neigh);
 
 		if (!std::holds_alternative<Entry>(var))
 		{
+			rtnl_neigh_put(neigh);
 			return std::get<int>(var);
 		}
 		auto& entry = std::get<Entry>(var);
 		if (!entry.mac.has_value())
 		{
 			YANET_LOG_INFO("Skipping message with no MAC address\n");
+			rtnl_neigh_put(neigh);
 			return NL_OK;
 		}
 		dump.emplace_back(std::move(entry));
+		rtnl_neigh_put(neigh);
 		return NL_OK;
 	};
 	if (auto err = nl_connect(sk, NETLINK_ROUTE); err < 0)
@@ -154,10 +160,9 @@ std::vector<Entry> Provider::GetHostDump(unsigned rcvbuf_size,
 }
 
 void Provider::StartMonitor(unsigned rcvbuf_size,
-                            std::function<std::optional<tInterfaceId>(const char*)> get_id,
-                            std::function<void(tInterfaceId, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
-                            std::function<void(tInterfaceId, const ipv6_address_t&, bool)> remove,
-                            std::function<void(tInterfaceId, const ipv6_address_t&, bool)> timestamp)
+                            std::function<void(std::string, const ipv6_address_t&, bool, const rte_ether_addr&)> upsert,
+                            std::function<void(std::string, const ipv6_address_t&, bool)> remove,
+                            std::function<void(std::string, const ipv6_address_t&, bool)> timestamp)
 {
 	auto deleter = [](nl_sock* sk) { nl_socket_free(sk); };
 	std::unique_ptr<nl_sock, decltype(deleter)> usk{nl_socket_alloc(), deleter};
@@ -181,7 +186,7 @@ void Provider::StartMonitor(unsigned rcvbuf_size,
 		}
 	}
 
-	monitor_callback_ = [get_id, upsert, remove, timestamp](nl_msg* msg) -> int {
+	monitor_callback_ = [upsert, remove, timestamp](nl_msg* msg) -> int {
 		nlmsghdr* msghdr = nlmsg_hdr(msg);
 		if (msghdr->nlmsg_type != RTM_NEWNEIGH && msghdr->nlmsg_type != RTM_DELNEIGH)
 		{
@@ -198,13 +203,15 @@ void Provider::StartMonitor(unsigned rcvbuf_size,
 		if (state == NUD_NOARP)
 		{
 			YANET_LOG_INFO("Skipping message with state NUD_NOARP\n");
+			rtnl_neigh_put(neigh);
 			return NL_OK;
 		}
 
-		auto parsed = ParseNeighbor(neigh, get_id);
+		auto parsed = ParseNeighbor(neigh);
 
 		if (!std::holds_alternative<Entry>(parsed))
 		{
+			rtnl_neigh_put(neigh);
 			return std::get<int>(parsed);
 		}
 		auto& [iface, dst, mac, is_v6] = std::get<Entry>(parsed);
@@ -224,6 +231,7 @@ void Provider::StartMonitor(unsigned rcvbuf_size,
 				remove(iface, dst, is_v6);
 				break;
 		}
+		rtnl_neigh_put(neigh);
 		return NL_OK;
 	};
 	if (nl_socket_modify_cb(sk, NL_CB_VALID, NL_CB_CUSTOM, &WrapAsCallback<decltype(monitor_callback_)>, &monitor_callback_))
