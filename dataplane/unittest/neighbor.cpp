@@ -142,7 +142,7 @@ TEST(NeighborTest, Basic)
 
 	dut.neighbor_update_interfaces({{1, "route0", "kni1"}});
 	common::idp::neighbor_show::response expected = {
-	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}}};
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, std::nullopt}};
 	dut.neighbor_interfaces_switch();
 	dut.Upsert("kni1", Ip6FromString("192.168.1.1"), false, EthFromString("DE:AD:BE:EF:01:02"));
 	dut.neighbor_flush();
@@ -158,8 +158,8 @@ TEST(NeighborTest, Basic)
 	dut.Upsert("kni1", Ip6FromString("100.200.1.2"), false, EthFromString("DE:AD:BE:EF:08:08"));
 	dut.neighbor_flush();
 	expected = {
-	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}},
-	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}}};
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, std::nullopt},
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, std::nullopt}};
 
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 	dut.neighbor_flush();
@@ -169,8 +169,8 @@ TEST(NeighborTest, Basic)
 	dut.UpdateTimestamp("kni1", Ip6FromString("100.200.1.2"), false);
 	dut.neighbor_flush();
 	expected = {
-	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}},
-	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}}};
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, std::nullopt},
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, std::nullopt}};
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 	dut.neighbor_flush();
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
@@ -180,8 +180,8 @@ TEST(NeighborTest, Basic)
 	dut.neighbor_flush();
 	now = 7;
 	expected = {
-	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}},
-	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}}};
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, std::nullopt},
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, std::nullopt}};
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 	dut.neighbor_flush();
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
@@ -190,7 +190,7 @@ TEST(NeighborTest, Basic)
 	dut.NeighborThreadAction(now);
 	dut.neighbor_flush();
 	expected = {
-	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}}};
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, std::nullopt}};
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 
 	dut.neighbor_flush();
@@ -235,8 +235,42 @@ TEST(NeighborTest, Provider)
 	dut.neighbor_clear();
 
 	common::idp::neighbor_show::response expected = {
-	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}},
-	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}}};
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, std::nullopt},
+	        {"route0", "kni1", Common4FromString("100.200.1.2"), {"DE:AD:BE:EF:08:08"}, std::nullopt}};
+	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
+}
+
+TEST(NeighborTest, StaticNeighborSurvivesInterfaceUpdate)
+{
+	auto mock = new MockProvider;
+	dataplane::neighbor::module dut(mock);
+	auto now = 1;
+	dut.init(
+	        {1},
+	        64 * 1024,
+	        0,
+	        YANET_CONFIG_NEIGHBOR_CHECK_INTERVAL,
+	        YANET_CONFIG_NEIGHBOR_REMOVE_TIMEOUT,
+	        YANET_CONFIG_RESOLVE_REMOVED,
+	        [](tSocketId) {
+		        auto size = dataplane::neighbor::hashtable::calculate_sizeof(64 * 1024);
+		        void* ptr = new char[size];
+		        dataplane::neighbor::hashtable* ht = new (ptr) dataplane::neighbor::hashtable;
+		        return ht;
+	        },
+	        [&]() { return now; },
+	        []() {},
+	        []() { return std::vector<dataplane::neighbor::key>{}; });
+
+	dut.neighbor_update_interfaces({{1, "route0", "kni1"}});
+	dut.neighbor_insert({"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}});
+	dut.neighbor_flush();
+
+	common::idp::neighbor_show::response expected = {
+	        {"route0", "kni1", Common4FromString("192.168.1.1"), {"DE:AD:BE:EF:01:02"}, std::nullopt}};
+	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
+
+	dut.neighbor_update_interfaces({{2, "route0", "kni1"}});
 	EXPECT_TRUE(equal(dut.neighbor_show(), expected));
 }
 
