@@ -192,6 +192,10 @@ public:
 			one_segment_size = segment_size;
 			total_segments = block_size / segment_size;
 			free_segments = total_segments;
+			// Defensive reset: a stale bitmap from a previous size would
+			// silently alias slots when this block is reused.
+			group_mask = 0;
+			memset(masks, 0, sizeof(masks));
 		}
 
 		uint16_t Allocate()
@@ -333,8 +337,13 @@ private:
 
 	void InsertToList(uint32_t block_index, uint16_t size)
 	{
-		all_blocks_[block_index].next = sizes_info_[size].head_block;
+		const uint32_t old_head = sizes_info_[size].head_block;
+		all_blocks_[block_index].next = old_head;
 		all_blocks_[block_index].previous = null_block_;
+		if (old_head != null_block_)
+		{
+			all_blocks_[old_head].previous = block_index;
+		}
 		sizes_info_[size].head_block = block_index;
 		sizes_info_[size].used_blocks++;
 	}

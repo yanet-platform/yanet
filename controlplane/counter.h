@@ -196,6 +196,13 @@ public:
 		else
 		{
 			const auto counter_id = manager->counter_reserve(size_T);
+			if (counter_id == 0)
+			{
+				/// counter_reserve uses ErrorResult==0 — silently accepting it
+				/// aliases every failing key onto counters[0..size_T-1].
+				YANET_LOG_ERROR("counter_reserve failed (size=%zu): out of counter slots or allocator bookkeeping is broken; check `counters stat`\n",
+				                size_T);
+			}
 
 			counters.emplace_hint(counters_it,
 			                      key,
