@@ -74,6 +74,7 @@ enum class requestType : uint32_t
 	dump_physical_port,
 	balancer_state_clear,
 	neighbor_show,
+	neighbor_show_cache,
 	neighbor_insert,
 	neighbor_remove,
 	neighbor_clear,
@@ -82,6 +83,7 @@ enum class requestType : uint32_t
 	neighbor_stats,
 	memory_manager_update,
 	memory_manager_stats,
+	neighbor_interfaces_switch,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -966,6 +968,15 @@ namespace neighbor_show
 using entry = std::tuple<std::string, ///< route_name
                          std::string, ///< interface_name
                          ip_address_t, ///< ip_address
+                         mac_address_t>; ///< mac_address
+
+using response = std::vector<entry>;
+}
+
+namespace neighbor_show_cache
+{
+using entry = std::tuple<std::string, ///< interface_name
+                         ip_address_t, ///< ip_address
                          mac_address_t, ///< mac_address
                          std::optional<uint32_t>, ///< last_update_timestamp
                          std::string>; ///< last_remove_timestamp
@@ -1068,6 +1079,7 @@ using response = std::variant<std::tuple<>,
                               get_shm_info::response,
                               get_shm_tsc_info::response,
                               neighbor_show::response,
+                              neighbor_show_cache::response,
                               neighbor_stats::response,
                               memory_manager_stats::response>;
 }
