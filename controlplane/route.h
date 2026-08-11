@@ -280,6 +280,19 @@ protected:
 
 	std::optional<uint32_t> tunnel_value_insert(const route::tunnel_value_key_t& value_key);
 	void tunnel_value_remove(const uint32_t& value_id);
+	void AddRequestForEachSocket(common::idp::updateGlobalBase::request& globalbase,
+	                             uint32_t value_id,
+	                             common::globalBase::eNexthopType nexthop);
+	bool MakePerSocketRequest(
+	        common::idp::updateGlobalBase::request& globalbase,
+	        uint32_t value_id,
+	        const route::tunnel_value_key_t& value_key);
+	std::vector<route::tunnel_value_interface_t>
+	MakeTunnelValueRequestInterface(
+	        common::idp::updateGlobalBase::request& globalbase,
+	        const route::generation_t& generation,
+	        uint32_t value_id,
+	        const route::tunnel_value_key_t& value_key);
 	void tunnel_value_compile(common::idp::updateGlobalBase::request& globalbase,
 	                          const route::generation_t& generation,
 	                          const uint32_t& value_id,

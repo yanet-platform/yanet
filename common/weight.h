@@ -28,7 +28,19 @@ public:
 	}
 
 public:
-	std::tuple<uint32_t, uint32_t, bool> insert(const std::vector<uint32_t>& weights)
+	struct Range
+	{
+		uint32_t start;
+		uint32_t size;
+	};
+
+	struct InsertResult
+	{
+		Range range;
+		bool is_fallback;
+	};
+
+	InsertResult insert(const std::vector<uint32_t>& weights)
 	{
 		/// @todo: check weights.size()
 
@@ -38,11 +50,7 @@ public:
 		}
 		else
 		{
-			uint32_t weight_total = 0;
-			for (const auto& weight : weights)
-			{
-				weight_total += weight;
-			}
+			uint32_t weight_total = std::accumulate(weights.begin(), weights.end(), uint32_t{});
 			if (size + weight_total > size_T)
 			{
 				YANET_LOG_WARNING("not enough weights\n");
@@ -55,9 +63,9 @@ public:
 				return {0, std::min((uint32_t)weights.size(), (uint32_t)256), true}; ///< fallback
 			}
 
-			auto& [range_start, range_size] = ranges[*id];
+			Range& range = ranges[*id];
 
-			range_start = size;
+			range.start = size;
 
 			index_type_T item_i = 0;
 			for (const auto& weight : weights)
@@ -68,10 +76,10 @@ public:
 				size += weight;
 			}
 
-			range_size = size - range_start;
+			range.size = size - range.start;
 		}
 
-		return std::tuple_cat(ranges[values.get_id(weights)], std::make_tuple(false));
+		return {ranges[values.get_id(weights)], false};
 	}
 
 	void clear()
@@ -108,7 +116,7 @@ protected:
 	        values;
 
 	std::map<uint64_t, ///< refarray_t::id_t
-	         std::tuple<uint32_t, uint32_t>>
+	         Range>
 	        ranges;
 
 	mutable std::vector<index_type_T> base;
