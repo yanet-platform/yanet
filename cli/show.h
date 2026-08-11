@@ -87,7 +87,11 @@ inline void logicalPort()
 	                 "vlanId",
 	                 "vrf",
 	                 "macAddress",
-	                 "promiscuousMode");
+	                 "promiscuousMode",
+	                 "rx_packets",
+	                 "rx_bytes",
+	                 "tx_packets",
+	                 "tx_bytes");
 
 	for (const auto& [logicalPortName, logicalPort] : response)
 	{
@@ -96,7 +100,11 @@ inline void logicalPort()
 		                 std::get<1>(logicalPort),
 		                 std::get<2>(logicalPort),
 		                 std::get<3>(logicalPort),
-		                 std::get<4>(logicalPort) ? "true" : "false");
+		                 std::get<4>(logicalPort) ? "true" : "false",
+		                 std::get<5>(logicalPort),
+		                 std::get<6>(logicalPort),
+		                 std::get<7>(logicalPort),
+		                 std::get<8>(logicalPort));
 	}
 
 	table.Print();

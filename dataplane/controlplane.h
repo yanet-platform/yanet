@@ -53,6 +53,7 @@ public:
 	common::idp::get_dregress_counters::response get_dregress_counters();
 	common::idp::get_ports_stats::response get_ports_stats();
 	common::idp::get_ports_stats_extended::response get_ports_stats_extended();
+	common::idp::get_logical_ports_stats::response get_logical_ports_stats();
 	common::idp::getControlPlanePortStats::response getControlPlanePortStats(const common::idp::getControlPlanePortStats::request& request);
 	common::idp::getPortStatsEx::response getPortStatsEx();
 	[[nodiscard]] common::idp::getFragmentationStats::response getFragmentationStats() const;
@@ -92,6 +93,8 @@ public:
 private:
 	[[nodiscard]] const std::vector<cWorker*>& workers_vector() const;
 	[[nodiscard]] const std::map<tCoreId, dataplane::SlowWorker*>& slow_workers() const;
+	[[nodiscard]] std::set<tLogicalPortId> _getActiveLogicalPorts();
+	[[nodiscard]] std::set<tLogicalPortId> getActiveLogicalPorts();
 
 	template<typename F>
 	// @brief returns sum of results of applying F to all cWorker*s

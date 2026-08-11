@@ -21,7 +21,7 @@ public:
 	nlohmann::json getReport();
 
 protected:
-	nlohmann::json convertWorker(const cWorker* worker);
+	nlohmann::json convertWorker(const cWorker* worker, const std::set<tLogicalPortId>& activeLogicalPorts);
 	nlohmann::json convertWorkerGC(const worker_gc_t* worker);
 	nlohmann::json convertMempool(const rte_mempool* mempool);
 	nlohmann::json convertPort(const tPortId& portId);

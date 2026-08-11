@@ -65,10 +65,11 @@ cReport::cReport(cDataPlane* dataPlane) :
 nlohmann::json cReport::getReport()
 {
 	nlohmann::json jsonReport;
+	const auto activeLogicalPorts = dataPlane->controlPlane->_getActiveLogicalPorts();
 
 	for (const cWorker* worker : dataPlane->workers_vector)
 	{
-		jsonReport["workers"].emplace_back(convertWorker(worker));
+		jsonReport["workers"].emplace_back(convertWorker(worker, activeLogicalPorts));
 	}
 
 	for (const auto& [core_id, worker] : dataPlane->worker_gcs)
@@ -126,7 +127,7 @@ static inline std::string convertEtherAddressToString(const rte_ether_addr& ethe
 	return buffer;
 }
 
-nlohmann::json cReport::convertWorker(const cWorker* worker)
+nlohmann::json cReport::convertWorker(const cWorker* worker, const std::set<tLogicalPortId>& activeLogicalPorts)
 {
 	nlohmann::json json;
 
@@ -180,6 +181,19 @@ nlohmann::json cReport::convertWorker(const cWorker* worker)
 		jsonPort["controlPlane_drops"] = 0; // @todo: DELETE
 
 		json["statsPorts"].emplace_back(jsonPort);
+	}
+
+	for (const auto logicalPortId : activeLogicalPorts)
+	{
+		nlohmann::json jsonLogicalPort;
+
+		jsonLogicalPort["logicalPortId"] = logicalPortId;
+		jsonLogicalPort["rx_packets"] = worker->statsLogicalPorts[logicalPortId].rx_packets;
+		jsonLogicalPort["rx_bytes"] = worker->statsLogicalPorts[logicalPortId].rx_bytes;
+		jsonLogicalPort["tx_packets"] = worker->statsLogicalPorts[logicalPortId].tx_packets;
+		jsonLogicalPort["tx_bytes"] = worker->statsLogicalPorts[logicalPortId].tx_bytes;
+
+		json["statsLogicalPorts"].emplace_back(jsonLogicalPort);
 	}
 
 	for (unsigned int burst_i = 0;

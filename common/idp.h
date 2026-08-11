@@ -45,6 +45,7 @@ enum class requestType : uint32_t
 	get_dregress_counters,
 	get_ports_stats,
 	get_ports_stats_extended,
+	get_logical_ports_stats,
 	getControlPlanePortStats,
 	getPortStatsEx,
 	getFragmentationStats,
@@ -104,6 +105,12 @@ using port_stats_t = std::map<tPortId,
                                          uint64_t, ///< tx_bytes
                                          uint64_t, ///< tx_errors
                                          uint64_t>>; ///< tx_drops
+                                                     ///
+using logical_port_stats_t = std::tuple<
+                                uint64_t,       // rx_packets
+                                uint64_t,       // rx_bytes
+                                uint64_t,       // tx_packets
+                                uint64_t>;      // tx_bytes
 
 namespace lpm
 {
@@ -683,6 +690,11 @@ using response = std::map<tPortId,
                           std::map<std::string, common::uint64>>; ///< all stats
 }
 
+namespace get_logical_ports_stats
+{
+using response = std::map<tLogicalPortId, common::idp::logical_port_stats_t>;
+}
+
 namespace getControlPlanePortStats
 {
 using request = std::set<tPortId>;
@@ -1047,6 +1059,7 @@ using response = std::variant<std::tuple<>,
                               get_dregress_counters::response,
                               get_ports_stats::response, ///< + getControlPlanePortStats::response
                               get_ports_stats_extended::response,
+                              get_logical_ports_stats::response,
                               getPortStatsEx::response,
                               getFragmentationStats::response,
                               getFWState::response,

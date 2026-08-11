@@ -320,11 +320,15 @@ using worker = std::tuple<double>; ///< usage
 
 using port = std::map<std::string, uint64>; ///< all stats
 
+using logicalPort = std::map<std::string, uint64_t>;	///< stats
+
 using response = std::tuple<uint8_t, ///< flagFirst
                             std::map<coreId,
                                      worker>,
                             std::map<std::string,
-                                     port>>;
+                                     port>,
+			    std::map<std::string,
+				     logicalPort>>;
 }
 
 namespace telegraf_mappings
@@ -355,11 +359,15 @@ using response = std::map<std::string,
 namespace getLogicalPorts
 {
 using response = std::map<std::string,
-                          std::tuple<std::string, ///< physicalPortName
-                                     uint16_t, ///< vlanId
-                                     std::string, ///< vrf
-                                     mac_address_t, ///< macAddress
-                                     uint8_t>>; ///< promiscuousMode
+                          std::tuple<std::string,       ///< physicalPortName
+                                     uint16_t,          ///< vlanId
+                                     std::string,       ///< vrf
+                                     mac_address_t,     ///< macAddress
+                                     uint8_t,           ///< promiscuousMode
+                                     uint64_t,          ///< rx_packets
+                                     uint64_t,          ///< rx_bytes
+                                     uint64_t,          ///< tx_packets
+                                     uint64_t>>;        ///< tx_bytes
 }
 
 namespace tun64_tunnels

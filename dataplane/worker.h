@@ -403,6 +403,7 @@ protected:
 
 	common::worker::stats::common* stats;
 	common::worker::stats::port* statsPorts; // CONFIG_YADECAP_PORTS_SIZE
+	common::worker::stats::logicalPort* statsLogicalPorts; // CONFIG_YADECAP_LOGICALPORTS_SIZE
 	uint64_t* bursts; // CONFIG_YADECAP_MBUFS_BURST_SIZE + 1
 	uint64_t* counters; // YANET_CONFIG_COUNTERS_SIZE
 	uint64_t* aclCounters; // YANET_CONFIG_ACL_COUNTERS_SIZE

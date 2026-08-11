@@ -589,7 +589,7 @@ void dregress_traffic()
 void other()
 {
 	interface::controlPlane controlPlane;
-	const auto& [flagFirst, workers, ports] = controlPlane.telegraf_other();
+	const auto& [flagFirst, workers, ports, logicalPorts] = controlPlane.telegraf_other();
 	const auto rib_summary = controlPlane.rib_summary();
 	const auto limit_summary = controlPlane.limit_summary();
 	GCC_BUG_UNUSED(flagFirst);
@@ -605,6 +605,13 @@ void other()
 	{
 		influxdb_format::print("port",
 		                       {{"physicalPortName", physicalPortName}},
+		                       {{"ext_", stats}});
+	}
+
+	for (const auto& [logicalPortName, stats] : logicalPorts)
+	{
+		influxdb_format::print("logicalPort",
+		                       {{"logicalPortName", logicalPortName}},
 		                       {{"ext_", stats}});
 	}
 
