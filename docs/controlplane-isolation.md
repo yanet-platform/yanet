@@ -37,6 +37,11 @@ rules for deleted prefixes. Omit the key or provide an empty array to remove all
 prefix rules. Unchanged prefixes retain their rules; failed rule operations are
 retried on a later configuration update.
 
+After `yanet-cli reload`, the dataplane logs `controlplane isolation settings`
+at INFO level: isolated ports with their CPU and RX queue IDs, and the configured
+`prefixesIsolatedCP`. View it with `journalctl -u yanet-dataplane -f`. This is a
+configuration summary; failures to install NIC rules are logged separately.
+
 The worker counters `interface_isolated_cp`, `interface_isolated_cp_miss`, and
 `interface_isolated_cp_fixed_mac` show controlplane packets received by isolated
 workers, unexpected controlplane packets on other workers, and packets on other
