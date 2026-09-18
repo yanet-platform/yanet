@@ -21,7 +21,13 @@ needs isolation, and keep these cores separate from `coreIds`, `workerGC`, and
 
 The NIC and its DPDK driver must support ingress `rte_flow` queue and RSS rules.
 ARP, LLDP, and STP traffic for `01:80:c2:00:00:00` is directed to the isolated
-queue. Other IPv4 and IPv6 traffic uses the port's forwarding queues through RSS.
+queue. ARP isolation covers untagged and VLAN-tagged frames. Remaining traffic
+matching the port's configured `rssFlags` is distributed across forwarding queues;
+traffic excluded by those flags uses the first forwarding queue. With
+`rssFlags: []`, all remaining traffic uses the first forwarding queue without RSS.
+
+The mlx5 Verbs backend uses its Ethernet ARP rule for both tagged and untagged
+frames. Backends such as mlx5 DV use an additional VLAN ARP rule.
 
 Use `prefixesIsolatedCP` in the controlplane configuration to direct destination
 prefixes to isolated queues:
@@ -40,4 +46,6 @@ retried on a later configuration update.
 The worker counters `interface_isolated_cp`, `interface_isolated_cp_miss`, and
 `interface_isolated_cp_fixed_mac` show controlplane packets received by isolated
 workers, unexpected controlplane packets on other workers, and packets on other
-workers with recognized STP destination MAC addresses. They are available in worker reports and Telegraf output.
+workers with recognized STP destination MAC addresses. Locally generated
+firewall-sync packets are excluded. These counters are available in worker
+reports and Telegraf output.

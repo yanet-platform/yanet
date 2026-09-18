@@ -2008,7 +2008,12 @@ void cDataPlane::StartIsolatedControlPlane()
 		{
 			if (config.workers_isolated_cp.count(core_id))
 			{
-				CreateFlowsForIsolatedPort(port_id, rx_queues.size(), queue_id);
+				const auto& interface_name = std::get<0>(port);
+				const auto rss_flags = std::get<3>(config.ports.at(interface_name));
+				if (!CreateFlowsForIsolatedPort(port_id, rx_queues.size(), queue_id, rss_flags))
+				{
+					abort();
+				}
 				rte_flow_storage.AddPortAndQueue(port_id, queue_id);
 			}
 		}

@@ -300,11 +300,6 @@ void cWorker::start()
 	mainThread();
 }
 
-void cWorker::SetWorkerAsIsolatedCP()
-{
-	isolated_for_cp = true;
-}
-
 void cWorker::fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table)
 {
 	table["brokenPackets"] = &stats.brokenPackets;
@@ -5853,30 +5848,34 @@ inline void cWorker::controlPlane_handle()
 		return;
 	}
 
-	if (isolated_for_cp)
+	static constexpr uint8_t stp_macs[][RTE_ETHER_ADDR_LEN] = {
+	        {0x01, 0x80, 0xc2, 0x00, 0x00, 0x00},
+	        {0x01, 0x80, 0xc2, 0x00, 0x00, 0x01},
+	        {0x01, 0x00, 0x0c, 0xcc, 0xcc, 0xcd}};
+	for (unsigned int mbuf_i = 0; mbuf_i < controlPlane_stack.mbufsCount; ++mbuf_i)
 	{
-		stats.interface_isolated_cp += controlPlane_stack.mbufsCount;
-	}
-	else
-	{
-		static constexpr uint8_t stp_macs[][RTE_ETHER_ADDR_LEN] = {
-		        {0x01, 0x80, 0xc2, 0x00, 0x00, 0x00},
-		        {0x01, 0x80, 0xc2, 0x00, 0x00, 0x01},
-		        {0x01, 0x00, 0x0c, 0xcc, 0xcc, 0xcd}};
-		for (unsigned int mbuf_i = 0; mbuf_i < controlPlane_stack.mbufsCount; ++mbuf_i)
+		auto* mbuf = controlPlane_stack.mbufs[mbuf_i];
+		if (YADECAP_METADATA(mbuf)->flow.type == common::globalBase::eFlowType::slowWorker_fw_sync)
 		{
-			const rte_ether_hdr* ethernet_header = rte_pktmbuf_mtod(controlPlane_stack.mbufs[mbuf_i], rte_ether_hdr*);
-			const auto* dst = ethernet_header->dst_addr.addr_bytes;
-			if (std::any_of(std::begin(stp_macs), std::end(stp_macs), [dst](const auto& mac) {
-				    return memcmp(dst, mac, RTE_ETHER_ADDR_LEN) == 0;
-			    }))
-			{
-				++stats.interface_isolated_cp_fixed_mac;
-			}
-			else
-			{
-				++stats.interface_isolated_cp_miss;
-			}
+			continue;
+		}
+		if (isolated_for_cp)
+		{
+			++stats.interface_isolated_cp;
+			continue;
+		}
+
+		const rte_ether_hdr* ethernet_header = rte_pktmbuf_mtod(mbuf, rte_ether_hdr*);
+		const auto* dst = ethernet_header->dst_addr.addr_bytes;
+		if (std::any_of(std::begin(stp_macs), std::end(stp_macs), [dst](const auto& mac) {
+			    return memcmp(dst, mac, RTE_ETHER_ADDR_LEN) == 0;
+		    }))
+		{
+			++stats.interface_isolated_cp_fixed_mac;
+		}
+		else
+		{
+			++stats.interface_isolated_cp_miss;
 		}
 	}
 

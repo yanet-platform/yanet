@@ -3,7 +3,7 @@
 #include "common.h"
 #include "common/type.h"
 
-void CreateFlowsForIsolatedPort(uint16_t port_id, uint16_t queues_count, uint16_t isolated_queue);
+[[nodiscard]] bool CreateFlowsForIsolatedPort(uint16_t port_id, uint16_t queues_count, uint16_t isolated_queue, uint64_t rss_flags);
 
 class RteFlowStorage
 {

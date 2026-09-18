@@ -2001,6 +2001,19 @@ void config_parser_t::loadConfig_prefixes_isolated_cp(controlplane::base_t& base
 {
 	for (const auto& json_prefix : json)
 	{
-		baseNext.prefixes_isolated_cp.emplace(json_prefix.get<std::string>());
+		const auto text = json_prefix.get<std::string>();
+		const auto slash = text.find('/');
+		common::ip_prefix_t prefix(text.substr(0, slash));
+		if (slash != std::string::npos)
+		{
+			unsigned int mask = 0;
+			std::istringstream mask_stream(text.substr(slash + 1));
+			if (!(mask_stream >> mask) || text.find_first_not_of("0123456789", slash + 1) != std::string::npos || mask > prefix.mask())
+			{
+				throw error_result_t(eResult::invalidPrefix, "invalid isolation prefix length: " + text);
+			}
+			prefix.mask() = static_cast<uint8_t>(mask);
+		}
+		baseNext.prefixes_isolated_cp.emplace(prefix);
 	}
 }

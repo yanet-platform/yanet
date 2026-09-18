@@ -179,7 +179,7 @@ protected:
 	pthread_barrier_t initPortBarrier;
 	pthread_barrier_t runBarrier;
 
-	rte_mempool* mempool_log;
+	rte_mempool* mempool_log = nullptr;
 
 	common::idp::get_shm_info::response dumps_meta;
 	std::map<std::string, uint64_t> tag_to_id;
