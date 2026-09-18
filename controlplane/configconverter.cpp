@@ -33,7 +33,8 @@ eResult config_converter_t::process(uint32_t serial)
 		processBalancer();
 		processDregress();
 		processAcl();
-		processPrefixesIsolatedCP();
+		globalbase.emplace_back(common::idp::updateGlobalBase::requestType::update_prefixes_isolated_cp,
+		                        baseNext.prefixes_isolated_cp);
 
 		buildAcl();
 	}
@@ -1964,10 +1965,4 @@ void config_converter_t::buildAcl()
 	baseNext.rules = std::move(result.rules);
 	baseNext.dispatcher = std::move(result.dispatcher);
 	baseNext.dump_id_to_tag = std::move(result.dump_id_to_tag);
-}
-
-void config_converter_t::processPrefixesIsolatedCP()
-{
-	globalbase.emplace_back(common::idp::updateGlobalBase::requestType::update_prefixes_isolated_cp,
-	                        baseNext.prefixes_isolated_cp);
 }

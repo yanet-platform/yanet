@@ -67,7 +67,7 @@ public:
 
 	void start();
 
-	void SetWorkerAsIsolatedCP();
+	void SetWorkerAsIsolatedCP() { isolated_for_cp = true; }
 	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
 
 protected:
