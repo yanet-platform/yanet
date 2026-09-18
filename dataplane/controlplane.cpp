@@ -110,6 +110,9 @@ void cControlPlane::start()
 		rte_eth_promiscuous_enable(portId);
 	}
 
+	dataPlane->StartIsolatedControlPlane();
+	dataPlane->bus.run();
+
 	if (use_kernel_interface)
 	{
 		if (init_kernel_interfaces() != eResult::success)

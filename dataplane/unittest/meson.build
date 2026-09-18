@@ -8,7 +8,8 @@ dependencies += dependency('gtest_main')
 
 sources = files('unittest.cpp',
                 'ip_address.cpp',
-                'hashtable.cpp')
+                'hashtable.cpp',
+                'isolation_request.cpp')
 
 arch = 'corei7'
 cpp_args_append = ['-march=' + arch, '-DCONFIG_YADECAP_UNITTEST']
@@ -35,3 +36,7 @@ unittest_neighbor = executable('yanet-dataplane-unittest-neighbor',
                                override_options: 'b_lto=false')
 
 test('neighbor', unittest_neighbor, protocol: 'gtest')
+
+subdir('rteflow')
+
+subdir('isolation')

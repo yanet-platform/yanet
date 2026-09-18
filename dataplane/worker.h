@@ -67,6 +67,7 @@ public:
 
 	void start();
 
+	void SetWorkerAsIsolatedCP();
 	void fillStatsNamesToAddrsTable(std::unordered_map<std::string, uint64_t*>& table);
 
 protected:
@@ -356,4 +357,5 @@ protected:
 	YADECAP_CACHE_ALIGNED(align3);
 
 	dataplane::base::generation bases[2];
+	bool isolated_for_cp = false;
 };

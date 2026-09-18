@@ -36,6 +36,7 @@ protected:
 	void loadConfig_tun64(controlplane::base_t& baseNext, const std::string& moduleId, const nlohmann::json& moduleJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_tun64mappings(controlplane::base_t& baseNext, controlplane::tun64::config_t& tunnel, const nlohmann::json& mappingsJson, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 
+	void loadConfig_prefixes_isolated_cp(controlplane::base_t& baseNext, const nlohmann::json& json);
 	void loadConfig_variables(controlplane::base_t& baseNext, const nlohmann::json& json);
 	void loadConfig_fqdns(controlplane::base_t& baseNext, const nlohmann::json& json, const std::string& rootFilePath, const std::map<std::string, nlohmann::json>& jsons);
 	void loadConfig_rib(controlplane::base_t& baseNext, const nlohmann::json& json);

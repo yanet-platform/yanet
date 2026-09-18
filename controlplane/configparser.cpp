@@ -131,6 +131,11 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 			loadConfig_rib(baseNext, rootJson["rib"]);
 		}
 
+		if (exist(rootJson, "prefixesIsolatedCP"))
+		{
+			loadConfig_prefixes_isolated_cp(baseNext, rootJson["prefixesIsolatedCP"]);
+		}
+
 		if (exist(rootJson, "memory_groups"))
 		{
 			loadConfig_memory_group(baseNext.root_memory_group, rootJson["memory_groups"]);
@@ -1988,5 +1993,14 @@ void config_parser_t::loadConfig_memory_group(common::memory_manager::memory_gro
 		}
 
 		memory_group.memory_groups.emplace_back(memory_group_next);
+	}
+}
+
+void config_parser_t::loadConfig_prefixes_isolated_cp(controlplane::base_t& baseNext,
+                                                      const nlohmann::json& json)
+{
+	for (const auto& json_prefix : json)
+	{
+		baseNext.prefixes_isolated_cp.emplace(json_prefix.get<std::string>());
 	}
 }

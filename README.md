@@ -24,6 +24,9 @@ The main objective of our solution is to be fault-tolerant and high-performance 
 You can build YANET in [docker](https://www.docker.com/) container and run it in [QEMU](https://www.qemu.org/). See [DEMO](demo/qemu).
 
 Or build on bare metal. See [documentation](docs/build.md).
+See [controlplane isolation](docs/controlplane-isolation.md) for dedicated
+controlplane worker and prefix configuration.
+
 ## Running Autotests
 Pull docker image:
 ```
