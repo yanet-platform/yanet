@@ -429,6 +429,10 @@ eResult generation::update(const common::idp::updateGlobalBase::request& request
 		{
 			result = tsc_state_update(std::get<common::idp::updateGlobalBase::tsc_state_update::request>(data));
 		}
+		else if (type == common::idp::updateGlobalBase::requestType::update_prefixes_isolated_cp)
+		{
+			result = update_prefixes_isolated_cp(std::get<common::idp::updateGlobalBase::update_prefixes_isolated_cp::request>(data));
+		}
 		else if (type == common::idp::updateGlobalBase::requestType::tscs_base_value_update)
 		{
 			result = tscs_base_value_update(std::get<common::idp::updateGlobalBase::tscs_base_value_update::request>(data));
@@ -2491,5 +2495,11 @@ eResult generation::fwstate_synchronization_update(const common::idp::updateGlob
 	std::lock_guard<std::mutex> lock(dataPlane->controlPlane->fw_state_multicast_acl_ids_mutex);
 	std::swap(dataPlane->controlPlane->fw_state_multicast_acl_ids, fw_state_multicast_acl_ids);
 
+	return eResult::success;
+}
+
+eResult generation::update_prefixes_isolated_cp(const common::idp::updateGlobalBase::update_prefixes_isolated_cp::request& request)
+{
+	dataPlane->update_prefixes_isolated_cp(request);
 	return eResult::success;
 }

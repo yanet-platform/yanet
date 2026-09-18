@@ -10,7 +10,8 @@ if get_option('custom_hash_structures')
     dependencies += ankerl_dep
 endif
 
-controlplane_sources = files('../acl_compiler.cpp',
+controlplane_sources = files('../configparser.cpp',
+                             '../acl_compiler.cpp',
                              '../acl.cpp',
                              '../acl_filter.cpp',
                              '../acl_network_table.cpp',
@@ -28,7 +29,8 @@ sources = files('unittest.cpp',
                 'network.cpp',
                 'parser.cpp',
                 'segment_allocator.cpp',
-                'type.cpp')
+                'type.cpp',
+                'isolation_config.cpp')
 
 arch = 'corei7'
 cpp_args_append = ['-march=' + arch]

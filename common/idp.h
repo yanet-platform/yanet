@@ -170,7 +170,8 @@ enum class requestType : uint32_t
 	nat46clat_update,
 	dump_tags_ids,
 	tsc_state_update,
-	tscs_base_value_update
+	tscs_base_value_update,
+	update_prefixes_isolated_cp
 };
 
 namespace updateLogicalPort
@@ -503,6 +504,11 @@ using request = uint32_t; ///< serial
 namespace tsc_state_update
 {
 using request = bool;
+}
+
+namespace update_prefixes_isolated_cp
+{
+using request = std::set<common::ip_prefix_t>;
 }
 
 namespace tscs_base_value_update
