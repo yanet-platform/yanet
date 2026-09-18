@@ -25,6 +25,7 @@
 #include "memory_manager.h"
 #include "neighbor.h"
 #include "report.h"
+#include "rteflow.h"
 #include "type.h"
 #include "worker_gc.h"
 
@@ -57,6 +58,7 @@ struct tDataPlaneConfig
 	std::string memory;
 	std::map<std::string, std::tuple<unsigned int, unsigned int>> shared_memory;
 
+	std::set<tCoreId> workers_isolated_cp;
 	std::vector<std::string> ealArgs;
 };
 
@@ -100,6 +102,8 @@ public:
 	void run_on_worker_gc(const tSocketId socket_id, const std::function<bool()>& callback);
 
 	void switch_worker_base();
+	void StartIsolatedControlPlane();
+	void update_prefixes_isolated_cp(const std::set<common::ip_prefix_t>& prefixes);
 
 	inline uint32_t get_current_time() const
 	{
@@ -199,6 +203,7 @@ protected:
 	std::vector<std::thread> threads;
 
 	mutable std::mutex dpdk_mutex;
+	RteFlowStorage rte_flow_storage;
 
 public: ///< modules
 	cReport report;

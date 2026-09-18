@@ -130,6 +130,9 @@ void unsafe()
 		       "interface_lookupMisses=%luu,"
 		       "interface_hopLimits=%luu,"
 		       "interface_neighbor_invalid=%luu,"
+		       "interface_isolated_cp=%luu,"
+		       "interface_isolated_cp_miss=%luu,"
+		       "interface_isolated_cp_fixed_mac=%luu,"
 		       "interface_neighbor_requests=%luu,"
 		       "nat64stateless_ingressPackets=%luu,"
 		       "nat64stateless_ingressFragments=%luu,"
@@ -162,6 +165,9 @@ void unsafe()
 		       stats.interface_lookupMisses,
 		       stats.interface_hopLimits,
 		       stats.interface_neighbor_invalid,
+		       stats.interface_isolated_cp,
+		       stats.interface_isolated_cp_miss,
+		       stats.interface_isolated_cp_fixed_mac,
 		       stats.interface_neighbor_requests,
 		       stats.nat64stateless_ingressPackets,
 		       stats.nat64stateless_ingressFragments,

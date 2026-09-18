@@ -37,6 +37,7 @@ protected:
 	void processBalancer();
 	void processDregress();
 	void processAcl();
+	void processPrefixesIsolatedCP();
 	void buildAcl();
 
 	void serializeLogicalPorts();

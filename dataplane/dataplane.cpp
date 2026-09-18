@@ -973,6 +973,10 @@ eResult cDataPlane::initWorkers()
 		}
 
 		worker->fillStatsNamesToAddrsTable(coreId_to_stats_tables[coreId]);
+		if (config.workers_isolated_cp.count(coreId))
+		{
+			worker->SetWorkerAsIsolatedCP();
+		}
 		workers[coreId] = worker;
 		workers_vector.emplace_back(worker);
 
@@ -1193,8 +1197,6 @@ void cDataPlane::start()
 	threads.emplace_back([this]() {
 		neighbor_thread();
 	});
-
-	bus.run();
 
 	workers_started_.store(true, std::memory_order_release);
 	/// run forwarding plane and control plane
@@ -1613,6 +1615,12 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 		return eResult::invalidConfigurationFile;
 	}
 
+	if (rootJson.find("workerIsolatedCP") != rootJson.end())
+	{
+		const std::vector<tCoreId> isolated_cores = rootJson["workerIsolatedCP"];
+		config.workers_isolated_cp.insert(isolated_cores.begin(), isolated_cores.end());
+	}
+
 	result = parseJsonPorts(rootJson.find("ports").value());
 	if (result != eResult::success)
 	{
@@ -1695,6 +1703,7 @@ eResult cDataPlane::parseConfig(const std::string& configFilePath)
 
 eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 {
+	auto available_isolated_cores = config.workers_isolated_cp;
 	for (const auto& portJson : json)
 	{
 		std::string interfaceName = portJson["interfaceName"];
@@ -1735,7 +1744,22 @@ eResult cDataPlane::parseJsonPorts(const nlohmann::json& json)
 
 		config.ports[interfaceName] = {pci, name, symmetric_mode, rss_flags};
 
-		for (tCoreId coreId : portJson["coreIds"])
+		std::vector<tCoreId> coreIds = portJson["coreIds"];
+		if (!coreIds.empty())
+		{
+			const int socket_id = numa_node_of_cpu(coreIds.front());
+			for (auto iter = available_isolated_cores.begin(); iter != available_isolated_cores.end(); ++iter)
+			{
+				if (numa_node_of_cpu(*iter) == socket_id)
+				{
+					coreIds.push_back(*iter);
+					available_isolated_cores.erase(iter);
+					break;
+				}
+			}
+		}
+
+		for (tCoreId coreId : coreIds)
 		{
 			if (exist(config.workers, coreId))
 			{
@@ -1973,4 +1997,25 @@ eResult cDataPlane::initEal(const std::string& binaryPath,
 	}
 
 	return eResult::success;
+}
+
+void cDataPlane::StartIsolatedControlPlane()
+{
+	for (const auto& [port_id, port] : ports)
+	{
+		const auto& rx_queues = std::get<1>(port);
+		for (const auto& [core_id, queue_id] : rx_queues)
+		{
+			if (config.workers_isolated_cp.count(core_id))
+			{
+				CreateFlowsForIsolatedPort(port_id, rx_queues.size(), queue_id);
+				rte_flow_storage.AddPortAndQueue(port_id, queue_id);
+			}
+		}
+	}
+}
+
+void cDataPlane::update_prefixes_isolated_cp(const std::set<common::ip_prefix_t>& prefixes)
+{
+	rte_flow_storage.UpdatePrefixes(prefixes);
 }

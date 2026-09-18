@@ -475,6 +475,7 @@ public:
 	std::map<unsigned int, std::string> logicalport_id_to_name;
 	bool storeSamples;
 	uint32_t serial;
+	std::set<common::ip_prefix_t> prefixes_isolated_cp;
 
 	std::map<std::string, common::uint64> variables;
 	std::map<std::string, ///< vrf

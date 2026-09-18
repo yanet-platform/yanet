@@ -184,6 +184,7 @@ protected:
 	eResult tun64_update(const common::idp::updateGlobalBase::tun64_update::request& request);
 	eResult tun64mappings_update(const common::idp::updateGlobalBase::tun64mappings_update::request& request);
 	eResult tsc_state_update(const common::idp::updateGlobalBase::tsc_state_update::request& request);
+	eResult update_prefixes_isolated_cp(const common::idp::updateGlobalBase::update_prefixes_isolated_cp::request& request);
 	eResult tscs_base_value_update(const common::idp::updateGlobalBase::tscs_base_value_update::request& request);
 
 	void evaluate_service_ring();
