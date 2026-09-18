@@ -2,10 +2,8 @@
 #include <rte_flow.h>
 
 #include <algorithm>
-#include <array>
 #include <cstdlib>
 #include <cstring>
-#include <memory>
 #include <vector>
 
 #include "dataplane/dataplane.h"
@@ -22,7 +20,6 @@ public:
 	}
 
 	using cDataPlane::config;
-	using cDataPlane::globalBases;
 	using cDataPlane::parseJsonPorts;
 	using cDataPlane::ports;
 };
@@ -345,48 +342,4 @@ TEST_F(RteFlowTest, UsesActualQueueMapForIsolatedAndOrdinaryTraffic)
 			EXPECT_EQ(rule.rss_queues, (std::vector<uint16_t>{1, 2}));
 		}
 	}
-}
-
-TEST_F(RteFlowTest, ReloadLogsIsolationSettingsOnceAcrossNumaGenerations)
-{
-	IsolationDataPlane dataplane;
-	dataplane.config.workers_isolated_cp = {2, 10};
-	dataplane.ports[7] = {"first", {{2, 0}, {4, 1}}, 2, {}, "first", false};
-	dataplane.ports[9] = {"second", {{6, 0}, {8, 1}, {10, 2}}, 3, {}, "second", false};
-	dataplane.ports[11] = {"ordinary", {{12, 0}}, 1, {}, "ordinary", false};
-	std::array<std::unique_ptr<dataplane::globalBase::generation>, 4> generations;
-	for (size_t i = 0; i < generations.size(); ++i)
-	{
-		generations[i] = std::make_unique<dataplane::globalBase::generation>(&dataplane, i / 2);
-		dataplane.globalBases[i / 2][i % 2] = generations[i].get();
-	}
-	const common::idp::updateGlobalBase::request request = {
-	        {common::idp::updateGlobalBase::requestType::update_prefixes_isolated_cp,
-	         std::set<common::ip_prefix_t>{common::ip_prefix_t("192.0.2.0/24"), common::ip_prefix_t("2001:db8::/32")}}};
-	const std::string expected =
-	        R"(controlplane isolation settings: {"ports":[)"
-	        R"({"coreId":2,"interfaceName":"first","queueId":0},)"
-	        R"({"coreId":10,"interfaceName":"second","queueId":2}],)"
-	        R"("prefixesIsolatedCP":["192.0.2.0/24","2001:db8::/32"]})";
-	for (int reload = 0; reload < 2; ++reload)
-	{
-		testing::internal::CaptureStdout();
-		const auto result = dataplane.controlPlane->updateGlobalBase(request);
-		const auto output = testing::internal::GetCapturedStdout();
-		ASSERT_EQ(eResult::success, result);
-		EXPECT_NE(std::string::npos, output.find(expected)) << output;
-		EXPECT_EQ(1, std::count(output.begin(), output.end(), '\n')) << output;
-	}
-}
-
-TEST_F(RteFlowTest, ReloadLogsEmptyIsolationSettings)
-{
-	IsolationDataPlane dataplane;
-	const common::idp::updateGlobalBase::request request = {
-	        {common::idp::updateGlobalBase::requestType::update_prefixes_isolated_cp, std::set<common::ip_prefix_t>{}}};
-	testing::internal::CaptureStdout();
-	const auto result = dataplane.controlPlane->updateGlobalBase(request);
-	const auto output = testing::internal::GetCapturedStdout();
-	ASSERT_EQ(eResult::success, result);
-	EXPECT_NE(std::string::npos, output.find(R"(controlplane isolation settings: {"ports":[],"prefixesIsolatedCP":[]})")) << output;
 }

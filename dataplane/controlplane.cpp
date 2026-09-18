@@ -209,29 +209,6 @@ common::idp::updateGlobalBase::response cControlPlane::updateGlobalBase(const co
 
 	YADECAP_MEMORY_BARRIER_COMPILE;
 
-	for (const auto& [type, data] : request)
-	{
-		if (type == common::idp::updateGlobalBase::requestType::update_prefixes_isolated_cp)
-		{
-			nlohmann::json settings = {{"ports", nlohmann::json::array()}, {"prefixesIsolatedCP", nlohmann::json::array()}};
-			for (const auto& [port_id, port] : dataPlane->ports)
-			{
-				for (const auto& [core_id, queue_id] : std::get<1>(port))
-				{
-					if (dataPlane->config.workers_isolated_cp.count(core_id))
-					{
-						settings["ports"].push_back({{"interfaceName", std::get<0>(port)}, {"coreId", core_id}, {"queueId", queue_id}});
-					}
-				}
-			}
-			for (const auto& prefix : std::get<common::idp::updateGlobalBase::update_prefixes_isolated_cp::request>(data))
-			{
-				settings["prefixesIsolatedCP"].push_back(prefix.toString());
-			}
-			YADECAP_LOG_INFO("controlplane isolation settings: %s\n", settings.dump().c_str());
-		}
-	}
-
 	return eResult::success;
 }
 
