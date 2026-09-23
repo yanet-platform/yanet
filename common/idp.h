@@ -86,6 +86,7 @@ enum class requestType : uint32_t
 	memory_manager_update,
 	memory_manager_stats,
 	neighbor_interfaces_switch,
+	update_dscp_isolated_cp,
 	size, // size should always be at the bottom of the list, this enum allows us to find out the size of the enum list
 };
 
@@ -1019,6 +1020,12 @@ using response = std::tuple<memory_manager::memory_group,
 
 //
 
+namespace update_dscp_isolated_cp
+{
+using request = std::set<uint8_t>;
+using response = eResult;
+}
+
 using request = std::tuple<requestType,
                            std::variant<std::tuple<>,
                                         updateGlobalBase::request,
@@ -1039,7 +1046,8 @@ using request = std::tuple<requestType,
                                         neighbor_insert::request,
                                         neighbor_remove::request,
                                         neighbor_update_interfaces::request,
-                                        memory_manager_update::request>>;
+                                        memory_manager_update::request,
+                                        update_dscp_isolated_cp::request>>;
 
 using response = std::variant<std::tuple<>,
                               updateGlobalBase::response, ///< + others which have eResult as response

@@ -212,6 +212,16 @@ common::idp::updateGlobalBase::response cControlPlane::updateGlobalBase(const co
 	return eResult::success;
 }
 
+eResult cControlPlane::update_dscp_isolated_cp(const common::idp::update_dscp_isolated_cp::request& request)
+{
+	std::lock_guard<std::mutex> guard(mutex);
+	if (!errors.empty())
+	{
+		return eResult::dataplaneIsBroken;
+	}
+	return dataPlane->update_dscp_isolated_cp(request) ? eResult::success : eResult::invalidFlow;
+}
+
 eResult cControlPlane::updateGlobalBaseBalancer(const common::idp::updateGlobalBaseBalancer::request& request)
 {
 	if (!errors.empty())

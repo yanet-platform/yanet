@@ -873,6 +873,13 @@ eResult cControlPlane::loadConfig(const std::string& rootFilePath,
 
 		YANET_LOG_INFO("updating dataplane (stage 2)\n");
 
+		result = dataPlane.update_dscp_isolated_cp(converter.getBaseNext().dscp_isolated_cp);
+		if (result != eResult::success)
+		{
+			YANET_LOG_ERROR("Failed to update isolated controlplane DSCP rules: %s\n", common::result_to_c_str(result));
+			return result;
+		}
+
 		/// apply
 		{
 			{

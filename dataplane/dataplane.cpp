@@ -2024,3 +2024,8 @@ void cDataPlane::update_prefixes_isolated_cp(const std::set<common::ip_prefix_t>
 {
 	rte_flow_storage.UpdatePrefixes(prefixes);
 }
+
+bool cDataPlane::update_dscp_isolated_cp(const std::set<uint8_t>& dscp)
+{
+	return rte_flow_storage.UpdateDscp(dscp);
+}

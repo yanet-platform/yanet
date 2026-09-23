@@ -34,6 +34,7 @@ public:
 
 	common::idp::updateGlobalBase::response updateGlobalBase(const common::idp::updateGlobalBase::request& request);
 	eResult updateGlobalBaseBalancer(const common::idp::updateGlobalBaseBalancer::request& request);
+	eResult update_dscp_isolated_cp(const common::idp::update_dscp_isolated_cp::request& request);
 	common::idp::getGlobalBase::response getGlobalBase(const common::idp::getGlobalBase::request& request);
 	common::idp::getWorkerStats::response getWorkerStats(const common::idp::getWorkerStats::request& request);
 	common::idp::getSlowWorkerStats::response getSlowWorkerStats();

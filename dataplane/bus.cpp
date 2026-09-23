@@ -202,6 +202,10 @@ void cBus::clientThread(int clientSocket)
 		{
 			response = callWithResponse(&cControlPlane::updateGlobalBaseBalancer, request);
 		}
+		else if (type == common::idp::requestType::update_dscp_isolated_cp)
+		{
+			response = callWithResponse(&cControlPlane::update_dscp_isolated_cp, request);
+		}
 		else if (type == common::idp::requestType::getGlobalBase)
 		{
 			response = callWithResponse(&cControlPlane::getGlobalBase, request);
