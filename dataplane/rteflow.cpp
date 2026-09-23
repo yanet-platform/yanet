@@ -1,11 +1,16 @@
 #include <rte_ethdev.h>
 #include <rte_flow.h>
+#include <rte_ip.h>
 
 #include "rteflow.h"
 
 namespace
 {
-rte_flow* CreateFlow(uint16_t port_id, const rte_flow_item* pattern, const rte_flow_action& action, uint32_t priority = 0)
+constexpr uint32_t isolated_priority = 0;
+constexpr uint32_t forwarding_priority = 1;
+constexpr uint8_t ecn_bits = 2;
+
+rte_flow* CreateFlow(uint16_t port_id, const rte_flow_item* pattern, const rte_flow_action& action, uint32_t priority = isolated_priority)
 {
 	rte_flow_attr attr{};
 	attr.ingress = 1;
@@ -75,6 +80,32 @@ rte_flow* CreatePrefixFlow(uint16_t port_id, uint16_t isolated_queue, const comm
 	return CreateFlow(port_id, pattern, {RTE_FLOW_ACTION_TYPE_QUEUE, &queue});
 }
 
+rte_flow* CreateDscpFlow(uint16_t port_id, uint16_t isolated_queue, uint8_t dscp, rte_flow_item_type type)
+{
+	rte_flow_item pattern[] = {
+	        {RTE_FLOW_ITEM_TYPE_ETH, nullptr, nullptr, nullptr},
+	        {type, nullptr, nullptr, nullptr},
+	        {RTE_FLOW_ITEM_TYPE_END, nullptr, nullptr, nullptr}};
+	rte_flow_item_ipv4 ipv4_spec{};
+	rte_flow_item_ipv4 ipv4_mask{};
+	rte_flow_item_ipv6 ipv6_spec{};
+	rte_flow_item_ipv6 ipv6_mask{};
+	if (type == RTE_FLOW_ITEM_TYPE_IPV4)
+	{
+		ipv4_spec.hdr.type_of_service = dscp << ecn_bits;
+		ipv4_mask.hdr.type_of_service = RTE_IPV4_HDR_DSCP_MASK;
+		pattern[1] = {type, &ipv4_spec, nullptr, &ipv4_mask};
+	}
+	else
+	{
+		ipv6_spec.hdr.vtc_flow = rte_cpu_to_be_32(static_cast<uint32_t>(dscp) << (RTE_IPV6_HDR_TC_SHIFT + ecn_bits));
+		ipv6_mask.hdr.vtc_flow = rte_cpu_to_be_32(RTE_IPV6_HDR_DSCP_MASK);
+		pattern[1] = {type, &ipv6_spec, nullptr, &ipv6_mask};
+	}
+	const rte_flow_action_queue queue{isolated_queue};
+	return CreateFlow(port_id, pattern, {RTE_FLOW_ACTION_TYPE_QUEUE, &queue});
+}
+
 bool CreateForwardingFlows(uint16_t port_id, uint16_t queues_count, uint16_t isolated_queue, uint64_t rss_flags)
 {
 	std::vector<uint16_t> queues;
@@ -106,7 +137,7 @@ bool CreateForwardingFlows(uint16_t port_id, uint16_t queues_count, uint16_t iso
 	const rte_flow_item pattern[] = {
 	        {RTE_FLOW_ITEM_TYPE_ETH, nullptr, nullptr, nullptr},
 	        {RTE_FLOW_ITEM_TYPE_END, nullptr, nullptr, nullptr}};
-	return CreateFlow(port_id, pattern, action, 1) != nullptr;
+	return CreateFlow(port_id, pattern, action, forwarding_priority) != nullptr;
 }
 }
 
@@ -152,6 +183,64 @@ bool CreateFlowsForIsolatedPort(uint16_t port_id, uint16_t queues_count, uint16_
 void RteFlowStorage::AddPortAndQueue(tPortId port_id, tQueueId queue_id)
 {
 	ports_and_queues_.insert({port_id, queue_id});
+}
+
+bool RteFlowStorage::UpdateDscp(const std::set<uint8_t>& dscp)
+{
+	if (!dscp.empty() && *dscp.rbegin() > (RTE_IPV4_HDR_DSCP_MASK >> ecn_bits))
+	{
+		YANET_LOG_ERROR("Isolation DSCP values must be between 0 and 63\n");
+		return false;
+	}
+	if (!dscp.empty() && ports_and_queues_.empty())
+	{
+		YANET_LOG_ERROR("DSCP isolation requires an isolated port\n");
+		return false;
+	}
+	for (const auto value : dscp)
+	{
+		for (const auto& [port_id, queue_id] : ports_and_queues_)
+		{
+			for (const auto type : {RTE_FLOW_ITEM_TYPE_IPV4, RTE_FLOW_ITEM_TYPE_IPV6})
+			{
+				const auto key = std::make_tuple(port_id, queue_id, value, type);
+				if (dscp_flows_.count(key) != 0)
+				{
+					continue;
+				}
+				auto* flow = CreateDscpFlow(port_id, queue_id, value, type);
+				if (!flow)
+				{
+					YANET_LOG_ERROR("Failed to isolate DSCP=%u, IPv%u, port=%u, queue=%u\n", value, type == RTE_FLOW_ITEM_TYPE_IPV4 ? 4 : 6, port_id, queue_id);
+					return false;
+				}
+				dscp_flows_.emplace(key, flow);
+			}
+		}
+	}
+
+	bool success = true;
+	for (auto iter = dscp_flows_.begin(); iter != dscp_flows_.end();)
+	{
+		const auto& [port_id, queue_id, value, type] = iter->first;
+		if (dscp.count(value) != 0)
+		{
+			++iter;
+			continue;
+		}
+		rte_flow_error error{};
+		if (rte_flow_destroy(port_id, iter->second, &error))
+		{
+			YANET_LOG_ERROR("Failed to delete isolation flow: DSCP=%u, IPv%u, port=%u, queue=%u: %s\n", value, type == RTE_FLOW_ITEM_TYPE_IPV4 ? 4 : 6, port_id, queue_id, error.message ? error.message : "unknown error");
+			success = false;
+			++iter;
+		}
+		else
+		{
+			iter = dscp_flows_.erase(iter);
+		}
+	}
+	return success;
 }
 
 void RteFlowStorage::UpdatePrefixes(const std::set<common::ip_prefix_t>& prefixes)

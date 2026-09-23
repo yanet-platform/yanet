@@ -133,7 +133,12 @@ controlplane::base_t config_parser_t::loadConfig(const std::string& rootFilePath
 
 		if (exist(rootJson, "prefixesIsolatedCP"))
 		{
-			loadConfig_prefixes_isolated_cp(baseNext, rootJson["prefixesIsolatedCP"]);
+			throw error_result_t(eResult::invalidConfigurationFile, "replace prefixesIsolatedCP with rulesIsolatedCP.dstPrefixes");
+		}
+
+		if (exist(rootJson, "rulesIsolatedCP"))
+		{
+			loadConfig_rules_isolated_cp(baseNext, rootJson["rulesIsolatedCP"]);
 		}
 
 		if (exist(rootJson, "memory_groups"))
@@ -2015,5 +2020,38 @@ void config_parser_t::loadConfig_prefixes_isolated_cp(controlplane::base_t& base
 			prefix.mask() = static_cast<uint8_t>(mask);
 		}
 		baseNext.prefixes_isolated_cp.emplace(prefix);
+	}
+}
+
+void config_parser_t::loadConfig_rules_isolated_cp(controlplane::base_t& baseNext,
+                                                   const nlohmann::json& json)
+{
+	if (!json.is_object())
+	{
+		throw error_result_t(eResult::invalidConfigurationFile, "rulesIsolatedCP must be an object");
+	}
+	for (const auto& item : json.items())
+	{
+		if (item.key() != "dscp" && item.key() != "dstPrefixes")
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "unknown rulesIsolatedCP field: " + item.key());
+		}
+		if (!item.value().is_array())
+		{
+			throw error_result_t(eResult::invalidConfigurationFile, "rulesIsolatedCP." + item.key() + " must be an array");
+		}
+		if (item.key() == "dstPrefixes")
+		{
+			loadConfig_prefixes_isolated_cp(baseNext, item.value());
+			continue;
+		}
+		for (const auto& dscp : item.value())
+		{
+			if (!dscp.is_number_integer() || dscp < 0 || dscp > 63)
+			{
+				throw error_result_t(eResult::invalidConfigurationFile, "rulesIsolatedCP.dscp values must be integers from 0 to 63");
+			}
+			baseNext.dscp_isolated_cp.emplace(dscp.get<uint8_t>());
+		}
 	}
 }

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <rte_flow.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
@@ -26,6 +27,7 @@ public:
 	using cDataPlane::config;
 	using cDataPlane::parseJsonPorts;
 	using cDataPlane::ports;
+	using cDataPlane::rte_flow_storage;
 };
 
 struct FlowRule
@@ -57,6 +59,7 @@ int failing_rule = -1;
 bool fail_destroy = false;
 const char* driver_name = "mlx5_pci";
 bool supports_eth_vlan = true;
+constexpr uint32_t max_priority = 1;
 int validation_error = ENOTSUP;
 rte_flow_error_type validation_error_type = RTE_FLOW_ERROR_TYPE_ITEM;
 bool validation_item_cause = true;
@@ -113,11 +116,17 @@ extern "C" int __wrap_rte_eth_dev_info_get(uint16_t, rte_eth_dev_info* info)
 }
 
 extern "C" int __wrap_rte_flow_validate(uint16_t,
-                                        const rte_flow_attr*,
+                                        const rte_flow_attr* attr,
                                         const rte_flow_item* pattern,
                                         const rte_flow_action*,
                                         rte_flow_error* error)
 {
+	if (attr->priority > max_priority)
+	{
+		error->type = RTE_FLOW_ERROR_TYPE_ATTR_PRIORITY;
+		error->message = "priority out of range";
+		return -ENOTSUP;
+	}
 	if (pattern[0].type == RTE_FLOW_ITEM_TYPE_ETH && pattern[0].mask &&
 	    static_cast<const rte_flow_item_eth*>(pattern[0].mask)->has_vlan && !supports_eth_vlan)
 	{
@@ -182,8 +191,13 @@ extern "C" rte_flow* __wrap_rte_flow_create(uint16_t port,
 		EXPECT_EQ(nullptr, pattern[1].mask);
 		rule.rss_queues.assign(rss.queue, rss.queue + rss.queue_num);
 	}
-	if (!supports_eth_vlan && rule.type == RTE_FLOW_ITEM_TYPE_VLAN &&
-	    !(rule.vlan_spec.hdr.vlan_tci & rule.vlan_mask.hdr.vlan_tci))
+	if (attr->priority > max_priority)
+	{
+		error->type = RTE_FLOW_ERROR_TYPE_ATTR_PRIORITY;
+		error->message = "priority out of range";
+	}
+	else if (!supports_eth_vlan && rule.type == RTE_FLOW_ITEM_TYPE_VLAN &&
+	         !(rule.vlan_spec.hdr.vlan_tci & rule.vlan_mask.hdr.vlan_tci))
 	{
 		error->type = RTE_FLOW_ERROR_TYPE_ITEM_SPEC;
 		error->cause = pattern[1].spec;
@@ -256,6 +270,138 @@ TEST_F(RteFlowTest, IPv4PrefixMatchesOnlyDestination)
 	EXPECT_EQ(7u, rules[0].queue);
 }
 
+TEST_F(RteFlowTest, DscpMatchesBothIpVersionsIgnoringEcnAndFlowLabel)
+{
+	for (const auto& [dscp, ipv4_tos, ipv6_tc] : {
+	             std::tuple<uint8_t, uint8_t, uint32_t>{0, 0x00, 0x00000000},
+	             {48, 0xc0, 0x0c000000},
+	             {63, 0xfc, 0x0fc00000},
+	     })
+	{
+		SCOPED_TRACE(dscp);
+		rules.clear();
+		ASSERT_TRUE(storage.UpdateDscp({dscp}));
+		ASSERT_EQ(2u, rules.size());
+		EXPECT_EQ(RTE_FLOW_ITEM_TYPE_IPV4, rules[0].type);
+		EXPECT_EQ(RTE_FLOW_ITEM_TYPE_IPV6, rules[1].type);
+		rte_flow_item_ipv4 ipv4_spec{};
+		rte_flow_item_ipv4 ipv4_mask{};
+		ipv4_spec.hdr.type_of_service = ipv4_tos;
+		ipv4_mask.hdr.type_of_service = 0xfc;
+		ExpectItem(rules[0].ipv4_spec, ipv4_spec);
+		ExpectItem(rules[0].ipv4_mask, ipv4_mask);
+		rte_flow_item_ipv6 ipv6_spec{};
+		rte_flow_item_ipv6 ipv6_mask{};
+		ipv6_spec.hdr.vtc_flow = rte_cpu_to_be_32(ipv6_tc);
+		ipv6_mask.hdr.vtc_flow = rte_cpu_to_be_32(0x0fc00000);
+		ExpectItem(rules[1].ipv6_spec, ipv6_spec);
+		ExpectItem(rules[1].ipv6_mask, ipv6_mask);
+		for (const auto& rule : rules)
+		{
+			EXPECT_EQ(2u, rule.port);
+			EXPECT_EQ(RTE_FLOW_ACTION_TYPE_QUEUE, rule.action);
+			EXPECT_EQ(7u, rule.queue);
+		}
+	}
+}
+
+TEST_F(RteFlowTest, PrefixAndDscpRulesSharePriorityAndPrecedeForwarding)
+{
+	ASSERT_TRUE(CreateFlowsForIsolatedPort(2, 8, 7, RTE_ETH_RSS_IP));
+	const auto forwarding = rules.back();
+	rules.clear();
+	storage.UpdatePrefixes(prefixes);
+	ASSERT_TRUE(storage.UpdateDscp({48}));
+	ASSERT_EQ(3u, rules.size());
+	for (const auto& rule : rules)
+	{
+		EXPECT_EQ(0u, rule.priority);
+		EXPECT_LT(rule.priority, forwarding.priority);
+		EXPECT_EQ(7u, rule.queue);
+	}
+	EXPECT_EQ(1u, forwarding.priority);
+	EXPECT_EQ((std::vector<uint16_t>{0, 1, 2, 3, 4, 5, 6}), forwarding.rss_queues);
+}
+
+TEST_F(RteFlowTest, DscpUpdatesKeepUnchangedFlowsAndClearOnlyDscpRules)
+{
+	storage.UpdatePrefixes(prefixes);
+	ASSERT_TRUE(storage.UpdateDscp({0, 48, 63}));
+	ASSERT_EQ(7u, rules.size());
+	ASSERT_TRUE(storage.UpdateDscp({0, 48, 63}));
+	EXPECT_EQ(7u, rules.size());
+	ASSERT_TRUE(storage.UpdateDscp({48}));
+	EXPECT_EQ(4u, destroyed.size());
+	ASSERT_TRUE(storage.UpdateDscp({}));
+	EXPECT_EQ(6u, destroyed.size());
+	EXPECT_EQ(destroyed.end(), std::find(destroyed.begin(), destroyed.end(), std::make_pair(uint16_t{2}, rules[0].handle)));
+	ASSERT_TRUE(storage.UpdateDscp({}));
+	EXPECT_EQ(6u, destroyed.size());
+}
+
+TEST_F(RteFlowTest, DscpCreationFailureKeepsOldRulesAndRetriesMissingFamily)
+{
+	ASSERT_TRUE(storage.UpdateDscp({48}));
+	failing_rule = 3;
+	EXPECT_FALSE(storage.UpdateDscp({56}));
+	ASSERT_EQ(4u, rules.size());
+	EXPECT_TRUE(destroyed.empty());
+	failing_rule = -1;
+	ASSERT_TRUE(storage.UpdateDscp({56}));
+	ASSERT_EQ(5u, rules.size());
+	EXPECT_EQ(RTE_FLOW_ITEM_TYPE_IPV6, rules.back().type);
+	EXPECT_EQ((std::vector<std::pair<uint16_t, rte_flow*>>{{2, rules[0].handle}, {2, rules[1].handle}}), destroyed);
+}
+
+TEST_F(RteFlowTest, DscpDestructionFailureRetainsHandlesForRetry)
+{
+	ASSERT_TRUE(storage.UpdateDscp({48}));
+	fail_destroy = true;
+	EXPECT_FALSE(storage.UpdateDscp({}));
+	ASSERT_TRUE(storage.UpdateDscp({48}));
+	EXPECT_EQ(2u, rules.size());
+	fail_destroy = false;
+	ASSERT_TRUE(storage.UpdateDscp({}));
+	EXPECT_EQ((std::vector<std::pair<uint16_t, rte_flow*>>{{2, rules[0].handle}, {2, rules[1].handle}, {2, rules[0].handle}, {2, rules[1].handle}}), destroyed);
+}
+
+TEST_F(RteFlowTest, DscpUpdateCreatesRulesForNewlyRegisteredPorts)
+{
+	ASSERT_TRUE(storage.UpdateDscp({48}));
+	storage.AddPortAndQueue(3, 4);
+	ASSERT_TRUE(storage.UpdateDscp({48}));
+	ASSERT_EQ(4u, rules.size());
+	for (size_t i = 2; i < rules.size(); ++i)
+	{
+		EXPECT_EQ(3u, rules[i].port);
+		EXPECT_EQ(4u, rules[i].queue);
+	}
+}
+
+TEST_F(RteFlowTest, DscpRejectsInvalidValuesAndMissingIsolatedPorts)
+{
+	EXPECT_FALSE(storage.UpdateDscp({48, 64}));
+	EXPECT_TRUE(rules.empty());
+	RteFlowStorage unconfigured;
+	EXPECT_FALSE(unconfigured.UpdateDscp({48}));
+	EXPECT_TRUE(unconfigured.UpdateDscp({}));
+	EXPECT_TRUE(rules.empty());
+}
+
+TEST_F(RteFlowTest, DscpRequestFailureDoesNotPreventRetry)
+{
+	IsolationDataPlane dataplane;
+	dataplane.rte_flow_storage.AddPortAndQueue(2, 7);
+	cControlPlane controlplane(&dataplane);
+	failing_port = 2;
+	EXPECT_EQ(eResult::invalidFlow, controlplane.update_dscp_isolated_cp({48}));
+	failing_port = -1;
+	EXPECT_EQ(eResult::success, controlplane.update_dscp_isolated_cp({48}));
+	EXPECT_TRUE(controlplane.getErrors().empty());
+	ASSERT_EQ(3u, rules.size());
+	EXPECT_EQ(RTE_FLOW_ITEM_TYPE_IPV6, rules.back().type);
+}
+
 TEST_F(RteFlowTest, StaticRulesPreserveTrafficSelectionAndRssQueues)
 {
 	ASSERT_TRUE(CreateFlowsForIsolatedPort(2, 4, 1, RTE_ETH_RSS_IP));
@@ -314,6 +460,18 @@ TEST_F(RteFlowTest, Mlx5VerbsUsesEthernetArpRuleForTaggedTraffic)
 		EXPECT_EQ(1u, rules[1].queue);
 		EXPECT_EQ((std::vector<uint16_t>{0, 2, 3}), rules.back().rss_queues);
 	}
+}
+
+TEST_F(RteFlowTest, StartupSupportsDscpWithTwoPriorities)
+{
+	IsolationDataPlane dataplane;
+	dataplane.config.workers_isolated_cp = {2};
+	ASSERT_EQ(dataplane.parseJsonPorts({{{"interfaceName", "test"}, {"pci", "test"}, {"coreIds", {4, 6}}}}), eResult::success);
+	dataplane.ports[7] = {"test", {{2, 0}, {4, 1}, {6, 2}}, 3, {}, "test", false};
+	dataplane.StartIsolatedControlPlane();
+	cControlPlane controlplane(&dataplane);
+	EXPECT_EQ(eResult::success, controlplane.update_dscp_isolated_cp({48}));
+	EXPECT_EQ(eResult::success, controlplane.update_dscp_isolated_cp({}));
 }
 
 TEST_F(RteFlowTest, OtherDriversStillRequireTaggedArpRule)

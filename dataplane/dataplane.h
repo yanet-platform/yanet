@@ -104,6 +104,7 @@ public:
 	void switch_worker_base();
 	void StartIsolatedControlPlane();
 	void update_prefixes_isolated_cp(const std::set<common::ip_prefix_t>& prefixes);
+	[[nodiscard]] bool update_dscp_isolated_cp(const std::set<uint8_t>& dscp);
 
 	inline uint32_t get_current_time() const
 	{

@@ -38,6 +38,11 @@ public:
 		return get<common::idp::requestType::updateGlobalBaseBalancer, common::idp::updateGlobalBaseBalancer::response>(request);
 	}
 
+	eResult update_dscp_isolated_cp(const common::idp::update_dscp_isolated_cp::request& request) const
+	{
+		return get<common::idp::requestType::update_dscp_isolated_cp, common::idp::update_dscp_isolated_cp::response>(request);
+	}
+
 	common::idp::lpm4LookupAddress::response lpm4LookupAddress(const common::idp::lpm4LookupAddress::request& request) const
 	{
 		return get<common::idp::requestType::lpm4LookupAddress, common::idp::lpm4LookupAddress::response>(request);

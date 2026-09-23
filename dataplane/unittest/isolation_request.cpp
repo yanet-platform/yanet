@@ -24,4 +24,19 @@ TEST(IsolationRequest, PrefixesRoundTrip)
 	EXPECT_EQ(std::get<common::idp::updateGlobalBase::update_prefixes_isolated_cp::request>(std::get<1>(decoded.front())), prefixes);
 }
 
+TEST(IsolationRequest, DscpRoundTrip)
+{
+	for (const auto& dscp : {std::set<uint8_t>{0, 48, 63}, std::set<uint8_t>{}})
+	{
+		const common::idp::request request = {common::idp::requestType::update_dscp_isolated_cp, dscp};
+		common::stream_out_t output;
+		output.push(request);
+		common::stream_in_t input(output.getBuffer());
+		common::idp::request decoded;
+		input.pop(decoded);
+		ASSERT_FALSE(input.isFailed());
+		EXPECT_EQ(std::get<0>(decoded), common::idp::requestType::update_dscp_isolated_cp);
+		EXPECT_EQ(std::get<common::idp::update_dscp_isolated_cp::request>(std::get<1>(decoded)), dscp);
+	}
+}
 }

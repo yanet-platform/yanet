@@ -476,6 +476,7 @@ public:
 	bool storeSamples;
 	uint32_t serial;
 	std::set<common::ip_prefix_t> prefixes_isolated_cp;
+	std::set<uint8_t> dscp_isolated_cp;
 
 	std::map<std::string, common::uint64> variables;
 	std::map<std::string, ///< vrf
