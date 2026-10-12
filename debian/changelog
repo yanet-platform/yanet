@@ -1,3 +1,180 @@
+yanet (64.1-22) UNRELEASED; urgency=medium
+
+  * Raise DPDK's per-memseg-list capacity to 64 GiB for large balancer
+    allocations.
+  * Fix counter allocator block-list links and reuse of allocation bitmaps;
+    log reservation failures and add regression tests.
+  * Add dedicated controlplane receive workers with destination-prefix and
+    DSCP steering, configuration validation, documentation, and tests.
+  * Correct isolation flow setup for VLAN ARP and mlx5 Verbs, respect RSS
+    settings, and exclude firewall-sync packets from receive counters.
+  * Include error text alongside configuration-loading result codes.
+  * Extend neighbor unit tests and correct existing expectations.
+
+ -- Andrey Kiselev <kiselevandrew@yandex.ru>  Mon, 12 Oct 2026 18:23:55 +0300
+
+yanet (64.1-21) UNRELEASED; urgency=medium
+
+  * Set kernel interface MAC addresses from the corresponding DPDK ports
+    during setup and check failures when reading port MAC addresses.
+  * Release libnl neighbor objects after dump and monitor processing to fix
+    memory leaks.
+
+ -- Andrey Kiselev <kiselevandrew@yandex.ru>  Thu, 30 Jul 2026 12:51:31 +0300
+
+yanet (64.1-20) UNRELEASED; urgency=medium
+
+  * Add the last_update column to yanet-cli neighbor show and extend its
+    response format; timestamps remain unset.
+
+ -- Andrey Kiselev <kiselevandrew@yandex.ru>  Fri, 20 Mar 2026 15:59:06 +0300
+
+yanet (64.1-19) UNRELEASED; urgency=medium
+
+  * Refresh cached neighbors using the next interface generation before
+    switching global configuration, and improve resolution error messages.
+
+ -- Andrey Kiselev <kiselevandrew@yandex.ru>  Mon, 16 Mar 2026 12:50:51 +0300
+
+yanet (64.1-18) UNRELEASED; urgency=medium
+
+  * Preserve neighbor mappings across configuration reloads using interface
+    names and add yanet-cli neighbor show cache.
+  * Fix IPv4 neighbor resolution, adapt neighbor CLI table output, and fix
+    compilation issues after backporting.
+
+ -- Alexandr Stepanov <stal76@yandex.ru>  Wed, 04 Feb 2026 15:16:29 +0300
+
+yanet (64.1-17) UNRELEASED; urgency=medium
+
+  * Deduplicate kernel neighbor requests and stop flushing the whole table
+    for each change; expose the interface_neighbor_requests counter.
+  * Add configurable netlink receive buffers and restart monitoring after
+    errors.
+  * Fix neighbor generation updates and stale interface data; defer neighbor
+    deletion and optionally resolve removed entries.
+  * Extend neighbor CLI and statistics reporting and tests, and fix backport
+    integration and formatting.
+
+ -- Andrey Kiselev <kiselevandrew@yandex.ru>  Tue, 09 Dec 2025 19:24:55 +0300
+
+yanet (64.1-16) UNRELEASED; urgency=medium
+
+  * Package a systemd service for yanet-logger.
+  * Update yanet-announcer image builds and include them in the release
+    workflow.
+  * Adjust route-tunnel ECMP and weight-table limits together, and update
+    weighted ECMP autotests.
+
+ -- Andrey Kiselev <kiselevandrew@yandex.ru>  Thu, 27 Nov 2025 19:08:25 +0300
+
+yanet (64.1-15) UNRELEASED; urgency=medium
+
+  * Fix free-group bitmap updates in the counter segment allocator and add
+    invariant checks and allocation/free regression tests.
+
+ -- Georgy Kirichenko <g-e-o-r-g-y@yandex-team.ru>  Tue, 18 Nov 2025 14:06:49 +0300
+
+yanet (64.1-14) UNRELEASED; urgency=medium
+
+  * Increase ECMP group, route-tunnel ECMP, and balancer weight-table limits.
+
+ -- Georgy Kirichenko <g-e-o-r-g-y@yandex-team.ru>  Tue, 18 Nov 2025 12:36:44 +0300
+
+yanet (64.1-12) UNRELEASED; urgency=medium
+
+  * Use libnl for neighbor configuration and netlink monitoring, and add
+    neighbor unit tests and the required build dependency.
+
+ -- Georgy Kirichenko <g-e-o-r-g-y@yandex-team.ru>  Tue, 09 Sep 2025 15:45:53 +0300
+
+yanet (64.1-11) UNRELEASED; urgency=medium
+
+  * Add configurable DSCP marking for IPv4 and IPv6 balancer tunnel headers,
+    with never, onlyDefault, and always modes and packet autotests.
+
+ -- Georgy Kirichenko <g-e-o-r-g-y@yandex-team.ru>  Tue, 12 Aug 2025 15:07:40 +0300
+
+yanet (64.1-10) UNRELEASED; urgency=medium
+
+  * Fix worker initialization and NUMA iteration when active workers occupy
+    only one NUMA node with a nonzero ID.
+  * Fix perfect forwarding of memory-manager arguments.
+  * Split and modernize the dynamic ACL hashtable implementation, and
+    allocate its storage in chunks instead of one large contiguous block.
+
+ -- GeorgyKirichenko <kirichenkoga@gmail.com>  Thu, 07 Aug 2025 15:53:13 +0300
+
+yanet (64.1-9) UNRELEASED; urgency=medium
+
+  * Optimize counter allocation with a segment allocator, add unit tests and
+    yanet-cli counters stat, and double the ACL counter limit.
+  * Improve IPv4 and IPv6 route LPM reallocation and add memory-manager
+    smart-pointer support, with related code cleanup.
+  * Fail interface initialization when interfacesRequired is enabled and
+    no configured interface is available.
+  * Refactor DPDK EAL argument construction to use managed buffers and a
+    128-bit core mask, and improve initialization error messages.
+
+ -- Georgy Kirichenko <g-e-o-r-g-y@yandex-team.ru>  Thu, 31 Jul 2025 16:45:53 +0300
+
+yanet (64.1-8) UNRELEASED; urgency=medium
+
+  * Pass ref-derived version components to release image builds, validate
+    three-component version refs, and default missing components to zero.
+  * Normalize release workflow variable formatting.
+
+ -- Georgy Kirichenko <g-e-o-r-g-y@yandex-team.ru>  Wed, 02 Apr 2025 18:18:13 +0300
+
+yanet (64.1-7) UNRELEASED; urgency=medium
+
+  * Enable compiler debug information, including in release builds.
+
+ -- Georgy Kirichenko <g-e-o-r-g-y@yandex-team.ru>  Tue, 01 Apr 2025 08:55:36 +0300
+
+yanet (64.1-6) UNRELEASED; urgency=medium
+
+  * Include yanet-logger in yanet-utils and the runtime image.
+  * Update package and runtime image build defaults to Ubuntu 24.04, allow
+    selecting the build platform, and adapt Meson installation for PEP 668.
+
+ -- Georgy Kirichenko <g-e-o-r-g-y@yandex-team.ru>  Mon, 31 Mar 2025 12:15:38 +0300
+
+yanet (64.1-5) UNRELEASED; urgency=medium
+
+  * Introduce NDArray storage for ACL network and transport tables and add
+    unit tests, replacing the old table implementation.
+  * Add emhash and ankerl flat-container dependencies and an optional custom
+    hash-structure build setting; use flat maps and sets across ACL tables.
+  * Reduce ACL compilation memory use and unnecessary work by removing
+    unused fields, duplicate group mappings, temporary bitmasks, and set
+    copies, and simplifying layer and variation storage.
+  * Consolidate ACL container helpers, update debug group counting and test
+    dependencies, document optimization and threading concerns, and clean
+    up formatting.
+  * Update the Docker image workflow.
+
+ -- Georgy Kirichenko <kirichenkoga@gmail.com>  Wed, 12 Mar 2025 18:11:39 +0300
+
+yanet (64.1-4) UNRELEASED; urgency=medium
+
+  * Add route and route-tunnel counter queries and centralize the default
+    BGP autonomous-system constant.
+  * Implement IP-in-IP route tunnels, including IPv6-in-IPv6 encapsulation
+    and correct handling of locally destined packets.
+  * Allow static route-tunnel configuration, local-prefix routing without
+    encapsulation, and random_source tunnel addressing; extend autotests.
+  * Refactor route types and formatting, export release version variables,
+    and update the Docker image workflow.
+
+ -- Georgy Kirichenko <kirichenkoga@gmail.com>  Wed, 12 Mar 2025 15:47:39 +0300
+
+yanet (64.1-1) UNRELEASED; urgency=medium
+
+  * Export aggregate ingress and egress ACL drop counters in Telegraf output.
+
+ -- Georgy Kirichenko <kirichenkoga@gmail.com>  Tue, 10 Sep 2024 21:14:27 +0300
+
 yanet (64.0-0) UNRELEASED; urgency=medium
 
   * Initial support for deb packages build
