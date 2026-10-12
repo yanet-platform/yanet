@@ -198,6 +198,11 @@ public:
 		else
 		{
 			const auto counter_id = manager->counter_reserve(size_T);
+			if (counter_id == 0)
+			{
+				YANET_LOG_ERROR("failed to reserve %zu counters; using fallback counters; check 'yanet-cli counters stat'\n",
+				                size_T);
+			}
 
 			counters.emplace_hint(counters_it,
 			                      key,

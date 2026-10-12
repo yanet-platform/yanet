@@ -1,4 +1,7 @@
+#include <algorithm>
+#include <array>
 #include <gtest/gtest.h>
+#include <utility>
 #include <vector>
 
 #include "common/type.h"
@@ -173,6 +176,99 @@ TEST(SegmentAllocator, Simple)
 	EXPECT_EQ(allocator.GetErrors(), no_errors);
 }
 
+TEST(SegmentAllocator, ReuseFreedNonHeadBlock)
+{
+	Allocator allocator;
+	constexpr uint16_t segment_size = 60;
+	constexpr uint16_t other_segment_size = 27;
+	std::array<uint32_t, 5> segments;
+	for (auto& segment : segments)
+	{
+		segment = allocator.Allocate(segment_size);
+		ASSERT_NE(segment, error_result);
+	}
+
+	ASSERT_TRUE(allocator.Free(segments[0], segment_size));
+	ASSERT_TRUE(allocator.Free(segments[2], segment_size));
+	ASSERT_TRUE(allocator.Free(segments[1], segment_size));
+
+	ASSERT_EQ(allocator.Allocate(segment_size), segments[2]);
+	ASSERT_EQ(allocator.Allocate(segment_size), segments[0]);
+	EXPECT_EQ(allocator.Allocate(other_segment_size), error_result);
+}
+
+TEST(SegmentAllocator, AllocateAfterFreedNonHeadBlockChangesSize)
+{
+	Allocator allocator;
+	constexpr uint16_t segment_size = 60;
+	constexpr uint16_t other_segment_size = 27;
+	std::array<uint32_t, 5> segments;
+	for (auto& segment : segments)
+	{
+		segment = allocator.Allocate(segment_size);
+		ASSERT_NE(segment, error_result);
+	}
+
+	ASSERT_TRUE(allocator.Free(segments[0], segment_size));
+	ASSERT_TRUE(allocator.Free(segments[2], segment_size));
+	ASSERT_TRUE(allocator.Free(segments[1], segment_size));
+
+	for (uint32_t index = 0; index < 4; index++)
+	{
+		ASSERT_NE(allocator.Allocate(other_segment_size), error_result);
+	}
+	ASSERT_EQ(allocator.Allocate(segment_size), segments[2]);
+	ASSERT_TRUE(allocator.Free(segments[4], segment_size));
+	EXPECT_EQ(allocator.Allocate(segment_size), segments[4]);
+}
+
+TEST(SegmentAllocator, ListIntegrityAcrossSizes)
+{
+	constexpr uint32_t block_size = 64;
+	constexpr uint32_t block_count = 4;
+	constexpr uint16_t segment_size = 4;
+	constexpr uint16_t other_segment_size = 2;
+	using SmallAllocator = SegmentAllocator<block_size, (block_count + 1) * block_size, block_size, segment_size, error_result>;
+	SmallAllocator allocator;
+
+	std::array<uint32_t, block_size / segment_size> first_block;
+	for (auto& segment : first_block)
+	{
+		segment = allocator.Allocate(segment_size);
+		ASSERT_NE(segment, error_result);
+	}
+	const auto second_block_segment = allocator.Allocate(segment_size);
+	ASSERT_NE(second_block_segment, error_result);
+
+	ASSERT_TRUE(allocator.Free(first_block.front(), segment_size));
+	ASSERT_TRUE(allocator.Free(second_block_segment, segment_size));
+	first_block.front() = allocator.Allocate(segment_size);
+	ASSERT_NE(first_block.front(), error_result);
+
+	std::vector<std::pair<uint32_t, uint16_t>> live_segments;
+	for (const auto segment : first_block)
+	{
+		live_segments.emplace_back(segment, segment_size);
+	}
+	for (size_t index = 0; index < first_block.size(); index++)
+	{
+		for (const auto size : {other_segment_size, segment_size})
+		{
+			const auto segment = allocator.Allocate(size);
+			ASSERT_NE(segment, error_result);
+			live_segments.emplace_back(segment, size);
+		}
+	}
+
+	EXPECT_EQ(allocator.GetErrors(), Errors(0, 0));
+	std::sort(live_segments.begin(), live_segments.end());
+	for (size_t index = 1; index < live_segments.size(); index++)
+	{
+		const auto& [start, size] = live_segments[index - 1];
+		ASSERT_LE(start + size, live_segments[index].first);
+	}
+}
+
 TEST(SegmentAllocator, BigSize)
 {
 	static constexpr uint32_t index_begin = 128;
@@ -284,6 +380,33 @@ TEST(SegmentAllocator, Block)
 	EXPECT_TRUE(TestBlockSegmentAllocator(4, 10, 500));
 	EXPECT_TRUE(TestBlockSegmentAllocator(6, 10, 500));
 	EXPECT_TRUE(TestBlockSegmentAllocator(37, 10, 100));
+}
+
+TEST(SegmentAllocator, SetSizeClearsStaleBitmaps)
+{
+	Allocator::OneBlock block;
+	block.Initialize(0, 0);
+	block.SetSize(4);
+
+	// Synthetic stale state: tests the defensive SetSize postcondition,
+	// not a state reachable after correctly freeing every live segment.
+	block.group_mask = ~uint64_t{0};
+	for (auto& mask : block.masks)
+	{
+		mask = ~uint64_t{0};
+	}
+	block.SetSize(2);
+
+	EXPECT_EQ(block.one_segment_size, 2);
+	EXPECT_EQ(block.total_segments, block.block_size / 2);
+	EXPECT_EQ(block.free_segments, block.total_segments);
+	EXPECT_EQ(block.group_mask, 0u);
+	for (const auto mask : block.masks)
+	{
+		EXPECT_EQ(mask, 0u);
+	}
+	EXPECT_TRUE(block.CheckInvariants());
+	EXPECT_EQ(block.Allocate(), 0u);
 }
 
 struct TestOneSizeInfo
@@ -434,6 +557,99 @@ TEST(SegmentAllocator, AddAndHalfDelete)
 		EXPECT_EQ(allocator.GetErrors(), Errors(0, 0));
 	}
 	EXPECT_EQ(allocator.GetErrors(), Errors(0, 0));
+}
+
+namespace
+{
+
+template<typename Vec>
+bool any_overlap(const Vec& slots)
+{
+	for (size_t i = 0; i < slots.size(); ++i)
+	{
+		const auto [a_off, a_sz] = slots[i];
+		for (size_t j = i + 1; j < slots.size(); ++j)
+		{
+			const auto [b_off, b_sz] = slots[j];
+			if (a_off + a_sz <= b_off)
+				continue;
+			if (b_off + b_sz <= a_off)
+				continue;
+			return true;
+		}
+	}
+	return false;
+}
+
+} // namespace
+
+// Regression: InsertToList used to leave the old head with previous=null_block_,
+// so RemoveFromList of a non-head block could not unlink it from its predecessor.
+// A block then ended up reachable from two free-lists simultaneously, the
+// allocator handed out overlapping byte ranges. This exercises public allocator
+// operations, separately from the defensive SetSize bitmap postcondition test.
+TEST(SegmentAllocator, ListIntegrityAcrossSizesPairwise)
+{
+	// IndexBegin=64 keeps valid offsets >= 64 so they never collide with
+	// the ErrorResult==0 sentinel.
+	using Small = SegmentAllocator<64, 64 + 4 * 64, 64, 16, 0>;
+	Small a;
+
+	std::vector<std::pair<uint32_t, uint16_t>> live;
+	auto take = [&](uint16_t sz) {
+		uint32_t v = a.Allocate(sz);
+		if (v != 0u)
+			live.emplace_back(v, sz);
+		return v;
+	};
+	auto drop = [&](uint32_t off, uint16_t sz) {
+		EXPECT_TRUE(a.Free(off, sz));
+		live.erase(std::remove(live.begin(), live.end(), std::make_pair(off, sz)),
+		           live.end());
+	};
+
+	// Fill block 0 with size=4 → busy, removed from head[4].
+	std::vector<uint32_t> first_block;
+	for (int i = 0; i < 16; ++i)
+	{
+		uint32_t v = take(4);
+		ASSERT_NE(v, 0u);
+		first_block.push_back(v);
+	}
+
+	// Claim block 1 for size=4: it becomes the lone head of size=4.
+	uint32_t first_in_block1 = take(4);
+	ASSERT_NE(first_in_block1, 0u);
+
+	// Insert block 0 in front of block 1 at head[4]. Without the fix,
+	// block 1's previous pointer stays null_block_ instead of pointing
+	// back to block 0.
+	drop(first_block.front(), 4);
+
+	// Fully free block 1. RemoveFromList relies on block1.previous to
+	// disconnect it from block0.next; with the bug that link is broken,
+	// so block 0 keeps pointing at block 1 after this returns.
+	drop(first_in_block1, 4);
+
+	// Refill block 0 to busy. head[4] now advances to block 0's stale next
+	// pointer (== block 1), so block 1 is simultaneously reachable from
+	// head[4] and head[0].
+	ASSERT_NE(take(4), 0u);
+
+	// Allocate alternately as size=2 and size=4. The size=2 path claims
+	// block 1 from head[0] via SetSize(2), but the buggy state also has it
+	// on head[4], so both sizes draw from the same physical block under
+	// conflicting interpretations and produce overlapping byte ranges.
+	for (int i = 0; i < 16; ++i)
+	{
+		uint32_t v2 = take(2);
+		ASSERT_NE(v2, 0u);
+		uint32_t v4 = take(4);
+		ASSERT_NE(v4, 0u);
+	}
+
+	EXPECT_EQ(a.GetErrors(), Errors(0, 0));
+	EXPECT_FALSE(any_overlap(live));
 }
 
 int main(int argc, char** argv)

@@ -1,5 +1,5 @@
 dependencies = []
-dependencies += libdpdk.get_variable('dpdk_dep')
+dependencies += yanet_dpdk_dep
 dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')

@@ -54,6 +54,10 @@ if target_option.contains('librib')
     subdir_done()
 endif
 
+# Parent-build-only: 64 GiB allows the 60.5 GiB balancer allocation.
+dpdk_override_args = ['-include', meson.current_source_dir() / 'common/dpdk_config.h']
+add_global_arguments(dpdk_override_args, language: 'c')
+
 libdpdk = subproject('dpdk', default_options: [
     'platform=generic',
     'cpu_instruction_set=corei7',
@@ -62,6 +66,10 @@ libdpdk = subproject('dpdk', default_options: [
     'disable_libs=bitratestats,cfgfile,flow_classify,gpudev,gro,gso,kni,jobstats,latencystats,metrics,node,pdump,pipeline,port,power,table,vhost',
     'enable_driver_sdk=true', 'disable_drivers=net/mlx4',
     'default_library=static', 'tests=false' ] )
+
+yanet_dpdk_dep = declare_dependency(
+    dependencies: libdpdk.get_variable('dpdk_dep'),
+    compile_args: dpdk_override_args)
 
 libjson = subproject('json')
 
