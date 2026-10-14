@@ -10,8 +10,10 @@ yanet (64.1-22) UNRELEASED; urgency=medium
     settings, and exclude firewall-sync packets from receive counters.
   * Include error text alongside configuration-loading result codes.
   * Extend neighbor unit tests and correct existing expectations.
+  * Use xxHash32 and 32-entry buckets for balancer state; add regression
+    coverage.
 
- -- Andrey Kiselev <kiselevandrew@yandex.ru>  Mon, 12 Oct 2026 18:23:55 +0300
+ -- Andrey Kiselev <kiselevandrew@yandex.ru>  Wed, 14 Oct 2026 15:07:21 +0300
 
 yanet (64.1-21) UNRELEASED; urgency=medium
 
