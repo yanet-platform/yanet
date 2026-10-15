@@ -6,6 +6,7 @@
 #include "common/counters.h"
 #include "common/fallback.h"
 
+#include "balancer_gc.h"
 #include "dataplane.h"
 #include "worker.h"
 #include "worker_gc.h"
@@ -355,6 +356,12 @@ void worker_gc_t::handle_balancer_gc()
 
 	/// @todo: skip if balancer disabled
 
+	if (balancer_next_real_entry)
+	{
+		project_balancer_service_connections();
+		return;
+	}
+
 	for (auto iter : globalbase_atomic->updater.balancer_state.gc(globalbase_atomic->balancer_state_gc.offset, gc_step))
 	{
 		if (iter.is_valid())
@@ -364,27 +371,6 @@ void worker_gc_t::handle_balancer_gc()
 			iter.unlock();
 
 			globalbase_atomic->balancer_state_gc.valid_keys++;
-
-			/// balancer service connections
-			{
-				common::idp::balancer_service_connections::service_key_t key;
-				auto& [balancer_id, virtual_ip, proto, virtual_port] = key;
-
-				balancer_id = iter.key()->balancer_id;
-				proto = iter.key()->protocol;
-				virtual_port = rte_be_to_cpu_16(iter.key()->port_destination);
-
-				if (iter.key()->addr_type == 4)
-				{
-					virtual_ip = common::ipv4_address_t(rte_be_to_cpu_32(iter.key()->ip_destination.mapped_ipv4_address.address));
-				}
-				else
-				{
-					virtual_ip = common::ipv6_address_t(iter.key()->ip_destination.bytes);
-				}
-
-				++balancer_service_connections.next()[key];
-			}
 
 			/// balancer real connections
 			{
@@ -494,11 +480,28 @@ void worker_gc_t::handle_balancer_gc()
 
 	if (globalbase_atomic->balancer_state_gc.offset == 0)
 	{
-		balancer_service_connections.switch_generation();
-		balancer_real_connections.switch_generation();
-		balancer_state_stats.switch_generation();
-		globalbase_atomic->balancer_state_gc.iterations++;
+		// Freeze the collected real snapshot while bounded projection finishes.
+		balancer_next_real_entry = balancer_real_connections.next().cbegin();
+		project_balancer_service_connections();
 	}
+}
+
+void worker_gc_t::project_balancer_service_connections()
+{
+	const auto& reals = balancer_real_connections.next();
+	balancer_next_real_entry = dataplane::balancer_gc::accumulate_service_counts(
+	        *balancer_next_real_entry, reals.cend(), balancer_service_connections.next(), balancer_projection_budget);
+	if (*balancer_next_real_entry != reals.cend())
+	{
+		return;
+	}
+
+	// Reset before switching generations invalidates the saved iterator.
+	balancer_next_real_entry.reset();
+	balancer_service_connections.switch_generation();
+	balancer_real_connections.switch_generation();
+	balancer_state_stats.switch_generation();
+	base_permanently.globalBaseAtomic->balancer_state_gc.iterations++;
 }
 
 void worker_gc_t::handle_acl_gc()
