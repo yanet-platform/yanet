@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mutex>
+#include <optional>
 #include <queue>
 
 #include "base.h"
@@ -33,6 +34,7 @@ protected:
 	void handle();
 	void handle_nat64stateful_gc();
 	void handle_balancer_gc();
+	void project_balancer_service_connections();
 	void handle_acl_gc();
 	void handle_acl_sync();
 	void handle_callbacks();
@@ -103,4 +105,10 @@ public:
 	dataplane::hashtable_gc_t fw6_state_gc;
 	uint32_t gc_step;
 	uint32_t sample_gc_step;
+
+	static constexpr uint32_t balancer_projection_budget = 32;
+
+protected:
+	// GC-owned; engaged only while projecting the frozen real-connections next generation.
+	std::optional<common::idp::balancer_real_connections::connections::const_iterator> balancer_next_real_entry{};
 };
