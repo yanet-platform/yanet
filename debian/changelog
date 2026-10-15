@@ -1,3 +1,12 @@
+yanet (64.1-23) UNRELEASED; urgency=medium
+
+  * Use xxHash32 and 32-entry buckets for balancer state; add regression
+    coverage.
+  * Fix release workflow branch filtering, duplicate step IDs, and
+    yanet-announcer image metadata.
+
+ -- Andrey Kiselev <kiselevandrew@yandex.ru>  Thu, 15 Oct 2026 15:10:54 +0300
+
 yanet (64.1-22) UNRELEASED; urgency=medium
 
   * Raise DPDK's per-memseg-list capacity to 64 GiB for large balancer
