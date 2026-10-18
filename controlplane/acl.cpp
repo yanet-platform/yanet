@@ -2,7 +2,6 @@
 #include <netdb.h>
 
 #include <array>
-#include <list>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -25,6 +24,7 @@
 #include "acl.h"
 #include "acl/bitset.h"
 #include "acl/dict.h"
+#include "acl/dispatcher.h"
 #include "acl/network.h"
 #include "acl/rule.h"
 #include "acl_compiler.h"
@@ -36,10 +36,16 @@ namespace acl
 
 struct dispatcher_rules_t
 {
-	std::list<rule_t> rules;
+	std::vector<rule_t> rules;
+	const dispatcher_index_t index;
 
-	dispatcher_rules_t(const controlplane::base::acl_t& acl)
+	dispatcher_rules_t(const controlplane::base::acl_t& acl) :
+	        rules(make_rules(acl)),
+	        index(rules) {}
+
+	static std::vector<rule_t> make_rules(const controlplane::base::acl_t& acl)
 	{
+		std::vector<rule_t> rules;
 		ref_t<filter_id_t> dir_in = new filter_id_t(0);
 
 		for (const auto& item : acl.nextModuleRules)
@@ -174,6 +180,7 @@ struct dispatcher_rules_t
 			flow.type = common::globalBase::eFlowType::logicalPort_egress;
 			rules.emplace_back(new filter_t(nullptr, nullptr, nullptr, nullptr, nullptr, dir_out, nullptr), flow, ids_t(), false);
 		}
+		return rules;
 	}
 };
 
@@ -353,23 +360,19 @@ struct firewall_rules_t
 
 static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher, const ref_t<filter_t>& filter, const std::string& iface, ids_t& ids, std::vector<rule_t>& rules, bool log);
 static bool unwind(int64_t start_from, firewall_rules_t& fw, const dispatcher_rules_t& dispatcher, const ref_t<filter_t>& filter, const std::string& iface, ids_t& ids, std::vector<rule_t>& rules, bool log, size_t recursion_limit);
-std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::base::acl_t>& acls,
-                                      const iface_map_t& iface_map,
-                                      ref_t<filter_t> filter,
-                                      result_t& result);
 std::vector<rule_t> unwind_rules(firewall_rules_t& fw, const dispatcher_rules_t& dispatcher, const ref_t<filter_t>& filter, const std::string& iface);
 
 static inline auto skip_rule(const rule_t& rule,
                              const ref_t<filter_t>& filter,
                              const std::string& iface)
 {
-	// skip rules that don't match given filter
-	if (filter && rule.filter && !compatible(filter, rule.filter))
+	// skip rules whose via-interfaces do not match given iface
+	if (!rule.via.empty() && rule.via.find(iface) == rule.via.end())
 	{
 		return true;
 	}
-	// skip rules whose via-interfaces do not match given iface
-	if (!rule.via.empty() && rule.via.find(iface) == rule.via.end())
+	// skip rules that don't match given filter
+	if (!compatible(filter, rule.filter))
 	{
 		return true;
 	}
@@ -399,8 +402,11 @@ static bool unwind_dispatcher(const dispatcher_rules_t& dispatcher,
                               bool log)
 {
 	auto idSize = ids.size();
-	for (const auto& rule : dispatcher.rules)
+	const auto candidates = dispatcher.index.candidates(filter);
+	const auto count = candidates ? candidates->size() : dispatcher.rules.size();
+	for (size_t i = 0; i < count; ++i)
 	{
+		const auto& rule = dispatcher.rules[candidates ? (*candidates)[i] : i];
 		ACL_DBGMSG("checking rule: " << rule.to_string());
 		if (skip_rule(rule, filter, iface))
 		{
