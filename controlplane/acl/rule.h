@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#include <algorithm>
 #include <list>
 #include <string>
 #include <vector>
@@ -34,6 +35,16 @@ struct range_t : std::tuple<uint_t, uint_t>
 	uint_t to() const
 	{
 		return std::get<1>(*this);
+	}
+
+	range_t intersection(const range_t& other) const
+	{
+		return {std::max(from(), other.from()), std::min(to(), other.to())};
+	}
+
+	bool empty() const
+	{
+		return from() > to();
 	}
 };
 
@@ -175,6 +186,14 @@ ref_t<filter_t> operator&(const ref_t<filter_t>& a, const ref_t<filter_t>& b)
 	}
 
 	return and_op(a, b);
+}
+
+// Returns false once the intersection is empty: the enclosing filter is then none.
+template<typename filter_t>
+bool intersect(ref_t<filter_t>& result, const ref_t<filter_t>& a, const ref_t<filter_t>& b)
+{
+	result = a & b;
+	return !result.is_none();
 }
 
 struct filter_network_t : filter_base_t
@@ -377,12 +396,10 @@ ref_t<filter_prm_t<uint_t>> and_op(const ref_t<filter_prm_t<uint_t>>& a, const r
 	{
 		for (const auto& b_item : b.filter->ranges)
 		{
-			uint_t from = std::max(a_item.from(), b_item.from());
-			uint_t to = std::min(a_item.to(), b_item.to());
-
-			if (from <= to)
+			const auto range = a_item.intersection(b_item);
+			if (!range.empty())
 			{
-				result->ranges.emplace_back(from, to);
+				result->ranges.push_back(range);
 			}
 		}
 	}
@@ -835,10 +852,15 @@ struct filter_proto_t : filter_base_t
 
 inline ref_t<filter_proto_t> and_op(const ref_t<filter_proto_t>& a, const ref_t<filter_proto_t>& b)
 {
-	return new filter_proto_t(a.filter->type & b.filter->type,
-	                          a.filter->prm1 & b.filter->prm1,
-	                          a.filter->prm2 & b.filter->prm2,
-	                          a.filter->prm3 & b.filter->prm3);
+	ref_t<filter_proto_t> result = new filter_proto_t(nullptr, nullptr, nullptr, nullptr);
+	// prm3 does not determine emptiness.
+	if (intersect(result->type, a->type, b->type) &&
+	    intersect(result->prm1, a->prm1, b->prm1) &&
+	    intersect(result->prm2, a->prm2, b->prm2))
+	{
+		result->prm3 = a->prm3 & b->prm3;
+	}
+	return result;
 }
 
 struct filter_t : filter_base_t
@@ -1000,30 +1022,55 @@ inline bool compatible(const filter_network_t* a, const filter_network_t* b)
 	return false;
 }
 
+// nullptr is unrestricted, thus compatible with anything.
+template<typename filter_t>
+bool compatible(const ref_t<filter_t>& a, const ref_t<filter_t>& b)
+{
+	return !a || !b || compatible(*a, *b);
+}
+
+inline bool compatible(const filter_id_t* a, const filter_id_t* b)
+{
+	return a->val == b->val;
+}
+
+inline bool compatible(const filter_prm8_t* a, const filter_prm8_t* b)
+{
+	return std::any_of(a->ranges.begin(), a->ranges.end(), [&](const auto& left) {
+		return std::any_of(b->ranges.begin(), b->ranges.end(), [&](const auto& right) {
+			return !left.intersection(right).empty();
+		});
+	});
+}
+
+inline bool compatible(const filter_proto_t* a, const filter_proto_t* b)
+{
+	return compatible(a->type, b->type);
+}
+
 inline bool compatible(const filter_t* a, const filter_t* b)
 {
-	if (a->dst && b->dst && !compatible(a->dst, b->dst))
-	{
-		return false;
-	}
-
-	if (a->src && b->src && !compatible(a->src, b->src))
-	{
-		return false;
-	}
-
-	return true;
+	return compatible(a->acl_id, b->acl_id) &&
+	       compatible(a->dir, b->dir) &&
+	       compatible(a->proto, b->proto) &&
+	       compatible(a->dst, b->dst) &&
+	       compatible(a->src, b->src);
 }
 
 inline ref_t<filter_t> and_op(const ref_t<filter_t>& a, const ref_t<filter_t>& b)
 {
-	return new filter_t(a.filter->acl_id & b.filter->acl_id,
-	                    a.filter->src & b.filter->src,
-	                    a.filter->dst & b.filter->dst,
-	                    a.filter->flags & b.filter->flags,
-	                    a.filter->proto & b.filter->proto,
-	                    a.filter->dir & b.filter->dir,
-	                    a.filter->keepstate & b.filter->keepstate);
+	ref_t<filter_t> result = new filter_t(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+	// Cheap fields first; fragment flags do not determine emptiness.
+	if (intersect(result->acl_id, a->acl_id, b->acl_id) &&
+	    intersect(result->dir, a->dir, b->dir) &&
+	    intersect(result->proto, a->proto, b->proto) &&
+	    intersect(result->keepstate, a->keepstate, b->keepstate) &&
+	    intersect(result->dst, a->dst, b->dst) &&
+	    intersect(result->src, a->src, b->src))
+	{
+		result->flags = a->flags & b->flags;
+	}
+	return result;
 }
 
 const int64_t DISPATCHER = -1;

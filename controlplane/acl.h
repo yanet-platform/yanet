@@ -42,6 +42,17 @@ struct result_t
 iface_map_t ifaceMapping(std::map<std::string, controlplane::base::logical_port_t> logicalPorts,
                          std::map<std::string, controlplane::route::config_t> routes);
 
+// Defined in acl/rule.h, which includes this header.
+struct filter_t;
+struct rule_t;
+template<typename filter_t>
+struct ref_t;
+
+std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::base::acl_t>& acls,
+                                      const iface_map_t& iface_map,
+                                      ref_t<filter_t> filter,
+                                      result_t& result);
+
 using unwind_result = std::vector<std::tuple<std::optional<std::string>,
                                              std::optional<std::string>,
                                              std::optional<std::string>,

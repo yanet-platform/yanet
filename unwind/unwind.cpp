@@ -70,14 +70,6 @@ void dump_result(const acl::result_t& result)
 	}
 }
 
-namespace acl
-{
-std::vector<rule_t> unwind_used_rules(const std::map<std::string, controlplane::base::acl_t>& acls,
-                                      const iface_map_t& iface_map,
-                                      ref_t<filter_t> filter,
-                                      result_t& result);
-};
-
 void usage(const std::string& name)
 {
 	std::cerr << "Usage: " << name << " -f rules.txt [-i input_iface] [-I] [-o output_iface]" << std::endl;
