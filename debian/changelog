@@ -1,3 +1,11 @@
+yanet (64.1-24) UNRELEASED; urgency=medium
+
+  * Index ACL dispatcher rules to speed up unwind and add regression coverage.
+  * Optimize balancer GC connection aggregation and add regression coverage.
+  * Harden the container build script and align build/package versions.
+
+ -- Andrey Kiselev <kiselevandrew@yandex.ru>  Mon, 19 Oct 2026 14:51:20 +0300
+
 yanet (64.1-23) UNRELEASED; urgency=medium
 
   * Use xxHash32 and 32-entry buckets for balancer state; add regression
