@@ -1,3 +1,5 @@
+#include <memory>
+#include <stdexcept>
 #include <vector>
 
 #include <fcntl.h>
@@ -16,6 +18,12 @@
 #include "protobus.h"
 
 using controlplane::module::protoBus;
+
+namespace
+{
+// Bounds the buffer a client can make the controlplane allocate.
+constexpr uint64_t max_request_size = 256 << 20;
+}
 
 protoBus::protoBus() :
         serverSocket(-1)
@@ -138,13 +146,14 @@ void protoBus::clientThread(int clientSocket)
 			return;
 		}
 
-		auto* service = controlPlane->services[rpc_meta.service_name()];
-		if (!service)
+		auto service_it = controlPlane->services.find(rpc_meta.service_name());
+		if (service_it == controlPlane->services.end())
 		{
 			YANET_LOG_WARNING("service '%s' not found", rpc_meta.service_name().c_str());
 			close(clientSocket);
 			return;
 		}
+		auto* service = service_it->second;
 
 		auto* method = service->GetDescriptor()->FindMethodByName(rpc_meta.method_name());
 		if (!method)
@@ -153,8 +162,8 @@ void protoBus::clientThread(int clientSocket)
 			close(clientSocket);
 			return;
 		}
-		auto* request = service->GetRequestPrototype(method).New();
-		auto* response = service->GetResponsePrototype(method).New();
+		std::unique_ptr<google::protobuf::Message> request(service->GetRequestPrototype(method).New());
+		std::unique_ptr<google::protobuf::Message> response(service->GetResponsePrototype(method).New());
 
 		if (auto err = common::recvAll(clientSocket, (char*)&messageSize, sizeof(messageSize)); err != 0)
 		{
@@ -165,6 +174,14 @@ void protoBus::clientThread(int clientSocket)
 			close(clientSocket);
 			return;
 		}
+
+		if (messageSize > max_request_size)
+		{
+			YANET_LOG_WARNING("too big request size: %lu", messageSize);
+			close(clientSocket);
+			return;
+		}
+
 		buffer.resize(messageSize);
 		if (auto err = common::recvAll(clientSocket, (char*)buffer.data(), buffer.size()); err != 0)
 		{
@@ -183,7 +200,16 @@ void protoBus::clientThread(int clientSocket)
 		}
 
 		// todo process errors through controller
-		service->CallMethod(method, nullptr, request, response, nullptr);
+		try
+		{
+			service->CallMethod(method, nullptr, request.get(), response.get(), nullptr);
+		}
+		catch (const std::invalid_argument& error)
+		{
+			YANET_LOG_WARNING("method '%s' rejected request: %s", rpc_meta.method_name().c_str(), error.what());
+			close(clientSocket);
+			return;
+		}
 
 		if (auto err = common::send(clientSocket, *response); err != 0)
 		{
@@ -191,8 +217,6 @@ void protoBus::clientThread(int clientSocket)
 			close(clientSocket);
 			return;
 		}
-		delete request;
-		delete response;
 	}
 
 	close(clientSocket);

@@ -204,10 +204,25 @@ public:
 				                size_T);
 			}
 
-			counters.emplace_hint(counters_it,
-			                      key,
-			                      std::tuple<tCounterId, uint32_t>(counter_id, 1));
-			counters_inserted.emplace(key, counter_id);
+			try
+			{
+				counters_it = counters.emplace_hint(counters_it,
+				                                    key,
+				                                    std::tuple<tCounterId, uint32_t>(counter_id, 1));
+				counters_inserted.emplace(key, counter_id);
+			}
+			catch (...)
+			{
+				if (counters_it != counters.end())
+				{
+					counters.erase(counters_it);
+				}
+				if (counter_id != 0)
+				{
+					manager->counter_release(counter_id, size_T);
+				}
+				throw;
+			}
 		}
 	}
 

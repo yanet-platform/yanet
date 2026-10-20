@@ -252,7 +252,7 @@ struct filter_network_t : filter_base_t
 
 inline ref_t<filter_network_t> and_op(const ref_t<filter_network_t>& a, const ref_t<filter_network_t>& b)
 {
-	filter_network_t* result = new filter_network_t;
+	ref_t<filter_network_t> result = new filter_network_t;
 
 	for (const auto& a_item : a.filter->networks)
 	{
@@ -390,7 +390,7 @@ struct filter_prm_t : filter_base_t
 template<typename uint_t>
 ref_t<filter_prm_t<uint_t>> and_op(const ref_t<filter_prm_t<uint_t>>& a, const ref_t<filter_prm_t<uint_t>>& b)
 {
-	filter_prm_t<uint_t>* result = new filter_prm_t<uint_t>;
+	ref_t<filter_prm_t<uint_t>> result = new filter_prm_t<uint_t>;
 
 	for (const auto& a_item : a.filter->ranges)
 	{
@@ -413,7 +413,7 @@ using filter_prm16_t = filter_prm_t<uint16_t>;
 
 static inline ref_t<filter_prm16_t> icmp_prm1(const common::ranges_t& types, const common::ranges_t& codes)
 {
-	filter_prm16_t* filter = new filter_prm16_t;
+	ref_t<filter_prm16_t> filter = new filter_prm16_t;
 
 	if (types == ranges_t{common::range_t{0x00, 0xFF}} && codes == ranges_t{common::range_t{0x00, 0xFF}})
 	{
@@ -719,7 +719,7 @@ struct filter_proto_t : filter_base_t
 
 		if (has_sports)
 		{
-			auto prm = new filter_prm16_t(rulep->sports);
+			ref_t<filter_prm16_t> prm = new filter_prm16_t(rulep->sports);
 			for (const auto& [from, to] : rulep->sports_range)
 			{
 				prm->ranges.emplace_back(from, to);
@@ -728,7 +728,7 @@ struct filter_proto_t : filter_base_t
 		}
 		if (has_dports)
 		{
-			auto prm = new filter_prm16_t(rulep->dports);
+			ref_t<filter_prm16_t> prm = new filter_prm16_t(rulep->dports);
 			for (const auto& [from, to] : rulep->dports_range)
 			{
 				prm->ranges.emplace_back(from, to);
@@ -741,7 +741,7 @@ struct filter_proto_t : filter_base_t
 		}
 		if (has_icmptypes)
 		{
-			auto prm = new filter_prm16_t;
+			ref_t<filter_prm16_t> prm = new filter_prm16_t;
 			for (unsigned int type : rulep->icmp_types)
 			{
 				prm->ranges.emplace_back(type << 8, (type << 8) + 255);
@@ -750,7 +750,7 @@ struct filter_proto_t : filter_base_t
 		}
 		if (has_icmp6types)
 		{
-			auto prm = new filter_prm16_t;
+			ref_t<filter_prm16_t> prm = new filter_prm16_t;
 			for (unsigned int type : rulep->icmp6_types)
 			{
 				prm->ranges.emplace_back(type << 8, (type << 8) + 255);

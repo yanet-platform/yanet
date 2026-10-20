@@ -253,7 +253,8 @@ void rib_t::rib_insert(const common::icp::rib_update::insert& request)
 
 					const rib::nexthop_stuff_t* nh_ptr = &(nh_to_ref_count_it->first);
 
-					if (!insert_result) // nh already existed in table
+					// An unchanged path already owns its nexthop reference.
+					if (!insert_result && nxthp_stff_diff)
 					{
 						auto& ref_count = nh_to_ref_count_it->second;
 						++ref_count;
@@ -372,7 +373,9 @@ void rib_t::rib_remove(const common::icp::rib_update::remove& request)
 
 				if (summary_prefixes.value == 0) // is it possible to have zero paths and not zero prefixes?
 				{
+					// The summary references dangle after erase; nothing is left to withdraw.
 					this->summary.erase({vrf, priority, protocol, peer, table_name});
+					break;
 				}
 			}
 		}

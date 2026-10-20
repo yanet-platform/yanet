@@ -80,6 +80,11 @@ public:
 	common::icp::telegraf_mappings::response telegraf_mappings();
 
 protected:
+	using peer_t = std::tuple<bool, uint32_t, common::ip_address_t>;
+	using tunnel_counters_t = std::map<route::tunnel_counter_key_t, std::array<uint64_t, 2>>;
+
+	common::icp::telegraf_dregress_traffic::response dregress_traffic(const tunnel_counters_t& counters);
+
 	interface::dataPlane dataPlaneUnsafe;
 	interface::dataPlane dataPlaneDregress;
 	interface::dataPlane dataPlaneOther;
@@ -90,6 +95,7 @@ protected:
 
 	std::map<tCoreId, common::idp::getOtherStats::worker> prevWorkers;
 
-	std::map<std::tuple<bool, uint32_t, common::ip_address_t>, std::array<common::uint64, 2>> route_tunnel_peer_counters; ///< @todo: gc
-	std::map<route::tunnel_counter_key_t, std::array<uint64_t, 2>> dregress_traffic_counters_prev;
+	std::mutex dregress_mutex;
+	std::map<peer_t, std::array<common::uint64, 2>> route_tunnel_peer_counters;
+	tunnel_counters_t dregress_traffic_counters_prev;
 };
