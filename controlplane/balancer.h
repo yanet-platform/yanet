@@ -109,6 +109,8 @@ public:
 	void update_service(const balancer::generation_config_t& generation_config,
 	                    balancer::generation_services_t& generation_services);
 
+	void prune_reals();
+
 protected:
 	void counters_gc_thread();
 	void reconfigure_wlc_thread();
@@ -129,7 +131,7 @@ protected:
 	// The set contains all reals touched while the last one reload was fired
 	std::set<balancer::real_key_global_t> real_reload_updates;
 	// The flag is true when a pending reload is there
-	bool in_reload;
+	bool in_reload = false;
 
 	mutable std::mutex reals_unordered_mutex;
 	mutable std::mutex config_switch_mutex;

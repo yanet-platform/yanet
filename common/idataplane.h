@@ -302,7 +302,10 @@ protected:
 		int ret = connect(clientSocket, (struct sockaddr*)&address, sizeof(address));
 		if (ret == -1)
 		{
-			throw std::string("connect(): ") + strerror(errno);
+			const int error = errno;
+			close(clientSocket);
+			clientSocket = -1;
+			throw std::string("connect(): ") + strerror(error);
 		}
 	}
 

@@ -55,8 +55,11 @@ public:
 		int ret = connect(clientSocket, (struct sockaddr*)&address, sizeof(address));
 		if (ret == -1)
 		{
+			const int error = errno;
+			close(clientSocket);
+			clientSocket = -1;
 			//			YANET_LOG_ERROR("connect()\n");
-			throw std::string("connect(): ") + strerror(errno);
+			throw std::string("connect(): ") + strerror(error);
 		}
 	}
 

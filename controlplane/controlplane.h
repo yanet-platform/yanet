@@ -181,7 +181,8 @@ protected:
 	generation_manager<controlplane::base_t> generations; ///< @todo: move to new class
 
 	std::mutex configs_mutex;
-	std::map<uint32_t, controlplane::base_t> configs;
+	// ACL metadata of recent configs, to decode log samples queued before a reload.
+	std::map<uint32_t, common::icp::getAclConfig::response> configs;
 
 	/// aclCountersDelta_mutex {
 	mutable std::shared_mutex aclCountersDelta_mutex;

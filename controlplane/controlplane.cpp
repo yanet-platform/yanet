@@ -740,15 +740,14 @@ common::icp::getSamples::response cControlPlane::command_getSamples()
 common::icp::getAclConfig::response cControlPlane::command_getAclConfig(common::icp::getAclConfig::request serial)
 {
 	std::unique_lock reload_lock(configs_mutex);
-	common::icp::getAclConfig::response response;
 
 	auto it = configs.find(serial);
 	if (it != configs.end())
 	{
-		response = {it->first, it->second.result_iface_map, it->second.ids_map};
+		return it->second;
 	}
 
-	return response;
+	return {};
 }
 
 common::icp::loadConfig::response cControlPlane::command_loadConfig(const common::icp::loadConfig::request& request)
@@ -970,16 +969,16 @@ eResult cControlPlane::loadConfig(const std::string& rootFilePath,
 void cControlPlane::addConfig(uint32_t serial, const controlplane::base_t& config)
 {
 	std::unique_lock reload_lock(configs_mutex);
-	if (configs.size() > YANET_CONFIG_CONFIG_CACHE_SIZE)
+	configs.insert_or_assign(serial, common::icp::getAclConfig::response{serial, config.result_iface_map, config.ids_map});
+	while (configs.size() > YANET_CONFIG_CONFIG_CACHE_SIZE)
 	{
-		auto it = configs.lower_bound(serial);
+		auto it = configs.upper_bound(serial);
 		if (it == configs.end())
 		{
 			it = configs.begin();
 		}
 		configs.erase(it);
 	}
-	configs[serial] = config;
 }
 
 void cControlPlane::main_thread()

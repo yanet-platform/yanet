@@ -1,4 +1,6 @@
+#include <iterator>
 #include <optional>
+#include <stdexcept>
 
 #include "balancer.h"
 #include "controlplane.h"
@@ -77,7 +79,7 @@ inline common::ip_address_t convert_to_ip_address(const common::icp_proto::IPAdd
 		case common::icp_proto::IPAddr::AddrCase::kIpv6:
 			return common::ipv6_address_t((uint8_t*)proto_ipaddr.ipv6().data());
 		default:
-			throw std::string("internal error: address type is not set");
+			throw std::invalid_argument("address type is not set");
 	}
 }
 
@@ -334,6 +336,8 @@ void balancer_t::reload(const controlplane::base_t& base_prev,
 
 void balancer_t::reload_after()
 {
+	common::idp::updateGlobalBaseBalancer::update_balancer_unordered_real::request released;
+
 	service_counters.release();
 	real_counters.release([&](const auto& key) {
 		/// remove counter
@@ -342,6 +346,8 @@ void balancer_t::reload_after()
 		auto it = reals_unordered.find(key);
 		if (it != reals_unordered.end())
 		{
+			// A freed id must not pass the enabled state of its real to the next owner.
+			released.emplace_back(it->second, false, 0);
 			reals_unordered_ids_unused.emplace(it->second);
 			reals_unordered.erase(it);
 		}
@@ -368,9 +374,15 @@ void balancer_t::reload_after()
 			real_updates = real_reload_updates;
 			real_reload_updates.clear();
 			in_reload = false;
+			prune_reals();
 		}
 
 		flush_reals(balancer, generations_config.next());
+		if (!released.empty())
+		{
+			balancer.emplace_back(common::idp::updateGlobalBaseBalancer::requestType::update_balancer_unordered_real,
+			                      std::move(released));
+		}
 		dataplane.updateGlobalBaseBalancer(balancer);
 
 		generations_services.next_lock();
@@ -381,6 +393,20 @@ void balancer_t::reload_after()
 
 		generations_services.next_unlock();
 		generations_config.next_unlock();
+	}
+}
+
+void balancer_t::prune_reals()
+{
+	// Retired reals keep their dataplane id until counter GC, and their overrides with it.
+	std::lock_guard<std::mutex> guard(reals_unordered_mutex);
+	for (auto it = reals_enabled.begin(); it != reals_enabled.end();)
+	{
+		it = reals_unordered.count(it->first) ? std::next(it) : reals_enabled.erase(it);
+	}
+	for (auto it = real_updates.begin(); it != real_updates.end();)
+	{
+		it = reals_unordered.count(*it) ? std::next(it) : real_updates.erase(it);
 	}
 }
 
@@ -912,7 +938,7 @@ void balancer_t::flush_reals(common::idp::updateGlobalBaseBalancer::request& bal
 	}
 
 	balancer.emplace_back(common::idp::updateGlobalBaseBalancer::requestType::update_balancer_unordered_real,
-	                      balancer_unordered_real_request);
+	                      std::move(balancer_unordered_real_request));
 }
 
 void balancer_t::counters_gc_thread()

@@ -1,5 +1,8 @@
-#include "telegraf.h"
+#include <iterator>
+#include <set>
+
 #include "controlplane.h"
+#include "telegraf.h"
 
 using common::int64;
 using controlplane::module::telegraf;
@@ -210,59 +213,65 @@ common::icp::telegraf_dregress::response telegraf_t::telegraf_dregress()
 
 common::icp::telegraf_dregress_traffic::response telegraf_t::telegraf_dregress_traffic()
 {
+	// The snapshot must be taken under the lock, or a stale one could become the baseline.
+	std::lock_guard<std::mutex> guard(dregress_mutex);
+	return dregress_traffic(controlPlane->route.tunnel_counter.get_counters());
+}
+
+common::icp::telegraf_dregress_traffic::response telegraf_t::dregress_traffic(const tunnel_counters_t& counters)
+{
 	common::icp::telegraf_dregress_traffic::response response;
 	auto& [response_peer, response_peer_as] = response;
+	std::set<peer_t> peers;
 
-	/// @todo: OPT
-	generations.current_lock();
-	std::map<uint32_t, std::string> peers = *generations.current().get_peers();
-	generations.current_unlock();
-
+	for (const auto& [key, value] : counters)
 	{
-		const auto counters = controlPlane->route.tunnel_counter.get_counters();
-		for (const auto& [key, value] : counters)
+		const auto& [is_ipv4, peer_id, nexthop, origin_as] = key;
+		const auto& [packets, bytes] = value;
+		peers.emplace(is_ipv4, peer_id, nexthop);
+
+		auto it = dregress_traffic_counters_prev.find(key);
+		if (it != dregress_traffic_counters_prev.end())
 		{
-			const auto& [is_ipv4, peer_id, nexthop, origin_as] = key;
-			const auto& [packets, bytes] = value;
-			(void)origin_as;
+			const auto& [packets_prev, bytes_prev] = it->second;
 
-			auto it = dregress_traffic_counters_prev.find(key);
-			if (it != dregress_traffic_counters_prev.end())
+			if (packets > packets_prev)
 			{
-				const auto& [packets_prev, bytes_prev] = it->second;
+				auto& [peer_packets, peer_bytes] = route_tunnel_peer_counters[{is_ipv4, peer_id, nexthop}];
+				peer_packets += packets - packets_prev;
+				peer_bytes += bytes - bytes_prev;
 
-				if (packets > packets_prev)
+				if (!(peer_id == 0 &&
+				      origin_as == 0))
 				{
-					auto& [peer_packets, peer_bytes] = route_tunnel_peer_counters[{is_ipv4, peer_id, nexthop}];
-					peer_packets += packets - packets_prev;
-					peer_bytes += bytes - bytes_prev;
+					/// not fallback
 
-					if (!(peer_id == 0 &&
-					      origin_as == 0))
-					{
-						/// not fallback
-
-						response_peer_as.emplace_back(is_ipv4,
-						                              peer_id,
-						                              nexthop.toString(),
-						                              origin_as,
-						                              packets - packets_prev,
-						                              bytes - bytes_prev);
-					}
+					response_peer_as.emplace_back(is_ipv4,
+					                              peer_id,
+					                              nexthop.toString(),
+					                              origin_as,
+					                              packets - packets_prev,
+					                              bytes - bytes_prev);
 				}
 			}
 		}
-
-		for (const auto& [key, value] : route_tunnel_peer_counters)
-		{
-			const auto& [is_ipv4, peer_id, nexthop] = key;
-			const auto& [packets, bytes] = value;
-
-			response_peer.emplace_back(is_ipv4, peer_id, nexthop.toString(), packets, bytes);
-		}
-
-		dregress_traffic_counters_prev = counters;
 	}
+
+	// A peer drops out once all of its tunnel counters are released.
+	for (auto it = route_tunnel_peer_counters.begin(); it != route_tunnel_peer_counters.end();)
+	{
+		it = peers.count(it->first) ? std::next(it) : route_tunnel_peer_counters.erase(it);
+	}
+
+	for (const auto& [key, value] : route_tunnel_peer_counters)
+	{
+		const auto& [is_ipv4, peer_id, nexthop] = key;
+		const auto& [packets, bytes] = value;
+
+		response_peer.emplace_back(is_ipv4, peer_id, nexthop.toString(), packets, bytes);
+	}
+
+	dregress_traffic_counters_prev = counters;
 
 	return response;
 }

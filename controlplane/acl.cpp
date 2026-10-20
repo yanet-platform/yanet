@@ -64,8 +64,8 @@ struct dispatcher_rules_t
 			{
 				const auto& network = *item.network;
 
-				filter_network_t* _src = new filter_network_t;
-				filter_network_t* _dst = new filter_network_t;
+				src = new filter_network_t;
+				dst = new filter_network_t;
 
 				if (std::holds_alternative<controlplane::base::acl_rule_network_ipv4_t>(network))
 				{
@@ -73,11 +73,11 @@ struct dispatcher_rules_t
 
 					for (const auto& pref : ipv4.sourcePrefixes)
 					{
-						_src->networks.emplace_back(pref);
+						src->networks.emplace_back(pref);
 					}
 					for (const auto& pref : ipv4.destinationPrefixes)
 					{
-						_dst->networks.emplace_back(pref);
+						dst->networks.emplace_back(pref);
 					}
 				}
 				else if (std::holds_alternative<controlplane::base::acl_rule_network_ipv6_t>(network))
@@ -86,20 +86,17 @@ struct dispatcher_rules_t
 
 					for (const auto& pref : ipv6.sourcePrefixes)
 					{
-						_src->networks.emplace_back(pref);
+						src->networks.emplace_back(pref);
 					}
 					for (const auto& pref : ipv6.destinationPrefixes)
 					{
-						_dst->networks.emplace_back(pref);
+						dst->networks.emplace_back(pref);
 					}
 				}
 				else
 				{
 					throw std::runtime_error("internal error");
 				}
-
-				src = _src;
-				dst = _dst;
 			}
 
 			if (item.fragment)
@@ -163,7 +160,8 @@ struct dispatcher_rules_t
 				}
 			}
 
-			rules.emplace_back(new filter_t(nullptr, src, dst, flags, proto, dir_in, nullptr), *item.flow, ids_t(), false);
+			ref_t<filter_t> filter = new filter_t(nullptr, src, dst, flags, proto, dir_in, nullptr);
+			rules.emplace_back(filter, *item.flow, ids_t(), false);
 		}
 
 		{
@@ -171,14 +169,16 @@ struct dispatcher_rules_t
 			// this rule is needed for correct determination of single from networks
 			common::globalBase::tFlow flow;
 			flow.type = common::globalBase::eFlowType::drop;
-			rules.emplace_back(new filter_t(nullptr, nullptr, nullptr, nullptr, nullptr, dir_in, nullptr), flow, ids_t(), false);
+			ref_t<filter_t> filter = new filter_t(nullptr, nullptr, nullptr, nullptr, nullptr, dir_in, nullptr);
+			rules.emplace_back(filter, flow, ids_t(), false);
 		}
 		{
 			// allow all output packets by default
 			ref_t<filter_id_t> dir_out = new filter_id_t(1);
 			common::globalBase::tFlow flow;
 			flow.type = common::globalBase::eFlowType::logicalPort_egress;
-			rules.emplace_back(new filter_t(nullptr, nullptr, nullptr, nullptr, nullptr, dir_out, nullptr), flow, ids_t(), false);
+			ref_t<filter_t> filter = new filter_t(nullptr, nullptr, nullptr, nullptr, nullptr, dir_out, nullptr);
+			rules.emplace_back(filter, flow, ids_t(), false);
 		}
 		return rules;
 	}
@@ -315,7 +315,8 @@ struct firewall_rules_t
 									continue;
 								}
 
-								auto& ruleref = yanet_rules.emplace_back(new filter_t(rulep), rulep->ruleno, skipto);
+								ref_t<filter_t> filter = new filter_t(rulep);
+								auto& ruleref = yanet_rules.emplace_back(filter, rulep->ruleno, skipto);
 								// add ifname to rule
 								ruleref.via.insert(ifname);
 								ruleref.ids.push_back(auto_id++);
@@ -1009,22 +1010,22 @@ void compile(const std::map<std::string, controlplane::base::acl_t>& acls,
 /// @todo: move
 uint8_t string_to_proto(const std::string& string)
 {
-	static std::map<std::string, uint8_t> protocols = {{"ip", IPPROTO_IP},
-	                                                   {"icmp", IPPROTO_ICMP},
-	                                                   {"icmpv6", IPPROTO_ICMPV6},
-	                                                   {"ipip", IPPROTO_IPIP},
-	                                                   {"tcp", IPPROTO_TCP},
-	                                                   {"egp", IPPROTO_EGP},
-	                                                   {"udp", IPPROTO_UDP},
-	                                                   {"ipv6", IPPROTO_IPV6},
-	                                                   {"gre", IPPROTO_GRE},
-	                                                   {"esp", IPPROTO_ESP},
-	                                                   {"sctp", IPPROTO_SCTP}};
+	static const std::map<std::string, uint8_t> protocols = {{"ip", IPPROTO_IP},
+	                                                         {"icmp", IPPROTO_ICMP},
+	                                                         {"icmpv6", IPPROTO_ICMPV6},
+	                                                         {"ipip", IPPROTO_IPIP},
+	                                                         {"tcp", IPPROTO_TCP},
+	                                                         {"egp", IPPROTO_EGP},
+	                                                         {"udp", IPPROTO_UDP},
+	                                                         {"ipv6", IPPROTO_IPV6},
+	                                                         {"gre", IPPROTO_GRE},
+	                                                         {"esp", IPPROTO_ESP},
+	                                                         {"sctp", IPPROTO_SCTP}};
 
 	auto it = protocols.find(string);
 	if (it == protocols.end())
 	{
-		it = protocols.emplace_hint(it, string, std::stoul(string, nullptr, 0));
+		return std::stoul(string, nullptr, 0);
 	}
 
 	return it->second;
