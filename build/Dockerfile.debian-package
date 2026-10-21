@@ -12,6 +12,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     libibverbs-dev \
     libpcap-dev \
     libsystemd-dev \
+    libjemalloc-dev \
     libyaml-cpp-dev \
     libgtest-dev \
     flex \

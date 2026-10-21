@@ -51,6 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libibverbs-dev \
     libpcap-dev \
     libsystemd-dev \
+    libjemalloc-dev \
     libyaml-cpp-dev \
     libgtest-dev \
     libgmock-dev \

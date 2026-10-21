@@ -141,7 +141,11 @@ inline common::ip_address_t convert_to_ip_address(const common::icp_proto::IPAdd
 		case common::icp_proto::IPAddr::AddrCase::kIpv4:
 			return common::ipv4_address_t(proto_ipaddr.ipv4());
 		case common::icp_proto::IPAddr::AddrCase::kIpv6:
-			return common::ipv6_address_t((uint8_t*)proto_ipaddr.ipv6().data());
+			if (const auto address = common::ipv6_address_t::from_bytes(proto_ipaddr.ipv6()))
+			{
+				return *address;
+			}
+			throw std::string("internal error: ipv6 address is not 16 bytes");
 		default:
 			throw std::string("internal error: address type is not set");
 	}

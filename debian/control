@@ -2,7 +2,7 @@ Source: yanet
 Section: net
 Priority: optional
 Maintainer: Georgy Kirichenko <g-e-o-r-g-y@@yandex-team.ru>
-Build-Depends: debhelper-compat (= 11), python3-pyelftools, libnuma-dev, libprotobuf-dev, protobuf-compiler, pkg-config, flex, bison, libsystemd-dev, libibverbs-dev
+Build-Depends: debhelper-compat (= 11), python3-pyelftools, libnuma-dev, libprotobuf-dev, protobuf-compiler, pkg-config, flex, bison, libsystemd-dev, libibverbs-dev, libjemalloc-dev
 Standards-Version: 4.6.0
 Homepage: https://github.com/yanet-platform/yanet
 Rules-Requires-Root: no

@@ -13,7 +13,7 @@ using tAclGroupId = uint32_t;
 #include "hash_table7.hpp"
 #include "unordered_dense.h"
 
-// TODO: check another maps/hashes. Note that they should work with gcc 7.5 on Ubuntu18
+// TODO: check another maps/hashes.
 template<typename Key, typename Value>
 using FlatMap = emhash7::HashMap<Key, Value>;
 template<typename Key>

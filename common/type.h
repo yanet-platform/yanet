@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <tuple>
@@ -373,6 +374,15 @@ public:
 	ipv6_address_t(const uint8_t* address)
 	{
 		memcpy(this->address.data(), address, 16);
+	}
+
+	static std::optional<ipv6_address_t> from_bytes(const std::string& bytes)
+	{
+		if (bytes.size() == sizeof(in6_addr))
+		{
+			return ipv6_address_t((const uint8_t*)bytes.data());
+		}
+		return std::nullopt;
 	}
 
 	ipv6_address_t(const uint64_t& address0,
