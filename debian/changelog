@@ -1,3 +1,13 @@
+yanet (64.1-25) UNRELEASED; urgency=medium
+
+  * Fix controlplane memory leaks and reduce ACL history retention.
+  * Link the controlplane with jemalloc by default and update build and
+    package dependencies.
+  * Validate IPv6 byte lengths in controlplane bus and CLI inputs.
+  * Drop Ubuntu 18.04 support from builds, images, and documentation.
+
+ -- Andrey Kiselev <kiselevandrew@yandex.ru>  Wed, 21 Oct 2026 16:00:04 +0300
+
 yanet (64.1-24) UNRELEASED; urgency=medium
 
   * Index ACL dispatcher rules to speed up unwind and add regression coverage.
