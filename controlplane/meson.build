@@ -2,6 +2,7 @@ dependencies = []
 dependencies += libjson.get_variable('nlohmann_json_dep')
 dependencies += dependency('libsystemd')
 dependencies += dependency('threads')
+dependencies += meson.get_compiler('cpp').find_library('jemalloc', required: get_option('jemalloc'))
 dependencies += libyanet_fwparser_dep
 dependencies += libyanet_protobuf_dep
 if get_option('custom_hash_structures')

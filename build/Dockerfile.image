@@ -12,6 +12,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libibverbs-dev \
         libpcap-dev \
         libsystemd-dev \
+        libjemalloc-dev \
         libyaml-cpp-dev \
         libgtest-dev \
         flex \
@@ -63,6 +64,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         jq \
         libatomic1 \
         libibverbs1 \
+        libjemalloc2 \
         libmlx5-1 \
         libnuma1 \
         libpcap0.8 \

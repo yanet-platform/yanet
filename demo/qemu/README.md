@@ -10,7 +10,7 @@ Hardware:
 - 8GB RAM
 
 Software:
-- OS: Ubuntu 18.04 or newer
+- OS: Ubuntu 22.04 or newer
 - [docker](https://www.docker.com/)
 - [QEMU](https://www.qemu.org/)
 - iproute2

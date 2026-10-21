@@ -4,7 +4,7 @@ Hardware:
 - Memory: 64G
 
 Software:
-- OS: Ubuntu 18.04
+- OS: Ubuntu 22.04 or newer
 - git
 - gcc or clang
 - DPDK v22.11.2
@@ -91,6 +91,7 @@ $ apt-get install -y --no-install-recommends \
     ca-certificates \
     python3-pip \
     libsystemd-dev \
+    libjemalloc-dev \
     bison \
     flex \
     libfl-dev

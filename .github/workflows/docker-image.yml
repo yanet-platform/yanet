@@ -46,6 +46,8 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
+      - name: install libjemalloc-dev, missing in builder-lite
+        run: apt-get update && apt-get install -y --no-install-recommends libjemalloc-dev
       - run: |
           meson setup --prefix=/target_autotest -Dtarget=autotest -Dstrip=true build_autotest
           meson compile -C build_autotest
@@ -67,21 +69,8 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - run: |
-          meson setup --prefix=/target -Dstrip=true build
-          meson compile -C build
-      - run: meson install -C build
-
-  build-ubuntu1804:
-    name: build (Ubuntu 18.04)
-    needs: formatting-check
-    runs-on: ubuntu-24.04
-    container:
-      image: yanetplatform/builder_ubuntu18.04-lite
-    steps:
-      - uses: actions/checkout@v1
-        with:
-          submodules: recursive
+      - name: install libjemalloc-dev, missing in builder-lite
+        run: apt-get update && apt-get install -y --no-install-recommends libjemalloc-dev
       - run: |
           meson setup --prefix=/target -Dstrip=true build
           meson compile -C build
@@ -115,6 +104,8 @@ jobs:
           name: target_autotest
       - name: bug https://github.com/actions/upload-artifact/issues/38
         run: tar -C /usr -xf target_autotest.tar.gz
+      - name: install libjemalloc2, missing in builder-lite
+        run: apt-get update && apt-get install -y --no-install-recommends libjemalloc2
       - run: yanet-autotest-run.py autotest/units/001_one_port
 
   deploy:
